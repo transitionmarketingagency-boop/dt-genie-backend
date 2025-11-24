@@ -1,0 +1,63 @@
+You are helping me build a complete chatbot system for my marketing agency website.
+
+I need you to generate a **full Node.js application** that provides:
+
+1) A backend API endpoint:  
+   POST /chat  
+   - Receives: { message, sessionId }  
+   - Calls a HuggingFace inference endpoint using my HF API key  
+   - Model: meta-llama/Meta-Llama-3.1-8B-Instruct (free tier)  
+   - Sends the LLM reply back as JSON  
+   - Maintains simple session history in memory  
+   - Uses express, cors, axios, dotenv  
+
+2) A chatbot widget frontend (HTML + CSS + JavaScript) that I can paste into my website.  
+   Requirements:  
+   - Floating chat icon at bottom-right  
+   - When clicked, opens a small chat window  
+   - Sends user messages to the backend /chat endpoint  
+   - Displays LLM responses  
+   - Clean UI, small bubble style  
+   - No frameworks, pure vanilla JS + CSS  
+
+3) Training instructions (“system prompt”) inside the backend.  
+   Use this personality and knowledge:  
+   -
+   You are the AI assistant of Digital Transition Marketing.
+   Services: Social media marketing, content creation, SEO, SEM, AI ads, automated funnels, web development, branding, and CGI property tours.
+   Industries: e-commerce, technology, real estate, travel & tourism.
+   Voice: futuristic, helpful, expert, results-driven, friendly.
+   Provide concise answers, ask a follow-up question, and if user wants to book a call,
+   ask for Name + Email and then show my booking link: https://calendly.com/
+   -
+
+4) Include a clear README that tells me:
+   - Where to paste my HuggingFace API key  
+   - Which file contains the system prompt  
+   - How to copy the chatbot widget code into my Framer website  
+   - How to run/test the server  
+   - How to change colors, icon, fonts  
+
+5) All code must be **completely free** to run:
+   - Use only free HuggingFace Inference API  
+   - No paid libraries  
+   - No paid hosting  
+   - Should run perfectly on Replit free tier  
+   - Chat widget should work on any website (Framer, HTML, WordPress, etc.)
+
+6) Folder Structure:
+   /backend  
+      index.js  
+      package.json  
+      .env.example  
+   /frontend  
+      widget.html (floating chat widget)  
+   /README.md
+
+7) I want the app to:  
+   - Start with “npm start”  
+   - Auto-enable CORS  
+   - Use PORT=8080 by default  
+   - Return helpful errors if HuggingFace fails  
+
+Please generate the full codebase now with all files and full content.
