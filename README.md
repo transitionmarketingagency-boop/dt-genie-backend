@@ -1,222 +1,288 @@
-# Digital Transition Marketing - AI Chatbot System
+# DT Genie - AI Chatbot Widget System
 
-A complete, **100% free** AI chatbot system for your marketing agency website, powered by HuggingFace's Meta-Llama-3.1-8B-Instruct model.
+A complete, premium AI chatbot widget for your website with a futuristic neon design. Powered by **OpenRouter's free tier** using Meta-Llama-3.1-8B-Instruct.
 
-## 🚀 Features
+![DT Genie](public/avatar.png)
 
-- **Free AI Model**: Uses HuggingFace's free inference API (Meta-Llama-3.1-8B-Instruct)
-- **Backend API**: Node.js/Express server with session management
-- **Embeddable Widget**: Vanilla JavaScript widget that works on ANY website
-- **Brand Customized**: Pre-configured with Digital Transition Marketing's voice and services
-- **Lead Capture**: Collects visitor info and directs to Calendly booking
-- **Mobile Responsive**: Beautiful UI that works on all devices
+## 🌟 Features
 
-## 📁 Project Structure
+- ✨ **100% Free** - Uses OpenRouter's free tier (no API costs)
+- 🎨 **Premium Design** - Glass-morphism UI with neon blue/orange theme
+- 🔄 **Curved Text** - Animated "We are here" text around avatar
+- 🤖 **Custom Training** - Edit `knowledge.json` to train on your business
+- 📱 **Fully Responsive** - Works on desktop, tablet, and mobile
+- 🚀 **Easy Embed** - Add to any website with 2 lines of code
+- 💬 **Context-Aware** - Maintains conversation history
+- ⚡ **Fast Setup** - Get running in under 5 minutes
+
+## 📁 File Structure
 
 ```
-/backend
-  index.js           - Express server with /chat endpoint
-  package.json       - Backend dependencies
-  .env.example       - Environment variable template
-
-/frontend
-  widget.html        - Embeddable chat widget (copy-paste ready)
-
-/client              - Demo website (React/Vite)
-  /src/components
-    ChatWidget.tsx         - React chat component
-    EmbeddableWidget.tsx   - Code snippet display
-    DemoPage.tsx          - Demo landing page
-
-README.md            - This file
+├── server.js              # Backend API server (Express)
+├── knowledge.json         # Business knowledge/training data
+├── index.html            # Demo page
+├── public/
+│   ├── widget.js         # Chat widget frontend
+│   ├── widget.css        # Neon-themed styling
+│   └── avatar.png        # Chatbot avatar image
+├── package-chatbot.json  # Dependencies
+└── README.md            # This file
 ```
 
-## 🔧 Setup Instructions
+## 🚀 Quick Start
 
-### 1. Get Your HuggingFace API Key
+### 1. Get OpenRouter API Key (Free)
 
-1. Go to [HuggingFace](https://huggingface.co/)
+1. Visit [OpenRouter.ai](https://openrouter.ai/keys)
 2. Sign up for a free account
-3. Go to Settings → Access Tokens
-4. Create a new token (read access is sufficient)
-5. Copy your API key
+3. Create a new API key
+4. Copy your API key
 
-### 2. Configure Backend
+### 2. Configure Server
 
-1. Navigate to the backend folder
-2. Copy `.env.example` to `.env`:
-   ```bash
-   cp .env.example .env
-   ```
-3. Open `.env` and paste your HuggingFace API key:
-   ```
-   HUGGINGFACE_API_KEY=your_api_key_here
-   PORT=8080
-   ```
+Open `server.js` and paste your API key:
+
+```javascript
+const OPENROUTER_API_KEY = 'YOUR_API_KEY_HERE';
+```
+
+Or set it as an environment variable:
+```bash
+export OPENROUTER_API_KEY='your_key_here'
+```
 
 ### 3. Install Dependencies
 
 ```bash
-cd backend
+npm install --package-lock-only --package-lock package-chatbot.json
 npm install
 ```
 
 ### 4. Start the Server
 
 ```bash
-npm start
+node server.js
 ```
 
-The server will start on `http://localhost:8080`
+The server will start on `http://localhost:5000`
 
-## 🎨 Customize the System Prompt
+### 5. Test It
 
-The chatbot's personality and knowledge are defined in the **system prompt**.
+Open your browser and go to `http://localhost:5000` to see the demo page with the working chatbot!
 
-**Location**: `backend/index.js` (around line 20-30)
+## 🎨 Customization
 
-**Default Prompt**:
-```javascript
-const systemPrompt = `You are the AI assistant of Digital Transition Marketing.
-Services: Social media marketing, content creation, SEO, SEM, AI ads, automated funnels, web development, branding, and CGI property tours.
-Industries: e-commerce, technology, real estate, travel & tourism.
-Voice: futuristic, helpful, expert, results-driven, friendly.
-Provide concise answers, ask a follow-up question, and if user wants to book a call,
-ask for Name + Email and then show my booking link: https://calendly.com/`;
+### Change Business Knowledge
+
+Edit `knowledge.json`:
+
+```json
+{
+  "business_info": "Your business description here...",
+  "services": ["Service 1", "Service 2", "Service 3"],
+  "industries": ["Industry 1", "Industry 2"],
+  "contact": {
+    "booking_link": "https://calendly.com/yourlink",
+    "instructions": "How to handle booking requests"
+  }
+}
 ```
 
-**To Customize**:
-1. Open `backend/index.js`
-2. Find the `systemPrompt` variable
-3. Edit the text to match your needs
-4. Restart the server
-
-## 🌐 Add Widget to Your Website
-
-### For Framer, WordPress, or Any HTML Site
-
-1. Start your backend server (must be running)
-2. Open `frontend/widget.html`
-3. Copy the entire `<script>` section
-4. Paste it before the closing `</body>` tag on your website
-
-**Or** use the demo site:
-1. Run `npm run dev` from the root folder
-2. Visit `http://localhost:5000`
-3. Click the "Get Code" tab
-4. Copy the widget code
-
-### Widget Configuration
-
-In `widget.html`, you can customize:
-
-**Backend URL** (line 3):
-```javascript
-const BACKEND_URL = 'http://localhost:8080';  // Change to your deployed backend URL
-```
-
-**Colors** (in the `styles` section):
-- Primary color: `hsl(217, 91%, 60%)` - Change to match your brand
-- Message bubbles, borders, text colors
-
-**Size**:
-- Widget width: `380px` (line in styles)
-- Button size: `60px × 60px` (line in styles)
-
-## 🎯 How It Works
-
-1. **User opens chat**: Widget sends welcome message
-2. **User types message**: Sent to backend `/chat` endpoint
-3. **Backend processes**:
-   - Maintains conversation history per session
-   - Adds system prompt + conversation to HuggingFace API
-   - Returns AI response
-4. **Widget displays**: Shows AI response with typing animation
-
-## 🔄 Testing Locally
-
-1. Start backend: `cd backend && npm start`
-2. Open `frontend/widget.html` in your browser
-3. Click the chat button and start chatting
-
-## 🚀 Deploy to Production
-
-### Backend Deployment (Replit)
-
-1. This project is already set up for Replit
-2. Add your `HUGGINGFACE_API_KEY` to Replit Secrets
-3. Click "Run" - server starts automatically on port 8080
-4. Copy your Replit URL (e.g., `https://your-project.replit.app`)
-
-### Update Widget
-
-In your widget code, change:
-```javascript
-const BACKEND_URL = 'https://your-project.replit.app';
-```
-
-## 💡 Customization Guide
+The chatbot will automatically use this information in its responses!
 
 ### Change Colors
 
-**Widget Colors** (`frontend/widget.html`):
-```javascript
-// Primary brand color
-background: hsl(217, 91%, 60%);
+Edit `public/widget.css` at the top:
 
-// User message bubble
-background: hsl(217, 91%, 60%);
-
-// AI message bubble
-background: #f3f4f6;
+```css
+:root {
+  --neon-blue: #00E1FF;      /* Primary color */
+  --neon-orange: #FF7A18;    /* Secondary color */
+  --dark-bg: #0a0a0a;        /* Background */
+  --glass-bg: rgba(15, 15, 25, 0.85);  /* Panel background */
+}
 ```
 
-### Change Icon
+### Change Avatar
 
-Replace the SVG icons in the widget code with your own SVG or icon library.
+Replace `public/avatar.png` with your own image (recommended: 200x200px)
 
-### Change Fonts
+### Change Curved Text
 
-Add your font in the `styles` section:
+Edit `public/widget.js` around line 15:
+
 ```javascript
-font-family: 'Your Font', -apple-system, sans-serif;
+We are here • We are here • We are here •
 ```
 
-### Modify Chat Behavior
+Change to any text you want!
 
-**Conversation History Limit** (`backend/index.js`):
-```javascript
-// Keep last 10 messages (5 pairs)
-sessions[sessionId].history = history.slice(-10);
+### Change Font
+
+Edit `public/widget.css` at the top to change from Poppins to another Google Font
+
+## 🌐 Embed on Your Website
+
+Once your server is running and deployed, add these 2 lines before the closing `</body>` tag:
+
+```html
+<!-- DT Genie Chatbot Widget -->
+<link rel="stylesheet" href="https://your-domain.com/widget.css">
+<script src="https://your-domain.com/widget.js"></script>
 ```
 
-## ❓ Troubleshooting
+### For Replit Deployment
+
+If you're hosting on Replit:
+
+```html
+<link rel="stylesheet" href="https://your-replit-name.replit.app/widget.css">
+<script src="https://your-replit-name.replit.app/widget.js"></script>
+```
+
+### For Other Hosting
+
+Replace `your-domain.com` with:
+- Your deployed URL (Vercel, Netlify, Heroku, etc.)
+- Your custom domain
+- Any server where you host `server.js`
+
+## 🔧 API Endpoints
+
+### POST /chat
+
+Send a message to the chatbot:
+
+```javascript
+fetch('http://localhost:5000/chat', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    message: "What services do you offer?",
+    history: []  // Optional: previous messages for context
+  })
+})
+```
+
+Response:
+```json
+{
+  "reply": "We offer social media marketing, SEO, web development...",
+  "success": true
+}
+```
+
+### GET /health
+
+Check server status:
+
+```javascript
+fetch('http://localhost:5000/health')
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "knowledgeLoaded": true
+}
+```
+
+## 💡 How It Works
+
+1. **User opens chat**: Widget appears in bottom-right corner
+2. **User types message**: Sent to `/chat` endpoint
+3. **Server processes**:
+   - Loads `knowledge.json` for business context
+   - Combines with conversation history
+   - Sends to OpenRouter API (free tier)
+   - Returns AI-generated response
+4. **Widget displays**: Shows response with smooth animations
+
+## 🎯 System Prompt
+
+The chatbot uses this personality (automatically generated from `knowledge.json`):
+
+```
+You are DT Genie — an AI assistant for Digital Transition Marketing.
+You answer clearly, helpfully, and stay on-brand.
+
+[Business info from knowledge.json]
+[Services list]
+[Industries served]
+[Contact/booking information]
+
+Provide concise, expert responses. Ask follow-up questions to better understand client needs.
+```
+
+## 🔒 Security Notes
+
+- Never commit your API key to version control
+- Use environment variables in production
+- Add rate limiting if needed
+- CORS is enabled by default (configure in `server.js`)
+
+## 📊 OpenRouter Free Tier
+
+- **Model**: Meta-Llama-3.1-8B-Instruct
+- **Cost**: $0.00 (free tier)
+- **Rate Limits**: Check [OpenRouter docs](https://openrouter.ai/docs)
+- **Upgrade**: Available if you need higher limits
+
+## 🐛 Troubleshooting
 
 **Chat not responding?**
-- Check if backend is running: `http://localhost:8080`
-- Verify HuggingFace API key is correct in `.env`
-- Check browser console for errors
+- Check if server is running: `http://localhost:5000/health`
+- Verify API key is correct in `server.js`
+- Check browser console for errors (F12)
+
+**"API key not configured" error?**
+- Make sure you added your API key to `server.js`
+- Or set `OPENROUTER_API_KEY` environment variable
+
+**Widget not appearing?**
+- Check that `widget.css` and `widget.js` are loaded
+- Open browser console (F12) to see any errors
+- Verify the server is serving files from `/public`
 
 **CORS errors?**
-- Backend has CORS enabled by default
-- If using different domain, verify BACKEND_URL in widget
+- CORS is enabled by default in `server.js`
+- If using different domain, ensure server URL is correct
 
-**Rate limits?**
-- HuggingFace free tier has rate limits
-- Consider adding retry logic or use paid tier for production
+## 🚀 Deployment
+
+### Replit (Easiest)
+
+1. Upload all files to Replit
+2. Add `OPENROUTER_API_KEY` to Secrets
+3. Run `node server.js`
+4. Get your `.replit.app` URL
+5. Update embed code with your URL
+
+### Other Platforms
+
+The chatbot works on any Node.js hosting:
+- Heroku
+- Vercel
+- Railway
+- DigitalOcean
+- AWS
+- Your own VPS
 
 ## 📝 License
 
-Free to use for Digital Transition Marketing and clients.
+MIT License - Free to use for Digital Transition Marketing and clients
 
 ## 🤝 Support
 
-For questions or issues, check:
-1. This README
-2. Console errors in browser
-3. Server logs in terminal
-4. HuggingFace API status
+For issues or questions:
+1. Check this README
+2. Review browser console errors
+3. Verify server logs
+4. Check OpenRouter status
 
 ---
 
 **Built with ❤️ for Digital Transition Marketing**
+
+*Powered by OpenRouter's Free Tier*

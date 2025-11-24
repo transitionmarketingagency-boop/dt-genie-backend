@@ -1,0 +1,17 @@
+{
+  "name": "dt-genie-chatbot",
+  "version": "1.0.0",
+  "description": "DT Genie - AI Chatbot Widget for Digital Transition Marketing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["chatbot", "ai", "openrouter", "widget"],
+  "author": "Digital Transition Marketing",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.2",
+    "cors": "^2.8.5"
+  }
+}

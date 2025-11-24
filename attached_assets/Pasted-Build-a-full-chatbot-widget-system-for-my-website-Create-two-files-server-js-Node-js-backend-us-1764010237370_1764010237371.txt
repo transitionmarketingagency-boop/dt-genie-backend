@@ -1,0 +1,175 @@
+Build a full chatbot widget system for my website.
+Create two files:
+
+server.js → Node.js backend using Express
+
+public/widget.js + public/widget.css → floating chat widget
+
+index.html demo page showing how to embed the widget
+
+A simple "knowledge.json" file for custom training
+
+FUNCTIONALITY REQUIREMENTS
+Backend
+
+Use Express.js
+
+Use OpenRouter (free tier) for LLM responses
+Endpoint: https://openrouter.ai/api/v1/chat/completions
+
+Allow me to insert my API key at top of the file.
+
+Automatically load a small JSON file named knowledge.json and include its contents in system prompt (acts as chatbot memory/training).
+
+Provide /chat POST endpoint:
+
+receives {message: "..."}
+
+sends user message + training data to OpenRouter
+
+returns the assistant reply
+
+Training
+
+Load knowledge.json
+
+Combine its text as “business knowledge”
+
+Add this instruction to the LLM:
+
+You are DT Genie — an AI assistant for Digital Transition Marketing. 
+You answer clearly, helpfully, and stay on-brand.
+
+Frontend Chat Widget
+
+Create a floating circular chatbot widget, bottom-right corner.
+When clicked → opens a modern chat panel.
+
+DESIGN REQUIREMENTS
+Widget Icon:
+
+A circular button
+
+Inside it, show an image (placeholder: /public/avatar.png)
+
+Around the circle, text written in a curved circular format:
+
+“We are here • We are here • We are here •”
+
+Use a sexy modern font (e.g., Poppins).
+
+Colors:
+
+Neon Blue: #00E1FF
+
+Neon Orange: #FF7A18
+
+Glow hover effect:
+
+Soft neon blue outer glow
+
+Slight scale up (1.05)
+
+Chat Panel:
+
+Glass-morphism background
+
+Rounded corners (20px)
+
+Soft neon shadows
+
+Chat header:
+
+Show same image avatar on left
+
+Display name: DT Genie
+
+Remove any “powered by” text.
+
+Make it look premium, futuristic, and high-end
+
+Message Bubbles
+
+User bubble: neon orange border, dark background
+
+Bot bubble: neon blue glow, darker background
+
+Smooth fade-in animation for each message
+
+Files to Generate
+1. index.html
+
+Demonstrates usage
+
+Loads:
+
+widget.css
+
+widget.js
+
+Automatically initializes widget
+
+2. public/widget.js
+
+Frontend script:
+
+Renders:
+
+floating widget button
+
+curved text
+
+chat panel
+
+Handles:
+
+open/close animation
+
+sending messages to backend
+
+appending replies
+
+3. public/widget.css
+
+All the styling:
+
+neon theme
+
+glowing hover
+
+curved text
+
+chat UI styling
+
+shadows / modern feel
+
+4. server.js
+
+Backend:
+
+Express server
+
+/chat endpoint
+
+Loads knowledge.json
+
+Sends chat requests to OpenRouter
+
+CORS enabled
+
+5. knowledge.json
+
+Example structure:
+
+{
+  "business_info": "Digital Transition Marketing helps brands transition to the digital future using AI, CGI, performance marketing, and automation."
+}
+
+Embed Instructions
+
+At the end of your output, add instructions:
+
+To embed on a website:
+
+<script src="https://myreplitdomain.replit.app/widget.js"></script>
+<link rel="stylesheet" href="https://myreplitdomain.replit.app/widget.css">

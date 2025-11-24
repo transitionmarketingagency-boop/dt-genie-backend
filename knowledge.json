@@ -1,0 +1,24 @@
+{
+  "business_info": "Digital Transition Marketing helps brands transition to the digital future using AI, CGI, performance marketing, and automation. We offer social media marketing, content creation, SEO, SEM, AI-powered ads, automated sales funnels, web development, branding, and CGI property tours. We specialize in e-commerce, technology, real estate, and travel & tourism industries. Our voice is futuristic, helpful, expert, results-driven, and friendly.",
+  "services": [
+    "Social Media Marketing",
+    "Content Creation",
+    "SEO (Search Engine Optimization)",
+    "SEM (Search Engine Marketing)",
+    "AI-Powered Advertising",
+    "Automated Sales Funnels",
+    "Web Development",
+    "Branding & Identity",
+    "CGI Property Tours"
+  ],
+  "industries": [
+    "E-commerce",
+    "Technology",
+    "Real Estate",
+    "Travel & Tourism"
+  ],
+  "contact": {
+    "booking_link": "https://calendly.com/digitaltransition",
+    "instructions": "When a user wants to book a consultation, ask for their name and email, then provide the Calendly booking link."
+  }
+}

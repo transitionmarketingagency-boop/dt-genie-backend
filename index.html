@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DT Genie Chatbot - Digital Transition Marketing</title>
+  <meta name="description" content="Experience DT Genie, our AI-powered chatbot assistant for Digital Transition Marketing. Built with OpenRouter's free tier.">
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+      color: #fff;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    
+    .hero {
+      text-align: center;
+      margin-bottom: 60px;
+    }
+    
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 700;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #00E1FF 0%, #FF7A18 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    
+    .hero p {
+      font-size: 1.2rem;
+      color: rgba(255, 255, 255, 0.7);
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    
+    .badge {
+      display: inline-block;
+      padding: 8px 16px;
+      background: rgba(0, 225, 255, 0.1);
+      border: 1px solid rgba(0, 225, 255, 0.3);
+      border-radius: 20px;
+      color: #00E1FF;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 24px;
+    }
+    
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-bottom: 60px;
+    }
+    
+    .feature-card {
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 32px;
+      text-align: center;
+      transition: all 0.3s;
+    }
+    
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0, 225, 255, 0.2);
+      border-color: rgba(0, 225, 255, 0.3);
+    }
+    
+    .feature-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 20px;
+      background: linear-gradient(135deg, #00E1FF 0%, #FF7A18 100%);
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+    }
+    
+    .feature-card h3 {
+      font-size: 1.3rem;
+      margin-bottom: 12px;
+      color: #00E1FF;
+    }
+    
+    .feature-card p {
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.6;
+    }
+    
+    .demo-section {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(0, 225, 255, 0.2);
+      border-radius: 20px;
+      padding: 48px;
+      margin-bottom: 60px;
+      text-align: center;
+    }
+    
+    .demo-section h2 {
+      font-size: 2rem;
+      margin-bottom: 16px;
+      color: #FF7A18;
+    }
+    
+    .demo-section p {
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 24px;
+      font-size: 1.1rem;
+    }
+    
+    .demo-hint {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 32px;
+      background: linear-gradient(135deg, rgba(0, 225, 255, 0.1) 0%, rgba(255, 122, 24, 0.1) 100%);
+      border: 2px solid rgba(0, 225, 255, 0.3);
+      border-radius: 50px;
+      color: #00E1FF;
+      font-weight: 600;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% {
+        box-shadow: 0 0 20px rgba(0, 225, 255, 0.3);
+      }
+      50% {
+        box-shadow: 0 0 40px rgba(0, 225, 255, 0.6);
+      }
+    }
+    
+    .embed-section {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 122, 24, 0.2);
+      border-radius: 20px;
+      padding: 48px;
+    }
+    
+    .embed-section h2 {
+      font-size: 2rem;
+      margin-bottom: 24px;
+      color: #FF7A18;
+    }
+    
+    .code-block {
+      background: rgba(0, 0, 0, 0.4);
+      border: 1px solid rgba(0, 225, 255, 0.2);
+      border-radius: 12px;
+      padding: 24px;
+      margin: 24px 0;
+      text-align: left;
+      overflow-x: auto;
+    }
+    
+    .code-block code {
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: #00E1FF;
+      line-height: 1.8;
+    }
+    
+    .code-block .comment {
+      color: #888;
+    }
+    
+    .setup-steps {
+      text-align: left;
+      margin-top: 32px;
+    }
+    
+    .setup-steps ol {
+      list-style-position: inside;
+      color: rgba(255, 255, 255, 0.8);
+      line-height: 2;
+    }
+    
+    .setup-steps li {
+      margin-bottom: 12px;
+    }
+    
+    .setup-steps code {
+      background: rgba(0, 225, 255, 0.1);
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: #00E1FF;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 0.9rem;
+    }
+    
+    footer {
+      text-align: center;
+      margin-top: 80px;
+      padding-top: 40px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      color: rgba(255, 255, 255, 0.5);
+    }
+    
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2.5rem;
+      }
+      
+      .features {
+        grid-template-columns: 1fr;
+      }
+      
+      .demo-section,
+      .embed-section {
+        padding: 32px 24px;
+      }
+    }
+  </style>
+  
+  <!-- Load the chat widget -->
+  <link rel="stylesheet" href="/widget.css">
+</head>
+<body>
+  <div class="container">
+    <!-- Hero Section -->
+    <div class="hero">
+      <span class="badge">✨ Powered by OpenRouter (Free Tier)</span>
+      <h1>DT Genie</h1>
+      <p>Your AI Assistant for Digital Transition Marketing</p>
+    </div>
+
+    <!-- Features -->
+    <div class="features">
+      <div class="feature-card">
+        <div class="feature-icon">🤖</div>
+        <h3>AI-Powered</h3>
+        <p>Advanced language model trained on your business knowledge</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3>100% Free</h3>
+        <p>Uses OpenRouter's free tier - no API costs for you</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3>Premium Design</h3>
+        <p>Glass-morphism UI with neon accents and smooth animations</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">🔧</div>
+        <h3>Customizable</h3>
+        <p>Edit knowledge.json to train the bot on your business</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3>Responsive</h3>
+        <p>Works perfectly on desktop, tablet, and mobile devices</p>
+      </div>
+      
+      <div class="feature-card">
+        <div class="feature-icon">🚀</div>
+        <h3>Easy Embed</h3>
+        <p>Add to any website with just 2 lines of code</p>
+      </div>
+    </div>
+
+    <!-- Demo Section -->
+    <div class="demo-section">
+      <h2>Try It Now!</h2>
+      <p>Click the floating widget in the bottom-right corner to start chatting</p>
+      <div class="demo-hint">
+        <span>👉</span>
+        <span>Look for DT Genie in the bottom-right</span>
+      </div>
+    </div>
+
+    <!-- Embed Instructions -->
+    <div class="embed-section">
+      <h2>📋 How to Embed on Your Website</h2>
+      
+      <p style="color: rgba(255, 255, 255, 0.8); margin-bottom: 24px;">
+        Add DT Genie to any website by pasting these 2 lines before the closing <code>&lt;/body&gt;</code> tag:
+      </p>
+      
+      <div class="code-block">
+        <code>
+          <span class="comment">&lt;!-- DT Genie Chatbot Widget --&gt;</span><br>
+          &lt;link rel="stylesheet" href="<span style="color: #FF7A18;">https://your-replit-domain.replit.app/widget.css</span>"&gt;<br>
+          &lt;script src="<span style="color: #FF7A18;">https://your-replit-domain.replit.app/widget.js</span>"&gt;&lt;/script&gt;
+        </code>
+      </div>
+      
+      <div class="setup-steps">
+        <h3 style="color: #00E1FF; margin-bottom: 16px;">🛠️ Setup Instructions</h3>
+        <ol>
+          <li>Get a free API key from <a href="https://openrouter.ai/keys" target="_blank" style="color: #FF7A18;">OpenRouter.ai</a></li>
+          <li>Open <code>server.js</code> and paste your API key at the top</li>
+          <li>Edit <code>knowledge.json</code> to customize the chatbot's knowledge</li>
+          <li>Run <code>node server.js</code> to start the backend</li>
+          <li>Deploy to Replit or your own server</li>
+          <li>Replace <code>your-replit-domain</code> in the embed code with your actual domain</li>
+        </ol>
+        
+        <h3 style="color: #00E1FF; margin: 32px 0 16px;">🎨 Customization Options</h3>
+        <ul style="list-style: none; padding: 0;">
+          <li style="margin-bottom: 12px;">
+            <strong style="color: #00E1FF;">Change Colors:</strong> Edit CSS variables in <code>widget.css</code>
+          </li>
+          <li style="margin-bottom: 12px;">
+            <strong style="color: #00E1FF;">Replace Avatar:</strong> Upload your image to <code>public/avatar.png</code>
+          </li>
+          <li style="margin-bottom: 12px;">
+            <strong style="color: #00E1FF;">Modify Training:</strong> Update <code>knowledge.json</code> with your business info
+          </li>
+          <li style="margin-bottom: 12px;">
+            <strong style="color: #00E1FF;">Change Text:</strong> Edit the curved text in <code>widget.js</code>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>
+      <p>Built with ❤️ for Digital Transition Marketing</p>
+      <p style="margin-top: 8px; font-size: 0.9rem;">Powered by OpenRouter • Free AI Chat System</p>
+    </footer>
+  </div>
+
+  <!-- Initialize the widget -->
+  <script src="/widget.js"></script>
+</body>
+</html>
