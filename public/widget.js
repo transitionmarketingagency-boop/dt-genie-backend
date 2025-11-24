@@ -3,8 +3,8 @@
 
   // Configuration
   const CONFIG = {
-    apiEndpoint: window.DT_GENIE_API || '/chat',
-    avatarUrl: window.DT_GENIE_AVATAR || '/avatar.png',
+    apiEndpoint: '/api/chat',
+    avatarUrl: '/avatar.png',
     maxHistoryMessages: 10
   };
 
@@ -12,6 +12,7 @@
   let messageHistory = [];
   let isOpen = false;
   let isProcessing = false;
+  let sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
   // Create widget HTML
   function createWidget() {
@@ -85,15 +86,6 @@
     
     // Scroll to bottom
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
-    
-    // Add to history for context
-    if (role !== 'system') {
-      messageHistory.push({ role, content });
-      // Keep only recent messages
-      if (messageHistory.length > CONFIG.maxHistoryMessages) {
-        messageHistory = messageHistory.slice(-CONFIG.maxHistoryMessages);
-      }
-    }
   }
 
   // Show typing indicator
@@ -150,7 +142,7 @@
         },
         body: JSON.stringify({
           message: message,
-          history: messageHistory
+          sessionId: sessionId
         })
       });
       
