@@ -6,6 +6,7 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import cors from "cors";
 
 import { registerRoutes } from "./routes";
 
@@ -27,6 +28,14 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+// Enable CORS for all routes
+app.use(cors({
+  origin: true,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
