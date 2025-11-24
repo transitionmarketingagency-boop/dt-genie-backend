@@ -6,19 +6,27 @@ import express, { type Express } from "express";
 import runApp from "./app";
 
 export async function serveStatic(app: Express, _server: Server) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  const distPublicPath = path.resolve(import.meta.dirname, "../dist/public");
+  const publicPath = path.resolve(import.meta.dirname, "../public");
 
-  if (!fs.existsSync(distPath)) {
-    throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
-    );
+  // Serve static files from dist/public (built frontend)
+  if (fs.existsSync(distPublicPath)) {
+    app.use(express.static(distPublicPath));
   }
-
-  app.use(express.static(distPath));
+  
+  // Also serve from root public directory (widget files)
+  if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+  }
 
   // fall through to index.html if the file doesn't exist
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    const indexPath = path.resolve(distPublicPath, "index.html");
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Not Found");
+    }
   });
 }
 

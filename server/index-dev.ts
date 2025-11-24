@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { type Server } from "node:http";
 
+import express from "express";
 import { nanoid } from "nanoid";
 import { type Express } from "express";
 import { createServer as createViteServer, createLogger } from "vite";
@@ -30,6 +31,9 @@ export async function setupVite(app: Express, server: Server) {
     server: serverOptions,
     appType: "custom",
   });
+
+  // Serve static files BEFORE Vite middleware
+  app.use(express.static(path.join(import.meta.dirname, '../public')));
 
   app.use(vite.middlewares);
   app.use("*", async (req, res, next) => {

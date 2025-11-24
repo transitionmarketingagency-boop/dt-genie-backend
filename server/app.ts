@@ -1,4 +1,5 @@
 import { type Server } from "node:http";
+import path from "node:path";
 
 import express, {
   type Express,
@@ -35,6 +36,9 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Serve static files from public directory (widget files)
+app.use(express.static(path.join(import.meta.dirname, '../public')));
 
 app.use(express.json({
   verify: (req, _res, buf) => {
