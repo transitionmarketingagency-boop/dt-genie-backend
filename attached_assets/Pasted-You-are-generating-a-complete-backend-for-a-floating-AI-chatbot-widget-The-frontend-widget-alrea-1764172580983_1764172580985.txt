@@ -1,0 +1,153 @@
+You are generating a complete backend for a floating AI chatbot widget.
+
+The frontend widget already exists — now build the FULL BACKEND “brain” with all features below:
+
+==================================================
+🔥 PROJECT NAME: AgencyAIBot Brain
+==================================================
+
+==================================================
+🧠 1. CORE REQUIREMENTS
+==================================================
+Build a Node.js + Express backend with these endpoints:
+
+1) POST /chat  
+    - Accepts: { message, conversationId }  
+    - Returns: AI reply  
+    - Uses: Gemini 2.0/3.0 Flash (if free), fallback: OpenAI o3-mini or gpt-4o-mini free-tier  
+    - Stores conversation in vector memory  
+    - Retrieves relevant embeddings for context
+
+2) POST /train/upload  
+    - Accept file uploads: PDF, DOCX, TXT  
+    - Extract text  
+    - Chunk it  
+    - Generate embeddings  
+    - Save to local vector store (use: `chromadb` or `llamaindex` local)  
+
+3) POST /train/crawl  
+    - Input: website URL  
+    - Crawl all internal pages  
+    - Scrape + clean text  
+    - Chunk + embed + store in vector database
+
+4) GET /memory/{conversationId}  
+    - Returns full conversation context  
+    - Memory persists for future replies
+
+5) GET /health  
+    - Simple status endpoint
+
+==================================================
+⚙️ 2. TECH STACK REQUIREMENTS
+==================================================
+Use:
+
+- Node.js + Express
+- ChromaDB (local persistent vector DB)
+- axios + cheerio for crawling
+- multer for file upload
+- pdf-parse for PDFs
+- docx for docx extraction
+- dotenv for API keys
+- Google Gemini API (if free)
+- OpenAI fallback (free-tier mini models)
+
+==================================================
+🧩 3. CHATBOT LOGIC
+==================================================
+Chatbot personality:
+- Intelligent, high-end, premium marketing consultant  
+- Represents brand: Digital Transition Marketing  
+- Tone: clean, modern, friendly, expert  
+- Never hallucinate — always fallback to “I don’t have that data yet, but you can upload it.”
+
+Pipeline:
+1. Receive message  
+2. Retrieve most relevant embeddings using similarity search  
+3. Combine:
+    - User message  
+    - Relevant chunks  
+    - Brand instructions  
+4. Send to LLM  
+5. Save response + user message → vector DB for memory  
+6. Return reply to widget
+
+==================================================
+📚 4. VECTOR MEMORY FORMAT
+==================================================
+Each record saved in ChromaDB must contain:
+{
+  chunk: "...",
+  source: "file | website | memory",
+  timestamp: "...",
+  conversationId: "...",
+  embedding: [...]
+}
+
+==================================================
+🕸️ 5. WEBSITE CRAWLER REQUIREMENTS
+==================================================
+- Accept URL  
+- Fetch all internal links (depth 2 max)  
+- Clean HTML → readable text  
+- Chunk into 300–500 tokens  
+- Generate embeddings  
+- Save into vector database  
+
+Use cheerio or linkedom.
+
+==================================================
+📁 6. TRAINING SYSTEM UI ENDPOINTS (API ONLY)
+==================================================
+The Replit server does not need a visual UI.  
+I only need working endpoints that my widget or Postman can call:
+
+POST /train/upload  
+POST /train/crawl  
+POST /chat  
+
+==================================================
+🔒 7. SECURITY
+==================================================
+- Add API key auth via headers (x-api-key)
+- Store key in .env
+- Rate limit: 10 req/min
+
+==================================================
+🚀 8. WHAT YOU MUST DELIVER
+==================================================
+Generate the **FULL project**:
+- server.js
+- routes/chat.js
+- routes/train.js
+- services/embeddings.js
+- services/crawler.js
+- services/memory.js
+- vector database init
+- /public folder
+- package.json with all dependencies
+- Instructions for:
+    - Setting environment variables  
+    - Running locally  
+    - Connecting widget.js to POST /chat  
+
+==================================================
+🎯 FINAL GOAL
+==================================================
+I want a fully autonomous, trainable, high-end chatbot backend
+that my existing Replit floating widget calls like this:
+
+POST https://agency-ai-bot-transitionmarke.replit.app/chat
+
+This backend must handle:
+✔ AI replies  
+✔ Memory  
+✔ Document training  
+✔ Website crawling  
+✔ Vector search  
+✔ High-end logic  
+
+==================================================
+
+Generate all code now — complete, clean, production-ready.
