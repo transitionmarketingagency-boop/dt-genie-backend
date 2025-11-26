@@ -3,10 +3,11 @@
 
   // Configuration
   const CONFIG = {
-    apiEndpoint: '/api/chat',
-    avatarUrl: '/avatar.png',
+    apiEndpoint: 'https://e80080f9-353f-47ca-9d3a-354fe040db23-00-1s5mi7w3iqtau.worf.replit.dev/api/chat',
+    avatarUrl: 'https://e80080f9-353f-47ca-9d3a-354fe040db23-00-1s5mi7w3iqtau.worf.replit.dev/avatar.png',
     maxHistoryMessages: 10
   };
+
 
   // Message history for context
   let messageHistory = [];
