@@ -53,6 +53,7 @@ const upload = multer({
 
 // Core middleware
 app.use(cors());
+app.set("trust proxy", 1); // Trust first proxy for rate-limiting
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
