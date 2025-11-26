@@ -1,6 +1,6 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
-import multer from "multer";
+import multer, { type FileFilterCallback } from "multer";
 import path from "node:path";
 import fs from "node:fs";
 import { storage } from "./storage";
@@ -30,7 +30,7 @@ Voice: Intelligent, premium, friendly, expert, results-driven. You are a high-en
 const upload = multer({
   dest: path.join(process.cwd(), "uploads"),
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB
-  fileFilter: (_req, file, cb) => {
+  fileFilter: (_req: Request, file: Express.Multer.File, cb: FileFilterCallback) => {
     const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain"];
     if (allowed.includes(file.mimetype)) {
       cb(null, true);
