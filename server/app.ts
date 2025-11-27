@@ -75,7 +75,7 @@ async function setupVite(app: Express, server: Server) {
   });
 
   // Serve static files
-  app.use(express.static(path.join(import.meta.dirname, '../public')));
+  app.use(express.static(path.join(import.meta.dirname, "../public")));
 
   // Apply Vite middleware
   app.use(vite.middlewares);
@@ -88,12 +88,12 @@ async function setupVite(app: Express, server: Server) {
         import.meta.dirname,
         "..",
         "client",
-        "index.html",
+        "index.html"
       );
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`,
+        `src="/src/main.tsx?v=${nanoid()}"`
       );
       const page = await vite.transformIndexHtml(url, template);
       res.status(200).set({ "Content-Type": "text/html" }).end(page);
@@ -108,10 +108,7 @@ async function setupVite(app: Express, server: Server) {
 async function main() {
   const PORT = parseInt(process.env.PORT || "5000", 10);
 
-  // Register API routes and get HTTP server
   const httpServer = await registerRoutes(app);
-
-  // Setup Vite
   await setupVite(app, httpServer);
 
   httpServer.listen(PORT, () => {
@@ -119,7 +116,7 @@ async function main() {
   });
 }
 
-main().catch(err => {
+main().catch((err) => {
   console.error("Server startup failed:", err);
   process.exit(1);
 });
