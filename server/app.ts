@@ -1,6 +1,8 @@
+#!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
 import { type Server } from "node:http";
+
 import express from "express";
 import { nanoid } from "nanoid";
 import { type Express } from "express";
