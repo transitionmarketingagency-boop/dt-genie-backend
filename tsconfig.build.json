@@ -2,13 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "server",
-    "module": "ESNext",
-    "moduleResolution": "Node",
-    "target": "ES2022",
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "rootDir": "./server",
+    "noEmit": false
   },
-  "include": ["server/**/*"]
+  "include": ["server/**/*"],
+  "exclude": ["node_modules", "vite.config.ts", "client", "frontend", "public"]
 }
