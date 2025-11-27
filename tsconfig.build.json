@@ -17,7 +17,8 @@
     "server/**/*",
     "vite.config.ts",
     "server/**/*.ts",
-    "server/**/*.tsx"
+    "server/**/*.tsx",
+    "shared/**/*.ts"
   ],
   "exclude": [
     "node_modules",
