@@ -3,28 +3,13 @@
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "node",
-    "outDir": "dist",
-    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
-    "baseUrl": ".",
-    "types": ["node"],
-    "paths": {
-      "@/*": ["./client/src/*"],
-      "@shared/*": ["./shared/*"]
-    }
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "dist",
+    "rootDir": ".",
+    "types": ["node"]
   },
-  "ts-node": {
-    "esm": true,
-    "experimentalEsm": true,
-    "transpileOnly": true,
-    "compilerOptions": {
-      "noEmit": false,
-      "module": "ESNext"
-    }
-  },
-  "include": ["server/**/*.ts", "vite.config.ts"]
+  "include": ["server/**/*.ts"]
 }
