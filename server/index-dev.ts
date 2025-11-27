@@ -6,11 +6,23 @@ import express from "express";
 import { nanoid } from "nanoid";
 import { type Express } from "express";
 import { createServer as createViteServer, createLogger } from "vite";
+import cors from "cors";
+import dotenv from "dotenv";
 
 import viteConfig from "../vite.config";
-import runApp from "./app";
+import { registerRoutes } from "./routes";
 
-export async function setupVite(app: Express, server: Server) {
+dotenv.config();
+
+const app = express();
+
+// Core middleware
+app.use(cors());
+app.set("trust proxy", 1);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
+
+async function setupVite(app: Express, server: Server) {
   const viteLogger = createLogger();
   const serverOptions = {
     middlewareMode: true,
@@ -62,6 +74,23 @@ export async function setupVite(app: Express, server: Server) {
   });
 }
 
+export async function startApp() {
+  const PORT = parseInt(process.env.PORT || "5000", 10);
+  
+  // Register all API routes
+  const httpServer = await registerRoutes(app);
+
+  // Setup Vite for development
+  await setupVite(app, httpServer);
+
+  return new Promise<Server>(resolve => {
+    httpServer.listen(PORT, () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+      resolve(httpServer);
+    });
+  });
+}
+
 (async () => {
-  await runApp(setupVite);
-})();
+  await startApp();
+})().catch(console.error);
