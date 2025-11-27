@@ -48,7 +48,7 @@
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
-    "@types/express": "^4.17.21",
+    "@types/express": "^4.17.25",
     "@types/multer": "^2.0.0",
     "@types/node": "^20.19.25",
     "@types/pdf-parse": "^1.1.5",
