@@ -1,35 +1,41 @@
-import fs from "node:fs";
-import path from "node:path";
-import { type Server } from "node:http";
-
 import express, { type Express } from "express";
-import runApp from "./app";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createServer as createHttpServer, type Server } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-export async function serveStatic(app: Express, _server: Server) {
-  const distPublicPath = path.resolve(import.meta.dirname, "../dist/public");
-  const publicPath = path.resolve(import.meta.dirname, "../public");
+// Resolve __dirname in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  // Serve static files from dist/public (built frontend)
-  if (fs.existsSync(distPublicPath)) {
-    app.use(express.static(distPublicPath));
-  }
-  
-  // Also serve from root public directory (widget files)
-  if (fs.existsSync(publicPath)) {
-    app.use(express.static(publicPath));
-  }
+// Load environment variables
+dotenv.config();
 
-  // fall through to index.html if the file doesn't exist
-  app.use("*", (_req, res) => {
-    const indexPath = path.resolve(distPublicPath, "index.html");
-    if (fs.existsSync(indexPath)) {
-      res.sendFile(indexPath);
-    } else {
-      res.status(404).send("Not Found");
-    }
-  });
-}
+const PORT = process.env.PORT || 3000;
+const app: Express = express();
+const server: Server = createHttpServer(app);
 
-(async () => {
-  await runApp(serveStatic);
-})();
+// ---------- Middleware ----------
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ---------- API Routes ----------
+import routes from "./routes"; // make sure your routes.ts is backend-ready
+app.use("/api", routes);
+
+// ---------- Serve Frontend ----------
+const clientBuildPath = path.join(__dirname, "../client"); // Adjust if your build folder is elsewhere
+app.use(express.static(clientBuildPath));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(clientBuildPath, "index.html"));
+});
+
+// ---------- Start Server ----------
+server.listen(PORT, () => {
+  console.log(`Production server running on port ${PORT}`);
+});
+
+export default app;
