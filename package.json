@@ -2,12 +2,12 @@
   "name": "dt-genie-backend",
   "version": "1.0.0",
   "description": "Backend for DT Genie",
-  "main": "dist/index-prod.js",
+  "main": "dist/app.js",
   "type": "module",
   "scripts": {
     "dev": "tsx server/index-dev.ts",
     "build": "tsc -p tsconfig.build.json",
-    "start": "node dist/index-prod.js",
+    "start": "node dist/app.js",
     "build:backend": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
