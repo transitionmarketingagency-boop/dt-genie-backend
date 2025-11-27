@@ -5,7 +5,7 @@
   "main": "dist/app.js",
   "type": "module",
   "scripts": {
-    "dev": "tsx server/index-dev.ts",
+    "dev": "tsx server/app.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/app.js",
     "build:backend": "tsc -p tsconfig.build.json"
