@@ -3,7 +3,7 @@
 <<<<<<< HEAD
 =======
 // Node 18+ includes global fetch, so no import needed.
-// If running on Node 16, uncomment the next line:
+// Uncomment the next line if using Node <18
 // import fetch from "node-fetch";
 
 >>>>>>> f71e4e4 (Rename gemini.js to gemini.ts)
@@ -14,8 +14,11 @@ if (!GEMINI_API_KEY) {
 }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 // TypeScript interface for Gemini API response
+=======
+>>>>>>> aca607f (Update gemini.ts)
 export interface GeminiResponse {
   candidates?: Array<{
     content?: {
@@ -23,18 +26,20 @@ export interface GeminiResponse {
         text?: string;
       }>;
     };
-    output?: string; // fallback for older API response shape
   }>;
 }
 
+<<<<<<< HEAD
 // Main function to query Gemini API
 >>>>>>> f71e4e4 (Rename gemini.js to gemini.ts)
+=======
+// Unified queryGemini function (TypeScript + Node 18+)
+>>>>>>> aca607f (Update gemini.ts)
 export async function queryGemini(prompt: string): Promise<string> {
   if (!GEMINI_API_KEY) {
     return "Error: Gemini API key missing.";
   }
 
-  // Modern Gemini 2.5 API endpoint
   const url =
     "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" +
     GEMINI_API_KEY;
@@ -62,11 +67,9 @@ export async function queryGemini(prompt: string): Promise<string> {
 
     const data = await response.json();
 
-    // Return text if available
     return (
       data?.candidates?.[0]?.content?.parts?.[0]?.text ??
-      data?.candidates?.[0]?.output ??
-      "No response received from Gemini."
+      "No response received from Gemini 2.5 Flash."
     );
   } catch (err) {
     console.error("❌ Gemini request failed:", err);
