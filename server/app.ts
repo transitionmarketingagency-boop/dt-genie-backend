@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import router from "./routes"; // <-- correct router import
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
-import { askGemini } from "./services/gemini.js";
+import { askGemini } from "./services/gemini";
 
 // --- Define interfaces ---
 interface MemoryEntry {
