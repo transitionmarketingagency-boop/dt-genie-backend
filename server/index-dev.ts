@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { type Server } from "node:http";
+import { type Server, createServer } from "node:http";
 
 import express, { type Express } from "express";
 import { nanoid } from "nanoid";
@@ -22,7 +22,7 @@ export async function setupVite(app: Express, server: Server) {
     configFile: false,
     customLogger: {
       ...viteLogger,
-      error: (msg, options) => {
+      error: (msg: any, options: any) => {
         viteLogger.error(msg, options);
         process.exit(1);
       },
@@ -66,7 +66,7 @@ export async function setupVite(app: Express, server: Server) {
 // ---------- Start Dev Server ----------
 async function startDevServer() {
   const app = express();
-  const server = new (await import("node:http")).createServer(app);
+  const server = createServer(app); // <-- fixed: removed 'new' and destructured createServer
 
   await setupVite(app, server);
 
