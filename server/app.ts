@@ -7,7 +7,7 @@ import dotenv from "dotenv";
 import router from "./routes"; // <-- correct router import
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
-import { askGemini } from "./services/gemini";
+import { queryGemini } from "./services/gemini";
 
 // --- Define interfaces ---
 interface MemoryEntry {
@@ -75,7 +75,7 @@ const loader = async (): Promise<void> => {
 
     // Gemini test
     try {
-      const response = await askGemini("Hello world");
+      const reply = await queryGemini(message);
       console.log("Gemini response:", response);
     } catch {
       console.log("Gemini not configured.");
