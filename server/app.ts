@@ -1,16 +1,32 @@
+<<<<<<< HEAD
 import express, { Application } from "express";
+=======
+// server/app.ts
+import express, { Application, Request, Response } from "express";
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
 import cors from "cors";
 import dotenv from "dotenv";
+import { createServer, Server } from "http";
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 import router from "./routes";
 =======
 import router from "./routes.ts"; // Correct router import with .ts
 >>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
+=======
+import router from "./routes.ts"; // router import with .ts
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
-import { queryGemini } from "./services/gemini.ts"; // Correct .ts import
+import { queryGemini } from "./services/gemini.ts"; // .ts import
 
+<<<<<<< HEAD
+=======
+dotenv.config();
+
+// -------------------- Interfaces --------------------
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
 interface MemoryEntry {
   source: string;
   chunk: string;
@@ -21,27 +37,46 @@ interface ChatHistory {
   content: string;
 }
 
+<<<<<<< HEAD
 const formatMemory = (memory: MemoryEntry[]): string[] =>
   memory.slice(-20).map((m) => `[${m.source.toUpperCase()}] ${m.chunk}`);
 
 const formatHistory = (history: ChatHistory[]): string[] =>
+=======
+// -------------------- Helper functions --------------------
+export const formatMemory = (memory: MemoryEntry[]): string[] =>
+  memory.slice(-20).map((m) => `[${m.source.toUpperCase()}] ${m.chunk}`);
+
+export const formatHistory = (history: ChatHistory[]): string[] =>
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
   history.slice(-10).map(
     (h) => `${h.role === "assistant" ? "Assistant" : "User"}: ${h.content}`
   );
 
+<<<<<<< HEAD
 const getFormattedHistoryObjects = (history: ChatHistory[]): ChatHistory[] =>
   history.slice(-10).map((h) => ({ role: h.role, content: h.content }));
 
+=======
+export const getFormattedHistoryObjects = (history: ChatHistory[]): ChatHistory[] =>
+  history.slice(-10).map((h) => ({ role: h.role, content: h.content }));
+
+// -------------------- Main loader --------------------
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
 const loader = async (): Promise<void> => {
   try {
-    dotenv.config();
-
     const app: Application = express();
+<<<<<<< HEAD
+=======
+    const PORT = parseInt(process.env.PORT || "5000", 10);
+
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
     app.use(cors());
     app.set("trust proxy", 1);
     app.use(express.json({ limit: "10mb" }));
     app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
+<<<<<<< HEAD
 <<<<<<< HEAD
     const PORT: number = parseInt(process.env.PORT || "5000", 10);
 
@@ -56,6 +91,14 @@ const loader = async (): Promise<void> => {
 
     const PORT: number = parseInt(process.env.PORT || "5000", 10);
 >>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
+=======
+    // Apply backend routes
+    app.use("/", router);
+
+    // Create HTTP server
+    const http = createServer(app);
+
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
     http.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });
@@ -96,6 +139,10 @@ const loader = async (): Promise<void> => {
 
 <<<<<<< HEAD
 loader();
+<<<<<<< HEAD
 =======
 loader();
 >>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
+=======
+
+>>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
