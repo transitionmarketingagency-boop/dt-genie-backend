@@ -19,10 +19,11 @@ import type { MemoryEntry, ChatHistory } from "@shared/types";
 // --------------------
 =======
 // server/services/app.ts
-import express, { Express } from "express";
+import express, { Express, Request, Response } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createServer, Server } from "http";
+
 import { storage } from "./storage";
 import { memoryStore } from "./memory";
 import { queryGemini } from "./gemini"; 
@@ -84,8 +85,12 @@ export const setupApp = async (
   // Middleware
 =======
 // -------------------- Setup App --------------------
+<<<<<<< HEAD
 export const setupApp = async (app: Express, sessionId: string) => {
 >>>>>>> 2fd3fb1 (Fix app.ts route import: replace non-existent registerRoutes with router from routes.ts)
+=======
+export const setupApp = async (app: Express, sessionId?: string) => {
+>>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
   app.use(cors());
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
@@ -94,15 +99,31 @@ export const setupApp = async (app: Express, sessionId: string) => {
   const memoryData: MemoryEntry[] = memoryStore.getAllMemory() as MemoryEntry[];
   const formattedMemory = formatMemory(memoryData);
 
+<<<<<<< HEAD
   // Load chat history
   const chatHistory: ChatHistory[] = await storage.getChatHistory(sessionId);
+=======
+  // CHAT HISTORY
+  const chatHistory: ChatHistory[] = sessionId ? await storage.getChatHistory(sessionId) : [];
+>>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
   const formattedHistory = formatHistory(chatHistory);
 
   console.log("Memory:", formattedMemory);
   console.log("History:", formattedHistory);
 
+<<<<<<< HEAD
   // Apply rate limiters
   app.use("/chat", chatRateLimiter);
+=======
+  // GEMINI CALL
+  try {
+    const message = "Hello from backend";
+    const response = await queryGemini(message);
+    console.log("Gemini reply:", response);
+  } catch {
+    console.log("Gemini not configured.");
+  }
+>>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
 
 <<<<<<< HEAD
   // GEMINI test call
@@ -121,9 +142,13 @@ export const setupApp = async (app: Express, sessionId: string) => {
 };
 =======
   // TEST ROUTE
-  app.get("/test-gemini", async (req, res) => {
-    const reply: string = await queryGemini("Test message");
-    res.json({ reply });
+  app.get("/test-gemini", async (_req: Request, res: Response) => {
+    try {
+      const reply = await queryGemini("Test message");
+      res.json({ reply });
+    } catch {
+      res.status(500).json({ error: "Gemini not available" });
+    }
   });
 };
 
@@ -145,7 +170,7 @@ export default async function runApp(
   app.use("/", router);
 
   // Health endpoint
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", (req: Request, res: Response) => {
     try {
       res.json({
         status: "ok",
@@ -157,7 +182,7 @@ export default async function runApp(
     }
   });
 
-  // Call the optional setup function (like seeding memory or chat)
+  // Call the optional setup function
   if (setupFn) {
     await setupFn(app, httpServer);
   }
@@ -170,4 +195,9 @@ export default async function runApp(
   });
 }
 
+<<<<<<< HEAD
 >>>>>>> 2fd3fb1 (Fix app.ts route import: replace non-existent registerRoutes with router from routes.ts)
+=======
+
+
+>>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
