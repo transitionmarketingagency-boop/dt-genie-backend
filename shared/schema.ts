@@ -1,4 +1,3 @@
-// shared/schema.ts
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -11,12 +10,17 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+// Use createInsertSchema from Drizzle-Zod
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
 });
 
+<<<<<<< HEAD
 // Explicit TS interfaces
+=======
+// ✅ Explicit TS interfaces for clarity
+>>>>>>> 307d96c ("Fix shared/schema.ts Zod types for Drizzle-Zod compatibility and TypeScript inference")
 export interface InsertUser extends z.infer<typeof insertUserSchema> {}
 export interface User extends typeof users.$inferSelect {}
 
@@ -52,5 +56,8 @@ export const chatResponseSchema = z.object({
   reply: z.string(),
   sessionId: z.string(),
 });
+<<<<<<< HEAD
 
+=======
+>>>>>>> 307d96c ("Fix shared/schema.ts Zod types for Drizzle-Zod compatibility and TypeScript inference")
 export type ChatResponse = z.infer<typeof chatResponseSchema>;
