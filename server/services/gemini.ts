@@ -1,23 +1,7 @@
-// server/services/gemini.ts
-
-// Node 18+ includes global fetch, so no import needed.
-// If you ever run on Node 16, uncomment:
-// import fetch from "node-fetch";
-
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
   console.warn("⚠️ Warning: GEMINI_API_KEY is not set in environment variables.");
-}
-
-export interface GeminiResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{
-        text?: string;
-      }>;
-    };
-  }>;
 }
 
 export async function queryGemini(prompt: string): Promise<string> {
@@ -32,11 +16,7 @@ export async function queryGemini(prompt: string): Promise<string> {
   const payload = {
     contents: [
       {
-        parts: [
-          {
-            text: prompt
-          }
-        ]
+        parts: [{ text: prompt }]
       }
     ]
   };
@@ -44,13 +24,11 @@ export async function queryGemini(prompt: string): Promise<string> {
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
 
-    const data = (await response.json()) as GeminiResponse;
+    const data = await response.json();
 
     return (
       data?.candidates?.[0]?.content?.parts?.[0]?.text ??
@@ -61,4 +39,3 @@ export async function queryGemini(prompt: string): Promise<string> {
     return "Gemini API error — please try again.";
   }
 }
-

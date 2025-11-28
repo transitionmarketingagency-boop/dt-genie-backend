@@ -1,122 +1,78 @@
-import fs from "node:fs";
-import path from "node:path";
-import { type Server } from "node:http";
-
-import express from "express";
-import { nanoid } from "nanoid";
-import { type Express } from "express";
-import { createServer as createViteServer, createLogger } from "vite";
+import express, { Application } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
-import viteConfig from "../vite.config";
-import router, { registerRoutes } from "./routes.js";
-import { queryGemini } from "./services/gemini.js";
-import { memoryStore } from "./services/memory.js";
+import router from "./routes";
+import { storage } from "./storage";
+import { memoryStore } from "./services/memory";
+import { queryGemini } from "./services/gemini";
 
-dotenv.config();
+interface MemoryEntry {
+  source: string;
+  chunk: string;
+}
 
-const app = express();
+interface ChatHistory {
+  role: "assistant" | "user";
+  content: string;
+}
 
-// Core middleware
-app.use(cors());
-app.set("trust proxy", 1);
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
+const formatMemory = (memory: MemoryEntry[]): string[] =>
+  memory.slice(-20).map((m) => `[${m.source.toUpperCase()}] ${m.chunk}`);
 
-// Basic backend routes
-app.use("/", router);
+const formatHistory = (history: ChatHistory[]): string[] =>
+  history.slice(-10).map(
+    (h) => `${h.role === "assistant" ? "Assistant" : "User"}: ${h.content}`
+  );
 
-// Health check
-app.get("/api/health", (_req, res) => {
-  res.json({ status: "ok" });
-});
+const getFormattedHistoryObjects = (history: ChatHistory[]): ChatHistory[] =>
+  history.slice(-10).map((h) => ({ role: h.role, content: h.content }));
 
-// Gemini test
-app.get("/test-gemini", async (_req, res) => {
+const loader = async (): Promise<void> => {
   try {
-    const reply = await queryGemini("Say hello! This is a Gemini test.");
-    res.json({ ok: true, reply });
-  } catch (err) {
-    console.error("Gemini test error:", err);
-    res.status(500).json({ ok: false, error: "Gemini test failed" });
-  }
-});
+    dotenv.config();
 
-// Debug memory
-try {
-  const memoryData = memoryStore.getAllMemory?.() || [];
-  console.log("Memory loaded:", memoryData);
-} catch {
-  console.log("No memory store found.");
-}
+    const app: Application = express();
+    app.use(cors());
+    app.set("trust proxy", 1);
+    app.use(express.json({ limit: "10mb" }));
+    app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// ------------------- Vite integration -------------------
-async function setupVite(app: Express, server: Server) {
-  const viteLogger = createLogger();
-  const serverOptions = {
-    middlewareMode: true,
-    hmr: { server },
-    allowedHosts: true as const,
-  };
+    const PORT: number = parseInt(process.env.PORT || "5000", 10);
 
-  const vite = await createViteServer({
-    ...viteConfig,
-    configFile: false,
-    customLogger: {
-      ...viteLogger,
-      error: (msg, options) => {
-        viteLogger.error(msg, options);
-        process.exit(1);
-      },
-    },
-    server: serverOptions,
-    appType: "custom",
-  });
+    app.use("/", router);
 
-  // Serve static files
-  app.use(express.static(path.join(import.meta.dirname, "../public")));
+    const http = require("http").createServer(app);
+    http.listen(PORT, () => {
+      console.log(`Server running at http://localhost:${PORT}`);
+    });
 
-  // Apply Vite middleware
-  app.use(vite.middlewares);
-
-  // Transform index.html for HMR
-  app.use("*", async (req, res, next) => {
-    const url = req.originalUrl;
+    // Debug memory + chat history
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html"
-      );
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
-      template = template.replace(
-        `src="/src/main.tsx"`,
-        `src="/src/main.tsx?v=${nanoid()}"`
-      );
-      const page = await vite.transformIndexHtml(url, template);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
-    } catch (e) {
-      vite.ssrFixStacktrace(e as Error);
-      next(e);
+      const memoryData: MemoryEntry[] = memoryStore.getAllMemory();
+      console.log("Memory:", formatMemory(memoryData));
+    } catch {
+      console.log("No memory store initialized yet.");
     }
-  });
-}
 
-// ------------------- Start server -------------------
-async function main() {
-  const PORT = parseInt(process.env.PORT || "5000", 10);
+    try {
+      const chatHistory: ChatHistory[] = storage.getAllHistory?.() || [];
+      console.log("History:", formatHistory(chatHistory));
+    } catch {
+      console.log("No chat history yet.");
+    }
 
-  const httpServer = await registerRoutes(app);
-  await setupVite(app, httpServer);
+    // Gemini test
+    try {
+      const reply = await queryGemini("Say hello! This is a Gemini test.");
+      console.log("Gemini response:", reply);
+    } catch {
+      console.log("Gemini not configured.");
+    }
+  } catch (error: unknown) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+};
 
-  httpServer.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
-  });
-}
-
-main().catch((err) => {
-  console.error("Server startup failed:", err);
-  process.exit(1);
-});
+loader();
