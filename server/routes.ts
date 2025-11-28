@@ -19,4 +19,5 @@ router.get("/api/memory/:conversationId", (req: Request, res: Response) => {
   res.json({ conversationId, entries: [] });
 });
 
+// Add more routes here as needed, always export router at the end
 export default router;
