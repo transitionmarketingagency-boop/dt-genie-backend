@@ -1,11 +1,17 @@
-import { type User, type InsertUser, type ChatMessage, type InsertChatMessage } from "@shared/schema";
+// server/storage.ts
 import { randomUUID } from "crypto";
+import type {
+  User,
+  InsertUser,
+  ChatMessage,
+  InsertChatMessage,
+} from "@shared/schema";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  
+
   getChatHistory(sessionId: string): Promise<ChatMessage[]>;
   addChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
 }
@@ -25,13 +31,18 @@ export class MemStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     return Array.from(this.users.values()).find(
-      (user) => user.username === username,
+      (user) => user.username === username
     );
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = { ...insertUser, id };
+
+    const user: User = {
+      id,
+      ...insertUser,
+    };
+
     this.users.set(id, user);
     return user;
   }
@@ -42,15 +53,17 @@ export class MemStorage implements IStorage {
 
   async addChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
     const id = randomUUID();
+
     const message: ChatMessage = {
-      ...insertMessage,
       id,
       timestamp: new Date(),
+      ...insertMessage,
     };
 
-    const sessionMessages = this.chatMessages.get(insertMessage.sessionId) || [];
-    sessionMessages.push(message);
-    this.chatMessages.set(insertMessage.sessionId, sessionMessages);
+    const existing = this.chatMessages.get(insertMessage.sessionId) || [];
+    existing.push(message);
+
+    this.chatMessages.set(insertMessage.sessionId, existing);
 
     return message;
   }
