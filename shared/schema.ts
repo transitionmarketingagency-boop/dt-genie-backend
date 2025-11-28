@@ -10,11 +10,13 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
+// Use createInsertSchema from Drizzle-Zod
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
 });
 
+// TypeScript types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
