@@ -30,6 +30,10 @@
   ]
 <<<<<<< HEAD
 }
+<<<<<<< HEAD
 =======
 }
 >>>>>>> e830b17 (chore: enable allowImportingTsExtensions in tsconfig.build.json)
+=======
+
+>>>>>>> efbc305 (Update tsconfig.build.json)
