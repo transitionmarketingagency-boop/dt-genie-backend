@@ -16,9 +16,11 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
 });
 
-// ✅ Explicit TS interfaces
+// Explicit TS interfaces (correct Drizzle types)
 export interface InsertUser extends z.infer<typeof insertUserSchema> {}
-export interface User extends z.infer<typeof users.$inferSelect> {}
+
+export interface User extends z.infer<(typeof users)["_inferSelect"]> {}
+
 
 // ---------------- CHAT MESSAGES ----------------
 export const chatMessages = pgTable("chat_messages", {
@@ -34,19 +36,26 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
   timestamp: true,
 });
 
-// ✅ Explicit TS interfaces
-export interface InsertChatMessage extends z.infer<typeof insertChatMessageSchema> {}
-export interface ChatMessage extends z.infer<typeof chatMessages.$inferSelect> {}
+// Explicit interfaces (correct Drizzle infer types)
+export interface InsertChatMessage
+  extends z.infer<typeof insertChatMessageSchema> {}
 
-// ---------------- CHAT REQUEST/RESPONSE ----------------
+export interface ChatMessage
+  extends z.infer<(typeof chatMessages)["_inferSelect"]> {}
+
+
+// ---------------- CHAT REQUEST / RESPONSE ----------------
 export const chatRequestSchema = z.object({
   message: z.string().min(1),
   sessionId: z.string().min(1),
 });
+
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
+
 
 export const chatResponseSchema = z.object({
   reply: z.string(),
   sessionId: z.string(),
 });
+
 export type ChatResponse = z.infer<typeof chatResponseSchema>;
