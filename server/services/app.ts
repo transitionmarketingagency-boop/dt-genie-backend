@@ -1,24 +1,21 @@
-// server/services/app.ts
-
-import type { ChatMessage } from "@shared/schema";
-import type { MemoryEntry, ChatHistory } from "@shared/types";
-
 import express from "express";
 import cors from "cors";
 
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
 import { queryGemini } from "./services/gemini";
-
 import {
   chatRateLimiter,
   trainingRateLimiter,
   memoryRateLimiter
 } from "./middleware/rateLimit";
 
-// ----------------------------
-// Utility format functions
-// ----------------------------
+import type { ChatMessage } from "@shared/schema";
+import type { MemoryEntry, ChatHistory } from "@shared/types";
+
+// --------------------
+// Helper functions
+// --------------------
 export const formatMemory = (memory: MemoryEntry[]): string[] =>
   memory.slice(-20).map((m) => `[${m.source.toUpperCase()}] ${m.chunk}`);
 
@@ -29,17 +26,11 @@ export const formatHistory = (history: ChatHistory[]): string[] =>
 
 export const getFormattedHistoryObjects = (
   history: ChatHistory[]
-): ChatHistory[] =>
-  history.slice(-10).map((h) => ({
-    role: h.role,
-    content: h.content
-  }));
+): ChatHistory[] => history.slice(-10).map((h) => ({ role: h.role, content: h.content }));
 
-/**
- * processUserMessage
- * Handles incoming user messages, stores them,
- * calls the LLM, and returns updated conversation history.
- */
+// --------------------
+// User message processor
+// --------------------
 export async function processUserMessage(
   sessionId: string,
   userMessage: string
@@ -51,7 +42,7 @@ export async function processUserMessage(
     sessionId
   });
 
-  // Generate assistant response using Gemini
+  // Generate assistant response
   const aiResponse = await queryGemini(userMessage);
 
   // Save assistant response
@@ -65,9 +56,9 @@ export async function processUserMessage(
   return storage.getChatHistory(sessionId);
 }
 
-// ----------------------------
+// --------------------
 // Express App Setup
-// ----------------------------
+// --------------------
 export const setupApp = async (
   app: express.Application,
   sessionId: string
@@ -91,7 +82,7 @@ export const setupApp = async (
   // Apply rate limiters
   app.use("/chat", chatRateLimiter);
 
-  // Test Gemini ping
+  // GEMINI test call
   const testMsg = "Hello world from backend";
   const testReply = await queryGemini(testMsg);
   console.log("Gemini reply:", testReply);
