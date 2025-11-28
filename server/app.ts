@@ -2,10 +2,14 @@ import express, { Application } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 
+<<<<<<< HEAD
 import router from "./routes";
+=======
+import router from "./routes.ts"; // Correct router import with .ts
+>>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
-import { queryGemini } from "./services/gemini";
+import { queryGemini } from "./services/gemini.ts"; // Correct .ts import
 
 interface MemoryEntry {
   source: string;
@@ -38,11 +42,20 @@ const loader = async (): Promise<void> => {
     app.use(express.json({ limit: "10mb" }));
     app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
+<<<<<<< HEAD
     const PORT: number = parseInt(process.env.PORT || "5000", 10);
 
+=======
+    // Mount all backend routes
+>>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
     app.use("/", router);
 
     const http = require("http").createServer(app);
+<<<<<<< HEAD
+=======
+
+    const PORT: number = parseInt(process.env.PORT || "5000", 10);
+>>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
     http.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });
@@ -64,8 +77,14 @@ const loader = async (): Promise<void> => {
 
     // Gemini test
     try {
+<<<<<<< HEAD
       const reply = await queryGemini("Say hello! This is a Gemini test.");
       console.log("Gemini response:", reply);
+=======
+      const message = "Hello from backend";
+      const response = await queryGemini(message);
+      console.log("Gemini response:", response);
+>>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
     } catch {
       console.log("Gemini not configured.");
     }
@@ -75,4 +94,8 @@ const loader = async (): Promise<void> => {
   }
 };
 
+<<<<<<< HEAD
 loader();
+=======
+loader();
+>>>>>>> 4f74436 (fix: update app.ts imports with .ts extensions for TypeScript resolution)
