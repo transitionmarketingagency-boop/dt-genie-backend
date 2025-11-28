@@ -1,8 +1,9 @@
 {
   "extends": "./tsconfig.json",
+
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "server",
+    "rootDir": ".",
     "moduleResolution": "node",
     "module": "ESNext",
     "target": "ES2022",
@@ -11,16 +12,17 @@
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "skipLibCheck": true,
-    "noEmit": true,
+    "noEmit": false,
     "allowImportingTsExtensions": true
   },
+
   "include": [
-    "server/**/*",
-    "vite.config.ts",
     "server/**/*.ts",
     "server/**/*.tsx",
-    "server/types/**/*.d.ts"
+    "server/types/**/*.d.ts",
+    "vite.config.ts"
   ],
+
   "exclude": [
     "node_modules",
     "dist",
