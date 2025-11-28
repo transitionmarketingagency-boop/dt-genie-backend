@@ -3,6 +3,7 @@ import express, { Application } from "express";
 =======
 // server/app.ts
 <<<<<<< HEAD
+<<<<<<< HEAD
 import express, { Application, Request, Response } from "express";
 >>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
 =======
@@ -25,6 +26,13 @@ import router from "./routes.ts"; // router import with .ts
 =======
 import router from "./routes.ts"; // Correct router import with .ts
 >>>>>>> f493617 (fix: rewrite server/app.ts to remove registerRoutes, correct router import, fix memory/history methods, and stabilize Express server)
+=======
+import express, { Application } from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createServer, Server } from "http";
+import router from "./routes.ts"; // Correct .ts import
+>>>>>>> d78464c (Update app.ts)
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
 import { queryGemini } from "./services/gemini.ts"; // Correct .ts import
@@ -34,6 +42,7 @@ import type { MemoryEntry, ChatHistory } from "@shared/types";
 =======
 dotenv.config();
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 // -------------------- Interfaces --------------------
 >>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
@@ -56,6 +65,11 @@ const formatHistory = (history: ChatHistory[]): string[] =>
 =======
 >>>>>>> f493617 (fix: rewrite server/app.ts to remove registerRoutes, correct router import, fix memory/history methods, and stabilize Express server)
 // -------------------- Helper functions --------------------
+=======
+// --------------------
+// Helper functions
+// --------------------
+>>>>>>> d78464c (Update app.ts)
 export const formatMemory = (memory: MemoryEntry[]): string[] =>
   memory.slice(-20).map((m) => `[${m.source.toUpperCase()}] ${m.chunk}`);
 
@@ -65,6 +79,7 @@ export const formatHistory = (history: ChatHistory[]): string[] =>
     (h) => `${h.role === "assistant" ? "Assistant" : "User"}: ${h.content}`
   );
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 const getFormattedHistoryObjects = (history: ChatHistory[]): ChatHistory[] =>
@@ -111,24 +126,34 @@ const loader = async (): Promise<void> => {
 export const getFormattedHistoryObjects = (
   history: ChatHistory[]
 ): ChatHistory[] => history.slice(-10).map((h) => ({ role: h.role, content: h.content }));
+=======
+export const getFormattedHistoryObjects = (history: ChatHistory[]): ChatHistory[] =>
+  history.slice(-10).map((h) => ({ role: h.role, content: h.content }));
+>>>>>>> d78464c (Update app.ts)
 
-// -------------------- Setup App --------------------
-export const setupApp = async (app: Express, sessionId: string) => {
+// --------------------
+// Setup App
+// --------------------
+export const setupApp = async (app: Application, sessionId: string) => {
   app.use(cors());
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
   // MEMORY
   const memoryData: MemoryEntry[] = memoryStore.getAllMemory() as MemoryEntry[];
-  const formattedMemory = formatMemory(memoryData);
+  console.log("Memory:", formatMemory(memoryData));
 
   // CHAT HISTORY
   const chatHistory: ChatHistory[] = await storage.getChatHistory(sessionId);
+<<<<<<< HEAD
   const formattedHistory = formatHistory(chatHistory);
 >>>>>>> f493617 (fix: rewrite server/app.ts to remove registerRoutes, correct router import, fix memory/history methods, and stabilize Express server)
 
   console.log("Memory:", formattedMemory);
   console.log("History:", formattedHistory);
+=======
+  console.log("History:", formatHistory(chatHistory));
+>>>>>>> d78464c (Update app.ts)
 
 <<<<<<< HEAD
 >>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
@@ -179,9 +204,12 @@ loader();
 =======
 =======
   // GEMINI CALL
-  const message: string = "Hello from backend";
-  const response: string = await queryGemini(message);
-  console.log("Gemini reply:", response);
+  try {
+    const response = await queryGemini("Hello from backend");
+    console.log("Gemini reply:", response);
+  } catch (err) {
+    console.log("Gemini not configured.", err);
+  }
 
   // TEST ROUTE
   app.get("/test-gemini", async (req, res) => {
@@ -190,21 +218,23 @@ loader();
   });
 };
 
-// -------------------- Main App --------------------
+// --------------------
+// Main App
+// --------------------
 export default async function runApp(
-  setupFn?: (app: Express, server: Server) => Promise<void>
+  setupFn?: (app: Application, server: Server) => Promise<void>
 ): Promise<Server> {
-  const app: Express = express();
+  const app: Application = express();
   const PORT = parseInt(process.env.PORT || "5000", 10);
   const httpServer = createServer(app);
 
   // Core middleware
   app.use(cors());
-  app.set("trust proxy", 1); // for rate-limiting
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-  // Apply routes from routes.ts
+  // Apply routes
   app.use("/", router);
 
   // Health endpoint
@@ -220,7 +250,7 @@ export default async function runApp(
     }
   });
 
-  // Call the optional setup function (like seeding memory or chat)
+  // Optional setup function
   if (setupFn) {
     await setupFn(app, httpServer);
   }
@@ -232,6 +262,9 @@ export default async function runApp(
     });
   });
 }
+<<<<<<< HEAD
 >>>>>>> f493617 (fix: rewrite server/app.ts to remove registerRoutes, correct router import, fix memory/history methods, and stabilize Express server)
 
 >>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
+=======
+>>>>>>> d78464c (Update app.ts)
