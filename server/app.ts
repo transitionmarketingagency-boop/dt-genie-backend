@@ -3,21 +3,13 @@
 import express, { Application } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { registerRoutes } from "./routes";
-import { setupVite } from "./index-dev";
+
+import router from "./routes"; // <-- correct router import
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
-import { generateEmbedding, chunkText } from "./services/embeddings";
-import { crawlWebsite } from "./services/crawler";
-import { parseFile } from "./services/fileParser";
-import {
-  chatRateLimiter,
-  trainingRateLimiter,
-  memoryRateLimiter
-} from "./middleware/rateLimit";
 import { askGemini } from "./services/gemini.js";
 
-// --- Define interfaces for typed parameters ---
+// --- Define interfaces ---
 interface MemoryEntry {
   source: string;
   chunk: string;
@@ -56,26 +48,38 @@ const loader = async (): Promise<void> => {
 
     const PORT: number = parseInt(process.env.PORT || "5000", 10);
 
-    // Register backend routes
-    const httpServer = await registerRoutes(app);
+    // Mount all backend routes
+    app.use("/", router);
 
-    // Setup Vite development server
-    await setupVite(app, httpServer);
+    // Create HTTP server
+    const http = require("http").createServer(app);
 
-    httpServer.listen(PORT, () => {
+    http.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
     });
 
-    // Example: process memory and chat history (for debugging)
-    const memoryData: MemoryEntry[] = memoryStore.getMemory();
-    console.log("Memory:", formatMemory(memoryData));
+    // Debug memory + chat history
+    try {
+      const memoryData: MemoryEntry[] = memoryStore.getAllMemory(); // correct method
+      console.log("Memory:", formatMemory(memoryData));
+    } catch {
+      console.log("No memory store initialized yet.");
+    }
 
-    const chatHistory: ChatHistory[] = storage.getHistory();
-    console.log("History:", formatHistory(chatHistory));
+    try {
+      const chatHistory: ChatHistory[] = storage.getAllHistory?.() || []; // safe accessor
+      console.log("History:", formatHistory(chatHistory));
+    } catch {
+      console.log("No chat history yet.");
+    }
 
-    // Example Gemini API call
-    const response = await askGemini("Hello world");
-    console.log("Gemini response:", response);
+    // Gemini test
+    try {
+      const response = await askGemini("Hello world");
+      console.log("Gemini response:", response);
+    } catch {
+      console.log("Gemini not configured.");
+    }
 
   } catch (error: unknown) {
     console.error("Failed to start server:", error);
