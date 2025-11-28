@@ -1,6 +1,5 @@
 {
   "extends": "./tsconfig.json",
-
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
@@ -15,14 +14,12 @@
     "noEmit": false,
     "allowImportingTsExtensions": true
   },
-
   "include": [
     "server/**/*.ts",
     "server/**/*.tsx",
     "server/types/**/*.d.ts",
     "vite.config.ts"
   ],
-
   "exclude": [
     "node_modules",
     "dist",
