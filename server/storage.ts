@@ -1,13 +1,7 @@
 // server/storage.ts
 import { randomUUID } from "crypto";
-import type {
-  User,
-  InsertUser,
-  ChatMessage,
-  InsertChatMessage,
-} from "@shared/schema";
+import { User, InsertUser, ChatMessage, InsertChatMessage } from "@shared/schema";
 
-// Storage interface
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
@@ -17,7 +11,6 @@ export interface IStorage {
   addChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
 }
 
-// In-memory implementation
 export class MemStorage implements IStorage {
   private users: Map<string, User> = new Map();
   private chatMessages: Map<string, ChatMessage[]> = new Map();
@@ -40,25 +33,18 @@ export class MemStorage implements IStorage {
   }
 
   async getChatHistory(sessionId: string): Promise<ChatMessage[]> {
-    // Always return a new array to prevent mutations
     return [...(this.chatMessages.get(sessionId) || [])];
   }
 
   async addChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
     const id = randomUUID();
-    const message: ChatMessage = {
-      id,
-      timestamp: new Date(),
-      ...insertMessage,
-    };
-
+    const message: ChatMessage = { id, timestamp: new Date(), ...insertMessage };
     const existing = this.chatMessages.get(insertMessage.sessionId) || [];
     existing.push(message);
     this.chatMessages.set(insertMessage.sessionId, existing);
-
     return message;
   }
 }
 
-// Export singleton storage
 export const storage = new MemStorage();
+
