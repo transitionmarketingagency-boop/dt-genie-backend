@@ -208,7 +208,7 @@ loader();
     const response = await queryGemini("Hello from backend");
     console.log("Gemini reply:", response);
   } catch (err) {
-    console.log("Gemini not configured.", err);
+    console.warn("Gemini not configured.", err);
   }
 
   // TEST ROUTE
@@ -263,8 +263,12 @@ export default async function runApp(
   });
 }
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> f493617 (fix: rewrite server/app.ts to remove registerRoutes, correct router import, fix memory/history methods, and stabilize Express server)
 
 >>>>>>> ef3954f (fix(server): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for MemoryEntry and ChatHistory - Typed all map and reduce callbacks - Typed express app and PORT variables - Cleaned async loader with Promise<void>)
 =======
 >>>>>>> d78464c (Update app.ts)
+=======
+
+>>>>>>> 4f73bd9 (Update app.ts)
