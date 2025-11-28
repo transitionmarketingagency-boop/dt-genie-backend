@@ -1,3 +1,5 @@
+// server/services/gemini.ts
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
@@ -16,16 +18,22 @@ export async function queryGemini(prompt: string): Promise<string> {
   const payload = {
     contents: [
       {
-        parts: [{ text: prompt }]
-      }
-    ]
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+    ],
   };
 
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
     const data = await response.json();
