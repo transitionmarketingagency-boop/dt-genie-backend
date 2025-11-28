@@ -27,10 +27,7 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = randomUUID();
-    const user: User = {
-      id,
-      ...insertUser,
-    };
+    const user: User = { id, ...insertUser };
     this.users.set(id, user);
     return user;
   }
@@ -41,16 +38,10 @@ export class MemStorage implements IStorage {
 
   async addChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
     const id = randomUUID();
-    const message: ChatMessage = {
-      id,
-      timestamp: new Date(),
-      ...insertMessage,
-    };
-
+    const message: ChatMessage = { id, timestamp: new Date(), ...insertMessage };
     const existing = this.chatMessages.get(insertMessage.sessionId) || [];
     existing.push(message);
     this.chatMessages.set(insertMessage.sessionId, existing);
-
     return message;
   }
 }
