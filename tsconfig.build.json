@@ -13,12 +13,13 @@
     "noEmit": true,
     "allowImportingTsExtensions": true
   },
-  "include": [
-    "server/**/*",
-    "vite.config.ts",
-    "server/**/*.ts",
-    "server/**/*.tsx",
-    "shared/**/*.ts"
+    "include": [
+      "server/**/*",
+      "vite.config.ts",
+      "server/**/*.ts",
+      "server/**/*.tsx",
+      "server/types/**/*.d.ts"
+      
   ],
   "exclude": [
     "node_modules",
@@ -28,5 +29,4 @@
     "public"
   ]
 }
-
 
