@@ -41,20 +41,24 @@ export const setupApp = async (
   app: express.Application,
   sessionId: string
 ) => {
-  app.use(cors());
+  // --------------------
+  // Middleware
+  // --------------------
+  app.use(cors()); // types fixed via custom.d.ts
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
   // --------------------
   // MEMORY
   // --------------------
-  const memoryData = memoryStore.getAllMemory() as MemoryEntry[];
+  // Ensure memoryStore.getAllMemory() returns MemoryEntry[]
+  const memoryData: MemoryEntry[] = memoryStore.getAllMemory();
   const formattedMemory = formatMemory(memoryData);
 
   // --------------------
   // CHAT HISTORY
   // --------------------
-  const chatHistory = await storage.getChatHistory(sessionId);
+  const chatHistory: ChatHistory[] = await storage.getChatHistory(sessionId);
   const formattedHistory = formatHistory(chatHistory);
 
   console.log("Memory:", formattedMemory);
@@ -68,11 +72,8 @@ export const setupApp = async (
   // --------------------
   // GEMINI CALL (queryGemini)
   // --------------------
-  const promptMessage = "Hello world from backend";
-  const geminiReply = await queryGemini(promptMessage);
+  const message: string = "Hello world from backend"; // properly scoped
+  const response: string = await queryGemini(message);
 
-  console.log("Gemini reply:", geminiReply);
+  console.log("Gemini reply:", response);
 };
-
-
-
