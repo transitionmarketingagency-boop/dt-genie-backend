@@ -28,4 +28,8 @@
     "frontend",
     "public"
   ]
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> e830b17 (chore: enable allowImportingTsExtensions in tsconfig.build.json)
