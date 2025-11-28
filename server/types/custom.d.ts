@@ -1,7 +1,10 @@
 // server/types/custom.d.ts
+
+// Shared schema and types
 declare module '@shared/schema';
 declare module '@shared/types';
 
+// Services and middleware
 declare module "./services/gemini";
 declare module './storage';
 declare module './services/memory';
