@@ -1,3 +1,4 @@
+// shared/schema.ts
 import { sql } from "drizzle-orm";
 import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -10,15 +11,14 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
 });
 
-// Use createInsertSchema from Drizzle-Zod
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
 });
 
-// TypeScript types
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+// ✅ Explicit TS interfaces
+export interface InsertUser extends z.infer<typeof insertUserSchema> {}
+export interface User extends z.infer<typeof users.$inferSelect> {}
 
 // ---------------- CHAT MESSAGES ----------------
 export const chatMessages = pgTable("chat_messages", {
@@ -34,20 +34,19 @@ export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
   timestamp: true,
 });
 
-export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;
-export type ChatMessage = typeof chatMessages.$inferSelect;
+// ✅ Explicit TS interfaces
+export interface InsertChatMessage extends z.infer<typeof insertChatMessageSchema> {}
+export interface ChatMessage extends z.infer<typeof chatMessages.$inferSelect> {}
 
 // ---------------- CHAT REQUEST/RESPONSE ----------------
 export const chatRequestSchema = z.object({
   message: z.string().min(1),
   sessionId: z.string().min(1),
 });
-
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 
 export const chatResponseSchema = z.object({
   reply: z.string(),
   sessionId: z.string(),
 });
-
 export type ChatResponse = z.infer<typeof chatResponseSchema>;
