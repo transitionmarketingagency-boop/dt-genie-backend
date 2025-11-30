@@ -1,0 +1,12 @@
+{
+  "test123": [
+    {
+      "role": "user",
+      "content": "Hello DT Genie"
+    },
+    {
+      "role": "assistant",
+      "content": "Hello! I'm DT Genie, your AI assistant for Digital Transition Marketing.\n\nHow can I help you navigate the world of digital transformation and marketing today?"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": ".",
+    "moduleResolution": "node",
+    "module": "ESNext",
+    "target": "ES2022",
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "server/**/*",
+<<<<<<< HEAD
+    "vite.config.ts",
+    "server/**/*.ts",
+    "server/**/*.tsx",
+    "server/types/**/*.d.ts",
+    "shared/**/*.ts"
+=======
+    "shared/**/*"
+>>>>>>> 59cfae3 (Update project configuration and server setup for improved functionality)
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "client",
+    "frontend",
+<<<<<<< HEAD
+    "public"
+=======
+    "public",
+    "vite.config.ts",
+    "vite.config.js"
+>>>>>>> 59cfae3 (Update project configuration and server setup for improved functionality)
+  ]
+}
+
+

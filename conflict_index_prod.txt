@@ -1,0 +1,87 @@
+<<<<<<< HEAD
+import express, { type Express } from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import { createServer as createHttpServer, type Server } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+=======
+// server/index-prod.ts
+
+import fs from "node:fs";
+import path from "node:path";
+import { type Server } from "node:http";
+
+import express, { type Express } from "express";
+
+// ❗ Use .ts extension ONLY for ts-node-esm in dev
+// Production will use compiled .js automatically.
+import runApp from "./app.ts";
+>>>>>>> 59cfae3 (Update project configuration and server setup for improved functionality)
+
+// Resolve __dirname in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+<<<<<<< HEAD
+// Load environment variables
+dotenv.config();
+
+const PORT = process.env.PORT || 3000;
+const app: Express = express();
+const server: Server = createHttpServer(app);
+
+// ---------- Middleware ----------
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// ---------- API Routes ----------
+import routes from "./routes"; // make sure your routes.ts is backend-ready
+app.use("/api", routes);
+
+// ---------- Serve Frontend ----------
+const clientBuildPath = path.join(__dirname, "../client"); // Adjust if your build folder is elsewhere
+app.use(express.static(clientBuildPath));
+
+app.get("*", (req, res) => {
+  res.sendFile(path.join(clientBuildPath, "index.html"));
+});
+
+// ---------- Start Server ----------
+server.listen(PORT, () => {
+  console.log(`Production server running on port ${PORT}`);
+});
+
+export default app;
+=======
+  // Serve built frontend
+  if (fs.existsSync(distPublicPath)) {
+    app.use(express.static(distPublicPath));
+  }
+
+  // Serve static widget files
+  if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+  }
+
+  // Fallback for SPA routing
+  app.use("*", (_req, res) => {
+    const indexPath = path.resolve(distPublicPath, "index.html");
+
+    if (fs.existsSync(indexPath)) {
+      res.sendFile(indexPath);
+    } else {
+      res.status(404).send("Not Found");
+    }
+  });
+}
+
+// Boot in production
+(async () => {
+  await runApp(serveStatic);
+})();
+
+
+
+>>>>>>> 59cfae3 (Update project configuration and server setup for improved functionality)

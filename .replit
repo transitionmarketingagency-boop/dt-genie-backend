@@ -11,14 +11,17 @@ deploymentTarget = "autoscale"
 build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
+# Backend port (Express server)
 [[ports]]
 localPort = 5000
 externalPort = 80
 
+# Frontend dev server (Vite)
 [[ports]]
 localPort = 5173
 externalPort = 5173
 
+# Extra port used by Replit preview (keep)
 [[ports]]
 localPort = 44635
 externalPort = 3000
@@ -47,6 +50,6 @@ task = "shell.exec"
 args = "npm run dev"
 waitForPort = 5000
 
-# --- Added Node.js engine specification ---
+# Node engine
 node_version = "24"
 

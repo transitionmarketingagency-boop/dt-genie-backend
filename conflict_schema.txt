@@ -1,0 +1,38 @@
+<<<<<<< HEAD
+import { sql } from "drizzle-orm";
+import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+=======
+// shared/schema.ts
+>>>>>>> 59cfae3 (Update project configuration and server setup for improved functionality)
+
+export interface User {
+  id: string;
+  username: string;
+  email: string;
+}
+
+<<<<<<< HEAD
+// Use createInsertSchema from Drizzle-Zod
+export const insertUserSchema = createInsertSchema(users).pick({
+  username: true,
+  password: true,
+});
+
+// ✅ Explicit TS interfaces for clarity
+export interface InsertUser extends z.infer<typeof insertUserSchema> {}
+export interface User extends z.infer<typeof users.$inferSelect> {}
+=======
+export interface InsertUser extends Omit<User, "id"> {}
+
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
+>>>>>>> 59cfae3 (Update project configuration and server setup for improved functionality)
+
+export interface InsertChatMessage extends Omit<ChatMessage, "id" | "timestamp"> {}
