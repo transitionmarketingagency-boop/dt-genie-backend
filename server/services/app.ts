@@ -26,8 +26,8 @@ import { createServer, Server } from "http";
 
 import { storage } from "./storage";
 import { memoryStore } from "./memory";
-import { queryGemini } from "./gemini"; 
-import router from "../routes"; // import your routes
+import { queryGemini } from "./gemini";
+import router from "../routes";
 import type { MemoryEntry, ChatHistory } from "@shared/types";
 
 dotenv.config();
@@ -107,18 +107,28 @@ export const setupApp = async (app: Express, sessionId?: string) => {
   // CHAT HISTORY
 =======
   // -------------------- MEMORY --------------------
-  const memoryData: MemoryEntry[] = (memoryStore.getAllMemory?.() ?? []).map(m => ({
-    source: m.source ?? "unknown",
-    chunk: m.chunk ?? m.content ?? ""
+  const rawMemory = memoryStore.getAllMemory?.() ?? [];
+  const memoryData: MemoryEntry[] = rawMemory.map(m => ({
+    source: (m as any).source ?? "unknown",
+    chunk: (m as any).chunk ?? (m as any).content ?? ""
   }));
+
   const formattedMemory = formatMemory(memoryData);
 
   // -------------------- CHAT HISTORY --------------------
+<<<<<<< HEAD
 >>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
   const chatHistory: ChatHistory[] = sessionId ? await storage.getChatHistory(sessionId) : [];
 >>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
+=======
+  const chatHistory: ChatHistory[] = sessionId
+    ? await storage.getChatHistory(sessionId)
+    : [];
+
+>>>>>>> 8eb4c8f (Add memory and chat history endpoints to the chatbot backend)
   const formattedHistory = formatHistory(chatHistory);
 
+  console.log("Raw memory example:", rawMemory[0]);
   console.log("Memory:", formattedMemory);
   console.log("History:", formattedHistory);
 
@@ -161,14 +171,54 @@ export const setupApp = async (app: Express, sessionId?: string) => {
   app.get("/test-gemini", async (_req: Request, res: Response) => {
 =======
   // -------------------- TEST ROUTE --------------------
+<<<<<<< HEAD
   app.get("/test-gemini", async (req: Request, res: Response) => {
 >>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
+=======
+  app.get("/test-gemini", async (_req, res) => {
+>>>>>>> 8eb4c8f (Add memory and chat history endpoints to the chatbot backend)
     try {
       const reply = await queryGemini("Test message");
       res.json({ ok: true, reply });
     } catch (err) {
       console.error("Test route error:", err);
       res.status(500).json({ ok: false, error: "Gemini test failed" });
+    }
+  });
+
+  // --------------------------------------------------
+  // 🔥 REAL CHAT ENDPOINT (widget uses this)
+  // --------------------------------------------------
+  app.post("/chat", async (req, res) => {
+    try {
+      const { message, sessionId } = req.body;
+
+      // 1. Store user message
+      await storage.addChatMessage({
+        sessionId,
+        role: "user",
+        content: message
+      });
+
+      // 2. AI response
+      const aiResponse = await queryGemini(message);
+
+      // 3. Store assistant message
+      await storage.addChatMessage({
+        sessionId,
+        role: "assistant",
+        content: aiResponse
+      });
+
+      // 4. Save updated history
+      const fullHistory = await storage.getChatHistory(sessionId);
+      await storage.saveChatHistory(sessionId, fullHistory);
+
+      // 5. Return response
+      res.json({ ok: true, reply: aiResponse });
+    } catch (err) {
+      console.error("Chat route error:", err);
+      res.status(500).json({ ok: false, error: "Chat failed" });
     }
   });
 };
@@ -183,32 +233,32 @@ export default async function runApp(
 
   // Core middleware
   app.use(cors());
-  app.set("trust proxy", 1); // for rate-limiting
+  app.set("trust proxy", 1);
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-  // Apply routes from routes.ts
+  // Routes
   app.use("/", router);
 
   // Health endpoint
-  app.get("/api/health", (req: Request, res: Response) => {
+  app.get("/api/health", (_req: Request, res: Response) => {
     try {
       res.json({
         status: "ok",
         timestamp: new Date().toISOString(),
-        memory: memoryStore.getAllMemory().length,
+        memory: memoryStore.getAllMemory().length
       });
     } catch (err) {
       res.status(500).json({ status: "error", message: "Health check failed" });
     }
   });
 
-  // Call the optional setup function
+  // Optional setup (static serving in production)
   if (setupFn) {
     await setupFn(app, httpServer);
   }
 
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     httpServer.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
       resolve(httpServer);

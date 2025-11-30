@@ -4,20 +4,30 @@ export interface MemoryEntry {
   id: string;
   conversationId: string;
   chunk: string;
-  source: "file" | "website" | "memory";
-  embedding: number[];
+  source: "file" | "website" | "memory" | "manual";
+  embedding?: number[];
   timestamp: Date;
 }
 
-interface ConversationMemory {
+export interface ConversationMemory {
+  id: string; // ✅ added id
   conversationId: string;
-  entries: MemoryEntry[];
-  createdAt: Date;
-  updatedAt: Date;
+  key?: string; // optional for testMemory
+  value?: any;  // optional for testMemory
+  chunk: string;
+  source: "file" | "website" | "memory" | "manual";
+  created_at: string;
+  updatedAt?: Date;
 }
 
 class MemoryStore {
   private conversations: Map<string, ConversationMemory> = new Map();
+
+  // Add memory entry from test data
+  addMemory(entry: ConversationMemory) {
+    if (!entry.id) entry.id = uuid();
+    this.conversations.set(entry.id, entry);
+  }
 
   addEntry(
     conversationId: string,
@@ -25,41 +35,35 @@ class MemoryStore {
     source: "file" | "website" | "memory",
     embedding: number[]
   ): MemoryEntry {
-    if (!this.conversations.has(conversationId)) {
-      this.conversations.set(conversationId, {
-        conversationId,
-        entries: [],
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-    }
-
-    const memory = this.conversations.get(conversationId)!;
+    const id = uuid();
     const entry: MemoryEntry = {
-      id: uuid(),
+      id,
       conversationId,
       chunk,
       source,
       embedding,
       timestamp: new Date(),
     };
-
-    memory.entries.push(entry);
-    memory.updatedAt = new Date();
-
+    this.conversations.set(id, {
+      id,
+      conversationId,
+      chunk,
+      source,
+      created_at: new Date().toISOString(),
+    });
     return entry;
   }
 
   searchSimilar(embedding: number[], limit: number = 3): MemoryEntry[] {
     const allEntries: MemoryEntry[] = [];
-
     for (const conv of this.conversations.values()) {
-      allEntries.push(...conv.entries);
+      if ("embedding" in conv && conv.embedding) {
+        allEntries.push(conv as MemoryEntry);
+      }
     }
 
-    // Cosine similarity
     const scored = allEntries.map(entry => {
-      const similarity = this.cosineSimilarity(embedding, entry.embedding);
+      const similarity = this.cosineSimilarity(embedding, entry.embedding!);
       return { entry, similarity };
     });
 
@@ -70,7 +74,9 @@ class MemoryStore {
   }
 
   getConversationMemory(conversationId: string): MemoryEntry[] {
-    return this.conversations.get(conversationId)?.entries || [];
+    return Array.from(this.conversations.values())
+      .filter(conv => conv.conversationId === conversationId)
+      .map(conv => conv as MemoryEntry);
   }
 
   getAllMemory(): ConversationMemory[] {
@@ -78,7 +84,11 @@ class MemoryStore {
   }
 
   clearConversation(conversationId: string): void {
-    this.conversations.delete(conversationId);
+    for (const [id, conv] of this.conversations.entries()) {
+      if (conv.conversationId === conversationId) {
+        this.conversations.delete(id);
+      }
+    }
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {

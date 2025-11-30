@@ -43,7 +43,12 @@ import type { MemoryEntry, ChatHistory } from "@shared/types";
 import router from "./routes";
 import { setupApp } from "./services/app";
 import { queryGemini } from "./services/gemini";
+<<<<<<< HEAD
 >>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
+=======
+import { memoryStore } from "./services/memory";
+import { storage } from "./storage";
+>>>>>>> 8eb4c8f (Add memory and chat history endpoints to the chatbot backend)
 
 <<<<<<< HEAD
 =======
@@ -248,7 +253,7 @@ export default async function runApp(
   // Apply routes
   app.use("/", router);
 
-  // Health endpoint
+  // -------------------- Health endpoint --------------------
   app.get("/api/health", (_req, res) => {
     try {
       res.json({
@@ -260,7 +265,7 @@ export default async function runApp(
     }
   });
 
-  // -------------------- Gemini test route --------------------
+  // -------------------- Gemini test endpoint --------------------
   app.get("/test-gemini", async (_req, res) => {
     try {
       const reply = await queryGemini("Say hello! This is a Gemini test.");
@@ -271,7 +276,30 @@ export default async function runApp(
     }
   });
 
-  // -------------------- Session-specific setup --------------------
+  // -------------------- MEMORY ENDPOINT --------------------
+  app.get("/memory", (_req, res) => {
+    try {
+      const memory = memoryStore.getAllMemory?.() ?? [];
+      res.json({ ok: true, memory });
+    } catch (err) {
+      console.error("Memory endpoint error:", err);
+      res.status(500).json({ ok: false, error: "Failed to get memory" });
+    }
+  });
+
+  // -------------------- HISTORY ENDPOINT --------------------
+  app.get("/history/:sessionId", async (req, res) => {
+    try {
+      const { sessionId } = req.params;
+      const history = await storage.getChatHistory(sessionId);
+      res.json({ ok: true, history });
+    } catch (err) {
+      console.error("History endpoint error:", err);
+      res.status(500).json({ ok: false, error: "Failed to get history" });
+    }
+  });
+
+  // -------------------- SESSION SETUP --------------------
   await setupApp(app, "default-session");
 
   // Optional static handler (for production)
@@ -299,4 +327,8 @@ export default async function runApp(
 
   return httpServer;
 }
+<<<<<<< HEAD
 >>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
+=======
+
+>>>>>>> 8eb4c8f (Add memory and chat history endpoints to the chatbot backend)

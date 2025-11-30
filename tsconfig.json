@@ -3,10 +3,14 @@
     "target": "ES2022",
     "module": "ESNext",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "moduleResolution": "node",
 =======
     "moduleResolution": "bundler",
 >>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
+=======
+    "moduleResolution": "node",          // ✅ needed for ES modules
+>>>>>>> 8eb4c8f (Add memory and chat history endpoints to the chatbot backend)
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -19,7 +23,9 @@
   "include": ["server/**/*.ts"]
 =======
     "baseUrl": ".",
-    "types": ["node"]
+    "types": ["node"],
+    "outDir": "dist",                    // ✅ emit JS files to dist
+    "resolveJsonModule": true            // ✅ optional, if you import JSON
   },
   "include": [
     "server/**/*",
@@ -35,4 +41,5 @@
   ]
 >>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
 }
+
 
