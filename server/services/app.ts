@@ -35,16 +35,16 @@ dotenv.config();
 // -------------------- Helpers --------------------
 >>>>>>> 2fd3fb1 (Fix app.ts route import: replace non-existent registerRoutes with router from routes.ts)
 export const formatMemory = (memory: MemoryEntry[]): string[] =>
-  memory.slice(-20).map((m) => `[${m.source.toUpperCase()}] ${m.chunk}`);
+  memory.slice(-20).map(m => `[${m.source.toUpperCase()}] ${m.chunk}`);
 
 export const formatHistory = (history: ChatHistory[]): string[] =>
   history.slice(-10).map(
-    (h) => `${h.role === "assistant" ? "Assistant" : "User"}: ${h.content}`
+    h => `${h.role === "assistant" ? "Assistant" : "User"}: ${h.content}`
   );
 
 export const getFormattedHistoryObjects = (
   history: ChatHistory[]
-): ChatHistory[] => history.slice(-10).map((h) => ({ role: h.role, content: h.content }));
+): ChatHistory[] => history.slice(-10).map(h => ({ role: h.role, content: h.content }));
 
 <<<<<<< HEAD
 // --------------------
@@ -95,6 +95,7 @@ export const setupApp = async (app: Express, sessionId?: string) => {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
+<<<<<<< HEAD
   // Load memory + format
   const memoryData: MemoryEntry[] = memoryStore.getAllMemory() as MemoryEntry[];
   const formattedMemory = formatMemory(memoryData);
@@ -104,6 +105,16 @@ export const setupApp = async (app: Express, sessionId?: string) => {
   const chatHistory: ChatHistory[] = await storage.getChatHistory(sessionId);
 =======
   // CHAT HISTORY
+=======
+  // -------------------- MEMORY --------------------
+  const memoryData: MemoryEntry[] = (memoryStore.getAllMemory?.() ?? []).map(m => ({
+    source: m.source ?? "unknown",
+    chunk: m.chunk ?? m.content ?? ""
+  }));
+  const formattedMemory = formatMemory(memoryData);
+
+  // -------------------- CHAT HISTORY --------------------
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
   const chatHistory: ChatHistory[] = sessionId ? await storage.getChatHistory(sessionId) : [];
 >>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
   const formattedHistory = formatHistory(chatHistory);
@@ -112,19 +123,24 @@ export const setupApp = async (app: Express, sessionId?: string) => {
   console.log("History:", formattedHistory);
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   // Apply rate limiters
   app.use("/chat", chatRateLimiter);
 =======
   // GEMINI CALL
+=======
+  // -------------------- GEMINI CALL --------------------
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
   try {
     const message = "Hello from backend";
     const response = await queryGemini(message);
     console.log("Gemini reply:", response);
-  } catch {
-    console.log("Gemini not configured.");
+  } catch (err) {
+    console.error("Gemini query failed:", err);
   }
 >>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
 
+<<<<<<< HEAD
 <<<<<<< HEAD
   // GEMINI test call
   const testMsg = "Hello world from backend";
@@ -143,11 +159,16 @@ export const setupApp = async (app: Express, sessionId?: string) => {
 =======
   // TEST ROUTE
   app.get("/test-gemini", async (_req: Request, res: Response) => {
+=======
+  // -------------------- TEST ROUTE --------------------
+  app.get("/test-gemini", async (req: Request, res: Response) => {
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
     try {
       const reply = await queryGemini("Test message");
-      res.json({ reply });
-    } catch {
-      res.status(500).json({ error: "Gemini not available" });
+      res.json({ ok: true, reply });
+    } catch (err) {
+      console.error("Test route error:", err);
+      res.status(500).json({ ok: false, error: "Gemini test failed" });
     }
   });
 };
@@ -199,5 +220,8 @@ export default async function runApp(
 >>>>>>> 2fd3fb1 (Fix app.ts route import: replace non-existent registerRoutes with router from routes.ts)
 =======
 
+<<<<<<< HEAD
 
 >>>>>>> 2491800 (fix(services): add TypeScript types to app.ts to remove implicit any errors  - Added interfaces for memory entries and chat history - Typed all map, reduce, and callback parameters - Fixed imports to ensure proper type checking - Improved type safety across service functions)
+=======
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)

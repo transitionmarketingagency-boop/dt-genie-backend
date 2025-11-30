@@ -31,17 +31,25 @@ import express, { Application } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { createServer, Server } from "http";
+<<<<<<< HEAD
 import router from "./routes.ts"; // Correct .ts import
 >>>>>>> d78464c (Update app.ts)
 import { storage } from "./storage";
 import { memoryStore } from "./services/memory";
 import { queryGemini } from "./services/gemini.ts"; // Correct .ts import
 import type { MemoryEntry, ChatHistory } from "@shared/types";
+=======
+
+import router from "./routes";
+import { setupApp } from "./services/app";
+import { queryGemini } from "./services/gemini";
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
 
 <<<<<<< HEAD
 =======
 dotenv.config();
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
 // -------------------- Interfaces --------------------
@@ -221,8 +229,11 @@ loader();
 // --------------------
 // Main App
 // --------------------
+=======
+// -------------------- Main App --------------------
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
 export default async function runApp(
-  setupFn?: (app: Application, server: Server) => Promise<void>
+  staticHandler?: (app: Application, server?: Server) => void
 ): Promise<Server> {
   const app: Application = express();
   const PORT = parseInt(process.env.PORT || "5000", 10);
@@ -238,29 +249,41 @@ export default async function runApp(
   app.use("/", router);
 
   // Health endpoint
-  app.get("/api/health", (req, res) => {
+  app.get("/api/health", (_req, res) => {
     try {
       res.json({
         status: "ok",
         timestamp: new Date().toISOString(),
-        memory: memoryStore.getAllMemory().length,
       });
     } catch (err) {
       res.status(500).json({ status: "error", message: "Health check failed" });
     }
   });
 
-  // Optional setup function
-  if (setupFn) {
-    await setupFn(app, httpServer);
+  // -------------------- Gemini test route --------------------
+  app.get("/test-gemini", async (_req, res) => {
+    try {
+      const reply = await queryGemini("Say hello! This is a Gemini test.");
+      res.json({ ok: true, reply });
+    } catch (err) {
+      console.error("Gemini test route error:", err);
+      res.status(500).json({ ok: false, error: "Gemini test failed" });
+    }
+  });
+
+  // -------------------- Session-specific setup --------------------
+  await setupApp(app, "default-session");
+
+  // Optional static handler (for production)
+  if (staticHandler) {
+    await staticHandler(app, httpServer);
   }
 
-  return new Promise((resolve) => {
-    httpServer.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
-      resolve(httpServer);
-    });
+  // Start server
+  httpServer.listen(PORT, () => {
+    console.log(`🚀 Server running at http://localhost:${PORT}`);
   });
+<<<<<<< HEAD
 }
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -272,3 +295,8 @@ export default async function runApp(
 =======
 
 >>>>>>> 4f73bd9 (Update app.ts)
+=======
+
+  return httpServer;
+}
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)

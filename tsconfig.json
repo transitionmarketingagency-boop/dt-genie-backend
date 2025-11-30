@@ -2,14 +2,37 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
+<<<<<<< HEAD
     "moduleResolution": "node",
+=======
+    "moduleResolution": "bundler",
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+<<<<<<< HEAD
     "forceConsistentCasingInFileNames": true,
     "outDir": "dist",
     "rootDir": ".",
     "types": ["node"]
   },
   "include": ["server/**/*.ts"]
+=======
+    "baseUrl": ".",
+    "types": ["node"]
+  },
+  "include": [
+    "server/**/*",
+    "shared/**/*"
+  ],
+  "exclude": [
+    "client",
+    "frontend",
+    "public",
+    "vite.config.ts",
+    "dist",
+    "node_modules"
+  ]
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
 }
+

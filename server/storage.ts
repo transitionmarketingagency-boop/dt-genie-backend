@@ -1,6 +1,9 @@
-// server/storage.ts
 import { randomUUID } from "crypto";
+<<<<<<< HEAD
 import type { User, InsertUser, ChatMessage, InsertChatMessage } from "@shared/schema";
+=======
+import type { User, InsertUser, ChatMessage, InsertChatMessage } from "../shared/schema"; // type-only import
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -12,17 +15,15 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private users: Map<string, User> = new Map();
-  private chatMessages: Map<string, ChatMessage[]> = new Map();
+  private users = new Map<string, User>();
+  private chatMessages = new Map<string, ChatMessage[]>();
 
   async getUser(id: string): Promise<User | undefined> {
     return this.users.get(id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username
-    );
+    return Array.from(this.users.values()).find(user => user.username === username);
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -39,11 +40,14 @@ export class MemStorage implements IStorage {
   async addChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
     const id = randomUUID();
     const message: ChatMessage = { id, timestamp: new Date(), ...insertMessage };
+
     const existing = this.chatMessages.get(insertMessage.sessionId) || [];
     existing.push(message);
     this.chatMessages.set(insertMessage.sessionId, existing);
+
     return message;
   }
 }
 
+// Singleton instance
 export const storage = new MemStorage();

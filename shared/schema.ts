@@ -1,21 +1,27 @@
-import { sql } from "drizzle-orm";
+// shared/schema.ts
+
 import { pgTable, text, varchar, timestamp } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// ---------------- USERS ----------------
+// --------------------------------------
+// USER TABLE
+// --------------------------------------
 export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
+  id: varchar("id").primaryKey(),
+  username: varchar("username").notNull(),
+  email: varchar("email").notNull(),
   password: text("password").notNull(),
 });
 
-// Use createInsertSchema from Drizzle-Zod
+// Insert schema (drizzle-zod)
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
+  email: true,
   password: true,
 });
 
+<<<<<<< HEAD
 <<<<<<< HEAD
 // Explicit TS interfaces
 =======
@@ -23,21 +29,26 @@ export const insertUserSchema = createInsertSchema(users).pick({
 >>>>>>> 307d96c ("Fix shared/schema.ts Zod types for Drizzle-Zod compatibility and TypeScript inference")
 export interface InsertUser extends z.infer<typeof insertUserSchema> {}
 export interface User extends typeof users.$inferSelect {}
+=======
+export interface User extends z.infer<typeof users.$inferSelect> {}
+export interface InsertUser extends z.infer<typeof insertUserSchema> {}
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
 
-// ---------------- CHAT MESSAGES ----------------
-export const chatMessages = pgTable("chat_messages", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sessionId: text("session_id").notNull(),
-  role: text("role").notNull(),
-  content: text("content").notNull(),
-  timestamp: timestamp("timestamp").notNull().defaultNow(),
-});
+// --------------------------------------
+// CHAT MESSAGE TYPES (in-memory storage)
+// --------------------------------------
+export interface ChatMessage {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
 
-export const insertChatMessageSchema = createInsertSchema(chatMessages).omit({
-  id: true,
-  timestamp: true,
-});
+export interface InsertChatMessage
+  extends Omit<ChatMessage, "id" | "timestamp"> {}
 
+<<<<<<< HEAD
 // Explicit interfaces
 export interface InsertChatMessage
   extends z.infer<typeof insertChatMessageSchema> {}
@@ -61,3 +72,5 @@ export const chatResponseSchema = z.object({
 =======
 >>>>>>> 307d96c ("Fix shared/schema.ts Zod types for Drizzle-Zod compatibility and TypeScript inference")
 export type ChatResponse = z.infer<typeof chatResponseSchema>;
+=======
+>>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
