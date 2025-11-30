@@ -7,8 +7,14 @@
   "scripts": {
     "dev": "tsx server/app.ts",
     "build": "tsc -p tsconfig.build.json",
+<<<<<<< HEAD
     "start": "node dist/app.js",
     "build:backend": "tsc -p tsconfig.build.json"
+=======
+    "start": "node dist/index-prod.js",
+    "build:backend": "tsc -p tsconfig.build.json",
+    "frontend": "vite"
+>>>>>>> 1c30a94 (Backend fixed, memory & history endpoints working, frontend dependencies installed)
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -24,6 +30,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cors": "^2.8.5",
+<<<<<<< HEAD
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "express-rate-limit": "^8.2.1",
@@ -59,6 +66,32 @@
     "wouter": "^3.3.5",
     "ws": "^8.18.0",
     "zod-validation-error": "^3.4.0"
+=======
+    "dotenv": "^16.3.1",
+    "drizzle-orm": "^0.44.7",
+    "drizzle-zod": "^0.8.3",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.7.0",
+    "multer": "^1.4.5-lts.1",
+    "nanoid": "^4.0.2",
+    "pdf-parse": "^1.1.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "uuid": "^9.0.0",
+    "vite": "^7.2.4",
+    "zod": "^4.1.13",
+    "wouter": "^3.8.0",
+    "@tanstack/react-query": "^5.0.0",
+    "lucide-react": "^0.258.0",
+    "@radix-ui/react-tooltip": "^1.0.0",
+    "clsx": "^2.0.0",
+    "class-variance-authority": "^0.5.0",
+    "tailwind-merge": "^1.14.0",
+    "@radix-ui/react-toast": "^1.0.0",
+    "@radix-ui/react-slot": "^1.0.0",
+    "@radix-ui/react-tabs": "^1.0.0",
+    "@radix-ui/react-avatar": "^1.0.0"
+>>>>>>> 1c30a94 (Backend fixed, memory & history endpoints working, frontend dependencies installed)
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -72,8 +105,14 @@
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
     "ts-node": "^10.9.1",
+<<<<<<< HEAD
     "typescript": "^5.6.3",
     "tsx": "^4.20.6"
+=======
+    "tsx": "^4.20.6",
+    "typescript": "^5.2.2",
+    "vite": "^7.2.4"
+>>>>>>> 1c30a94 (Backend fixed, memory & history endpoints working, frontend dependencies installed)
   },
   "engines": {
     "node": ">=22.0.0"
