@@ -2,44 +2,17 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
-<<<<<<< HEAD
-<<<<<<< HEAD
     "moduleResolution": "node",
-=======
-    "moduleResolution": "bundler",
->>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
-=======
-    "moduleResolution": "node",          // ✅ needed for ES modules
->>>>>>> 8eb4c8f (Add memory and chat history endpoints to the chatbot backend)
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-<<<<<<< HEAD
     "forceConsistentCasingInFileNames": true,
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["node"]
-  },
-  "include": ["server/**/*.ts"]
-=======
-    "baseUrl": ".",
     "types": ["node"],
-    "outDir": "dist",                    // ✅ emit JS files to dist
-    "resolveJsonModule": true            // ✅ optional, if you import JSON
+    "baseUrl": ".",
+    "resolveJsonModule": true
   },
-  "include": [
-    "server/**/*",
-    "shared/**/*"
-  ],
-  "exclude": [
-    "client",
-    "frontend",
-    "public",
-    "vite.config.ts",
-    "dist",
-    "node_modules"
-  ]
->>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
+  "include": ["server/**/*", "shared/**/*"],
+  "exclude": ["client", "frontend", "public", "vite.config.ts", "dist", "node_modules"]
 }
-
-

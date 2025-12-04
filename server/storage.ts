@@ -1,85 +1,38 @@
-<<<<<<< HEAD
-import { randomUUID } from "crypto";
-<<<<<<< HEAD
-import type { User, InsertUser, ChatMessage, InsertChatMessage } from "@shared/schema";
-=======
-import type { User, InsertUser, ChatMessage, InsertChatMessage } from "../shared/schema"; // type-only import
->>>>>>> 3d7de80 (Resolve conflicts: update server and shared configs)
-=======
 // server/storage.ts
->>>>>>> 8eb4c8f (Add memory and chat history endpoints to the chatbot backend)
+import { ChatMessage } from "../shared/types";
 
-import { randomUUID } from "crypto";
-import type {
-  User,
-  InsertUser,
-  ChatMessage,
-  InsertChatMessage
-} from "../shared/schema";
-
-// -----------------------------
-// STORAGE INTERFACE
-// -----------------------------
-export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
-
-  getChatHistory(sessionId: string): Promise<ChatMessage[]>;
-  addChatMessage(message: InsertChatMessage): Promise<ChatMessage>;
-
-  // Added in feature branch — keep it
-  saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void>;
+export interface InsertChatMessage {
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
 }
 
-// -----------------------------
-// IN-MEMORY STORAGE IMPLEMENTATION
-// -----------------------------
-export class MemStorage implements IStorage {
-  private users = new Map<string, User>();
-  private chatMessages = new Map<string, ChatMessage[]>();
+export class Storage {
+  private chatMessages: Map<string, ChatMessage[]> = new Map();
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
-  }
+  async addChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const msg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sessionId: message.sessionId,
+      role: message.role,
+      content: message.content,
+      timestamp: new Date(),
+    };
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return [...this.users.values()].find(u => u.username === username);
-  }
+    const messages = this.chatMessages.get(message.sessionId) || [];
+    messages.push(msg);
+    this.chatMessages.set(message.sessionId, messages);
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { id, ...insertUser };
-    this.users.set(id, user);
-    return user;
+    return msg;
   }
 
   async getChatHistory(sessionId: string): Promise<ChatMessage[]> {
-    return [...(this.chatMessages.get(sessionId) || [])];
+    return this.chatMessages.get(sessionId) || [];
   }
 
-  async addChatMessage(insertMessage: InsertChatMessage): Promise<ChatMessage> {
-    const id = randomUUID();
-    const message: ChatMessage = {
-      id,
-      timestamp: new Date(),
-      ...insertMessage
-    };
-
-    const existing = this.chatMessages.get(insertMessage.sessionId) || [];
-    existing.push(message);
-    this.chatMessages.set(insertMessage.sessionId, existing);
-
-    return message;
-  }
-
-  // ----------------------------------
-  // 🔥 Required for chat persistence
-  // ----------------------------------
   async saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void> {
-    this.chatMessages.set(sessionId, [...messages]);
+    this.chatMessages.set(sessionId, messages);
   }
 }
 
-// Singleton instance for app usage
-export const storage = new MemStorage();
+export const storage = new Storage();
