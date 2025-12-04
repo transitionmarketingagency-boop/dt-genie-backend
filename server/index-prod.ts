@@ -4,9 +4,10 @@ import { fileURLToPath } from "node:url";
 import express, { type Application } from "express";
 import type { Server } from "node:http";
 
-import runApp from "./app";
-import { setupApp } from "./app"; 
-import populateTestData from "./populate-test-data";
+// ✅ ESM-compatible imports (point to .js in dist)
+import runApp from "./app.js";
+import { setupApp } from "./app.js";
+import populateTestData from "./populate-test-data.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,9 +31,10 @@ export function serveStatic(app: Application, _server: Server) {
 }
 
 (async () => {
+  // ✅ runApp callback signature with Application & Server
   await runApp(async (app: Application, server: Server) => {
-    await setupApp(app);          // API routes first
-    serveStatic(app, server);     // static files after
+    await setupApp(app);   // API routes first
+    serveStatic(app, server); // Static files after
   });
 
   try {

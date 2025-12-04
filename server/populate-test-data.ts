@@ -1,7 +1,7 @@
-// server/populate-test-data.ts
-import { storage, InsertChatMessage } from "./storage";
-import { memoryStore } from "./services/memory";
-import { ConversationMemory } from "../shared/types";
+// ✅ Add .js extensions for internal imports
+import { storage, InsertChatMessage } from "./storage.js";
+import { memoryStore } from "./services/memory.js";
+import { ConversationMemory } from "../shared/types.js";
 
 export default async function populateTestData() {
   const sessionId = "default-session";
