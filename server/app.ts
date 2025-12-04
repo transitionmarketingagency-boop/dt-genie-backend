@@ -56,19 +56,17 @@ export const setupApp = async (app: Application) => {
 };
 
 // -----------------------------
-// Run server (Render compatible)
+// Run server (Render-compatible)
 // -----------------------------
 export default async function runApp(
-  setupFn?: (app: Application) => Promise<void> | void
+  setupFn?: (app: Application, server: Server) => Promise<void>
 ): Promise<Server> {
   const app: Application = express();
   const PORT = parseInt(process.env.PORT || "5000", 10);
   const httpServer = createServer(app);
 
-  // FIX: now supports setupFn(app) without requiring 2 arguments
-  if (setupFn) {
-    await setupFn(app);
-  }
+  // Keep the original 2-argument signature
+  if (setupFn) await setupFn(app, httpServer);
 
   return new Promise((resolve) => {
     httpServer.listen(PORT, () => {
