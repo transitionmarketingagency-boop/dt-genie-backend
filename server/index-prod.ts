@@ -16,8 +16,17 @@ export function serveStatic(app: Application, _server: Server) {
   const distPublicPath = path.resolve(__dirname, "../dist/public");
   const publicPath = path.resolve(__dirname, "../public");
 
-  if (fs.existsSync(distPublicPath)) app.use(express.static(distPublicPath));
-  if (fs.existsSync(publicPath)) app.use(express.static(publicPath));
+  // Serve backend public folder first (avatar.png etc.)
+  if (fs.existsSync(publicPath)) {
+    app.use(express.static(publicPath));
+    console.log("✅ Public folder served at /");
+  }
+
+  // Serve frontend built files if exists
+  if (fs.existsSync(distPublicPath)) {
+    app.use(express.static(distPublicPath));
+    console.log("✅ Dist folder served at /");
+  }
 
   // SPA fallback
   app.get("*", (req, res, next) => {
@@ -31,10 +40,9 @@ export function serveStatic(app: Application, _server: Server) {
 }
 
 (async () => {
-  // ✅ runApp callback signature with Application & Server
   await runApp(async (app: Application, server: Server) => {
-    await setupApp(app);   // API routes first
-    serveStatic(app, server); // Static files after
+    await setupApp(app);   
+    serveStatic(app, server); 
   });
 
   try {
