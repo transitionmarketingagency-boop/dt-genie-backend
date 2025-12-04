@@ -1,17 +1,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import express, { Express } from "express";
+import express, { type Application } from "express";
 import type { Server } from "node:http";
 
 import runApp from "./app";
-import { setupApp } from "./app"; // ✅ API ROUTES
+import { setupApp } from "./app"; 
 import populateTestData from "./populate-test-data";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export function serveStatic(app: Express, server: Server) {
+export function serveStatic(app: Application, _server: Server) {
   const distPublicPath = path.resolve(__dirname, "../dist/public");
   const publicPath = path.resolve(__dirname, "../public");
 
@@ -30,9 +30,9 @@ export function serveStatic(app: Express, server: Server) {
 }
 
 (async () => {
-  await runApp(async (app: Express, server: Server) => {
-    await setupApp(app);        // API routes first
-    serveStatic(app, server);   // pass both app and server
+  await runApp(async (app: Application, server: Server) => {
+    await setupApp(app);          // API routes first
+    serveStatic(app, server);     // static files after
   });
 
   try {
