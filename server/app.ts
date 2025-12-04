@@ -8,7 +8,9 @@ import { queryGemini } from "./services/gemini";
 
 dotenv.config();
 
+// -----------------------------
 // Setup API routes
+// -----------------------------
 export const setupApp = async (app: Application) => {
   app.use(cors());
   app.use(express.json({ limit: "10mb" }));
@@ -19,7 +21,7 @@ export const setupApp = async (app: Application) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
 
-  // Test Gemini route
+  // Test route
   app.get("/test-gemini", (_req, res) => {
     res.json({ ok: true, message: "Gemini test route working!" });
   });
@@ -28,10 +30,23 @@ export const setupApp = async (app: Application) => {
   app.post("/chat", async (req, res) => {
     try {
       const { message, sessionId } = req.body;
-      await storage.addChatMessage({ sessionId, role: "user", content: message });
+
+      await storage.addChatMessage({
+        sessionId,
+        role: "user",
+        content: message,
+      });
+
       const aiResponse = await queryGemini(message);
-      await storage.addChatMessage({ sessionId, role: "assistant", content: aiResponse });
+
+      await storage.addChatMessage({
+        sessionId,
+        role: "assistant",
+        content: aiResponse,
+      });
+
       const fullHistory = await storage.getChatHistory(sessionId);
+
       res.json({ ok: true, reply: aiResponse, history: fullHistory });
     } catch (err) {
       console.error(err);
@@ -40,19 +55,24 @@ export const setupApp = async (app: Application) => {
   });
 };
 
-// Run server
+// -----------------------------
+// Run server (Render compatible)
+// -----------------------------
 export default async function runApp(
-  setupFn?: (app: Application, server: Server) => Promise<void>
+  setupFn?: (app: Application) => Promise<void> | void
 ): Promise<Server> {
   const app: Application = express();
   const PORT = parseInt(process.env.PORT || "5000", 10);
   const httpServer = createServer(app);
 
-  if (setupFn) await setupFn(app, httpServer);
+  // FIX: now supports setupFn(app) without requiring 2 arguments
+  if (setupFn) {
+    await setupFn(app);
+  }
 
   return new Promise((resolve) => {
     httpServer.listen(PORT, () => {
-      console.log(`Server running at http://localhost:${PORT}`);
+      console.log(`🚀 Server running at http://localhost:${PORT}`);
       resolve(httpServer);
     });
   });
