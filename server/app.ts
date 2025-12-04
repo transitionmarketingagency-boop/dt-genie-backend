@@ -3,8 +3,9 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { createServer, type Server } from "node:http";
 
-import { storage } from "./storage";
-import { queryGemini } from "./services/gemini";
+// ✅ Add .js extensions for Node ESM
+import { storage } from "./storage.js";
+import { queryGemini } from "./services/gemini.js";
 
 dotenv.config();
 
