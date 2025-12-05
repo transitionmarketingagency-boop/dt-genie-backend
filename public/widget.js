@@ -17,32 +17,41 @@
   let isOpen = false;
   let isProcessing = false;
 
-  function createWidget() {
-    const widgetHTML = `
-      <div id="dt-genie-widget">
-        <div id="dt-genie-button" role="button" aria-label="Open DT Genie Chat" tabindex="0">
-          <img id="dt-genie-avatar" src="${CONFIG.avatarUrl}" alt="DT Genie" />
-        </div>
-        <div id="dt-genie-panel" role="dialog" aria-label="DT Genie Chat">
-          <div id="dt-genie-header">
-            <img id="dt-genie-header-avatar" src="${CONFIG.avatarUrl}" alt="DT Genie" />
-            <div id="dt-genie-header-info">
-              <h3 id="dt-genie-header-name">DT Genie</h3>
-              <p id="dt-genie-header-status">Online</p>
-            </div>
-            <button id="dt-genie-close" aria-label="Close chat">×</button>
+    function createWidget() {
+      const widgetHTML = `
+        <div id="dt-genie-widget">
+          <!-- Floating Widget Button with Curved Text -->
+          <div id="dt-genie-button" role="button" aria-label="Open DT Genie Chat" tabindex="0">
+            <img id="dt-genie-avatar" src="https://i.ibb.co/5rP7h9f/cyberpunk-avatar.png" alt="DT Genie" />
+            <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
+              <text dy="0">
+                WE ARE HERE • WE ARE HERE • WE ARE HERE • WE ARE HERE
+              </text>
+            </svg>
           </div>
-          <div id="dt-genie-messages" role="log" aria-live="polite"></div>
-          <div id="dt-genie-input-container">
-            <div id="dt-genie-input-wrapper">
-              <textarea id="dt-genie-input" placeholder="Type your message..." rows="1" aria-label="Message input"></textarea>
-              <button id="dt-genie-send" aria-label="Send message">Send</button>
+
+          <!-- Chat Panel -->
+          <div id="dt-genie-panel" role="dialog" aria-label="DT Genie Chat">
+            <div id="dt-genie-header">
+              <img id="dt-genie-header-avatar" src="https://i.ibb.co/5rP7h9f/cyberpunk-avatar.png" alt="DT Genie" />
+              <div id="dt-genie-header-info">
+                <h3 id="dt-genie-header-name">DT Genie</h3>
+                <p id="dt-genie-header-status">Online</p>
+              </div>
+              <button id="dt-genie-close" aria-label="Close chat">×</button>
+            </div>
+            <div id="dt-genie-messages" role="log" aria-live="polite"></div>
+            <div id="dt-genie-input-container">
+              <div id="dt-genie-input-wrapper">
+                <textarea id="dt-genie-input" placeholder="Type your message..." rows="1" aria-label="Message input"></textarea>
+                <button id="dt-genie-send" aria-label="Send message">Send</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    `;
-    document.body.insertAdjacentHTML('beforeend', widgetHTML);
+      `;
+      document.body.insertAdjacentHTML('beforeend', widgetHTML);
+
   }
 
   function addMessage(role, content, options = {}) {
