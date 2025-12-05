@@ -57,22 +57,19 @@ export const setupApp = async (app: Application) => {
 };
 
 // -----------------------------
-// Run server (Render-compatible)
+// Run server — Render-compatible
+// ❗ DOES NOT START LISTENING
 // -----------------------------
 export default async function runApp(
   setupFn?: (app: Application, server: Server) => Promise<void>
 ): Promise<Server> {
   const app: Application = express();
-  const PORT = parseInt(process.env.PORT || "5000", 10);
   const httpServer = createServer(app);
 
   // Keep the original 2-argument signature
   if (setupFn) await setupFn(app, httpServer);
 
-  return new Promise((resolve) => {
-    httpServer.listen(PORT, () => {
-      console.log(`🚀 Server running at http://localhost:${PORT}`);
-      resolve(httpServer);
-    });
-  });
+  // ❗ Return the server WITHOUT calling listen()
+  // Render's index-prod.js will call server.listen()
+  return httpServer;
 }
