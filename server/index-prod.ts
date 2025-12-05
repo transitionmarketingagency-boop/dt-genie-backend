@@ -13,23 +13,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function serveStatic(app: Application, _server: Server) {
-  // Use Render-friendly static paths
   const distPublicPath = path.resolve(__dirname, "../dist/public");
   const publicPath = path.resolve(__dirname, "../public");
 
-  // Serve backend public folder first (avatar.png etc.)
   if (fs.existsSync(publicPath)) {
     app.use(express.static(publicPath));
     console.log("✅ Public folder served at /");
   }
 
-  // Serve dist folder (production build) for static assets
   if (fs.existsSync(distPublicPath)) {
     app.use(express.static(distPublicPath));
     console.log("✅ Dist folder served at /");
   }
 
-  // SPA fallback (optional)
   app.get("*", (req, res, next) => {
     const indexPath = path.join(distPublicPath, "index.html");
     if (fs.existsSync(indexPath)) {
@@ -40,17 +36,23 @@ export function serveStatic(app: Application, _server: Server) {
   });
 }
 
-(async () => {
-  await runApp(async (app: Application, server: Server) => {
-    await setupApp(app);
-    serveStatic(app, server);
+// ⛔ Prevent double server listen on Render
+// Render runs "node dist/server/index-prod.js" → it should be the ONLY one starting the server.
+const isRender = !!process.env.RENDER;
 
-    // Start server using PORT from environment (Render sets this automatically)
-    const PORT = process.env.PORT || 5000;
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+(async () => {
+  // ⛔ Only auto-start server if NOT running on Render
+  if (!isRender) {
+    await runApp(async (app: Application, server: Server) => {
+      await setupApp(app);
+      serveStatic(app, server);
+
+      const PORT = process.env.PORT || 5000;
+      server.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+      });
     });
-  });
+  }
 
   try {
     await populateTestData();
