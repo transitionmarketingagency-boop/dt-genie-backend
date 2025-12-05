@@ -4,7 +4,6 @@ import { fileURLToPath } from "node:url";
 import express, { type Application } from "express";
 import type { Server } from "node:http";
 
-// ✅ ESM-compatible imports (point to .js in dist)
 import runApp from "./app.js";
 import { setupApp } from "./app.js";
 import populateTestData from "./populate-test-data.js";
@@ -36,23 +35,17 @@ export function serveStatic(app: Application, _server: Server) {
   });
 }
 
-// ⛔ Prevent double server listen on Render
-// Render runs "node dist/server/index-prod.js" → it should be the ONLY one starting the server.
-const isRender = !!process.env.RENDER;
-
 (async () => {
-  // ⛔ Only auto-start server if NOT running on Render
-  if (!isRender) {
-    await runApp(async (app: Application, server: Server) => {
-      await setupApp(app);
-      serveStatic(app, server);
+  await runApp(async (app: Application, server: Server) => {
+    await setupApp(app);
+    serveStatic(app, server);
 
-      const PORT = process.env.PORT || 5000;
-      server.listen(PORT, () => {
-        console.log(`🚀 Server running on port ${PORT}`);
-      });
+    // ✅ FINAL FIX: single server listener placed here
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
     });
-  }
+  });
 
   try {
     await populateTestData();
