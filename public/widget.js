@@ -3,203 +3,146 @@
 
   const CONFIG = {
     apiEndpoint: 'https://dt-genie-backend.onrender.com/chat',
-    // Inline SVG will be used for the avatar so no remote image required
     maxHistoryMessages: 10
   };
 
   const CHATBOT_NAME = 'NeonVision';
-
   let sessionId = localStorage.getItem('dtGenieSession');
-  if (!sessionId) {
-    sessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+  if(!sessionId){
+    sessionId = 'session-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
     localStorage.setItem('dtGenieSession', sessionId);
   }
 
-  let messageHistory = [];
-  let isOpen = false;
-  let isProcessing = false;
+  let isOpen = false, isProcessing = false;
 
-  // Inline neon brain SVG (small, used twice)
-  const NEON_BRAIN_SVG = `
-    <svg width="56" height="56" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <defs>
-        <radialGradient id="g1" cx="30%" cy="30%">
-          <stop offset="0%" stop-color="#00E1FF"/>
-          <stop offset="60%" stop-color="#00E1FF"/>
-          <stop offset="100%" stop-color="#004E6E"/>
-        </radialGradient>
-        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3.5" result="coloredBlur"/>
-          <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
-          </feMerge>
-        </filter>
-      </defs>
-      <g filter="url(#glow)">
-        <path d="M32 6C26 6 22 10 20 14c-3 6-1 10-1 14s-3 6-2 10 4 6 8 6 6-3 10-3 6 3 10 3 7-2 8-6-2-7-2-10 1-6-1-10c-2-4-6-8-12-8-2 0-4-1-8-1z"
-              fill="url(#g1)"/>
-        <circle cx="22" cy="18" r="2.4" fill="#00E1FF" opacity="0.95"/>
-        <circle cx="42" cy="18" r="2.4" fill="#FF7A18" opacity="0.9"/>
-      </g>
-    </svg>`;
+  const NEON_BRAIN_SVG = `<svg width="64" height="64" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <radialGradient id="brainGlow" cx="50%" cy="50%">
+    <stop offset="0%" stop-color="#00E1FF"/>
+    <stop offset="33%" stop-color="#9B59B6"/>
+    <stop offset="66%" stop-color="#FF2D95"/>
+    <stop offset="100%" stop-color="#00E1FF"/>
+  </radialGradient>
+  <filter id="neonGlow">
+    <feGaussianBlur stdDeviation="8" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
+<path filter="url(#neonGlow)" fill="url(#brainGlow)" d="M256 30c-70 0-126 56-126 126v20c-22 8-38 28-38 54 0 24 14 45 34 54-6 10-10 22-10 34 0 38 31 69 69 69h18c13 24 39 40 69 40s56-16 69-40h18c38 0 69-31 69-69 0-12-4-24-10-34 20-9 34-30 34-54 0-26-16-46-38-54v-20c0-70-56-126-126-126z"/>
+</svg>`;
 
-  function createWidget() {
-    const widgetHTML = `
-      <div id="dt-genie-widget" aria-hidden="false">
-        <!-- Floating Widget Button with Curved Text -->
-        <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
-          <div id="dt-genie-avatar-wrap">${NEON_BRAIN_SVG}</div>
+  function createWidget(){
+    const widgetHTML = `<div id="dt-genie-widget" aria-hidden="false">
+      <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
+        <div id="dt-genie-avatar-wrap">${NEON_BRAIN_SVG}</div>
+        <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
+          <defs>
+            <path id="circlePath" d="M70,70 m-55,0 a55,55 0 1,1 110,0 a55,55 0 1,1 -110,0"/>
+          </defs>
+          <text><textPath href="#circlePath" startOffset="0">WE ARE HERE • NEONVISION AI • </textPath></text>
+        </svg>
+      </div>
 
-          <svg id="dt-genie-curved-text" viewBox="0 0 140 140" aria-hidden="true">
-            <defs>
-              <path id="circlePath" d="M70,70 m-55,0 a55,55 0 1,1 110,0 a55,55 0 1,1 -110,0"/>
-            </defs>
-            <text>
-              <textPath href="#circlePath" startOffset="0">
-                WE ARE HERE • WE ARE HERE • WE ARE HERE •
-              </textPath>
-            </text>
-          </svg>
-        </div>
-
-        <!-- Chat Panel -->
-        <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat" aria-hidden="true">
-          <div id="dt-genie-header">
-            <div id="dt-genie-header-avatar-wrap">${NEON_BRAIN_SVG}</div>
-            <div id="dt-genie-header-info">
-              <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
-              <p id="dt-genie-header-status">Online</p>
-            </div>
-            <button id="dt-genie-close" aria-label="Close chat">×</button>
+      <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat" aria-hidden="true">
+        <div id="dt-genie-header">
+          <div id="dt-genie-header-avatar-wrap">${NEON_BRAIN_SVG}</div>
+          <div id="dt-genie-header-info">
+            <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
+            <p id="dt-genie-header-status">Online</p>
           </div>
-          <div id="dt-genie-messages" role="log" aria-live="polite"></div>
-          <div id="dt-genie-input-container">
-            <div id="dt-genie-input-wrapper">
-              <textarea id="dt-genie-input" placeholder="Type your message..." rows="1" aria-label="Message input"></textarea>
-              <button id="dt-genie-send" aria-label="Send message">Send</button>
-            </div>
+          <button id="dt-genie-close" aria-label="Close chat">×</button>
+        </div>
+        <div id="dt-genie-messages"></div>
+        <div id="dt-genie-input-container">
+          <div id="dt-genie-input-wrapper">
+            <textarea id="dt-genie-input" placeholder="Type your message..." rows="1"></textarea>
+            <button id="dt-genie-send">Send</button>
           </div>
         </div>
       </div>
-    `;
+    </div>`;
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
   }
 
-  function addMessage(role, content, options = {}) {
-    const messagesContainer = document.getElementById('dt-genie-messages');
-    const messageDiv = document.createElement('div');
-    messageDiv.className = `dt-message ${role}`;
-    const bubbleDiv = document.createElement('div');
-    bubbleDiv.className = `dt-message-bubble${options.newMessage ? ' new-message' : ''}`;
-    bubbleDiv.textContent = content;
-    messageDiv.appendChild(bubbleDiv);
-    messagesContainer.appendChild(messageDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  function addMessage(role, content, options={}) {
+    const container = document.getElementById('dt-genie-messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `dt-message ${role}`;
+    const bubble = document.createElement('div');
+    bubble.className = `dt-message-bubble${options.newMessage?' new-message':''}`;
+    bubble.textContent = content;
+    msgDiv.appendChild(bubble);
+    container.appendChild(msgDiv);
+    container.scrollTop = container.scrollHeight;
   }
 
   function showTyping() {
-    const messagesContainer = document.getElementById('dt-genie-messages');
+    const container = document.getElementById('dt-genie-messages');
     const typingDiv = document.createElement('div');
     typingDiv.id = 'dt-genie-typing';
     typingDiv.className = 'dt-message assistant';
-    typingDiv.innerHTML = `
-      <div class="dt-message-bubble">
-        <div class="dt-typing">
-          <div class="dt-typing-dot"></div>
-          <div class="dt-typing-dot"></div>
-          <div class="dt-typing-dot"></div>
-        </div>
-      </div>
-    `;
-    messagesContainer.appendChild(typingDiv);
-    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    typingDiv.innerHTML = `<div class="dt-message-bubble"><div class="dt-typing">
+      <div class="dt-typing-dot"></div><div class="dt-typing-dot"></div><div class="dt-typing-dot"></div>
+    </div></div>`;
+    container.appendChild(typingDiv);
+    container.scrollTop = container.scrollHeight;
+
+    // Play typing sound
+    const audio = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-fast-click-1113.mp3');
+    audio.volume = 0.15; audio.play().catch(()=>{});
   }
 
-  function hideTyping() {
-    const typingDiv = document.getElementById('dt-genie-typing');
-    if (typingDiv) typingDiv.remove();
-  }
+  function hideTyping() { const t = document.getElementById('dt-genie-typing'); if(t) t.remove(); }
 
-  async function sendMessage(message) {
-    if (!message.trim() || isProcessing) return;
-    isProcessing = true;
-    const sendButton = document.getElementById('dt-genie-send');
-    sendButton.disabled = true;
-
-    addMessage('user', message);
-    const input = document.getElementById('dt-genie-input');
-    input.value = '';
-    input.style.height = 'auto';
+  async function sendMessage(msg){
+    if(!msg.trim() || isProcessing) return;
+    isProcessing=true;
+    const input=document.getElementById('dt-genie-input');
+    document.getElementById('dt-genie-send').disabled=true;
+    addMessage('user', msg);
+    input.value=''; input.style.height='auto';
     showTyping();
-
-    try {
-      const response = await fetch(CONFIG.apiEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, sessionId })
-      });
-
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
-      const data = await response.json();
+    try{
+      const res = await fetch(CONFIG.apiEndpoint,{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({message:msg,sessionId})});
+      if(!res.ok) throw new Error(`Server error: ${res.status}`);
+      const data = await res.json();
       hideTyping();
-      if (data.reply) addMessage('assistant', data.reply, { newMessage: true });
-      else throw new Error('No reply from server');
-
-    } catch (err) {
-      console.error('Chat error:', err);
+      addMessage('assistant', data.reply, {newMessage:true});
+    }catch(e){
       hideTyping();
-      addMessage('assistant', "Sorry, I'm having trouble connecting. Please try again.", { newMessage: true });
-    } finally {
-      isProcessing = false;
-      sendButton.disabled = false;
-      input.focus();
-    }
+      addMessage('assistant', "Sorry, I'm having trouble connecting. Try again in a moment.", {newMessage:true});
+    }finally{ isProcessing=false; document.getElementById('dt-genie-send').disabled=false; input.focus();}
   }
 
-  function togglePanel(open) {
-    const panel = document.getElementById('dt-genie-panel');
-    // keep the button visible even when panel opens
-    const button = document.getElementById('dt-genie-button');
-    isOpen = open !== undefined ? open : !isOpen;
-    if (isOpen) {
-      panel.classList.add('open');
-      panel.setAttribute('aria-hidden', 'false');
-      // don't hide the button; keep it visible
-      const messagesContainer = document.getElementById('dt-genie-messages');
-      if (messagesContainer.children.length === 0) {
-        addMessage('assistant', `Hello! I'm ${CHATBOT_NAME}, your AI assistant for Digital Transition Marketing. How can I help you today?`);
-      }
-      setTimeout(() => document.getElementById('dt-genie-input').focus(), 100);
-    } else {
-      panel.classList.remove('open');
-      panel.setAttribute('aria-hidden', 'true');
-    }
+  function togglePanel(force){
+    const panel=document.getElementById('dt-genie-panel');
+    isOpen = force!==undefined?force:!isOpen;
+    if(isOpen){
+      panel.classList.add('open'); panel.setAttribute('aria-hidden','false');
+      const msgs=document.getElementById('dt-genie-messages');
+      if(msgs.children.length===0) addMessage('assistant', `Hello! I'm ${CHATBOT_NAME}, your AI assistant. How can I help you today?`);
+    } else { panel.classList.remove('open'); panel.setAttribute('aria-hidden','true'); }
   }
 
-  function autoResizeTextarea(textarea) {
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
-  }
+  function autoResizeTextarea(input){ input.style.height='auto'; input.style.height=Math.min(input.scrollHeight,120)+'px'; }
 
-  function init() {
+  function init(){
     createWidget();
-    const button = document.getElementById('dt-genie-button');
-    const closeBtn = document.getElementById('dt-genie-close');
-    const sendBtn = document.getElementById('dt-genie-send');
-    const input = document.getElementById('dt-genie-input');
+    const btn=document.getElementById('dt-genie-button');
+    const closeBtn=document.getElementById('dt-genie-close');
+    const input=document.getElementById('dt-genie-input');
+    const sendBtn=document.getElementById('dt-genie-send');
 
-    // Accessibility: allow keyboard open
-    button.addEventListener('click', () => togglePanel(true));
-    button.addEventListener('keypress', e => { if (e.key==='Enter'||e.key===' ') { e.preventDefault(); togglePanel(true); } });
-    closeBtn.addEventListener('click', () => togglePanel(false));
-    sendBtn.addEventListener('click', () => sendMessage(input.value));
-    input.addEventListener('keypress', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(input.value); } });
-    input.addEventListener('input', () => autoResizeTextarea(input));
+    btn.addEventListener('click', ()=>togglePanel());
+    btn.addEventListener('keypress', e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();togglePanel();}});
+    closeBtn.addEventListener('click', ()=>togglePanel(false));
+    sendBtn.addEventListener('click', ()=>sendMessage(input.value));
+    input.addEventListener('keypress', e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage(input.value);}});
+    input.addEventListener('input', ()=>autoResizeTextarea(input));
 
-    console.log(`✨ ${CHATBOT_NAME} widget loaded successfully`);
+    console.log(`✨ ${CHATBOT_NAME} widget ready`);
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 })();
