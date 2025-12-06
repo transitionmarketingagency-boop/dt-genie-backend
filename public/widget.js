@@ -3,9 +3,11 @@
 
   const CONFIG = {
     apiEndpoint: 'https://dt-genie-backend.onrender.com/chat',
-    avatarUrl: 'https://dt-genie-backend.onrender.com/avatar.png',
+    avatarUrl: 'https://i.ibb.co/7QpKsCX/cyberpunk-avatar.png', // updated futuristic avatar
     maxHistoryMessages: 10
   };
+
+  const CHATBOT_NAME = 'NeonVision'; // updated chatbot name
 
   let sessionId = localStorage.getItem('dtGenieSession');
   if (!sessionId) {
@@ -17,41 +19,40 @@
   let isOpen = false;
   let isProcessing = false;
 
-    function createWidget() {
-      const widgetHTML = `
-        <div id="dt-genie-widget">
-          <!-- Floating Widget Button with Curved Text -->
-          <div id="dt-genie-button" role="button" aria-label="Open DT Genie Chat" tabindex="0">
-            <img id="dt-genie-avatar" src="https://i.ibb.co/5rP7h9f/cyberpunk-avatar.png" alt="DT Genie" />
-            <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
-              <text dy="0">
-                WE ARE HERE • WE ARE HERE • WE ARE HERE • WE ARE HERE
-              </text>
-            </svg>
-          </div>
+  function createWidget() {
+    const widgetHTML = `
+      <div id="dt-genie-widget">
+        <!-- Floating Widget Button with Curved Text -->
+        <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
+          <img id="dt-genie-avatar" src="${CONFIG.avatarUrl}" alt="${CHATBOT_NAME}" />
+          <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
+            <text dy="0">
+              WE ARE HERE • WE ARE HERE • WE ARE HERE • WE ARE HERE
+            </text>
+          </svg>
+        </div>
 
-          <!-- Chat Panel -->
-          <div id="dt-genie-panel" role="dialog" aria-label="DT Genie Chat">
-            <div id="dt-genie-header">
-              <img id="dt-genie-header-avatar" src="https://i.ibb.co/5rP7h9f/cyberpunk-avatar.png" alt="DT Genie" />
-              <div id="dt-genie-header-info">
-                <h3 id="dt-genie-header-name">DT Genie</h3>
-                <p id="dt-genie-header-status">Online</p>
-              </div>
-              <button id="dt-genie-close" aria-label="Close chat">×</button>
+        <!-- Chat Panel -->
+        <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat">
+          <div id="dt-genie-header">
+            <img id="dt-genie-header-avatar" src="${CONFIG.avatarUrl}" alt="${CHATBOT_NAME}" />
+            <div id="dt-genie-header-info">
+              <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
+              <p id="dt-genie-header-status">Online</p>
             </div>
-            <div id="dt-genie-messages" role="log" aria-live="polite"></div>
-            <div id="dt-genie-input-container">
-              <div id="dt-genie-input-wrapper">
-                <textarea id="dt-genie-input" placeholder="Type your message..." rows="1" aria-label="Message input"></textarea>
-                <button id="dt-genie-send" aria-label="Send message">Send</button>
-              </div>
+            <button id="dt-genie-close" aria-label="Close chat">×</button>
+          </div>
+          <div id="dt-genie-messages" role="log" aria-live="polite"></div>
+          <div id="dt-genie-input-container">
+            <div id="dt-genie-input-wrapper">
+              <textarea id="dt-genie-input" placeholder="Type your message..." rows="1" aria-label="Message input"></textarea>
+              <button id="dt-genie-send" aria-label="Send message">Send</button>
             </div>
           </div>
         </div>
-      `;
-      document.body.insertAdjacentHTML('beforeend', widgetHTML);
-
+      </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', widgetHTML);
   }
 
   function addMessage(role, content, options = {}) {
@@ -134,7 +135,7 @@
       button.style.display = 'none';
       const messagesContainer = document.getElementById('dt-genie-messages');
       if (messagesContainer.children.length === 0) {
-        addMessage('assistant', "Hello! I'm DT Genie, your AI assistant for Digital Transition Marketing. How can I help you today?");
+        addMessage('assistant', `Hello! I'm ${CHATBOT_NAME}, your AI assistant for Digital Transition Marketing. How can I help you today?`);
       }
       setTimeout(() => document.getElementById('dt-genie-input').focus(), 100);
     } else {
@@ -162,7 +163,7 @@
     input.addEventListener('keypress', e => { if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(input.value); } });
     input.addEventListener('input', () => autoResizeTextarea(input));
 
-    console.log('✨ DT Genie widget loaded successfully');
+    console.log(`✨ ${CHATBOT_NAME} widget loaded successfully`);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
