@@ -31,7 +31,7 @@
 
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
-            <img src="public/neon-brain.png" alt="${CHATBOT_NAME} icon" width="56" height="56" />
+            <img src="/neon-brain.png" alt="${CHATBOT_NAME} icon" width="56" height="56" />
           </div>
 
           <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
