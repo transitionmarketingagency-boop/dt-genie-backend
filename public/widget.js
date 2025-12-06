@@ -31,7 +31,7 @@
 
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
-            <img src="public/neon-brain.png" alt="${CHATBOT_NAME} icon" width="56" height="56" />
+            <img src="/neon-brain.png" alt="${CHATBOT_NAME} icon" width="56" height="56" />
           </div>
 
           <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
@@ -40,7 +40,7 @@
             </defs>
             <text>
               <textPath href="#circlePath" startOffset="0">
-                WE ARE HERE • NeonVision
+                WE ARE HERE • NeonVision •
               </textPath>
             </text>
           </svg>
@@ -49,7 +49,7 @@
         <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat" aria-hidden="true">
           <div id="dt-genie-header">
             <div id="dt-genie-header-avatar-wrap">
-             <img src="public/neon-brain.png" alt="${CHATBOT_NAME} icon" width="48" height="48" />
+              <img src="/neon-brain.png" alt="${CHATBOT_NAME} icon" width="48" height="48" />
             </div>
             <div id="dt-genie-header-info">
               <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
@@ -195,7 +195,6 @@
     const input = document.getElementById('dt-genie-input');
     const sendBtn = document.getElementById('dt-genie-send');
 
-    // Toggle panel on click
     button.addEventListener('click', () => togglePanel());
     button.addEventListener('keypress', e => {
       if (e.key === 'Enter' || e.key === ' ') {
