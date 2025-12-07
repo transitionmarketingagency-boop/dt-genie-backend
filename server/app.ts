@@ -6,6 +6,7 @@ import { createServer, type Server } from "node:http";
 // ✅ Add .js extensions for Node ESM
 import { storage } from "./storage.js";
 import { queryGemini } from "./services/gemini.js";
+// @ts-ignore
 import { fetchRelevantChunks } from "./query-chunks.js"; // ✅ NEW: fetch website content
 import path from "path";  // ✅ REQUIRED for static folder resolution
 
@@ -52,7 +53,7 @@ export const setupApp = async (app: Application) => {
 
       // 2️⃣ Fetch top 5 relevant chunks from website
       const chunks = await fetchRelevantChunks(message, 5);
-      let contextText = chunks.map(c => `${c.heading}\n${c.content}`).join("\n\n");
+      let contextText = chunks.map((c: any) => `${c.heading}\n${c.content}`).join("\n\n");
 
       // 3️⃣ Build prompt for Gemini
       let prompt = `Answer the user query based on the following website content:\n${contextText}\n\nUser Question: ${message}`;
