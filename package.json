@@ -9,10 +9,9 @@
     "frontend": "vite",
     "build": "tsc -p tsconfig.build.json",
 
-    "build:backend": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-query-chunks && npm run copy-db",
+    "build:backend": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-db",
 
     "copy-public": "mkdir -p dist/public && cp -r public/* dist/public/",
-    "copy-query-chunks": "mkdir -p dist/server && cp server/query-chunks.js dist/server/",
     "copy-db": "mkdir -p dist/server && cp website_chunks.db dist/server/",
 
     "start": "node dist/index-prod.js"
