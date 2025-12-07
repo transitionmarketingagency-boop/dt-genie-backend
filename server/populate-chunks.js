@@ -1,9 +1,17 @@
 import fs from "fs";
 import sqlite3 from "sqlite3";
+import path from "path";
 
-// Open DB helper (sqlite3 directly)
+// DB helper
+function getDBPath() {
+  if (process.env.RENDER_EXTERNAL_DB_FILE) {
+    return process.env.RENDER_EXTERNAL_DB_FILE;
+  }
+  return path.join(process.cwd(), "server/website_chunks.db");
+}
+
 function openDB() {
-  return new sqlite3.Database("./server/website_chunks.db");
+  return new sqlite3.Database(getDBPath());
 }
 
 // Chunk text into smaller pieces
@@ -17,7 +25,7 @@ function chunkText(text, size = 1000) {
   return chunks;
 }
 
-function populateChunks() {
+export function populateChunks() {
   const db = openDB();
 
   db.serialize(() => {
@@ -46,5 +54,7 @@ function populateChunks() {
   db.close();
 }
 
-// Run the script
-populateChunks();
+// ✅ ES module equivalent of require.main
+if (import.meta.url === `file://${process.cwd()}/server/populate-chunks.js`) {
+  populateChunks();
+}
