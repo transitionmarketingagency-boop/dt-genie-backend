@@ -1,7 +1,7 @@
 import runApp from "./app.js";
 import { setupApp } from "./app.js";
 
-const PORT = 10000;
+const PORT = process.env.PORT || 10000;
 
 (async () => {
   const server = await runApp(setupApp);
