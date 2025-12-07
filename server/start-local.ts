@@ -1,4 +1,3 @@
-// server/start-local.ts
 import runApp from "./app.js";
 import { setupApp } from "./app.js";
 

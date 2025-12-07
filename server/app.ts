@@ -16,12 +16,17 @@ dotenv.config();
 // Setup API routes
 // -----------------------------
 export const setupApp = async (app: Application) => {
-  app.use(cors());
+  // ✅ Updated CORS: allow all origins (frontend websites) for testing
+  app.use(cors({
+    origin: "*", 
+    credentials: true
+  }));
+
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
   // -----------------------------------------------------
-  // ✅ ADD THIS — Serve /public folder correctly on Render
+  // ✅ Serve /public folder correctly on Render
   // -----------------------------------------------------
   app.use(
     "/public",
@@ -39,7 +44,7 @@ export const setupApp = async (app: Application) => {
     res.json({ ok: true, message: "Gemini test route working!" });
   });
 
-  // Chat endpoint — UPDATED to fetch website chunks
+  // Chat endpoint — fetch website chunks
   app.post("/chat", async (req, res) => {
     try {
       const { message, sessionId } = req.body;
@@ -92,6 +97,5 @@ export default async function runApp(
   if (setupFn) await setupFn(app, httpServer);
 
   // ❗ Return the server WITHOUT calling listen()
-  // Render's index-prod.js will call server.listen()
   return httpServer;
 }
