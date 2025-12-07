@@ -6,6 +6,7 @@ import { createServer, type Server } from "node:http";
 // ✅ Add .js extensions for Node ESM
 import { storage } from "./storage.js";
 import { queryGemini } from "./services/gemini.js";
+import { fetchRelevantChunks } from "./query-chunks.js"; // ✅ NEW: fetch website content
 import path from "path";  // ✅ REQUIRED for static folder resolution
 
 dotenv.config();
@@ -37,27 +38,37 @@ export const setupApp = async (app: Application) => {
     res.json({ ok: true, message: "Gemini test route working!" });
   });
 
-  // Chat endpoint
+  // Chat endpoint — UPDATED to fetch website chunks
   app.post("/chat", async (req, res) => {
     try {
       const { message, sessionId } = req.body;
 
+      // 1️⃣ Save user message
       await storage.addChatMessage({
         sessionId,
         role: "user",
         content: message,
       });
 
-      const aiResponse = await queryGemini(message);
+      // 2️⃣ Fetch top 5 relevant chunks from website
+      const chunks = await fetchRelevantChunks(message, 5);
+      let contextText = chunks.map(c => `${c.heading}\n${c.content}`).join("\n\n");
 
+      // 3️⃣ Build prompt for Gemini
+      let prompt = `Answer the user query based on the following website content:\n${contextText}\n\nUser Question: ${message}`;
+
+      // 4️⃣ Query Google Gemini
+      const aiResponse = await queryGemini(prompt);
+
+      // 5️⃣ Save assistant response
       await storage.addChatMessage({
         sessionId,
         role: "assistant",
         content: aiResponse,
       });
 
+      // 6️⃣ Return response + full history
       const fullHistory = await storage.getChatHistory(sessionId);
-
       res.json({ ok: true, reply: aiResponse, history: fullHistory });
     } catch (err) {
       console.error(err);
