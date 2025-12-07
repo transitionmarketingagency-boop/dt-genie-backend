@@ -7,15 +7,10 @@ import { createServer, type Server } from "node:http";
 import { storage } from "./storage.js";
 import { queryGemini } from "./services/gemini.js";
 import { fetchRelevantChunks } from "./query-chunks.js"; // ✅ fetch website content
-import { populateChunks } from "./populate-chunks.js"; // ✅ Fix: import named function
+import { populateChunks } from "./populate-chunks.js"; // ✅ populate DB on startup
 import path from "path";  // ✅ REQUIRED for static folder resolution
 
 dotenv.config();
-
-// -----------------------------
-// Auto-populate DB before any request
-// -----------------------------
-await populateChunks(); // ✅ Ensure chunks table exists and has data
 
 // -----------------------------
 // Setup API routes
@@ -30,11 +25,17 @@ export const setupApp = async (app: Application) => {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-  // Serve /public folder correctly on Render
+  // -----------------------------------------------------
+  // ✅ Serve /public folder correctly on Render
+  // -----------------------------------------------------
   app.use(
     "/public",
     express.static(path.join(process.cwd(), "public"))
   );
+  // -----------------------------------------------------
+
+  // ✅ Auto-populate chunks table if not exists
+  await populateChunks();
 
   // Health check
   app.get("/api/health", (_req, res) => {
@@ -95,7 +96,9 @@ export default async function runApp(
   const app: Application = express();
   const httpServer = createServer(app);
 
+  // Keep the original 2-argument signature
   if (setupFn) await setupFn(app, httpServer);
 
+  // ❗ Return the server WITHOUT calling listen()
   return httpServer;
 }
