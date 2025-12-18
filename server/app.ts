@@ -1,22 +1,39 @@
+import 'dotenv/config';
+import fs from "fs";
+import path from "path";
+
+// =====================================================
+// GOOGLE SERVICE ACCOUNT SETUP (KEEP AS-IS LOGIC)
+// =====================================================
+if (process.env.SERVICE_ACCOUNT_BASE64) {
+  const json = Buffer
+    .from(process.env.SERVICE_ACCOUNT_BASE64, "base64")
+    .toString("utf8");
+
+  const keyPath = path.join(process.cwd(), "sa-key.json");
+
+  fs.writeFileSync(keyPath, json);
+
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
+}
+
+// =====================================================
+// NORMAL IMPORTS (AFTER ENV + SA SETUP)
+// =====================================================
 import express, { type Application } from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import { createServer, type Server } from "node:http";
 
-// ✅ Add .js extensions for Node ESM
+// ✅ Local imports (ESM-safe)
 import { storage } from "./storage.js";
 import { queryGemini } from "./services/gemini.js";
-import { fetchRelevantChunks } from "./query-chunks.js"; // ✅ fetch website content
-import { populateChunks } from "./populate-chunks.js"; // ✅ populate DB on startup
-import path from "path";  // ✅ REQUIRED for static folder resolution
+import { fetchRelevantChunks } from "./query-chunks.js";
+import { populateChunks } from "./populate-chunks.js";
 
-dotenv.config();
-
-// -----------------------------
+// =====================================================
 // Setup API routes
-// -----------------------------
+// =====================================================
 export const setupApp = async (app: Application) => {
-  // ✅ Updated CORS: allow all origins (frontend websites) for testing
   app.use(cors({
     origin: "*",
     credentials: true
@@ -26,16 +43,19 @@ export const setupApp = async (app: Application) => {
   app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
   // -----------------------------------------------------
-  // ✅ Serve /public folder correctly on Render
+  // Serve /public folder
   // -----------------------------------------------------
   app.use(
     "/public",
     express.static(path.join(process.cwd(), "public"))
   );
-  // -----------------------------------------------------
 
-  // ✅ Auto-populate chunks table if not exists
-  await populateChunks();
+  // -----------------------------------------------------
+  // Populate chunks on startup
+  // -----------------------------------------------------
+  if (process.env.POPULATE_CHUNKS === "true") {
+    await populateChunks();
+  }
 
   // Health check
   app.get("/api/health", (_req, res) => {
@@ -47,7 +67,9 @@ export const setupApp = async (app: Application) => {
     res.json({ ok: true, message: "Gemini test route working!" });
   });
 
-  // Chat endpoint — fetch website chunks
+  // -----------------------------------------------------
+  // Chat endpoint
+  // -----------------------------------------------------
   app.post("/chat", async (req, res) => {
     try {
       const { message, sessionId } = req.body;
@@ -59,14 +81,34 @@ export const setupApp = async (app: Application) => {
         content: message,
       });
 
-      // 2️⃣ Fetch top 5 relevant chunks from website
+      // 2️⃣ Fetch relevant chunks
       const chunks = await fetchRelevantChunks(message, 5);
-      let contextText = chunks.map((c: any) => `${c.heading}\n${c.content}`).join("\n\n");
 
-      // 3️⃣ Build prompt for Gemini
-      let prompt = `Answer the user query based on the following website content:\n${contextText}\n\nUser Question: ${message}`;
+      // ✅ STEP 1 — CLEAN CONTEXT
+      const contextText = chunks
+        .map((c: any, i: number) => `SOURCE ${i + 1}:\n${c.content.trim()}`)
+        .join("\n\n");
 
-      // 4️⃣ Query Google Gemini
+      // ✅ STEP 2 — IMPROVED PROMPT
+      const prompt = `
+You are NeonVision, the AI assistant for Digital Transition Marketing.
+
+Your job is to clearly explain the company's services using the website content below.
+The content may be fragmented, scraped, or unstructured — you must intelligently summarize it.
+
+If services are described across multiple sections, combine them into a clear, confident explanation.
+Do NOT say you cannot answer unless there is truly zero service-related information.
+
+WEBSITE CONTENT:
+${contextText}
+
+USER QUESTION:
+${message}
+
+Answer in a professional, confident marketing tone.
+      `.trim();
+
+      // 4️⃣ Query Gemini
       const aiResponse = await queryGemini(prompt);
 
       // 5️⃣ Save assistant response
@@ -76,29 +118,46 @@ export const setupApp = async (app: Application) => {
         content: aiResponse,
       });
 
-      // 6️⃣ Return response + full history
+      // 6️⃣ Return response
       const fullHistory = await storage.getChatHistory(sessionId);
       res.json({ ok: true, reply: aiResponse, history: fullHistory });
     } catch (err) {
       console.error(err);
       res.status(500).json({ ok: false, error: "Chat failed" });
     }
-  });
+   });
 };
 
-// -----------------------------
-// Run server — Render-compatible
-// ❗ DOES NOT START LISTENING
-// -----------------------------
+// =====================================================
+// Render-compatible server creator (UNCHANGED LOGIC)
+// =====================================================
 export default async function runApp(
   setupFn?: (app: Application, server: Server) => Promise<void>
 ): Promise<Server> {
   const app: Application = express();
   const httpServer = createServer(app);
 
-  // Keep the original 2-argument signature
-  if (setupFn) await setupFn(app, httpServer);
+  if (setupFn) {
+    await setupFn(app, httpServer);
+  } else {
+    await setupApp(app);
+  }
 
-  // ❗ Return the server WITHOUT calling listen()
   return httpServer;
+}
+
+// =====================================================
+// ✅ START SERVER WHEN RUN DIRECTLY (LOCAL DEV FIX)
+// =====================================================
+if (process.argv[1].includes("app.ts")) {
+  const PORT = Number(process.env.PORT) || 5000;
+
+  const app = express();
+  const server = createServer(app);
+
+  setupApp(app).then(() => {
+    server.listen(PORT, () => {
+      console.log(` ~@ Server running on http://localhost:${PORT}`);
+    });
+  });
 }

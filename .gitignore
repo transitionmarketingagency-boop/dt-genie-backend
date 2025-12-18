@@ -1,6 +1,19 @@
-node_modules
-dist
-.DS_Store
-server/public
-vite.config.ts.*
-*.tar.gz
+# env / secrets
+.env
+server/.env
+*.json.save
+sa-key.json
+server/sa-key.json
+
+# python / venv
+.venv/
+__pycache__/
+
+# databases
+*.db
+website_chunks.db
+website_chunks_backup.db
+
+# misc
+.tables
+embeddings_backup.json

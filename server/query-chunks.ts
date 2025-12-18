@@ -1,39 +1,66 @@
-// server/query-chunks.ts
 import sqlite3 from "sqlite3";
 import path from "path";
+import { getEmbedding } from "./services/embeddingClient.js";
+import { cosineSimilarity } from "./utils/cosine.js";
 
-export interface ChunkRow {
-  page_url: string;
-  heading: string;
-  content: string;
+function openDB() {
+  const dbPath = path.join(process.cwd(), "website_chunks.db");
+  return new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY);
 }
 
-export function openDB() {
-  const dbPath = path.join(process.cwd(), "server/website_chunks.db");
-  return new sqlite3.Database(dbPath);
-}
-
-export async function fetchRelevantChunks(query: string, limit = 5): Promise<ChunkRow[]> {
+export async function fetchRelevantChunks(query: string, limit = 5) {
   const db = openDB();
-  const words = query.toLowerCase().match(/\w+/g) || [];
-  if (words.length === 0) return [];
+  const queryEmbedding = await getEmbedding(query);
 
-  const conditions = words.map(() => "LOWER(content) LIKE ?").join(" AND ");
-  const params = words.map(word => `%${word}%`);
+  return new Promise<any[]>((resolve, reject) => {
+    db.all(
+      "SELECT id, page_url, heading, content, embedding FROM chunks",
+      (err, rows: any[]) => {
+        if (err) {
+          db.close();
+          return reject(err);
+        }
 
-  const sql = `
-    SELECT page_url, heading, content
-    FROM chunks
-    WHERE ${conditions}
-    ORDER BY id ASC
-    LIMIT ${limit}
-  `;
+        try {
+          const ranked = rows
+            .filter(r => r.embedding)
+            .map(r => ({
+              ...r,
+              embedding: JSON.parse(r.embedding)
+            }))
+            .map(r => ({
+              ...r,
+              score: cosineSimilarity(queryEmbedding, r.embedding)
+            }))
+            .sort((a, b) => b.score - a.score)
+            .slice(0, limit);
 
-  return new Promise((resolve, reject) => {
-    db.all(sql, params, (err, rows) => {
-      if (err) reject(err);
-      else resolve(rows as ChunkRow[]);
-    });
-    db.close();
+          resolve(ranked);
+        } catch (e) {
+          reject(e);
+        } finally {
+          db.close();
+        }
+      }
+    );
   });
+}
+
+/**
+ * Direct test:
+ * npx tsx query-chunks.ts
+ */
+if (process.argv[1]?.endsWith("query-chunks.ts")) {
+  (async () => {
+    const chunks = await fetchRelevantChunks(
+      "tell me about your services",
+      3
+    );
+
+    console.log("\n🔍 Top matching chunks:\n");
+    chunks.forEach((c, i) => {
+      console.log(`--- ${i + 1} (score: ${c.score.toFixed(4)}) ---`);
+      console.log(c.content.slice(0, 300), "\n");
+    });
+  })().catch(console.error);
 }
