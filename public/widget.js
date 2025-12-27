@@ -1,5 +1,6 @@
+'use strict';
+
 (function () {
-  'use strict';
 
   const CONFIG = {
     apiEndpoint: 'https://dt-genie-backend.onrender.com/chat',
@@ -74,9 +75,7 @@
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
   }
 
-  /* ---------------------------------------------------
-     MESSAGE HANDLING
-     --------------------------------------------------- */
+  /* --------------------------------------------------- */
   function addMessage(role, content, options = {}) {
     const messagesContainer = document.getElementById('dt-genie-messages');
     const messageDiv = document.createElement('div');
@@ -109,10 +108,6 @@
   }
 
   function hideTyping() {
-    const typingDiv = document.getElementById('dt-genie-typing');
-    if (typingDiv) typingDiv.remove();
-  }
-
   async function sendMessage(message) {
     if (!message.trim() || isProcessing) return;
     isProcessing = true;
@@ -155,19 +150,13 @@
     }
   }
 
-  /* ---------------------------------------------------
-     TOGGLE PANEL
-     --------------------------------------------------- */
   function togglePanel(force) {
     const panel = document.getElementById('dt-genie-panel');
-
-    // Toggle state
     isOpen = force !== undefined ? force : !isOpen;
 
     if (isOpen) {
       panel.classList.add('open');
       panel.setAttribute('aria-hidden', 'false');
-
       const messagesContainer = document.getElementById('dt-genie-messages');
       if (messagesContainer.children.length === 0) {
         addMessage(
@@ -186,9 +175,6 @@
     textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   }
 
-  /* ---------------------------------------------------
-     INITIALIZE
-     --------------------------------------------------- */
   function init() {
     createWidget();
 
@@ -224,4 +210,6 @@
   if (document.readyState === 'loading')
     document.addEventListener('DOMContentLoaded', init);
   else init();
+
 })();
+
