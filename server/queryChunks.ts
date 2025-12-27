@@ -1,11 +1,15 @@
 // server/queryChunks.ts
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
+import path from "path";
+
+// Absolute path to DB for Render deployment
+const DB_PATH = path.join(process.cwd(), "server/vector_store/unified_chunks.db");
 
 // Open DB connection
 export async function openDB() {
   return open({
-    filename: "./server/vector_store/unified_chunks.db",
+    filename: DB_PATH,
     driver: sqlite3.Database,
   });
 }
@@ -42,3 +46,4 @@ export async function getTopChunks(queryEmbedding: number[], topN = 5) {
   await db.close();
   return ranked;
 }
+
