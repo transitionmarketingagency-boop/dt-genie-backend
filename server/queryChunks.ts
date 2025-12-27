@@ -46,4 +46,3 @@ export async function getTopChunks(queryEmbedding: number[], topN = 5) {
   await db.close();
   return ranked;
 }
-
