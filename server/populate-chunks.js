@@ -1,17 +1,11 @@
+// server/populate-chunks.js
 import fs from "fs";
 import sqlite3 from "sqlite3";
-import path from "path";
+import { DB_PATH } from "./utils/dbPath";
 
-// DB helper
-function getDBPath() {
-  if (process.env.RENDER_EXTERNAL_DB_FILE) {
-    return process.env.RENDER_EXTERNAL_DB_FILE;
-  }
-  return path.join(process.cwd(), "server/website_chunks.db");
-}
-
+// Open canonical DB
 function openDB() {
-  return new sqlite3.Database(getDBPath());
+  return new sqlite3.Database(DB_PATH);
 }
 
 // Chunk text into smaller pieces
@@ -29,7 +23,6 @@ export function populateChunks() {
   const db = openDB();
 
   db.serialize(() => {
-    // Create table if not exists
     db.run(`
       CREATE TABLE IF NOT EXISTS chunks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,19 +35,22 @@ export function populateChunks() {
     const text = fs.readFileSync("./server/website_content.txt", "utf-8");
     const chunks = chunkText(text, 1000);
 
-    const stmt = db.prepare("INSERT INTO chunks (page_url, heading, content) VALUES (?, ?, ?)");
+    const stmt = db.prepare(
+      "INSERT INTO chunks (page_url, heading, content) VALUES (?, ?, ?)"
+    );
+
     for (const chunk of chunks) {
       stmt.run("", "", chunk);
     }
-    stmt.finalize();
 
+    stmt.finalize();
     console.log(`Inserted ${chunks.length} chunks into database.`);
   });
 
   db.close();
 }
 
-// ✅ ES module equivalent of require.main
+// ES module entry
 if (import.meta.url === `file://${process.cwd()}/server/populate-chunks.js`) {
   populateChunks();
 }

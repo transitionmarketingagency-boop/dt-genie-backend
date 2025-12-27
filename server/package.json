@@ -1,0 +1,12 @@
+{
+  "name": "dt-genie-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.6",
+    "dotenv": "^16.3.1"
+  }
+}

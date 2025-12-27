@@ -5,7 +5,7 @@
   "main": "dist/app.js",
   "type": "module",
   "scripts": {
-    "dev": "ts-node --esm server/app.ts",
+    "dev": "tsx server/app.ts",
     "frontend": "vite",
     "build": "tsc -p tsconfig.build.json",
     "build:backend": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-db",
@@ -45,6 +45,7 @@
     "pdf-parse": "^1.1.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "sqlite": "^5.1.1",
     "sqlite3": "^5.1.7",
     "tailwind-merge": "^3.4.0",
     "uuid": "^9.0.1",
