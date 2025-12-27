@@ -25,7 +25,7 @@ const COMPLEX_KEYWORDS = [
 function isComplex(prompt: string): boolean {
   if (prompt.length > 300) return true;
   const lower = prompt.toLowerCase();
-  return COMPLEX_KEYWORDS.some(word => lower.includes(word));
+  return COMPLEX_KEYWORDS.some((word) => lower.includes(word));
 }
 
 /**
@@ -33,11 +33,21 @@ function isComplex(prompt: string): boolean {
  * - Simple prompts → Gemma (local, free)
  * - Complex prompts → Gemini (cloud, free tier)
  * - Automatic fallback if Gemma fails
+ * 
+ * Accepts optional `context` string from vector store to improve answers
  */
-export async function generateHybridResponse(prompt: string): Promise<string> {
+export async function generateHybridResponse(
+  prompt: string,
+  context?: string
+): Promise<string> {
+  // Include context in the prompt if available
+  const fullPrompt = context
+    ? `Use the following context to answer the question:\n${context}\nQuestion: ${prompt}`
+    : prompt;
+
   try {
-    if (!isComplex(prompt)) {
-      const gemmaResponse = await generateGemma(prompt);
+    if (!isComplex(fullPrompt)) {
+      const gemmaResponse = await generateGemma(fullPrompt);
       if (gemmaResponse && gemmaResponse.trim().length > 20) {
         return gemmaResponse;
       }
@@ -46,5 +56,5 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
     console.warn("⚠️ Gemma failed, falling back to Gemini:", err);
   }
 
-  return generateGemini(prompt);
+  return generateGemini(fullPrompt);
 }
