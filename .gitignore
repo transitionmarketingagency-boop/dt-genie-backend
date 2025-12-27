@@ -21,3 +21,4 @@ website_chunks_backup.db
 # misc
 .tables
 embeddings_backup.json
+node_modules/
