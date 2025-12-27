@@ -1,0 +1,5 @@
+knowledge_base/01_brand/brand_identity.md
+knowledge_base/02_services/services_overview.md
+knowledge_base/03_sales/sales_logic.md
+knowledge_base/04_support/faqs.md
+knowledge_base/05_booking/booking_logic.md
