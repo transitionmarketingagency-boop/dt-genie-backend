@@ -23,12 +23,10 @@
   let isOpen = false;
   let isProcessing = false;
 
-  /* ---------------------------------------------------
-     CREATE WIDGET
-     --------------------------------------------------- */
+  /* --------------------------------------------------- */
   function createWidget() {
     const widgetHTML = `
-      <div id="dt-genie-widget" aria-hidden="false">
+      <div id="dt-genie-widget">
 
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
@@ -75,7 +73,6 @@
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
   }
 
-  /* --------------------------------------------------- */
   function addMessage(role, content, options = {}) {
     const messagesContainer = document.getElementById('dt-genie-messages');
     const messageDiv = document.createElement('div');
@@ -108,6 +105,10 @@
   }
 
   function hideTyping() {
+    const el = document.getElementById('dt-genie-typing');
+    if (el) el.remove();
+  }
+
   async function sendMessage(message) {
     if (!message.trim() || isProcessing) return;
     isProcessing = true;
@@ -184,13 +185,6 @@
     const sendBtn = document.getElementById('dt-genie-send');
 
     button.addEventListener('click', () => togglePanel());
-    button.addEventListener('keypress', e => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        togglePanel();
-      }
-    });
-
     closeBtn.addEventListener('click', () => togglePanel(false));
 
     sendBtn.addEventListener('click', () => sendMessage(input.value));
@@ -212,4 +206,3 @@
   else init();
 
 })();
-
