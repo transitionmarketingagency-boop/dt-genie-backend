@@ -1,7 +1,7 @@
 import sqlite3 from "sqlite3";
-import { DB_PATH } from "./utils/dbPath"; // use canonical DB_PATH
-import { getEmbedding } from "./services/embeddingClient.js";
-import { cosineSimilarity } from "./utils/cosine.js";
+import { DB_PATH } from "./utils/dbPath.ts"; // explicitly include .ts
+import { getEmbedding } from "./services/embeddingClient.ts"; // fixed .ts
+import { cosineSimilarity } from "./utils/cosine.ts"; // fixed .ts
 
 /**
  * Open the canonical DB in read-only mode
@@ -69,6 +69,6 @@ if (process.argv[1]?.endsWith("query-chunks.ts")) {
 }
 
 /**
- * ✅ No logic changes were made to your ranking/test code.
- * Only updated DB path to use DB_PATH from utils.
+ * ✅ Fixed import paths for TypeScript
+ * ✅ No other logic changes were made
  */

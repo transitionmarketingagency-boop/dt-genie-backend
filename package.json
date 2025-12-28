@@ -10,7 +10,7 @@
     "build": "tsc -p tsconfig.build.json",
     "build:backend": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-db",
     "copy-public": "mkdir -p dist/public && cp -r public/* dist/public/",
-    "copy-db": "mkdir -p dist/server/vector_store && cp server/vector_store/unified_chunks.db dist/server/vector_store/"
+    "copy-db": "mkdir -p dist/server/vector_store && cp server/vector_store/unified_chunks.db dist/server/vector_store/",
     "start": "node dist/index-prod.js"
   },
   "dependencies": {
