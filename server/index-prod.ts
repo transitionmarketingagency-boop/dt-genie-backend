@@ -67,7 +67,7 @@ export function serveStatic(app: Application, _server: Server) {
 
         const embedding = Array.from(message).map((c) => c.charCodeAt(0) / 255);
         const chunks = await getTopChunks(embedding, 5);
-        const context = chunks.map((c) => c.content).join("\n---\n");
+        const context = chunks.map((c: any) => c.content).join("\n---\n");
 
         const reply = await generateHybridResponse(message, context);
         res.json({ reply });

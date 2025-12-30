@@ -3,10 +3,16 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "noEmitOnError": true
+    "noEmitOnError": true,
+    "skipLibCheck": true
   },
   "include": [
-    "server/**/*.ts"
+    "server/index-prod.ts",
+    "server/app.ts",
+    "server/routes.ts",
+    "server/services/**/*.ts",
+    "server/queryChunks.ts",
+    "server/populate-test-data.ts"
   ],
   "exclude": [
     "node_modules",
@@ -15,7 +21,6 @@
     "**/*.spec.ts",
     "server/test-*",
     "server/**/test-*",
-    "server/**/__tests__/**",
     "server/training_pipeline/**",
     "server/services/ollamaClient.ts",
     "server/services/geminiClient.ts",
