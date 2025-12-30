@@ -65,10 +65,16 @@ export function serveStatic(app: Application, _server: Server) {
           return res.status(400).json({ reply: "Message is required." });
         }
 
-        const embedding = Array.from(message).map((c) => c.charCodeAt(0) / 255);
-        const chunks = await getTopChunks(embedding, 5);
-        const context = chunks.map((c: any) => c.content).join("\n---\n");
+        // 1️⃣ Create embedding
+         const msgStr = message as string;
+         const embedding = Array.from(msgStr).map((c) => c.charCodeAt(0) / 255);
 
+        // 2️⃣ Fetch relevant chunks and cast items to any to fix TS error
+        const chunks = (await getTopChunks(embedding, 5)) as any[];
+
+        const context = chunks.map((c) => c.content).join("\n---\n");
+
+        // 3️⃣ Generate final response
         const reply = await generateHybridResponse(message, context);
         res.json({ reply });
       } catch (err) {
@@ -81,7 +87,7 @@ export function serveStatic(app: Application, _server: Server) {
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(` ~@ Server running on port ${PORT}`);
     });
   });
 
