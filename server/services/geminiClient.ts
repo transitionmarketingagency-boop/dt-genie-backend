@@ -54,29 +54,5 @@ export async function generateGemini(prompt: string): Promise<string> {
   );
 }
 
-/**
- * OPTIONAL — List available Gemini models
- */
-export async function listGeminiModels(): Promise<void> {
-  const API_KEY = process.env.GEMINI_API_KEY;
-
-  if (!API_KEY) {
-    throw new Error("❌ GEMINI_API_KEY missing in .env");
-  }
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`
-  );
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`❌ ListModels Error ${res.status}: ${errText}`);
-  }
-
-  const data = await res.json();
-
-  console.log("✅ Available Gemini Models:");
-  data.models?.forEach((model: any) => {
-    console.log(`- ${model.name}`);
-  });
-}
+/** 🔁 Backward-compatible export (DO NOT REMOVE) */
+export const geminiClient = generateGemini;

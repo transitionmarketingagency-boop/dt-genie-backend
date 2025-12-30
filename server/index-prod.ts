@@ -1,6 +1,24 @@
-import fs from "node:fs";
+// ------------------ LOAD ENV FIRST (CRITICAL) ------------------
+import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables BEFORE ANY OTHER IMPORTS
+dotenv.config({ path: path.join(__dirname, ".env") });
+
+// Validate environment
+if (!process.env.GEMINI_API_KEY) {
+  console.error("❌ GEMINI_API_KEY is missing. Check your .env file.");
+  process.exit(1);
+}
+
+console.log("✅ GEMINI_API_KEY loaded successfully");
+
+// ------------------ STANDARD IMPORTS ------------------
+import fs from "node:fs";
 import express, { type Application } from "express";
 import type { Server } from "node:http";
 
@@ -9,9 +27,6 @@ import { setupApp } from "./app.js";
 import { getTopChunks } from "./queryChunks.js";
 import { generateHybridResponse } from "./services/hybridClient.js";
 import populateTestData from "./populate-test-data.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 // ------------------ STATIC FILE HANDLER ------------------
 export function serveStatic(app: Application, _server: Server) {
@@ -42,7 +57,6 @@ export function serveStatic(app: Application, _server: Server) {
   await runApp(async (app: Application, server: Server) => {
     await setupApp(app);
 
-    // 🔥 MAIN CHAT ENDPOINT — THIS WAS MISSING
     app.post("/chat", async (req, res) => {
       try {
         const { message } = req.body;
@@ -51,22 +65,15 @@ export function serveStatic(app: Application, _server: Server) {
           return res.status(400).json({ reply: "Message is required." });
         }
 
-        // 1️⃣ Create embedding
         const embedding = Array.from(message).map((c) => c.charCodeAt(0) / 255);
-
-        // 2️⃣ Fetch relevant knowledge
         const chunks = await getTopChunks(embedding, 5);
-        const context = chunks.map(c => c.content).join("\n---\n");
+        const context = chunks.map((c) => c.content).join("\n---\n");
 
-        // 3️⃣ Generate final response
         const reply = await generateHybridResponse(message, context);
-
         res.json({ reply });
       } catch (err) {
         console.error("❌ Chat Error:", err);
-        res.status(500).json({
-          reply: "Internal server error while generating response.",
-        });
+        res.status(500).json({ reply: "Internal server error" });
       }
     });
 

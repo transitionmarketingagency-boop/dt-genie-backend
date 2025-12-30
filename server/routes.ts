@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { generateHybridResponse } from "../services/hybridClient";
+import { generateHybridResponse } from "./services/generateHybridResponse";
 
 const router = Router();
 
@@ -15,7 +15,7 @@ router.post("/api/chat", async (req: Request, res: Response) => {
   }
 
   try {
-    const reply = await generateHybridResponse(body.message);
+     const reply = await generateHybridResponse(body.sessionId, body.message);
 
     res.json({
       reply,

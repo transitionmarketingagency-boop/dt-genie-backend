@@ -2,11 +2,11 @@ import { execFile } from "child_process";
 import { fileURLToPath } from "url";
 import path from "path";
 
-// Fix for __dirname in ESM
+// Fix __dirname for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Current location: server/services
+// Paths
 const PYTHON_PATH = path.resolve(__dirname, "../../.venv/Scripts/python.exe");
 const SCRIPT_PATH = path.resolve(__dirname, "../embeddings.py");
 
@@ -17,10 +17,14 @@ export async function getEmbedding(text: string): Promise<number[]> {
       [SCRIPT_PATH, "--text", text],
       { encoding: "utf8" },
       (error, stdout, stderr) => {
-        if (error) return reject(error);
+        if (error) {
+          reject(error);
+          return;
+        }
+
         try {
-          const result = JSON.parse(stdout);
-          resolve(result);
+          const parsed = JSON.parse(stdout);
+          resolve(parsed);
         } catch (err) {
           reject(err);
         }
@@ -28,3 +32,6 @@ export async function getEmbedding(text: string): Promise<number[]> {
     );
   });
 }
+
+// backward compatibility (DO NOT REMOVE)
+export { getEmbedding as embedText };

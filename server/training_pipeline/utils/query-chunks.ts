@@ -1,16 +1,12 @@
 import sqlite3 from "sqlite3";
 
-// server/services
-import { getEmbedding } from "../../services/embeddingClient.ts";
-import { detectRole } from "../../services/roleRouter.ts";
-
-// server/utils
-import { cosineSimilarity } from "../../utils/cosine.ts";
+// ✅ FIXED imports (removed .ts extensions)
+import { getEmbedding } from "../../services/embeddingClient";
+import { detectRole } from "../../services/roleRouter";
+import { cosineSimilarity } from "../../utils/cosine";
 import { DB_PATH } from "../../utils/dbPath";
 
-// training_pipeline/chunker
-import { detectIntent } from "../chunker/intentDetector";
-
+// Open DB
 function openDB() {
   return new sqlite3.Database(DB_PATH, sqlite3.OPEN_READONLY);
 }
@@ -18,12 +14,11 @@ function openDB() {
 export async function fetchRelevantChunks(query: string, limit = 6) {
   const db = openDB();
   const queryEmbedding = await getEmbedding(query);
-  const intent = detectIntent(query);
-  const role = detectRole(query);
+  const intent = detectRole(query);
 
   return new Promise<any[]>((resolve, reject) => {
     db.all(
-      "SELECT id, page_url, heading, content, embedding FROM chunks",
+      "SELECT id, page_url, heading, content, embedding, metadata FROM chunks",
       (err, rows: any[]) => {
         if (err) {
           db.close();
@@ -33,18 +28,15 @@ export async function fetchRelevantChunks(query: string, limit = 6) {
         try {
           const ranked = rows
             .filter(r => r.embedding)
-            .map(r => ({
-              ...r,
-              embedding: JSON.parse(r.embedding),
-              metadata: r.metadata ? JSON.parse(r.metadata) : {}
-            }))
             .map(r => {
-              let score = cosineSimilarity(queryEmbedding, r.embedding);
+              const embedding = JSON.parse(r.embedding);
+              const metadata = r.metadata ? JSON.parse(r.metadata) : {};
 
-              // metadata boost
-              if (r.metadata.intent === intent) score += 0.3;
-              if (r.metadata.type === role) score += 0.2;
-              if (r.metadata.purpose?.includes(intent)) score += 0.1;
+              let score = cosineSimilarity(queryEmbedding, embedding);
+
+              if (metadata.intent === intent) score += 0.3;
+              if (metadata.type === intent) score += 0.2;
+              if (metadata.purpose?.includes(intent)) score += 0.1;
 
               return { ...r, score };
             })
@@ -62,11 +54,11 @@ export async function fetchRelevantChunks(query: string, limit = 6) {
   });
 }
 
-// Direct test
+// Manual test
 if (process.argv[1]?.endsWith("query-chunks.ts")) {
   (async () => {
     const chunks = await fetchRelevantChunks("tell me about your services", 5);
-    console.log("\n ~M Top matching chunks:\n");
+    console.log("\n🔍 Top Matching Chunks:\n");
     chunks.forEach((c, i) => {
       console.log(`--- ${i + 1} (score: ${c.score.toFixed(4)}) ---`);
       console.log(c.content.slice(0, 300), "\n");

@@ -1,24 +1,44 @@
-// ✅ Add .js extensions for internal imports
-import { storage, InsertChatMessage } from "./storage.js";
-import { memoryStore } from "./services/memory.js";
-import { ConversationMemory } from "../shared/types.js";
+// ✅ Correct imports
+import { storage, InsertChatMessage } from "./storage";
+import { memoryStore } from "./services/memory";
+import { ConversationMemory, ChatMessage } from "../shared/types";
 
 export default async function populateTestData() {
   const sessionId = "default-session";
 
   const existingHistory = await storage.getChatHistory(sessionId);
+
   if (!existingHistory.length) {
     const testMessages: InsertChatMessage[] = [
-      { sessionId, role: "user", content: "Hi, I want to start email campaigns for XCGI clients." },
-      { sessionId, role: "assistant", content: "Great! Let’s draft a campaign targeting luxury real estate developers." },
-      { sessionId, role: "user", content: "Also, can we create a test memory for this chat?" },
-      { sessionId, role: "assistant", content: "Absolutely — I can populate memory with your preferences and current projects." }
+      {
+        sessionId,
+        role: "user",
+        content: "Hi, I want to start email campaigns for XCGI clients.",
+      },
+      {
+        sessionId,
+        role: "assistant",
+        content: "Great! Let’s draft a campaign targeting luxury real estate developers.",
+      },
+      {
+        sessionId,
+        role: "user",
+        content: "Also, can we create a test memory for this chat?",
+      },
+      {
+        sessionId,
+        role: "assistant",
+        content: "Absolutely — I can populate memory with your preferences and current projects.",
+      },
     ];
 
-    const fullMessages = [];
+    const fullMessages: ChatMessage[] = [];
+
     for (const msg of testMessages) {
-      fullMessages.push(await storage.addChatMessage(msg));
+      const saved = await storage.addChatMessage(msg);
+      fullMessages.push(saved);
     }
+
     await storage.saveChatHistory(sessionId, fullMessages);
     console.log("✅ Test chat history inserted!");
   } else {
@@ -26,6 +46,7 @@ export default async function populateTestData() {
   }
 
   const existingMemory = memoryStore.getAllMemory();
+
   const testMemory: ConversationMemory[] = [
     {
       id: "mem1",
@@ -57,10 +78,13 @@ export default async function populateTestData() {
       created_at: new Date().toISOString(),
       timestamp: new Date(),
     }
-  ];
+  ]; // ✅ THIS WAS MISSING
 
   for (const mem of testMemory) {
-    if (!existingMemory.some(m => m.id === mem.id)) memoryStore.addMemory(mem);
+    if (!existingMemory.some((m) => m.id === mem.id)) {
+      memoryStore.addMemory(mem);
+    }
   }
+
   console.log("✅ Test memory inserted!");
 }

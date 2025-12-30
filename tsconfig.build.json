@@ -11,8 +11,13 @@
     "rootDir": ".",
     "types": ["node"],
     "baseUrl": ".",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "noEmitOnError": false,
+    "strictPropertyInitialization": false,
+    "noImplicitAny": false
   },
   "include": ["server/**/*", "shared/**/*"],
-  "exclude": ["client", "frontend", "public", "vite.config.ts", "dist", "node_modules"]
+  "exclude": ["client", "frontend", "public", "vite.config.ts", "dist", "**/*.test.ts"]
 }

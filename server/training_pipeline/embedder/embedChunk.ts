@@ -1,9 +1,17 @@
-import { generateEmbedding } from "../../services/embeddingClient.js";
-import { EmbeddedChunk } from "./embeddingTypes.js";
+import { getEmbedding } from "../../services/embeddingClient";
+import { EmbeddedChunk } from "./embeddingTypes";
 import crypto from "crypto";
 
-export async function embedChunk(chunk: any): Promise<EmbeddedChunk> {
-  const vector = await generateEmbedding(chunk.content);
+export async function embedChunk(chunk: {
+  content: string;
+  metadata: {
+    type: string;
+    source: string;
+    intent: string;
+    purpose: string;
+  };
+}): Promise<EmbeddedChunk> {
+  const vector = await getEmbedding(chunk.content);
 
   return {
     id: crypto.randomUUID(),
@@ -11,7 +19,7 @@ export async function embedChunk(chunk: any): Promise<EmbeddedChunk> {
     embedding: vector,
     metadata: {
       ...chunk.metadata,
-      createdAt: new Date().toISOString()
-    }
+      createdAt: new Date().toISOString(),
+    },
   };
 }

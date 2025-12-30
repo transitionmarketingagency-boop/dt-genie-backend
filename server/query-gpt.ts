@@ -33,7 +33,8 @@ async function callGemini(prompt: string) {
     },
   });
 
-  return res.data.predictions?.[0]?.content || "No response from Gemini.";
+const data: any = res.data;
+return data?.predictions?.[0]?.content || "";
 }
 
 /**

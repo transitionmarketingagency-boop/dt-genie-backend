@@ -8,7 +8,7 @@ export function smartChunk(
 ) {
   const rule = chunkRules[type];
   const words = text.split(" ");
-  const chunks = [];
+  const chunks: any[] = [];
 
   let i = 0;
   while (i < words.length) {
