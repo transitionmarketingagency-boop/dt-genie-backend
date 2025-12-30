@@ -1,23 +1,24 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["node"],
-    "baseUrl": ".",
-    "resolveJsonModule": true,
-    "allowJs": true,
-    "allowSyntheticDefaultImports": true,
-    "noEmitOnError": false,
-    "strictPropertyInitialization": false,
-    "noImplicitAny": false
+    "noEmitOnError": true
   },
-  "include": ["server/**/*", "shared/**/*"],
-  "exclude": ["client", "frontend", "public", "vite.config.ts", "dist", "**/*.test.ts"]
+  "include": [
+    "server/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "server/test-*",
+    "server/**/test-*",
+    "server/**/__tests__/**",
+    "server/training_pipeline/**",
+    "server/services/ollamaClient.ts",
+    "server/services/geminiClient.ts",
+    "server/test-*.ts"
+  ]
 }
