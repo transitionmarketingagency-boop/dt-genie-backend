@@ -1,6 +1,6 @@
 import { fetchRelevantChunks } from "../training_pipeline/utils/query-chunks";
-import { generateGemma } from "./gemmaClient";
-import { memoryClient } from "./memoryClient";
+import { generateGemma } from "./gemmaClient.js";
+import { memoryClient } from "./memoryClient.js";
 import fs from "fs";
 import path from "path";
 

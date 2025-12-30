@@ -6,23 +6,17 @@ async function test() {
 
   console.log("➡️ Sending first prompt...");
   let resp = await generateHybridResponse(
-    "Hello, tell me about your services.",
-    [],
-    sessionId,
-    userId
+    userId,
+    "Hello, tell me about your services."
   );
   console.log("Response:", resp);
 
-  console.log("➡️ Sending complex prompt...");
+  console.log("➡️ Sending second prompt...");
   resp = await generateHybridResponse(
-    "Create a 6-month growth marketing plan for a travel agency.",
-    [],
-    sessionId,
-    userId
+    userId,
+    "Create a 6-month growth marketing plan."
   );
   console.log("Response:", resp);
-
-  console.log("✅ Check sessionMemory.json and userMemory.json for stored conversation");
 }
 
 test();

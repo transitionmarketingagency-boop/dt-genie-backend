@@ -1,12 +1,11 @@
-import { generateWithOllama } from './services/ollamaClient.js';
+import { generateWithOllama } from "./services/ollamaClient";
 
 async function test() {
   const response = await generateWithOllama(
-    'gemma3:1b',
-    'Say hello as DT-Genie in one sentence.'
+    "Say hello as DT-Genie in one sentence."
   );
 
-  console.log('\nOLLAMA RESPONSE:\n');
+  console.log("\nOLLAMA RESPONSE:\n");
   console.log(response);
 }
 

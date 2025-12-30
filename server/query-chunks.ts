@@ -1,7 +1,7 @@
 import sqlite3 from "sqlite3";
-import { DB_PATH } from "./utils/dbPath"; // explicitly include .ts
-import { getEmbedding } from "./services/embeddingClient"; // fixed .ts
-import { cosineSimilarity } from "./utils/cosine"; // fixed .ts
+import { DB_PATH } from "./utils/dbPath.js"; // explicitly include .ts
+import { getEmbedding } from "./services/embeddingClient.js"; // fixed .ts
+import { cosineSimilarity } from "./utils/cosine.js"; // fixed .ts
 
 /**
  * Open the canonical DB in read-only mode

@@ -2,7 +2,7 @@ import fs from "fs";
 import sqlite3 from "sqlite3";
 import path from "path";
 import { getEmbedding as embedText } from "./services/embeddingClient.js";
-import { DB_PATH } from "./utils/dbPath";
+import { DB_PATH } from "./utils/dbPath.js";
 
 const CONTENT_PATH = path.join(process.cwd(), "website_content.txt");
 const CONCURRENCY = 5; // number of chunks processed in parallel

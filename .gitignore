@@ -22,3 +22,9 @@ website_chunks_backup.db
 .tables
 embeddings_backup.json
 node_modules/
+
+
+dist/
+server_BACKUP/
+server/vector_store_BACKUP/
+.env

@@ -1,6 +1,6 @@
 import sqlite3 from "sqlite3";
-import { DB_PATH } from "./utils/dbPath";
-import { embedText } from "./services/embeddingClient";
+import { DB_PATH } from "./utils/dbPath.js";
+import { embedText } from "./services/embeddingClient.js";
 
 const db = new sqlite3.Database(DB_PATH);
 

@@ -1,7 +1,7 @@
 // server/chatbot.ts
 import readline from "readline";
-import { generateHybridResponse } from "./services/hybridClient";
-import { getTopChunks } from "./queryChunks";
+import { generateHybridResponse } from "./services/hybridClient.js";
+import { getTopChunks } from "./queryChunks.js";
 
 // Simple character-based embedding for user input
 function embedText(text: string): number[] {

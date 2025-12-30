@@ -9,8 +9,8 @@ dotenv.config({ path: path.join(__dirname, "../.env") });
 
 
 // server/services/hybridClient.ts
-import { generateGemma } from "./gemmaClient";
-import { generateGemini } from "./geminiClient";
+import { generateGemma } from "./gemmaClient.js";
+import { generateGemini } from "./geminiClient.js";
 
 /**
  * Keywords that indicate complex/high-reasoning prompts

@@ -3,10 +3,10 @@ import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 import path from "path";
 
-// Absolute path to DB for Render deployment
+// ✅ IMPORTANT: absolute DB path (works in Render)
 const DB_PATH = path.join(process.cwd(), "server/vector_store/unified_chunks.db");
 
-// Open DB connection
+// Open SQLite database
 export async function openDB() {
   return open({
     filename: DB_PATH,
@@ -25,22 +25,24 @@ function cosineSim(vecA: number[], vecB: number[]): number {
 }
 
 /**
- * Get top N chunks from DB based on query embedding
+ * Fetch top-N chunks using cosine similarity
  */
 export async function getTopChunks(queryEmbedding: number[], topN = 5) {
   const db = await openDB();
+
   const rows = await db.all("SELECT * FROM chunks");
 
-  // Parse embeddings from string to array
-  const parsedRows = rows.map((r) => ({
+  const parsedRows = rows.map((r: any) => ({
     ...r,
-    embedding: JSON.parse(r.embedding) as number[],
+    embedding: JSON.parse(r.embedding),
   }));
 
-  // Compute similarity dynamically (no score column in DB)
   const ranked = parsedRows
-    .map((r) => ({ ...r, score: cosineSim(queryEmbedding, r.embedding) }))
-    .sort((a, b) => b.score - a.score) // highest similarity first
+    .map((r: any) => ({
+      ...r,
+      score: cosineSim(queryEmbedding, r.embedding),
+    }))
+    .sort((a: any, b: any) => b.score - a.score)
     .slice(0, topN);
 
   await db.close();
