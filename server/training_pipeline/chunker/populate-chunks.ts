@@ -5,9 +5,9 @@ import path from "path";
 import sqlite3 from "sqlite3";
 import { fileURLToPath } from "url";
 
-// ✅ FIXED IMPORT PATHS (MUST USE .js EXTENSIONS IN ESM)
+// ✅ Correct relative paths from /chunker/
 import { DB_PATH } from "../utils/dbPath.js";
-import { embedText } from "../embedder/embedChunk.js";
+import { embedChunk } from "../embedder/embedChunk.js";
 
 // ------------------------------------------------------------------
 
@@ -42,7 +42,7 @@ async function processChunk(
   index: number
 ) {
   try {
-    const embedding = await embedText(chunk);
+    const embedding = await embedChunk(chunk);
     stmt.run("", "", chunk, JSON.stringify(embedding));
     console.log(`✅ Chunk ${index + 1} embedded`);
   } catch (err) {

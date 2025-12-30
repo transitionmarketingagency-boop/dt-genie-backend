@@ -1,7 +1,11 @@
-import { getEmbedding } from "../../services/embeddingClient";
-import { EmbeddedChunk } from "./embeddingTypes";
 import crypto from "crypto";
+import { getEmbedding } from "../../services/embeddingClient.js";
+import { EmbeddedChunk } from "./embeddingTypes.js";
 
+/**
+ * Embeds a single content chunk using the active embedding provider.
+ * Used by the chunking + ingestion pipeline.
+ */
 export async function embedChunk(chunk: {
   content: string;
   metadata: {
