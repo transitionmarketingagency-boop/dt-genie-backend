@@ -1,5 +1,5 @@
 // ✅ Correct imports
-import { storage, InsertChatMessage } from "./storage";
+import { storage, InsertChatMessage } from "./storage.js";
 import { memoryStore } from "./services/memory";
 import { ConversationMemory, ChatMessage } from "../shared/types";
 
