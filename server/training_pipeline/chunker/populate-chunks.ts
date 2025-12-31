@@ -2,10 +2,15 @@
 import fs from "fs";
 import path from "path";
 import sqlite3 from "sqlite3";
+import { fileURLToPath } from "url";
 
-// ✅ FIXED IMPORT PATHS FOR ESM
-import { DB_PATH } from "../utils/dbPath.js"; // no .js for TS
-import { embedChunk } from "../embedder/embedChunk.js"; // no .js for TS
+// ✅ Correct DB path for ESM (works on Render)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+export const DB_PATH = path.join(__dirname, "../vector_store/unified_chunks.db");
+
+// ✅ Fixed import for embedChunk
+import { embedChunk } from "../embedder/embedChunk.js";
 
 const CONTENT_PATH = path.join(process.cwd(), "server", "website_content.txt");
 const CONCURRENCY = 5;
@@ -32,7 +37,6 @@ async function processChunk(
   idx: number
 ) {
   try {
-    // Wrap chunkContent into the expected structure for embedChunk
     const embedded = await embedChunk({
       content: chunkContent,
       metadata: { type: "text", source: "website", intent: "general", purpose: "training" },
