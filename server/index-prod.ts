@@ -26,7 +26,6 @@ import runApp from "./app.js";
 import { setupApp } from "./app.js";
 import { getTopChunks } from "./queryChunks.js";
 import { generateHybridResponse } from "./services/hybridClient.js";
-import populateTestData from "./populate-test-data.js";
 
 // ------------------ STATIC FILE HANDLER ------------------
 export function serveStatic(app: Application, _server: Server) {
