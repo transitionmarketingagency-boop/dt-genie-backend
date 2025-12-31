@@ -2,7 +2,7 @@
 import * as dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { getTopChunks } from "../queryChunks";
+import { getTopChunks } from "../queryChunks.js";
 
 // ESM-safe __dirname
 const __filename = fileURLToPath(import.meta.url);
