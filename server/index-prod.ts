@@ -91,7 +91,6 @@ export function serveStatic(app: Application, _server: Server) {
   });
 
   try {
-    await populateTestData();
     console.log("✅ Memory and test data loaded");
   } catch (err) {
     console.error("❌ Failed to populate test data:", err);
