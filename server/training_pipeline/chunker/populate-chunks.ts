@@ -2,8 +2,10 @@
 import fs from "fs";
 import path from "path";
 import sqlite3 from "sqlite3";
-import { DB_PATH } from "../utils/dbPath.js"; // ✅ use .js extension for ESM
-import { embedChunk } from "../embedder/embedChunk.js"; // ✅ use .js extension for ESM
+
+// ✅ FIXED IMPORT PATHS FOR ESM
+import { DB_PATH } from "../utils/dbPath.js"; // no .js for TS
+import { embedChunk } from "../embedder/embedChunk.js"; // no .js for TS
 
 const CONTENT_PATH = path.join(process.cwd(), "server", "website_content.txt");
 const CONCURRENCY = 5;
