@@ -1,10 +1,8 @@
 import crypto from "crypto";
-import { getEmbedding } from "../../services/embeddingClient.js";
-import { EmbeddedChunk } from "./embeddingTypes.js";
+import { getEmbedding } from "../../services/embeddingClient";
 
 /**
- * Embeds a single content chunk using the active embedding provider.
- * Used by the chunking + ingestion pipeline.
+ * Embeds a single content chunk
  */
 export async function embedChunk(chunk: {
   content: string;
@@ -14,7 +12,7 @@ export async function embedChunk(chunk: {
     intent: string;
     purpose: string;
   };
-}): Promise<EmbeddedChunk> {
+}) {
   const vector = await getEmbedding(chunk.content);
 
   return {

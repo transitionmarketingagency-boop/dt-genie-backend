@@ -1,19 +1,18 @@
-// server/training_pipeline/chunker/populate-chunks.ts
 import fs from "fs";
 import path from "path";
 import sqlite3 from "sqlite3";
 import { fileURLToPath } from "url";
 
-// ✅ Correct DB path for ESM (works on Render)
-import { DB_PATH } from "../utils/dbPath.js"; // <- fixed import for ESM
-import { embedChunk } from "../embedder/embedChunk.js"; // <- fixed import for ESM
+import { embedChunk } from "../embedder/embedChunk";
+import { DB_PATH } from "../utils/dbPath";
+
+// Resolve __dirname for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const CONTENT_PATH = path.join(process.cwd(), "server", "website_content.txt");
 const CONCURRENCY = 5;
 
-/**
- * Split text into chunks of a given size
- */
 function chunkText(text: string, size = 1000) {
   const chunks: string[] = [];
   let i = 0;
@@ -24,9 +23,6 @@ function chunkText(text: string, size = 1000) {
   return chunks;
 }
 
-/**
- * Process a single chunk: generate embedding and insert into DB
- */
 async function processChunk(
   stmt: sqlite3.Statement,
   chunkContent: string,
@@ -35,23 +31,24 @@ async function processChunk(
   try {
     const embedded = await embedChunk({
       content: chunkContent,
-      metadata: { type: "text", source: "website", intent: "general", purpose: "training" },
+      metadata: {
+        type: "text",
+        source: "website",
+        intent: "general",
+        purpose: "training",
+      },
     });
 
     stmt.run("", "", chunkContent, JSON.stringify(embedded.embedding));
     console.log(`✅ Chunk ${idx + 1} embedded`);
   } catch (err) {
-    console.error(`❌ Failed to embed chunk ${idx + 1}:`, err);
+    console.error(`❌ Failed chunk ${idx + 1}`, err);
   }
 }
 
-/**
- * Populate DB with chunks and embeddings
- */
 export async function populateChunks(): Promise<void> {
-  console.log(" ~@ populateChunks() started");
+  console.log("🚀 populateChunks started");
   console.log("DB path:", DB_PATH);
-  console.log("Content path:", CONTENT_PATH);
 
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(DB_PATH, (err) => {
@@ -70,8 +67,7 @@ export async function populateChunks(): Promise<void> {
       `);
 
       const text = fs.readFileSync(CONTENT_PATH, "utf-8");
-      const chunks = chunkText(text, 1000);
-      console.log(`✂️ Chunked into ${chunks.length} pieces`);
+      const chunks = chunkText(text);
 
       db.run("DELETE FROM chunks");
 
@@ -81,21 +77,19 @@ export async function populateChunks(): Promise<void> {
 
       for (let i = 0; i < chunks.length; i += CONCURRENCY) {
         const batch = chunks.slice(i, i + CONCURRENCY);
-        await Promise.all(
-          batch.map((chunk, idx) => processChunk(stmt, chunk, i + idx))
-        );
+        await Promise.all(batch.map((c, idx) => processChunk(stmt, c, i + idx)));
       }
 
-      stmt.finalize((err) => {
-        if (err) return reject(err);
-        console.log(`✅ Inserted ${chunks.length} chunks with embeddings`);
-        db.close(() => resolve());
+      stmt.finalize(() => {
+        console.log(`✅ Inserted ${chunks.length} chunks`);
+        db.close();
+        resolve();
       });
     });
   });
 }
 
-// Allow script execution directly
+// Allow direct execution
 if (process.argv[1]?.endsWith("populate-chunks.ts")) {
   populateChunks()
     .then(() => process.exit(0))
