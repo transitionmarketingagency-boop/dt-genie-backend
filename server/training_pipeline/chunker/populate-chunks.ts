@@ -5,12 +5,8 @@ import sqlite3 from "sqlite3";
 import { fileURLToPath } from "url";
 
 // ✅ Correct DB path for ESM (works on Render)
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-export const DB_PATH = path.join(__dirname, "../vector_store/unified_chunks.db");
-
-// ✅ Fixed import for embedChunk
-import { embedChunk } from "../embedder/embedChunk.js";
+import { DB_PATH } from "../utils/dbPath.js"; // <- fixed import for ESM
+import { embedChunk } from "../embedder/embedChunk.js"; // <- fixed import for ESM
 
 const CONTENT_PATH = path.join(process.cwd(), "server", "website_content.txt");
 const CONCURRENCY = 5;
