@@ -3,8 +3,8 @@ import path from "path";
 import sqlite3 from "sqlite3";
 import { fileURLToPath } from "url";
 
-import { embedChunk } from "../embedder/embedChunk";
-import { DB_PATH } from "../utils/dbPath";
+import { DB_PATH } from "../utils/dbPath.js";
+import { embedChunk } from "../embedder/embedChunk.js";
 
 // Resolve __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);

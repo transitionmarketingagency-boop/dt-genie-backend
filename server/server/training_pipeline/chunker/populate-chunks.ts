@@ -1,8 +1,8 @@
 import fs from "fs";
 import sqlite3 from "sqlite3";
 import path from "path";
-import { DB_PATH } from "./utils/dbPath";
-import { getEmbedding as embedText } from "./services/embeddingClient.js";
+import { DB_PATH } from "../../../utils/dbPath";
+import { getEmbedding as embedText } from "../../services/embeddingClient";
 
 const CONTENT_PATH = path.join(
   process.cwd(),
