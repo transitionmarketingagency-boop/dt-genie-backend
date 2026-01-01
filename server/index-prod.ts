@@ -21,41 +21,28 @@ console.log("✅ GEMINI_API_KEY loaded successfully");
 import fs from "node:fs";
 import express, { type Application } from "express";
 import type { Server } from "node:http";
+import cors from "cors";
 
 import runApp from "./app.js";
 import { setupApp } from "./app.js";
 import { getTopChunks } from "./queryChunks.js";
 import { generateHybridResponse } from "./services/hybridClient.js";
 
-// ------------------ STATIC FILE HANDLER ------------------
-export function serveStatic(app: Application, _server: Server) {
-  const distPublicPath = path.resolve(__dirname, "../dist/public");
-  const publicPath = path.resolve(__dirname, "../public");
-
-  if (fs.existsSync(publicPath)) {
-    app.use(express.static(publicPath));
-    console.log("✅ Public folder served");
-  }
-
-  if (fs.existsSync(distPublicPath)) {
-    app.use(express.static(distPublicPath));
-    console.log("✅ Dist folder served");
-  }
-
-  app.get("*", (req, res, next) => {
-    const indexPath = path.join(distPublicPath, "index.html");
-    if (fs.existsSync(indexPath)) {
-      return res.sendFile(indexPath);
-    }
-    next();
-  });
-}
-
 // ------------------ SERVER BOOTSTRAP ------------------
 (async () => {
   await runApp(async (app: Application, server: Server) => {
-    await setupApp(app);
 
+    // ✅ REQUIRED FOR FRAMER / RENDER
+    app.use(
+      cors({
+        origin: "*", // lock this later if needed
+        credentials: true,
+      })
+    );
+
+    app.use(express.json());
+
+    // ------------------ CHAT ENDPOINT ------------------
     app.post("/chat", async (req, res) => {
       try {
         const { message } = req.body;
@@ -64,35 +51,52 @@ export function serveStatic(app: Application, _server: Server) {
           return res.status(400).json({ reply: "Message is required." });
         }
 
-        // 1️⃣ Create embedding
-         const msgStr = message as string;
-         const embedding = Array.from(msgStr).map((c) => c.charCodeAt(0) / 255);
+        const msgStr = String(message);
 
-        // 2️⃣ Fetch relevant chunks and cast items to any to fix TS error
+        // simple embedding mock (works for now)
+        const embedding = Array.from(msgStr).map((c) => c.charCodeAt(0) / 255);
+
         const chunks = (await getTopChunks(embedding, 5)) as any[];
-
         const context = chunks.map((c) => c.content).join("\n---\n");
 
-        // 3️⃣ Generate final response
         const reply = await generateHybridResponse(message, context);
-        res.json({ reply });
+
+        return res.json({ reply });
       } catch (err) {
         console.error("❌ Chat Error:", err);
-        res.status(500).json({ reply: "Internal server error" });
+        return res.status(500).json({ reply: "Internal server error" });
       }
     });
 
-    serveStatic(app, server);
+    // ------------------ STATIC FILE SERVING ------------------
+    const distPublicPath = path.resolve(__dirname, "../dist/public");
+    const publicPath = path.resolve(__dirname, "../public");
 
+    if (fs.existsSync(publicPath)) {
+      app.use(express.static(publicPath));
+      console.log("✅ Public folder served");
+    }
+
+    if (fs.existsSync(distPublicPath)) {
+      app.use(express.static(distPublicPath));
+      console.log("✅ Dist folder served");
+    }
+
+    // Fallback SPA route
+    app.get("*", (req, res) => {
+      const indexPath = path.join(distPublicPath, "index.html");
+      if (fs.existsSync(indexPath)) {
+        return res.sendFile(indexPath);
+      }
+      res.status(404).send("Not Found");
+    });
+
+    // ✅ CRITICAL FIX: Render uses process.env.PORT
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log(` ~@ Server running on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
   });
 
-  try {
-    console.log("✅ Memory and test data loaded");
-  } catch (err) {
-    console.error("❌ Failed to populate test data:", err);
-  }
+  console.log("✅ Memory and test data loaded");
 })();
