@@ -9,8 +9,8 @@
     "frontend": "vite",
     "build": "tsc -p tsconfig.build.json",
     "build:backend": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-db",
-    "copy-public": "mkdirp dist/public && cpy 'public/**/*' dist/public",
-    "copy-db": "mkdirp dist/server/vector_store && cpy 'server/vector_store/unified_chunks.db' dist/server/vector_store",
+    "copy-public": "mkdirp dist/public && cpy \"public/**/*\" dist/public",
+    "copy-db": "mkdirp dist/server/vector_store && cpy server/vector_store/unified_chunks.db dist/server/vector_store",
     "start": "node dist/index-prod.js"
   },
   "dependencies": {
