@@ -2,27 +2,23 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import fs from "node:fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables BEFORE ANY OTHER IMPORTS
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-// Validate environment
 if (!process.env.GEMINI_API_KEY) {
   console.error("❌ GEMINI_API_KEY is missing. Check your .env file.");
   process.exit(1);
 }
 
-console.log("✅ GEMINI_API_KEY loaded successfully");
+console.log("✅ GEMINI_API_KEY loaded");
 
-// ------------------ STANDARD IMPORTS ------------------
-import fs from "node:fs";
+// ------------------ IMPORTS ------------------
 import express, { type Application } from "express";
-import type { Server } from "node:http";
 import cors from "cors";
-
 import runApp from "./app.js";
 import { setupApp } from "./app.js";
 import { getTopChunks } from "./queryChunks.js";
@@ -30,17 +26,25 @@ import { generateHybridResponse } from "./services/hybridClient.js";
 
 // ------------------ SERVER BOOTSTRAP ------------------
 (async () => {
-  await runApp(async (app: Application, server: Server) => {
+  await runApp(async (app: Application, server) => {
 
-    // ✅ REQUIRED FOR FRAMER / RENDER
+    // Enable CORS (Framer-safe)
     app.use(
       cors({
-        origin: "*", // lock this later if needed
+        origin: "*",
         credentials: true,
       })
     );
 
     app.use(express.json());
+
+    // ------------------ STATIC FILES ------------------
+    const publicPath = path.resolve(__dirname, "../public");
+
+    if (fs.existsSync(publicPath)) {
+      app.use(express.static(publicPath));
+      console.log("✅ Public folder served:", publicPath);
+    }
 
     // ------------------ CHAT ENDPOINT ------------------
     app.post("/chat", async (req, res) => {
@@ -51,16 +55,14 @@ import { generateHybridResponse } from "./services/hybridClient.js";
           return res.status(400).json({ reply: "Message is required." });
         }
 
-        const msgStr = String(message);
+        const embedding = Array.from(String(message)).map(
+          (c) => c.charCodeAt(0) / 255
+        );
 
-        // simple embedding mock (works for now)
-        const embedding = Array.from(msgStr).map((c) => c.charCodeAt(0) / 255);
-
-        const chunks = (await getTopChunks(embedding, 5)) as any[];
+        const chunks = await getTopChunks(embedding, 5);
         const context = chunks.map((c) => c.content).join("\n---\n");
 
         const reply = await generateHybridResponse(message, context);
-
         return res.json({ reply });
       } catch (err) {
         console.error("❌ Chat Error:", err);
@@ -68,35 +70,11 @@ import { generateHybridResponse } from "./services/hybridClient.js";
       }
     });
 
-    // ------------------ STATIC FILE SERVING ------------------
-    const distPublicPath = path.resolve(__dirname, "../dist/public");
-    const publicPath = path.resolve(__dirname, "../public");
-
-    if (fs.existsSync(publicPath)) {
-      app.use(express.static(publicPath));
-      console.log("✅ Public folder served");
-    }
-
-    if (fs.existsSync(distPublicPath)) {
-      app.use(express.static(distPublicPath));
-      console.log("✅ Dist folder served");
-    }
-
-    // Fallback SPA route
-    app.get("*", (req, res) => {
-      const indexPath = path.join(distPublicPath, "index.html");
-      if (fs.existsSync(indexPath)) {
-        return res.sendFile(indexPath);
-      }
-      res.status(404).send("Not Found");
-    });
-
-    // ✅ CRITICAL FIX: Render uses process.env.PORT
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
   });
 
-  console.log("✅ Memory and test data loaded");
+  console.log("✅ Server bootstrap complete");
 })();
