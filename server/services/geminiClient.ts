@@ -10,8 +10,8 @@ const __dirname = dirname(__filename);
 // Load env
 dotenv.config({ path: join(__dirname, "../../.env") });
 
-// ✅ CORRECT MODEL + ENDPOINT
-const MODEL = "models/gemini-1.5-flash";
+// ✅ FIXED MODEL
+const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
 
 export async function generateGemini(prompt: string): Promise<string> {
