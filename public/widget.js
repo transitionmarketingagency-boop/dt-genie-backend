@@ -30,8 +30,10 @@
 
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
-            <img src="https://dt-genie-backend.onrender.com/public/neon-brain.png"
-     alt="${CHATBOT_NAME} icon" width="48" height="48" />
+            <img src="/neon-brain.png"
+                 alt="${CHATBOT_NAME} icon"
+                 width="48"
+                 height="48" />
           </div>
 
           <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
@@ -49,8 +51,10 @@
         <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat" aria-hidden="true">
           <div id="dt-genie-header">
             <div id="dt-genie-header-avatar-wrap">
-              <img src="https://dt-genie-backend.onrender.com/public/neon-brain.png"
-     alt="${CHATBOT_NAME} icon" width="48" height="48" />
+              <img src="/neon-brain.png"
+                   alt="${CHATBOT_NAME} icon"
+                   width="48"
+                   height="48" />
             </div>
             <div id="dt-genie-header-info">
               <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
@@ -128,26 +132,19 @@
       const response = await fetch(CONFIG.apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
         body: JSON.stringify({ message, sessionId })
       });
 
-      if (!response.ok) throw new Error(`Server error: ${response.status}`);
-
       const data = await response.json();
       hideTyping();
-      addMessage('assistant', data.reply, { newMessage: true });
-
+      addMessage('assistant', data.reply || 'No response received.');
     } catch (err) {
       hideTyping();
-      addMessage(
-        'assistant',
-        "Sorry, I'm having trouble connecting. Try again in a moment.",
-        { newMessage: true }
-      );
+      addMessage('assistant', "Sorry, I'm having trouble connecting. Try again in a moment.");
     } finally {
       isProcessing = false;
       sendButton.disabled = false;
-      input.focus();
     }
   }
 
@@ -160,20 +157,12 @@
       panel.setAttribute('aria-hidden', 'false');
       const messagesContainer = document.getElementById('dt-genie-messages');
       if (messagesContainer.children.length === 0) {
-        addMessage(
-          'assistant',
-          `Hello! I'm ${CHATBOT_NAME}, your AI assistant. How can I help you today?`
-        );
+        addMessage('assistant', `Hello! I'm ${CHATBOT_NAME}, your AI assistant. How can I help you today?`);
       }
     } else {
       panel.classList.remove('open');
       panel.setAttribute('aria-hidden', 'true');
     }
-  }
-
-  function autoResizeTextarea(textarea) {
-    textarea.style.height = 'auto';
-    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
   }
 
   function init() {
@@ -196,13 +185,13 @@
       }
     });
 
-    input.addEventListener('input', () => autoResizeTextarea(input));
-
     console.log(`✨ ${CHATBOT_NAME} widget ready`);
   }
 
-  if (document.readyState === 'loading')
+  if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
-  else init();
+  } else {
+    init();
+  }
 
 })();
