@@ -51,12 +51,11 @@
         <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat" aria-hidden="true">
           <div id="dt-genie-header">
             <div id="dt-genie-header-avatar-wrap">
-              <img src="/neon-brain.png"
+              <img src="https://dt-genie-backend.onrender.com/public/neon-brain.png"
                    alt="${CHATBOT_NAME} icon"
                    width="48"
                    height="48" />
-            </div>
-            <div id="dt-genie-header-info">
+            </div>                     <div id="dt-genie-header-info">
               <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
               <p id="dt-genie-header-status">Online</p>
             </div>
@@ -133,7 +132,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         mode: 'cors',
-        body: JSON.stringify({ message, sessionId })
+        body: JSON.stringify({ message, sessionId }) // <-- FIXED: proper JSON + Content-Type
       });
 
       const data = await response.json();
@@ -167,7 +166,6 @@
 
   function init() {
     createWidget();
-
     const button = document.getElementById('dt-genie-button');
     const closeBtn = document.getElementById('dt-genie-close');
     const input = document.getElementById('dt-genie-input');
