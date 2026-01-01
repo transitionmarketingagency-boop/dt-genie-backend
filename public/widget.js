@@ -30,7 +30,7 @@
 
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
-               <img src="https://dt-genie-backend.onrender.com/public/neon-brain.png"
+                <img src="https://dt-genie-backend.onrender.com/neon-brain.png" ...
                  alt="${CHATBOT_NAME} icon"
                  width="48"
                  height="48" />
@@ -51,7 +51,7 @@
         <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat" aria-hidden="true">
           <div id="dt-genie-header">
             <div id="dt-genie-header-avatar-wrap">
-              <img src="https://dt-genie-backend.onrender.com/public/neon-brain.png"
+                   <img src="https://dt-genie-backend.onrender.com/neon-brain.png" ...
                    alt="${CHATBOT_NAME} icon"
                    width="48"
                    height="48" />
