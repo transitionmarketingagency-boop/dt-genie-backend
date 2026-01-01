@@ -30,7 +30,7 @@
 
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
-            <img src="/neon-brain.png"
+               <img src="https://dt-genie-backend.onrender.com/public/neon-brain.png"
                  alt="${CHATBOT_NAME} icon"
                  width="48"
                  height="48" />
