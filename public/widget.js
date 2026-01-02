@@ -19,6 +19,8 @@
     localStorage.setItem('dtGenieSession', sessionId);
   }
 
+  let sessionData = JSON.parse(localStorage.getItem('dtGenieSessionData') || "{}");
+
   let messageHistory = [];
   let isOpen = false;
   let isProcessing = false;
@@ -30,7 +32,7 @@
 
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
-                <img src="https://dt-genie-backend.onrender.com/neon-brain.png" ...
+                <img src="https://dt-genie-backend.onrender.com/neon-brain.png"
                  alt="${CHATBOT_NAME} icon"
                  width="48"
                  height="48" />
@@ -51,11 +53,12 @@
         <div id="dt-genie-panel" role="dialog" aria-label="${CHATBOT_NAME} Chat" aria-hidden="true">
           <div id="dt-genie-header">
             <div id="dt-genie-header-avatar-wrap">
-                   <img src="https://dt-genie-backend.onrender.com/neon-brain.png" ...
+                   <img src="https://dt-genie-backend.onrender.com/neon-brain.png"
                    alt="${CHATBOT_NAME} icon"
                    width="48"
                    height="48" />
-            </div>                     <div id="dt-genie-header-info">
+            </div>                     
+            <div id="dt-genie-header-info">
               <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
               <p id="dt-genie-header-status">Online</p>
             </div>
@@ -74,6 +77,10 @@
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
+  }
+
+  function saveSession() {
+    localStorage.setItem('dtGenieSessionData', JSON.stringify(sessionData));
   }
 
   function addMessage(role, content, options = {}) {
@@ -132,12 +139,19 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         mode: 'cors',
-        body: JSON.stringify({ message, sessionId }) // <-- FIXED: proper JSON + Content-Type
+        body: JSON.stringify({ message, sessionId })
       });
 
       const data = await response.json();
       hideTyping();
-      addMessage('assistant', data.reply || 'No response received.');
+      
+      // If user asked for booking, trigger booking process
+      if (message.toLowerCase().includes("book") || message.toLowerCase().includes("strategy call")) {
+        sendBookingLink();
+      } else {
+        addMessage('assistant', data.reply || 'No response received.');
+      }
+
     } catch (err) {
       hideTyping();
       addMessage('assistant', "Sorry, I'm having trouble connecting. Try again in a moment.");
@@ -156,6 +170,9 @@
       panel.setAttribute('aria-hidden', 'false');
       const messagesContainer = document.getElementById('dt-genie-messages');
       if (messagesContainer.children.length === 0) {
+        if (sessionData.lastBooking) {
+          addMessage('assistant', `Welcome back! Last time you booked a slot at ${sessionData.lastBooking.slot}.`);
+        }
         addMessage('assistant', `Hello! I'm ${CHATBOT_NAME}, your AI assistant. How can I help you today?`);
       }
     } else {
@@ -164,13 +181,32 @@
     }
   }
 
+  function sendBookingLink() {
+    const bookingUrlBase = "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+    const timeSlots = ["9:00 AM", "11:00 AM", "2:00 PM"];
+    
+    addMessage('assistant', `Please choose a time slot for your 20-minute strategy call:`);
+    
+    timeSlots.forEach(slot => {
+      const slotBtn = document.createElement('button');
+      slotBtn.className = "dt-booking-slot";
+      slotBtn.textContent = slot;
+      slotBtn.addEventListener('click', () => {
+        addMessage('user', slot);
+        addMessage('assistant', `Great! Your slot ${slot} is reserved. Book your meeting here: ${bookingUrlBase}?date=${encodeURIComponent(slot)}`);
+        sessionData.lastBooking = { slot: slot, timestamp: Date.now() };
+        saveSession();
+      });
+      document.getElementById('dt-genie-messages').appendChild(slotBtn);
+    });
+  }
+
   function init() {
     createWidget();
     const button = document.getElementById('dt-genie-button');
     const closeBtn = document.getElementById('dt-genie-close');
     const input = document.getElementById('dt-genie-input');
     const sendBtn = document.getElementById('dt-genie-send');
-
     button.addEventListener('click', () => togglePanel());
     closeBtn.addEventListener('click', () => togglePanel(false));
 
@@ -193,3 +229,4 @@
   }
 
 })();
+
