@@ -169,6 +169,16 @@
 
     if (isOpen) {
       panel.classList.add('open');
+
+      if (!sessionData.introShown) {
+        addMessage(
+          'assistant',
+          "Hello! I'm NeonVision, your AI assistant from the DTM team. How can I help you today?"
+        );
+        sessionData.introShown = true;
+        saveSession();
+      }
+
     } else {
       panel.classList.remove('open');
     }
