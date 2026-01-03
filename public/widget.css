@@ -314,33 +314,32 @@
   box-shadow: 0 0 20px rgba(0,225,255,0.12);
 }
 
-/* Neon Send Button */
+/* Neon Send Button — Icon Only */
 #dt-genie-send {
-  width:50px;
-  height:50px;
+  width:44px;
+  height:44px;
   border-radius:50%;
-  background: linear-gradient(135deg, var(--neon-blue), var(--neon-orange));
-  border:none;
-  color:#fff;
+  background: transparent;
+  border: 2px solid var(--neon-blue);
+  color: var(--neon-blue);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-weight:700;
-  font-size:18px;
+  font-size:20px;
+  transition: all 0.25s ease-in-out;
   box-shadow:
-    0 0 12px var(--neon-blue),
-    0 0 24px var(--neon-orange),
-    0 0 36px rgba(255,122,24,0.4);
-  transition: all .25s ease-in-out;
+    0 0 8px var(--neon-blue),
+    0 0 16px var(--neon-blue),
+    0 0 24px rgba(0,225,255,0.2);
 }
-#dt-genie-send:disabled { opacity:0.5; cursor:not-allowed; }
 #dt-genie-send:hover:not(:disabled) {
-  transform: scale(1.08);
+  transform: scale(1.1);
   box-shadow:
-    0 0 24px var(--neon-blue),
-    0 0 36px var(--neon-orange),
+    0 0 16px var(--neon-blue),
+    0 0 32px var(--neon-orange),
     0 0 48px rgba(255,122,24,0.5);
 }
+#dt-genie-send:disabled { opacity:0.5; cursor:not-allowed; }
 
 /* Mobile */
 @media (max-width:768px) {
