@@ -67,7 +67,6 @@
               <button id="dt-genie-send">Send</button>
             </div>
           </div>
-
         </div>
       </div>
     `;
@@ -82,7 +81,12 @@
     const container = document.getElementById('dt-genie-messages');
     const div = document.createElement('div');
     div.className = `dt-message ${role}`;
-    div.innerText = content;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'dt-message-bubble';
+    bubble.innerText = content;
+
+    div.appendChild(bubble);
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
@@ -93,6 +97,7 @@
     div.id = 'dt-genie-typing';
     div.innerText = 'Typing...';
     container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
   }
 
   function hideTyping() {
@@ -122,13 +127,8 @@
       addMessage('assistant', data.reply || 'No response received.');
       messageHistory.push({ role: 'assistant', content: data.reply });
 
-      /* =====================================================
-         ✅ ADDITIVE BOOKING SYSTEM (NON-INVASIVE)
-      ===================================================== */
-      const bookingKeywords = [
-        "book", "schedule", "strategy call", "meeting", "call", "consultation"
-      ];
-
+      /* Calendly trigger preserved exactly */
+      const bookingKeywords = ["book", "schedule", "strategy call", "meeting", "call", "consultation"];
       const now = Date.now();
       const cooldown = 5 * 60 * 1000;
 
@@ -169,9 +169,6 @@
 
     if (isOpen) {
       panel.classList.add('open');
-      if (sessionData.lastCalendlyOpen) {
-        addMessage('assistant', "Welcome back! Want to continue booking your strategy call?");
-      }
     } else {
       panel.classList.remove('open');
     }
@@ -180,10 +177,25 @@
   function init() {
     createWidget();
 
+    const input = document.getElementById('dt-genie-input');
+    const sendBtn = document.getElementById('dt-genie-send');
+
+    function sendAndClear() {
+      const msg = input.value;
+      sendMessage(msg);
+      input.value = '';
+    }
+
     document.getElementById('dt-genie-button').onclick = () => togglePanel();
     document.getElementById('dt-genie-close').onclick = () => togglePanel(false);
-    document.getElementById('dt-genie-send').onclick = () =>
-      sendMessage(document.getElementById('dt-genie-input').value);
+    sendBtn.onclick = sendAndClear;
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendAndClear();
+      }
+    });
   }
 
   if (document.readyState === 'loading') {
