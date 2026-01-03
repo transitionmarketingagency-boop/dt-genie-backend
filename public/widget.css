@@ -218,14 +218,18 @@
 /* Messages */
 #dt-genie-messages {
   flex: 1;
-  overflow-y: auto; /* SCROLL ENABLED */
+  overflow-y: auto; /* scroll enabled */
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* hide scrollbar for Firefox */
+  -ms-overflow-style: none; /* hide scrollbar for IE 10+ */
   padding: 18px;
   display:flex;
   flex-direction:column;
   gap:14px;
 }
+#dt-genie-messages::-webkit-scrollbar { display: none; } /* hide scrollbar Chrome/Safari */
 
+/* Messages */
 .dt-message { display:flex; gap:10px; animation: fadeIn .28s ease-out; }
 @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
 .dt-message.user { justify-content:flex-end; }
@@ -259,18 +263,18 @@
     0 0 24px rgba(255,122,24,0.3);
 }
 
-/* Typing Indicator — UPDATED TO 3 NEON DOTS */
+/* Typing Indicator — 3 Neon Dots */
 .dt-typing {
   display:flex;
   gap:6px;
   padding:8px 12px;
 }
 .dt-typing-dot {
-  width:8px;
-  height:8px;
+  width:10px;
+  height:10px;
   border-radius:50%;
   background: var(--neon-blue);
-  box-shadow:0 0 8px var(--neon-blue);
+  box-shadow:0 0 8px var(--neon-blue), 0 0 16px var(--neon-blue);
   animation: typingBounce 1.3s infinite;
 }
 .dt-typing-dot:nth-child(2) { animation-delay:0.18s; }
@@ -309,9 +313,11 @@
   border-color: var(--neon-blue);
   box-shadow: 0 0 20px rgba(0,225,255,0.12);
 }
+
+/* Neon Send Button */
 #dt-genie-send {
-  width:44px;
-  height:44px;
+  width:50px;
+  height:50px;
   border-radius:50%;
   background: linear-gradient(135deg, var(--neon-blue), var(--neon-orange));
   border:none;
@@ -319,9 +325,22 @@
   display:flex;
   align-items:center;
   justify-content:center;
+  font-weight:700;
+  font-size:18px;
+  box-shadow:
+    0 0 12px var(--neon-blue),
+    0 0 24px var(--neon-orange),
+    0 0 36px rgba(255,122,24,0.4);
+  transition: all .25s ease-in-out;
 }
 #dt-genie-send:disabled { opacity:0.5; cursor:not-allowed; }
-#dt-genie-send:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 0 32px rgba(0,225,255,0.26); }
+#dt-genie-send:hover:not(:disabled) {
+  transform: scale(1.08);
+  box-shadow:
+    0 0 24px var(--neon-blue),
+    0 0 36px var(--neon-orange),
+    0 0 48px rgba(255,122,24,0.5);
+}
 
 /* Mobile */
 @media (max-width:768px) {
