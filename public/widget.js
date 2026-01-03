@@ -59,11 +59,6 @@
             <button id="dt-genie-close">×</button>
           </div>
 
-          <!-- Booking counter badge -->
-          <div id="dt-genie-booking-badge" style="padding:5px 10px; background:#ff4081; color:#fff; font-weight:bold; text-align:center; border-radius:8px; margin:10px; display:none;">
-            0 people booked today!
-          </div>
-
           <div id="dt-genie-messages"></div>
 
           <div id="dt-genie-input-container">
@@ -74,19 +69,6 @@
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
-
-    // Inject continuous pulsating neon glow
-    const style = document.createElement('style');
-    style.innerHTML = `
-      @keyframes neonPulse {
-        0%, 100% { box-shadow: 0 0 5px #00ffff, 0 0 10px #ff7f50, 0 0 15px #00ffff; }
-        50% { box-shadow: 0 0 15px #00ffff, 0 0 25px #ff7f50, 0 0 35px #00ffff; }
-      }
-      #dt-genie-booking-badge {
-        animation: neonPulse 2s infinite;
-      }
-    `;
-    document.head.appendChild(style);
   }
 
   function saveSession() {
@@ -116,43 +98,13 @@
   }
 
   function trackEvent(eventName, data) {
+    // Google Analytics 4
     if (window.gtag) {
       gtag('event', eventName, data);
     }
+    // Legacy analytics (optional)
     if (window.ga) {
       ga('send', 'event', 'DT-Genie', eventName, JSON.stringify(data));
-    }
-  }
-
-  function resetDailyCounterIfNeeded() {
-    const today = new Date().toISOString().split('T')[0];
-    if (sessionData.lastResetDate !== today) {
-      sessionData.bookingCount = 0;
-      sessionData.lastResetDate = today;
-      saveSession();
-      updateBookingBadge();
-    }
-  }
-
-  function updateBookingBadge() {
-    resetDailyCounterIfNeeded();
-    const badge = document.getElementById('dt-genie-booking-badge');
-    if (!badge) return;
-
-    const previousCount = parseInt(badge.getAttribute('data-count') || '0', 10);
-    const count = sessionData.bookingCount || 0;
-
-    badge.innerText = `${count} people booked today!`;
-    badge.setAttribute('data-count', count);
-    badge.style.display = count > 0 ? 'block' : 'none';
-
-    // Animate badge if count increased
-    if (count > previousCount) {
-      badge.style.transition = '0.3s all ease-in-out';
-      badge.style.background = 'linear-gradient(90deg, #00ffff, #ff7f50)';
-      setTimeout(() => {
-        badge.style.background = '#ff4081';
-      }, 1000);
     }
   }
 
@@ -178,6 +130,9 @@
       addMessage('assistant', data.reply || 'No response received.');
       messageHistory.push({ role: 'assistant', content: data.reply });
 
+      /* =====================================================
+         ✅ ADDITIVE BOOKING SYSTEM WITH TRACKING
+      ===================================================== */
       const bookingKeywords = [
         "book", "schedule", "strategy call", "meeting", "call", "consultation"
       ];
@@ -193,13 +148,16 @@
         sessionData.bookingIntentCount = (sessionData.bookingIntentCount || 0) + 1;
         saveSession();
 
+        // Track popup opened
         trackEvent('calendly_popup_opened', { sessionId, timestamp: now });
 
+        // Pass last 5 messages as context to Calendly notes
         const contextNote = encodeURIComponent(
           messageHistory.slice(-5).map(m => `${m.role}: ${m.content}`).join(' | ')
         );
 
         setTimeout(() => {
+          // Trigger real Calendly badge if exists
           if (window.openCalendlyPopup) {
             window.openCalendlyPopup();
           } else if (window.Calendly) {
@@ -211,25 +169,23 @@
           }
         }, 800);
 
+        // ✅ Add clickable link in chat and track click
         const linkHTML = `<a href="https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" target="_blank" id="dt-genie-calendly-link">Book Your Strategy Call</a>`;
         addMessage('assistant', 'Or you can also schedule directly here: ' + linkHTML);
 
+        // Track meeting booked on link click
         setTimeout(() => {
           const linkEl = document.getElementById('dt-genie-calendly-link');
           if (linkEl) {
             linkEl.addEventListener('click', () => {
               const bookedTime = Date.now();
-              resetDailyCounterIfNeeded();
               sessionData.lastCalendlyBooked = bookedTime;
               sessionData.bookingCount = (sessionData.bookingCount || 0) + 1;
               saveSession();
-              updateBookingBadge();
               trackEvent('calendly_link_clicked', { sessionId, timestamp: bookedTime });
             });
           }
         }, 100);
-
-        updateBookingBadge();
       }
 
     } catch (err) {
@@ -249,7 +205,6 @@
       if (sessionData.lastCalendlyOpen) {
         addMessage('assistant', "Welcome back! Want to continue booking your strategy call?");
       }
-      updateBookingBadge();
     } else {
       panel.classList.remove('open');
     }
@@ -263,14 +218,13 @@
     document.getElementById('dt-genie-send').onclick = () =>
       sendMessage(document.getElementById('dt-genie-input').value);
 
+    // Enter key sends message
     document.getElementById('dt-genie-input').addEventListener('keypress', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage(document.getElementById('dt-genie-input').value);
       }
     });
-
-    updateBookingBadge();
   }
 
   if (document.readyState === 'loading') {
