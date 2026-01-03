@@ -79,7 +79,7 @@
     const container = document.getElementById('dt-genie-messages');
     const div = document.createElement('div');
     div.className = `dt-message ${role}`;
-    div.innerHTML = content; // Use innerHTML to allow clickable links
+    div.innerText = content;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
@@ -122,6 +122,7 @@
       /* =====================================================
          ✅ ADDITIVE BOOKING SYSTEM (NON-INVASIVE)
       ===================================================== */
+
       const bookingKeywords = [
         "book", "schedule", "strategy call", "meeting", "call", "consultation"
       ];
@@ -137,16 +138,12 @@
         sessionData.bookingIntentCount = (sessionData.bookingIntentCount || 0) + 1;
         saveSession();
 
-        // Pass last 5 messages as context to Calendly notes
         const contextNote = encodeURIComponent(
           messageHistory.slice(-5).map(m => `${m.role}: ${m.content}`).join(' | ')
         );
 
         setTimeout(() => {
-          // Trigger real Calendly badge if exists
-          if (window.openCalendlyPopup) {
-            window.openCalendlyPopup();
-          } else if (window.Calendly) {
+          if (window.Calendly) {
             Calendly.initPopupWidget({
               url:
                 "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" +
@@ -154,12 +151,6 @@
             });
           }
         }, 800);
-
-        // ✅ Add clickable link in chat as well
-        addMessage(
-          'assistant',
-          'Or you can also schedule directly here: <a href="https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" target="_blank">Book Your Strategy Call</a>'
-        );
       }
 
     } catch (err) {
@@ -191,14 +182,6 @@
     document.getElementById('dt-genie-close').onclick = () => togglePanel(false);
     document.getElementById('dt-genie-send').onclick = () =>
       sendMessage(document.getElementById('dt-genie-input').value);
-
-    // Enter key sends message
-    document.getElementById('dt-genie-input').addEventListener('keypress', e => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage(document.getElementById('dt-genie-input').value);
-      }
-    });
   }
 
   if (document.readyState === 'loading') {
