@@ -261,28 +261,29 @@
     0 0 24px rgba(255,122,24,0.3);
 }
 
-/* Typing Indicator — Neon 3 Dots Only */
+/* Typing Indicator — Text Color Fixed to White */
 .dt-typing {
-  display:flex;
-  gap:6px;
-  padding:8px 12px;
-  color: transparent; /* hide any text */
-  font-size: 0; /* hide any text completely */
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  color: #fff; /* fixed text color */
+  font-size: 14px; /* normal font size */
 }
+
 .dt-typing-dot {
-  width:10px;
-  height:10px;
-  border-radius:50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
   background: var(--neon-blue);
   box-shadow: 0 0 8px var(--neon-blue), 0 0 16px var(--neon-blue);
   animation: typingBounce 1.3s infinite;
 }
-.dt-typing-dot:nth-child(2) { animation-delay:0.18s; }
-.dt-typing-dot:nth-child(3) { animation-delay:0.36s; }
+.dt-typing-dot:nth-child(2) { animation-delay: 0.18s; }
+.dt-typing-dot:nth-child(3) { animation-delay: 0.36s; }
 
 @keyframes typingBounce {
-  0%,60%,100% { transform:translateY(0); opacity:1; }
-  30% { transform:translateY(-8px); opacity:0.75; }
+  0%, 60%, 100% { transform: translateY(0); opacity: 1; }
+  30% { transform: translateY(-8px); opacity: 0.75; }
 }
 
 /* Input Area */
