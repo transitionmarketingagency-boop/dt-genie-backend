@@ -261,19 +261,20 @@
     0 0 24px rgba(255,122,24,0.3);
 }
 
-/* Typing Indicator — Only Neon Dots */
+/* Typing Indicator — Neon 3 Dots Only */
 .dt-typing {
   display:flex;
   gap:6px;
   padding:8px 12px;
   color: transparent; /* hide any text */
+  font-size: 0; /* hide any text completely */
 }
 .dt-typing-dot {
   width:10px;
   height:10px;
   border-radius:50%;
   background: var(--neon-blue);
-  box-shadow:0 0 8px var(--neon-blue), 0 0 16px var(--neon-blue);
+  box-shadow: 0 0 8px var(--neon-blue), 0 0 16px var(--neon-blue);
   animation: typingBounce 1.3s infinite;
 }
 .dt-typing-dot:nth-child(2) { animation-delay:0.18s; }
@@ -313,7 +314,7 @@
   box-shadow: 0 0 20px rgba(0,225,255,0.12);
 }
 
-/* Neon Send Button — Icon Only */
+/* Neon Send Button — Icon Only, Reduced Size */
 #dt-genie-send {
   width:44px;
   height:44px;
@@ -324,14 +325,14 @@
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:18px;
+  font-size:16px; /* reduced to prevent text overflow */
   transition: all 0.25s ease-in-out;
   box-shadow:
     0 0 8px var(--neon-blue),
     0 0 16px var(--neon-blue),
     0 0 24px rgba(0,225,255,0.2);
 }
-#dt-genie-send svg { width:20px; height:20px; } /* ensure icon fits */
+#dt-genie-send svg { width:18px; height:18px; } /* icon fits perfectly */
 #dt-genie-send:hover:not(:disabled) {
   transform: scale(1.1);
   box-shadow:
