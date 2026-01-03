@@ -313,7 +313,7 @@
   box-shadow: 0 0 20px rgba(0,225,255,0.12);
 }
 
-/* Neon Send Button — Small Icon Only */
+/* Neon Send Button — Icon Only */
 #dt-genie-send {
   width:44px;
   height:44px;
@@ -331,6 +331,7 @@
     0 0 16px var(--neon-blue),
     0 0 24px rgba(0,225,255,0.2);
 }
+#dt-genie-send svg { width:20px; height:20px; } /* ensure icon fits */
 #dt-genie-send:hover:not(:disabled) {
   transform: scale(1.1);
   box-shadow:
