@@ -75,7 +75,7 @@
     `;
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
 
-    // Neon badge glow & animations
+    // Inject continuous neon glow and smooth fast pulse
     const style = document.createElement('style');
     style.innerHTML = `
       @keyframes neonPulse {
@@ -88,7 +88,6 @@
       }
       #dt-genie-booking-badge {
         animation: neonPulse 2s infinite;
-        transition: background 0.5s ease, transform 0.2s ease;
       }
     `;
     document.head.appendChild(style);
@@ -105,10 +104,6 @@
     div.innerHTML = content;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
-
-    // subtle pop animation on new message
-    div.style.transform = "scale(0.95)";
-    setTimeout(() => { div.style.transform = "scale(1)"; }, 100);
   }
 
   function showTyping() {
@@ -125,8 +120,12 @@
   }
 
   function trackEvent(eventName, data) {
-    if (window.gtag) gtag('event', eventName, data);
-    if (window.ga) ga('send', 'event', 'DT-Genie', eventName, JSON.stringify(data));
+    if (window.gtag) {
+      gtag('event', eventName, data);
+    }
+    if (window.ga) {
+      ga('send', 'event', 'DT-Genie', eventName, JSON.stringify(data));
+    }
   }
 
   function resetDailyCounterIfNeeded() {
@@ -152,10 +151,12 @@
     badge.style.display = count > 0 ? 'block' : 'none';
 
     if (count > previousCount) {
+      badge.style.transition = '0.3s all ease-in-out';
       badge.style.background = 'linear-gradient(90deg, #00ffff, #ff7f50)';
 
       if (fastPulse) {
         let pulseTimes = 0;
+
         const smoothPulse = () => {
           pulseTimes++;
           badge.style.animation = 'neonPulseFast 0.7s ease-in-out 1';
@@ -164,12 +165,13 @@
             else badge.style.animation = 'neonPulse 2s infinite';
           }, 700);
         };
+
         smoothPulse();
       }
 
-      // pop effect
-      badge.style.transform = "scale(1.1)";
-      setTimeout(() => { badge.style.transform = "scale(1)"; badge.style.background = '#ff4081'; }, 1000);
+      setTimeout(() => {
+        badge.style.background = '#ff4081';
+      }, 1000);
     }
   }
 
@@ -221,7 +223,9 @@
             window.openCalendlyPopup();
           } else if (window.Calendly) {
             Calendly.initPopupWidget({
-              url: "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" + "?notes=" + contextNote
+              url:
+                "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" +
+                "?notes=" + contextNote
             });
           }
         }, 800);
@@ -238,7 +242,7 @@
               sessionData.lastCalendlyBooked = bookedTime;
               sessionData.bookingCount = (sessionData.bookingCount || 0) + 1;
               saveSession();
-              updateBookingBadge(true);
+              updateBookingBadge(true); // smooth pulse 3 times
               trackEvent('calendly_link_clicked', { sessionId, timestamp: bookedTime });
             });
           }
