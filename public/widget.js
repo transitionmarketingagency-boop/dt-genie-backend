@@ -57,7 +57,7 @@
                    alt="${CHATBOT_NAME} icon"
                    width="48"
                    height="48" />
-            </div>                     
+            </div>
             <div id="dt-genie-header-info">
               <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
               <p id="dt-genie-header-status">Online</p>
@@ -144,12 +144,30 @@
 
       const data = await response.json();
       hideTyping();
-      
-      // If user asked for booking, trigger booking process
-      if (message.toLowerCase().includes("book") || message.toLowerCase().includes("strategy call")) {
-        sendBookingLink();
-      } else {
-        addMessage('assistant', data.reply || 'No response received.');
+
+      addMessage('assistant', data.reply || 'No response received.');
+
+      // ✅ Trigger existing Calendly popup when booking intent is detected
+      const bookingKeywords = [
+        "book",
+        "schedule",
+        "strategy call",
+        "meeting",
+        "call",
+        "consultation"
+      ];
+
+      if (
+        data.reply &&
+        bookingKeywords.some(word =>
+          data.reply.toLowerCase().includes(word)
+        )
+      ) {
+        setTimeout(() => {
+          if (window.openCalendlyPopup) {
+            window.openCalendlyPopup();
+          }
+        }, 800);
       }
 
     } catch (err) {
@@ -171,7 +189,7 @@
       const messagesContainer = document.getElementById('dt-genie-messages');
       if (messagesContainer.children.length === 0) {
         if (sessionData.lastBooking) {
-          addMessage('assistant', `Welcome back! Last time you booked a slot at ${sessionData.lastBooking.slot}.`);
+          addMessage('assistant', `Welcome back!`);
         }
         addMessage('assistant', `Hello! I'm ${CHATBOT_NAME}, your AI assistant. How can I help you today?`);
       }
@@ -181,35 +199,15 @@
     }
   }
 
-  function sendBookingLink() {
-    const bookingUrlBase = "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
-    const timeSlots = ["9:00 AM", "11:00 AM", "2:00 PM"];
-    
-    addMessage('assistant', `Please choose a time slot for your 20-minute strategy call:`);
-    
-    timeSlots.forEach(slot => {
-      const slotBtn = document.createElement('button');
-      slotBtn.className = "dt-booking-slot";
-      slotBtn.textContent = slot;
-      slotBtn.addEventListener('click', () => {
-        addMessage('user', slot);
-        addMessage('assistant', `Great! Your slot ${slot} is reserved. Book your meeting here: ${bookingUrlBase}?date=${encodeURIComponent(slot)}`);
-        sessionData.lastBooking = { slot: slot, timestamp: Date.now() };
-        saveSession();
-      });
-      document.getElementById('dt-genie-messages').appendChild(slotBtn);
-    });
-  }
-
   function init() {
     createWidget();
     const button = document.getElementById('dt-genie-button');
     const closeBtn = document.getElementById('dt-genie-close');
     const input = document.getElementById('dt-genie-input');
     const sendBtn = document.getElementById('dt-genie-send');
+
     button.addEventListener('click', () => togglePanel());
     closeBtn.addEventListener('click', () => togglePanel(false));
-
     sendBtn.addEventListener('click', () => sendMessage(input.value));
 
     input.addEventListener('keypress', e => {
@@ -229,4 +227,3 @@
   }
 
 })();
-
