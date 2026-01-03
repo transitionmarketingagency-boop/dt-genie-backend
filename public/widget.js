@@ -75,16 +75,12 @@
     `;
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
 
-    // Inject continuous neon glow and smooth fast pulse
+    // Inject continuous pulsating neon glow
     const style = document.createElement('style');
     style.innerHTML = `
       @keyframes neonPulse {
         0%, 100% { box-shadow: 0 0 5px #00ffff, 0 0 10px #ff7f50, 0 0 15px #00ffff; }
         50% { box-shadow: 0 0 15px #00ffff, 0 0 25px #ff7f50, 0 0 35px #00ffff; }
-      }
-      @keyframes neonPulseFast {
-        0%, 100% { box-shadow: 0 0 10px #00ffff, 0 0 20px #ff7f50, 0 0 30px #00ffff; }
-        50% { box-shadow: 0 0 25px #00ffff, 0 0 40px #ff7f50, 0 0 55px #00ffff; }
       }
       #dt-genie-booking-badge {
         animation: neonPulse 2s infinite;
@@ -101,7 +97,7 @@
     const container = document.getElementById('dt-genie-messages');
     const div = document.createElement('div');
     div.className = `dt-message ${role}`;
-    div.innerHTML = content;
+    div.innerHTML = content; // Use innerHTML to allow clickable links
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
   }
@@ -138,7 +134,7 @@
     }
   }
 
-  function updateBookingBadge(fastPulse = false) {
+  function updateBookingBadge() {
     resetDailyCounterIfNeeded();
     const badge = document.getElementById('dt-genie-booking-badge');
     if (!badge) return;
@@ -150,25 +146,10 @@
     badge.setAttribute('data-count', count);
     badge.style.display = count > 0 ? 'block' : 'none';
 
+    // Animate badge if count increased
     if (count > previousCount) {
       badge.style.transition = '0.3s all ease-in-out';
       badge.style.background = 'linear-gradient(90deg, #00ffff, #ff7f50)';
-
-      if (fastPulse) {
-        let pulseTimes = 0;
-
-        const smoothPulse = () => {
-          pulseTimes++;
-          badge.style.animation = 'neonPulseFast 0.7s ease-in-out 1';
-          setTimeout(() => {
-            if (pulseTimes < 3) smoothPulse();
-            else badge.style.animation = 'neonPulse 2s infinite';
-          }, 700);
-        };
-
-        smoothPulse();
-      }
-
       setTimeout(() => {
         badge.style.background = '#ff4081';
       }, 1000);
@@ -242,7 +223,7 @@
               sessionData.lastCalendlyBooked = bookedTime;
               sessionData.bookingCount = (sessionData.bookingCount || 0) + 1;
               saveSession();
-              updateBookingBadge(true); // smooth pulse 3 times
+              updateBookingBadge();
               trackEvent('calendly_link_clicked', { sessionId, timestamp: bookedTime });
             });
           }
