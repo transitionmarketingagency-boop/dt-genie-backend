@@ -53,18 +53,21 @@
                 alt="${CHATBOT_NAME} icon" width="48" height="48" />
             </div>
             <div id="dt-genie-header-info">
-              <h3>${CHATBOT_NAME}</h3>
-              <p>Online</p>
+              <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
+              <p id="dt-genie-header-status">Online</p>
             </div>
-            <button id="dt-genie-close">×</button>
+            <button id="dt-genie-close" aria-label="Close Chat">×</button>
           </div>
 
           <div id="dt-genie-messages"></div>
 
           <div id="dt-genie-input-container">
-            <textarea id="dt-genie-input" placeholder="Type your message..."></textarea>
-            <button id="dt-genie-send">Send</button>
+            <div id="dt-genie-input-wrapper">
+              <textarea id="dt-genie-input" placeholder="Type your message..."></textarea>
+              <button id="dt-genie-send">Send</button>
+            </div>
           </div>
+
         </div>
       </div>
     `;
@@ -122,7 +125,6 @@
       /* =====================================================
          ✅ ADDITIVE BOOKING SYSTEM (NON-INVASIVE)
       ===================================================== */
-
       const bookingKeywords = [
         "book", "schedule", "strategy call", "meeting", "call", "consultation"
       ];
