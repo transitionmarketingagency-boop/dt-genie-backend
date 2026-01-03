@@ -97,17 +97,6 @@
     if (el) el.remove();
   }
 
-  function trackEvent(eventName, data) {
-    // Google Analytics 4
-    if (window.gtag) {
-      gtag('event', eventName, data);
-    }
-    // Legacy analytics (optional)
-    if (window.ga) {
-      ga('send', 'event', 'DT-Genie', eventName, JSON.stringify(data));
-    }
-  }
-
   async function sendMessage(message) {
     if (!message.trim() || isProcessing) return;
     isProcessing = true;
@@ -131,7 +120,7 @@
       messageHistory.push({ role: 'assistant', content: data.reply });
 
       /* =====================================================
-         ✅ ADDITIVE BOOKING SYSTEM WITH TRACKING
+         ✅ ADDITIVE BOOKING SYSTEM (NON-INVASIVE)
       ===================================================== */
       const bookingKeywords = [
         "book", "schedule", "strategy call", "meeting", "call", "consultation"
@@ -147,9 +136,6 @@
         sessionData.lastCalendlyOpen = now;
         sessionData.bookingIntentCount = (sessionData.bookingIntentCount || 0) + 1;
         saveSession();
-
-        // Track popup opened
-        trackEvent('calendly_popup_opened', { sessionId, timestamp: now });
 
         // Pass last 5 messages as context to Calendly notes
         const contextNote = encodeURIComponent(
@@ -169,23 +155,11 @@
           }
         }, 800);
 
-        // ✅ Add clickable link in chat and track click
-        const linkHTML = `<a href="https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" target="_blank" id="dt-genie-calendly-link">Book Your Strategy Call</a>`;
-        addMessage('assistant', 'Or you can also schedule directly here: ' + linkHTML);
-
-        // Track meeting booked on link click
-        setTimeout(() => {
-          const linkEl = document.getElementById('dt-genie-calendly-link');
-          if (linkEl) {
-            linkEl.addEventListener('click', () => {
-              const bookedTime = Date.now();
-              sessionData.lastCalendlyBooked = bookedTime;
-              sessionData.bookingCount = (sessionData.bookingCount || 0) + 1;
-              saveSession();
-              trackEvent('calendly_link_clicked', { sessionId, timestamp: bookedTime });
-            });
-          }
-        }, 100);
+        // ✅ Add clickable link in chat as well
+        addMessage(
+          'assistant',
+          'Or you can also schedule directly here: <a href="https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" target="_blank">Book Your Strategy Call</a>'
+        );
       }
 
     } catch (err) {
