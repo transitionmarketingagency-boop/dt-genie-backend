@@ -59,6 +59,11 @@
             <button id="dt-genie-close">×</button>
           </div>
 
+          <!-- Booking counter badge -->
+          <div id="dt-genie-booking-badge" style="padding:5px 10px; background:#ff4081; color:#fff; font-weight:bold; text-align:center; border-radius:8px; margin:10px; display:none;">
+            0 people booked today!
+          </div>
+
           <div id="dt-genie-messages"></div>
 
           <div id="dt-genie-input-container">
@@ -69,6 +74,24 @@
       </div>
     `;
     document.body.insertAdjacentHTML('beforeend', widgetHTML);
+
+    // Neon badge glow & animations
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes neonPulse {
+        0%, 100% { box-shadow: 0 0 5px #00ffff, 0 0 10px #ff7f50, 0 0 15px #00ffff; }
+        50% { box-shadow: 0 0 15px #00ffff, 0 0 25px #ff7f50, 0 0 35px #00ffff; }
+      }
+      @keyframes neonPulseFast {
+        0%, 100% { box-shadow: 0 0 10px #00ffff, 0 0 20px #ff7f50, 0 0 30px #00ffff; }
+        50% { box-shadow: 0 0 25px #00ffff, 0 0 40px #ff7f50, 0 0 55px #00ffff; }
+      }
+      #dt-genie-booking-badge {
+        animation: neonPulse 2s infinite;
+        transition: background 0.5s ease, transform 0.2s ease;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function saveSession() {
@@ -79,9 +102,13 @@
     const container = document.getElementById('dt-genie-messages');
     const div = document.createElement('div');
     div.className = `dt-message ${role}`;
-    div.innerText = content;
+    div.innerHTML = content;
     container.appendChild(div);
     container.scrollTop = container.scrollHeight;
+
+    // subtle pop animation on new message
+    div.style.transform = "scale(0.95)";
+    setTimeout(() => { div.style.transform = "scale(1)"; }, 100);
   }
 
   function showTyping() {
@@ -95,6 +122,55 @@
   function hideTyping() {
     const el = document.getElementById('dt-genie-typing');
     if (el) el.remove();
+  }
+
+  function trackEvent(eventName, data) {
+    if (window.gtag) gtag('event', eventName, data);
+    if (window.ga) ga('send', 'event', 'DT-Genie', eventName, JSON.stringify(data));
+  }
+
+  function resetDailyCounterIfNeeded() {
+    const today = new Date().toISOString().split('T')[0];
+    if (sessionData.lastResetDate !== today) {
+      sessionData.bookingCount = 0;
+      sessionData.lastResetDate = today;
+      saveSession();
+      updateBookingBadge();
+    }
+  }
+
+  function updateBookingBadge(fastPulse = false) {
+    resetDailyCounterIfNeeded();
+    const badge = document.getElementById('dt-genie-booking-badge');
+    if (!badge) return;
+
+    const previousCount = parseInt(badge.getAttribute('data-count') || '0', 10);
+    const count = sessionData.bookingCount || 0;
+
+    badge.innerText = `${count} people booked today!`;
+    badge.setAttribute('data-count', count);
+    badge.style.display = count > 0 ? 'block' : 'none';
+
+    if (count > previousCount) {
+      badge.style.background = 'linear-gradient(90deg, #00ffff, #ff7f50)';
+
+      if (fastPulse) {
+        let pulseTimes = 0;
+        const smoothPulse = () => {
+          pulseTimes++;
+          badge.style.animation = 'neonPulseFast 0.7s ease-in-out 1';
+          setTimeout(() => {
+            if (pulseTimes < 3) smoothPulse();
+            else badge.style.animation = 'neonPulse 2s infinite';
+          }, 700);
+        };
+        smoothPulse();
+      }
+
+      // pop effect
+      badge.style.transform = "scale(1.1)";
+      setTimeout(() => { badge.style.transform = "scale(1)"; badge.style.background = '#ff4081'; }, 1000);
+    }
   }
 
   async function sendMessage(message) {
@@ -119,10 +195,6 @@
       addMessage('assistant', data.reply || 'No response received.');
       messageHistory.push({ role: 'assistant', content: data.reply });
 
-      /* =====================================================
-         ✅ ADDITIVE BOOKING SYSTEM (NON-INVASIVE)
-      ===================================================== */
-
       const bookingKeywords = [
         "book", "schedule", "strategy call", "meeting", "call", "consultation"
       ];
@@ -138,19 +210,41 @@
         sessionData.bookingIntentCount = (sessionData.bookingIntentCount || 0) + 1;
         saveSession();
 
+        trackEvent('calendly_popup_opened', { sessionId, timestamp: now });
+
         const contextNote = encodeURIComponent(
           messageHistory.slice(-5).map(m => `${m.role}: ${m.content}`).join(' | ')
         );
 
         setTimeout(() => {
-          if (window.Calendly) {
+          if (window.openCalendlyPopup) {
+            window.openCalendlyPopup();
+          } else if (window.Calendly) {
             Calendly.initPopupWidget({
-              url:
-                "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" +
-                "?notes=" + contextNote
+              url: "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" + "?notes=" + contextNote
             });
           }
         }, 800);
+
+        const linkHTML = `<a href="https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" target="_blank" id="dt-genie-calendly-link">Book Your Strategy Call</a>`;
+        addMessage('assistant', 'Or you can also schedule directly here: ' + linkHTML);
+
+        setTimeout(() => {
+          const linkEl = document.getElementById('dt-genie-calendly-link');
+          if (linkEl) {
+            linkEl.addEventListener('click', () => {
+              const bookedTime = Date.now();
+              resetDailyCounterIfNeeded();
+              sessionData.lastCalendlyBooked = bookedTime;
+              sessionData.bookingCount = (sessionData.bookingCount || 0) + 1;
+              saveSession();
+              updateBookingBadge(true);
+              trackEvent('calendly_link_clicked', { sessionId, timestamp: bookedTime });
+            });
+          }
+        }, 100);
+
+        updateBookingBadge();
       }
 
     } catch (err) {
@@ -170,6 +264,7 @@
       if (sessionData.lastCalendlyOpen) {
         addMessage('assistant', "Welcome back! Want to continue booking your strategy call?");
       }
+      updateBookingBadge();
     } else {
       panel.classList.remove('open');
     }
@@ -182,6 +277,15 @@
     document.getElementById('dt-genie-close').onclick = () => togglePanel(false);
     document.getElementById('dt-genie-send').onclick = () =>
       sendMessage(document.getElementById('dt-genie-input').value);
+
+    document.getElementById('dt-genie-input').addEventListener('keypress', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage(document.getElementById('dt-genie-input').value);
+      }
+    });
+
+    updateBookingBadge();
   }
 
   if (document.readyState === 'loading') {
