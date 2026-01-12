@@ -15,8 +15,11 @@ const { BOT_IDENTITY, enforceBotName, getPromptEmbedding } = await import(
 /* ---------------- Gemma live runner ---------------- */
 export async function generateGemma(prompt: string): Promise<string> {
   try {
-    // Compute prompt embedding via Python
-    const promptEmbedding = await getPromptEmbedding(prompt);
+    // Compute prompt embedding via Python (adjusted path for dist)
+    const promptEmbedding = await getPromptEmbedding(prompt, {
+      basePath: join(__dirname, "../utils/embed_prompt.py"),
+    });
+
     if (!Array.isArray(promptEmbedding))
       throw new Error("Invalid embedding returned from Python");
 
@@ -43,9 +46,10 @@ Answer:
     }
 
     return await runGemma(finalPrompt);
-  } catch (err) {
-    console.error("⚠️ generateGemma error:", err);
-    return enforceBotName("I’m here to help, but something went wrong.");
+  } catch (err: any) {
+    console.error("⚠️ generateGemma FULL ERROR:", err?.message);
+    console.error(err?.stack);
+    throw err; // let it bubble to Express → 500
   }
 }
 
