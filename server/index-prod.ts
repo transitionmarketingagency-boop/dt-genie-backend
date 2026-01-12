@@ -4,6 +4,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
 
+import { execSync } from "child_process";
+
+try {
+  execSync("python server/utils/fill_chunks.py", { stdio: "inherit" });
+} catch (e) {
+  console.warn("⚠️ DB init skipped or already exists");
+}
+
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 

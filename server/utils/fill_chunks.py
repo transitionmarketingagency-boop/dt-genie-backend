@@ -6,6 +6,9 @@ DB_PATH = os.getenv(
     os.path.join("dist", "server", "vector_store", "unified_chunks.db")
 )
 
+def ensure_dir():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
 def table_exists(conn, table_name):
     cur = conn.cursor()
     cur.execute(
@@ -15,15 +18,16 @@ def table_exists(conn, table_name):
     return cur.fetchone() is not None
 
 def main():
+    ensure_dir()
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
     if table_exists(conn, "chunks"):
-        print("✅ chunks table already exists — skipping population")
+        print("✅ chunks table already exists — skipping init")
         conn.close()
         return
 
-    print("⚠️ chunks table missing — creating and populating")
+    print("⚠️ chunks table missing — creating")
 
     cur.execute("""
     CREATE TABLE chunks(
@@ -35,7 +39,6 @@ def main():
     )
     """)
 
-    # Example seed (safe fallback)
     cur.execute("""
         INSERT INTO chunks (page_url, heading, content, embedding)
         VALUES (?, ?, ?, ?)
@@ -48,7 +51,7 @@ def main():
 
     conn.commit()
     conn.close()
-    print("✅ chunks table created successfully")
+    print("✅ chunks table created")
 
 if __name__ == "__main__":
     main()
