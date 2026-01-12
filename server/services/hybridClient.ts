@@ -26,37 +26,30 @@ const COMPLEX_KEYWORDS = [
   "system",
 ];
 
-/**
- * Determine if a prompt is complex enough to require Gemini
- */
+/* ---------------- Detect greetings / short queries ---------------- */
+function isGreetingOrShortQuery(prompt: string) {
+  const greetings = ["hi", "hello", "hey", "yo", "good morning", "good afternoon"];
+  return prompt.trim().length <= 20 || greetings.some((g) => prompt.toLowerCase().includes(g));
+}
+
+/* ---------------- Detect complex queries ---------------- */
 function isComplex(prompt: string): boolean {
   if (prompt.length > 300) return true;
   const lower = prompt.toLowerCase();
   return COMPLEX_KEYWORDS.some((word) => lower.includes(word));
 }
 
-/**
- * Hybrid response generator
- * - Simple prompts → Gemma (local, free)
- * - Complex prompts → Gemini (cloud, free tier)
- * - Automatic fallback if Gemma fails
- *
- * Accepts optional `context` string from vector store to improve answers
- */
-export async function generateHybridResponse(
-  prompt: string,
-  context?: string
-): Promise<string> {
+/* ---------------- Hybrid response generator ---------------- */
+export async function generateHybridResponse(prompt: string, context?: string): Promise<string> {
   const fullPrompt = context
-    ? `Use the following context to answer professionally and concisely:\n${context}\nQuestion: ${prompt}`
+    ? `Answer professionally and concisely using the following context:\n${context}\n\nQuestion: ${prompt}`
     : prompt;
 
   try {
-    // Simple queries → optimized Gemma
-    const isSimpleQuery = prompt.trim().length < 20; // greetings, short questions
-    if (!isComplex(fullPrompt) || isSimpleQuery) {
+    // Short/simple queries → use Gemma (optimized for speed & DB context)
+    if (!isComplex(fullPrompt) || isGreetingOrShortQuery(fullPrompt)) {
       const gemmaResponse = await generateGemma(fullPrompt);
-      if (gemmaResponse && gemmaResponse.trim().length > 10) {
+      if (gemmaResponse && gemmaResponse.trim().length > 5) {
         return gemmaResponse;
       }
     }
@@ -64,7 +57,7 @@ export async function generateHybridResponse(
     console.warn("⚠️ Gemma failed, falling back to Gemini:", err);
   }
 
-  // Fallback to Gemini for complex prompts or if Gemma fails
+  // Fallback to Gemini for complex queries or if Gemma fails
   try {
     const geminiResponse = await generateGemini(fullPrompt);
     return geminiResponse;

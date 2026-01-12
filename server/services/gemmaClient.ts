@@ -7,12 +7,11 @@ import { dirname, join } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/* ---------------- FIX: Force correct Python on Render ---------------- */
-if (process.env.RENDER === "true") {
-  process.env.PYTHON_BIN = "/opt/render/project/src/.venv/bin/python";
-} else {
-  process.env.PYTHON_BIN = "python";
-}
+/* ---------------- Force correct Python on Render ---------------- */
+process.env.PYTHON_BIN =
+  process.env.RENDER === "true"
+    ? "/opt/render/project/src/.venv/bin/python"
+    : "python";
 
 /* ---------------- Import system identity ---------------- */
 const { BOT_IDENTITY, enforceBotName, getPromptEmbedding } = await import(
@@ -32,23 +31,32 @@ function commandExists(cmd: string): boolean {
 /* ---------------- Gemma live runner ---------------- */
 export async function generateGemma(prompt: string): Promise<string> {
   try {
-    // Compute prompt embedding via Python
-    const promptEmbedding = await getPromptEmbedding(prompt, {
-      basePath: join(__dirname, "../utils/embed_prompt.py")
+    // Determine if query is simple (short greetings or Q&A)
+    const isSimpleQuery = prompt.trim().length < 20;
+
+    // Fetch top relevant chunks for all queries
+    const embedding = await getPromptEmbedding(prompt, {
+      basePath: join(__dirname, "../utils/embed_prompt.py"),
     });
 
-    if (!Array.isArray(promptEmbedding))
+    if (!Array.isArray(embedding))
       throw new Error("Invalid embedding returned from Python");
 
-    // Fetch top relevant chunks from database
-    const contextChunks = await getRelevantChunks(promptEmbedding, 5);
+    const contextChunks = await getRelevantChunks(embedding, 5);
     const context = contextChunks.map((c) => c.content).join("\n\n");
 
-    // Minimal prompt wrapper for simple queries
-    const isSimpleQuery = prompt.trim().length < 20; // greetings, short questions
-    const finalPrompt = isSimpleQuery
-      ? prompt
-      : `
+    // Build prompt
+    let finalPrompt = "";
+    if (isSimpleQuery) {
+      // Use database context if available for greetings
+      finalPrompt = context
+        ? `Answer professionally and concisely using the following context:\n${context}\nQuestion: ${prompt}`
+        : `Answer professionally and concisely: ${prompt}`;
+      return enforceBotName(finalPrompt);
+    }
+
+    // Complex query → include identity + context
+    finalPrompt = `
 ${BOT_IDENTITY}
 
 Context:
@@ -57,38 +65,19 @@ ${context || "No additional context."}
 Question:
 ${prompt}
 
-Answer (provide clear, professional, structured response):
+Answer (professional, structured, concise):
 `.trim();
 
-    // Fallback if Ollama Gemma is not available
-    if (process.platform === "win32" || !commandExists("ollama")) {
-      // Simple query → short, professional response
-      if (isSimpleQuery) {
-        return enforceBotName(
-          `Hello! I’m here to help you with Digital Transition Marketing.`
-        );
-      }
-
-      // Complex query → use database context for professional response
-      const fallbackResponse = `
-${BOT_IDENTITY}
-
-Context:
-${context || "No additional context."}
-
-Answer:
-[Professional response based on the context above]
-`.trim();
-
-      return enforceBotName(fallbackResponse);
+    // Only call Ollama Gemma if command exists
+    if (commandExists("ollama")) {
+      return await runGemma(finalPrompt);
+    } else {
+      return enforceBotName(finalPrompt);
     }
-
-    // Call real Ollama Gemma if available
-    return await runGemma(finalPrompt);
   } catch (err: any) {
     console.error("⚠️ generateGemma error:", err?.message);
     return enforceBotName(
-      "I’m here to help, but something went wrong."
+      "I’m here to help, but something went wrong. Please try again."
     );
   }
 }
@@ -98,7 +87,7 @@ function runGemma(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const gemma = spawn("ollama", ["run", "gemma", "--verbose=false"], {
       stdio: ["pipe", "pipe", "pipe"],
-      shell: true
+      shell: true,
     });
 
     let output = "";
