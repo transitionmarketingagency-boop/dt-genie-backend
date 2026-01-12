@@ -6,7 +6,8 @@
     "start": "node server/index.js"
   },
   "dependencies": {
-    "sqlite3": "^5.1.6",
-    "dotenv": "^16.3.1"
+    "dotenv": "^16.3.1",
+    "node-fetch": "^3.3.2",
+    "sqlite3": "^5.1.6"
   }
 }

@@ -1,43 +1,84 @@
-// server/services/gemmaClient.ts
-import * as dotenv from "dotenv";
-import { fileURLToPath } from "url";
+import { spawn } from "child_process";
+import { getRelevantChunks } from "../db/vectorStore.js";
+import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
-import { getTopChunks } from "../queryChunks.js";
 
-// ESM-safe __dirname
+/* ---------------- ESM-safe __dirname ---------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Load .env from project root
-dotenv.config({ path: join(__dirname, "../../.env") });
+/* ---------------- Import system identity ---------------- */
+const { BOT_IDENTITY, enforceBotName, getPromptEmbedding } = await import(
+  pathToFileURL(join(__dirname, "../system/identity.js")).href
+);
 
-/**
- * Simple local embedding function (placeholder)
- */
-function embedText(text: string): number[] {
-  return Array.from(text).map((c) => c.charCodeAt(0) / 255);
-}
-
-/**
- * Gemma local response generator
- */
+/* ---------------- Gemma live runner ---------------- */
 export async function generateGemma(prompt: string): Promise<string> {
   try {
-    const queryEmbedding = embedText(prompt);
-    const chunks = await getTopChunks(queryEmbedding, 5);
+    // Compute prompt embedding via Python
+    const promptEmbedding = await getPromptEmbedding(prompt);
+    if (!Array.isArray(promptEmbedding))
+      throw new Error("Invalid embedding returned from Python");
 
-    if (!chunks || chunks.length === 0) {
-      return "I'm sorry, I couldn't find relevant information in the knowledge base.";
+    // Fetch top relevant chunks using cosine similarity
+    const contextChunks = await getRelevantChunks(promptEmbedding);
+    const context = contextChunks.map((c) => c.content).join("\n\n");
+
+    // Build the full prompt
+    const finalPrompt = `
+${BOT_IDENTITY}
+
+Context:
+${context}
+
+User question:
+${prompt}
+
+Answer:
+`.trim();
+
+    // Windows fallback: return mock response if Ollama unavailable
+    if (process.platform === "win32") {
+      return enforceBotName(`[Local Neon Vision mock response] ${prompt}`);
     }
 
-    const context = chunks.map((c) => c.content).join("\n\n");
-
-    return `Based on our knowledge base:\n${context}\n\nAnswer: [This is a local-model placeholder response.]`;
+    return await runGemma(finalPrompt);
   } catch (err) {
     console.error("⚠️ generateGemma error:", err);
-    return "I'm sorry, something went wrong in generating the response.";
+    return enforceBotName("I’m here to help, but something went wrong.");
   }
 }
 
-/** ✅ Backward compatibility export */
+/* ---------------- Spawn Ollama Gemma ---------------- */
+function runGemma(prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const gemma = spawn("ollama", ["run", "gemma", "--verbose=false"], {
+      stdio: ["pipe", "pipe", "pipe"],
+      shell: true,
+    });
+
+    let output = "";
+    let error = "";
+
+    gemma.stdout.on("data", (d) => (output += d.toString()));
+    gemma.stderr.on("data", (d) => (error += d.toString()));
+
+    // Timeout safeguard: kill Gemma after 60s
+    const timeout = setTimeout(() => {
+      gemma.kill("SIGTERM");
+      reject(new Error("Gemma timeout after 60 seconds"));
+    }, 60_000);
+
+    gemma.on("close", (code) => {
+      clearTimeout(timeout);
+      if (code !== 0 && !output.trim()) reject(new Error(error || "Gemma error"));
+      else resolve(enforceBotName(output.trim()));
+    });
+
+    gemma.stdin.write(prompt);
+    gemma.stdin.end();
+  });
+}
+
+/* ---------------- Backward compatibility ---------------- */
 export const gemmaClient = generateGemma;

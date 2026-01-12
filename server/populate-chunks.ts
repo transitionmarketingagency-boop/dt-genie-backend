@@ -1,10 +1,11 @@
+// server/populate-chunks.ts
 import fs from "fs";
 import sqlite3 from "sqlite3";
 import path from "path";
 import { getEmbedding as embedText } from "./services/embeddingClient.js";
 import { DB_PATH } from "./utils/dbPath.js";
 
-const CONTENT_PATH = path.join(process.cwd(), "website_content.txt");
+const CONTENT_PATH = path.join(process.cwd(), "server", "website_content.txt");
 const CONCURRENCY = 5; // number of chunks processed in parallel
 
 function chunkText(text: string, size = 1000) {
@@ -33,6 +34,10 @@ export async function populateChunks(): Promise<void> {
   console.log("Content path:", CONTENT_PATH);
 
   return new Promise((resolve, reject) => {
+    if (!fs.existsSync(CONTENT_PATH)) {
+      return reject(new Error(`❌ website_content.txt not found at ${CONTENT_PATH}`));
+    }
+
     const db = new sqlite3.Database(DB_PATH, (err) => {
       if (err) return reject(err);
     });

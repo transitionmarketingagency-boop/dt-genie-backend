@@ -1,7 +1,14 @@
-import { generateGemini } from "./services/geminiClient";
+// server/test-gemini.ts
+import { generateGemini } from "./services/geminiClient.js";
 
-(async () => {
-  console.log("~@ Testing Gemini...");
-  const reply = await generateGemini("Say hello in one short sentence.");
-  console.log("✅ Gemini Response:", reply);
-})();
+async function run() {
+  try {
+    const prompt = "Explain what Digital Transition Marketing is in 3 sentences.";
+    const res = await generateGemini(prompt);
+    console.log("Gemini response:\n", res);
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+run();
