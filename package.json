@@ -12,7 +12,7 @@
     "copy-public": "mkdirp dist/public && cpy \"public/**/*\" dist/public",
     "copy-db": "mkdirp dist/server/vector_store && cpy server/vector_store/unified_chunks.db dist/server/vector_store",
     "start": "node dist/index-prod.js",
-    "postinstall": "python -m pip install --user -r requirements.txt"
+    "postinstall": "python -m pip install -r requirements.txt"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
