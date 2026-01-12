@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import { getRelevantChunks } from "../db/vectorStore.js";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
@@ -18,6 +18,16 @@ if (process.env.RENDER === "true") {
 const { BOT_IDENTITY, enforceBotName, getPromptEmbedding } = await import(
   pathToFileURL(join(__dirname, "../system/identity.js")).href
 );
+
+/* ---------------- Helper: Check if command exists ---------------- */
+function commandExists(cmd: string): boolean {
+  try {
+    execSync(`command -v ${cmd}`, { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /* ---------------- Gemma live runner ---------------- */
 export async function generateGemma(prompt: string): Promise<string> {
@@ -47,15 +57,31 @@ ${prompt}
 Answer (provide clear, professional response):
 `.trim();
 
-    // Windows fallback
-    if (process.platform === "win32") {
-      return enforceBotName(`[Local mock response] ${prompt}`);
+    // Windows fallback or Ollama missing
+    if (
+      process.platform === "win32" ||
+      !commandExists("ollama")
+    ) {
+      // Use professional local response with context
+      const fallbackResponse = `
+${BOT_IDENTITY}
+
+Context:
+${context || "No additional context."}
+
+Answer:
+[Professional response generated locally]
+`.trim();
+      return enforceBotName(fallbackResponse);
     }
 
+    // Call real Ollama Gemma if available
     return await runGemma(finalPrompt);
   } catch (err: any) {
     console.error("⚠️ generateGemma error:", err?.message);
-    return enforceBotName("I’m here to help, but something went wrong.");
+    return enforceBotName(
+      "I’m here to help, but something went wrong."
+    );
   }
 }
 
