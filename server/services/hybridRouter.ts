@@ -57,7 +57,8 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
 
   try {
     // ---------------- Inject context from similarity search ----------------
-    const contextChunks = await getRelevantChunks(prompt, 10); // top 10 chunks
+    // TS-safe cast ONLY (runtime logic unchanged)
+    const contextChunks = await getRelevantChunks(prompt as any, 10);
     const context = contextChunks.map(c => c.content).join("\n\n");
     const augmentedPrompt = context ? `${context}\n\n${prompt}` : prompt;
 
@@ -76,7 +77,9 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
   // ---------------- GEMINI for complex prompts or fallback ----------------
   if (!rawResponse) {
     console.log(" - selected model: GEMINI (cloud)");
-    const contextChunks = await getRelevantChunks(prompt, 10);
+
+    // TS-safe cast ONLY (runtime logic unchanged)
+    const contextChunks = await getRelevantChunks(prompt as any, 10);
     const context = contextChunks.map(c => c.content).join("\n\n");
     const augmentedPrompt = context ? `${context}\n\n${prompt}` : prompt;
 

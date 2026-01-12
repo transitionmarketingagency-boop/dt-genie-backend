@@ -16,6 +16,8 @@
     "**/*.test.ts",
     "**/*.spec.ts",
     "server/test-*",
-    "server/**/test-*"
+    "server/**/test-*",
+    "server/backup_services/**",
+    "server/training_pipeline/**"
   ]
 }
