@@ -28,3 +28,5 @@ dist/
 server_BACKUP/
 server/vector_store_BACKUP/
 .env
+venv/
+.schema

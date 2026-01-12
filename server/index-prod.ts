@@ -3,22 +3,35 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
-
 import { execSync } from "child_process";
 
-try {
-  execSync("python server/utils/fill_chunks.py", { stdio: "inherit" });
-} catch (e) {
-  console.warn("⚠️ DB init skipped or already exists");
-}
-
-
+// ------------------ PATH SETUP ------------------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables
+// ------------------ ENV ------------------
 dotenv.config();
 
+// ------------------ SAFE DB INIT (RUNTIME ONLY) ------------------
+try {
+  const dbDir = path.resolve(__dirname, "../server/vector_store");
+
+  // Ensure DB directory exists (Render-safe)
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+
+  // Populate DB only if needed
+  execSync("python server/utils/fill_chunks.py", {
+    stdio: "inherit"
+  });
+
+  console.log("✅ SQLite chunks ready");
+} catch (e) {
+  console.warn("⚠️ DB init skipped (already exists or non-fatal)");
+}
+
+// ------------------ REQUIRED ENV CHECK ------------------
 if (!process.env.GEMINI_API_KEY) {
   console.error("❌ GEMINI_API_KEY is missing. Check Render environment variables.");
   process.exit(1);
@@ -38,7 +51,6 @@ import { generateHybridResponse } from "./services/hybridClient.js";
 
     // Enable CORS for Framer
     app.use(cors({ origin: "*", credentials: true }));
-
     app.use(express.json());
 
     // ------------------ STATIC FILES ------------------
@@ -57,12 +69,12 @@ import { generateHybridResponse } from "./services/hybridClient.js";
           return res.status(400).json({ reply: "Message is required." });
         }
 
-        console.log(" M-% Chat request:", message);
+        console.log("📩 Chat request:", message);
 
         // Generate professional hybrid response
         const reply = await generateHybridResponse(message);
 
-        console.log(" M-$ Chat response sent");
+        console.log("📤 Chat response sent");
         return res.json({ reply });
 
       } catch (err: any) {
@@ -74,7 +86,7 @@ import { generateHybridResponse } from "./services/hybridClient.js";
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log(` ~@ Server running on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
   });
 
