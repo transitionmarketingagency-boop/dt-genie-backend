@@ -1,29 +1,54 @@
 import sqlite3
-import numpy as np
-from sklearn.preprocessing import normalize
-import json
+import os
 
-# 1️⃣ Connect to the DB
-conn = sqlite3.connect("server/vector_store/unified_chunks.db")
-c = conn.cursor()
+DB_PATH = os.getenv(
+    "DB_PATH",
+    os.path.join("dist", "server", "vector_store", "unified_chunks.db")
+)
 
-# 2️⃣ Sample training data (replace with your real text data)
-training_data = [
-    "We offer social media marketing.",
-    "Our AI tools simplify digital marketing.",
-    "We create CGI tours for real estate.",
-    "We provide search engine optimization and Google Ads services."
-]
-
-# 3️⃣ Insert chunks into DB
-for text in training_data:
-    vector = normalize(np.random.rand(1, 512))  # replace with real embeddings later
-    c.execute(
-        "INSERT INTO chunks (content, embedding) VALUES (?, ?)",
-        (text, json.dumps(vector.tolist()))
+def table_exists(conn, table_name):
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?;",
+        (table_name,)
     )
+    return cur.fetchone() is not None
 
-conn.commit()
-conn.close()
+def main():
+    conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
 
-print("✅ Chunks table populated successfully.")
+    if table_exists(conn, "chunks"):
+        print("✅ chunks table already exists — skipping population")
+        conn.close()
+        return
+
+    print("⚠️ chunks table missing — creating and populating")
+
+    cur.execute("""
+    CREATE TABLE chunks(
+        id INTEGER PRIMARY KEY,
+        page_url TEXT,
+        heading TEXT,
+        content TEXT,
+        embedding TEXT
+    )
+    """)
+
+    # Example seed (safe fallback)
+    cur.execute("""
+        INSERT INTO chunks (page_url, heading, content, embedding)
+        VALUES (?, ?, ?, ?)
+    """, (
+        "https://digitaltransitionmarketing.com",
+        "Digital Transition Marketing",
+        "We offer AI, marketing, automation, real estate, travel, and growth solutions.",
+        "[]"
+    ))
+
+    conn.commit()
+    conn.close()
+    print("✅ chunks table created successfully")
+
+if __name__ == "__main__":
+    main()
