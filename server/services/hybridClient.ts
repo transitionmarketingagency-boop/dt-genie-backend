@@ -11,7 +11,7 @@ const __dirname = path.dirname(__filename);
 /* ---------------- Load .env ---------------- */
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
-/* ---------------- Keywords for complex prompts ---------------- */
+/* ---------------- Keywords for complex queries ---------------- */
 const COMPLEX_KEYWORDS = [
   "strategy",
   "plan",
@@ -26,14 +26,14 @@ const COMPLEX_KEYWORDS = [
   "system",
 ];
 
-/* ---------------- Detect greetings / short queries ---------------- */
-function isGreetingOrShortQuery(prompt: string) {
+/* ---------------- Detect short/simple queries ---------------- */
+function isSimpleQuery(prompt: string) {
   const greetings = ["hi", "hello", "hey", "yo", "good morning", "good afternoon"];
   return prompt.trim().length <= 20 || greetings.some((g) => prompt.toLowerCase().includes(g));
 }
 
 /* ---------------- Detect complex queries ---------------- */
-function isComplex(prompt: string): boolean {
+function isComplex(prompt: string) {
   if (prompt.length > 300) return true;
   const lower = prompt.toLowerCase();
   return COMPLEX_KEYWORDS.some((word) => lower.includes(word));
@@ -46,18 +46,16 @@ export async function generateHybridResponse(prompt: string, context?: string): 
     : prompt;
 
   try {
-    // Short/simple queries → use Gemma (optimized for speed & DB context)
-    if (!isComplex(fullPrompt) || isGreetingOrShortQuery(fullPrompt)) {
+    // Short/simple → Gemma
+    if (!isComplex(fullPrompt) || isSimpleQuery(fullPrompt)) {
       const gemmaResponse = await generateGemma(fullPrompt);
-      if (gemmaResponse && gemmaResponse.trim().length > 5) {
-        return gemmaResponse;
-      }
+      if (gemmaResponse && gemmaResponse.trim().length > 5) return gemmaResponse;
     }
   } catch (err) {
-    console.warn("⚠️ Gemma failed, falling back to Gemini:", err);
+    console.warn("⚠️ Gemma failed, fallback to Gemini:", err);
   }
 
-  // Fallback to Gemini for complex queries or if Gemma fails
+  // Fallback → Gemini for complex or failed Gemma
   try {
     const geminiResponse = await generateGemini(fullPrompt);
     return geminiResponse;
