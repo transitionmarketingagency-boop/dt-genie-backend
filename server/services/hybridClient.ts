@@ -47,18 +47,16 @@ export async function generateHybridResponse(
   prompt: string,
   context?: string
 ): Promise<string> {
-  // Construct the full prompt with context if available
   const fullPrompt = context
-    ? `Use the following context to answer the question professionally and concisely:\n${context}\nQuestion: ${prompt}`
-    : `Answer professionally and concisely: ${prompt}`;
+    ? `Use the following context to answer professionally and concisely:\n${context}\nQuestion: ${prompt}`
+    : prompt;
 
   try {
-    // Use Gemma for simpler prompts first
-    if (!isComplex(fullPrompt)) {
+    // Simple queries → optimized Gemma
+    const isSimpleQuery = prompt.trim().length < 20; // greetings, short questions
+    if (!isComplex(fullPrompt) || isSimpleQuery) {
       const gemmaResponse = await generateGemma(fullPrompt);
-
-      if (gemmaResponse && gemmaResponse.trim().length > 20) {
-        // Return Gemma response if valid
+      if (gemmaResponse && gemmaResponse.trim().length > 10) {
         return gemmaResponse;
       }
     }

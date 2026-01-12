@@ -40,12 +40,15 @@ export async function generateGemma(prompt: string): Promise<string> {
     if (!Array.isArray(promptEmbedding))
       throw new Error("Invalid embedding returned from Python");
 
-    // Fetch top relevant chunks
+    // Fetch top relevant chunks from database
     const contextChunks = await getRelevantChunks(promptEmbedding, 5);
     const context = contextChunks.map((c) => c.content).join("\n\n");
 
-    // Build final prompt
-    const finalPrompt = `
+    // Minimal prompt wrapper for simple queries
+    const isSimpleQuery = prompt.trim().length < 20; // greetings, short questions
+    const finalPrompt = isSimpleQuery
+      ? prompt
+      : `
 ${BOT_IDENTITY}
 
 Context:
@@ -54,15 +57,19 @@ ${context || "No additional context."}
 Question:
 ${prompt}
 
-Answer (provide clear, professional response):
+Answer (provide clear, professional, structured response):
 `.trim();
 
-    // Windows fallback or Ollama missing
-    if (
-      process.platform === "win32" ||
-      !commandExists("ollama")
-    ) {
-      // Use professional local response with context
+    // Fallback if Ollama Gemma is not available
+    if (process.platform === "win32" || !commandExists("ollama")) {
+      // Simple query → short, professional response
+      if (isSimpleQuery) {
+        return enforceBotName(
+          `Hello! I’m here to help you with Digital Transition Marketing.`
+        );
+      }
+
+      // Complex query → use database context for professional response
       const fallbackResponse = `
 ${BOT_IDENTITY}
 
@@ -70,8 +77,9 @@ Context:
 ${context || "No additional context."}
 
 Answer:
-[Professional response generated locally]
+[Professional response based on the context above]
 `.trim();
+
       return enforceBotName(fallbackResponse);
     }
 
