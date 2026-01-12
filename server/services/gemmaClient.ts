@@ -7,6 +7,13 @@ import { dirname, join } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+/* ---------------- FIX: Force correct Python on Render ---------------- */
+if (process.env.RENDER === "true") {
+  process.env.PYTHON_BIN = "/opt/render/project/src/.venv/bin/python";
+} else {
+  process.env.PYTHON_BIN = "python";
+}
+
 /* ---------------- Import system identity ---------------- */
 const { BOT_IDENTITY, enforceBotName, getPromptEmbedding } = await import(
   pathToFileURL(join(__dirname, "../system/identity.js")).href
@@ -24,7 +31,7 @@ export async function generateGemma(prompt: string): Promise<string> {
       throw new Error("Invalid embedding returned from Python");
 
     // Fetch top relevant chunks
-    const contextChunks = await getRelevantChunks(promptEmbedding, 5); // top 5
+    const contextChunks = await getRelevantChunks(promptEmbedding, 5);
     const context = contextChunks.map((c) => c.content).join("\n\n");
 
     // Build final prompt
@@ -66,7 +73,6 @@ function runGemma(prompt: string): Promise<string> {
     gemma.stdout.on("data", (d) => (output += d.toString()));
     gemma.stderr.on("data", (d) => (error += d.toString()));
 
-    // Timeout safeguard
     const timeout = setTimeout(() => {
       gemma.kill("SIGTERM");
       reject(new Error("Gemma timeout after 60 seconds"));
