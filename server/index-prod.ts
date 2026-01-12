@@ -7,10 +7,11 @@ import fs from "node:fs";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.join(__dirname, ".env") });
+// ✅ Render injects env vars automatically (keep safe fallback)
+dotenv.config();
 
 if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY is missing. Check your .env file.");
+  console.error("❌ GEMINI_API_KEY is missing. Check Render environment variables.");
   process.exit(1);
 }
 
@@ -20,8 +21,6 @@ console.log("✅ GEMINI_API_KEY loaded");
 import express, { type Application } from "express";
 import cors from "cors";
 import runApp from "./app.js";
-import { setupApp } from "./app.js";
-import { getTopChunks } from "./queryChunks.js";
 import { generateHybridResponse } from "./services/hybridClient.js";
 
 // ------------------ SERVER BOOTSTRAP ------------------
@@ -51,21 +50,21 @@ import { generateHybridResponse } from "./services/hybridClient.js";
       try {
         const { message } = req.body;
 
-        if (!message) {
+        if (!message || typeof message !== "string") {
           return res.status(400).json({ reply: "Message is required." });
         }
 
-        const embedding = Array.from(String(message)).map(
-          (c) => c.charCodeAt(0) / 255
-        );
+        console.log("📥 Chat request:", message);
 
-        const chunks = await getTopChunks(embedding, 5);
-        const context = chunks.map((c) => c.content).join("\n---\n");
+        // ✅ SINGLE SOURCE OF TRUTH
+        const reply = await generateHybridResponse(message);
 
-        const reply = await generateHybridResponse(message, context);
+        console.log("📤 Chat response sent");
         return res.json({ reply });
-      } catch (err) {
-        console.error("❌ Chat Error:", err);
+
+      } catch (err: any) {
+        console.error("❌ Chat Error:", err?.message || err);
+        console.error(err?.stack);
         return res.status(500).json({ reply: "Internal server error" });
       }
     });
