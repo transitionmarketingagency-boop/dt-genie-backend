@@ -15,41 +15,40 @@ const { BOT_IDENTITY, enforceBotName, getPromptEmbedding } = await import(
 /* ---------------- Gemma live runner ---------------- */
 export async function generateGemma(prompt: string): Promise<string> {
   try {
-    // Compute prompt embedding via Python (adjusted path for dist)
+    // Compute prompt embedding via Python
     const promptEmbedding = await getPromptEmbedding(prompt, {
-      basePath: join(__dirname, "../utils/embed_prompt.py"),
+      basePath: join(__dirname, "../utils/embed_prompt.py")
     });
 
     if (!Array.isArray(promptEmbedding))
       throw new Error("Invalid embedding returned from Python");
 
-    // Fetch top relevant chunks using cosine similarity
-    const contextChunks = await getRelevantChunks(promptEmbedding);
+    // Fetch top relevant chunks
+    const contextChunks = await getRelevantChunks(promptEmbedding, 5); // top 5
     const context = contextChunks.map((c) => c.content).join("\n\n");
 
-    // Build the full prompt
+    // Build final prompt
     const finalPrompt = `
 ${BOT_IDENTITY}
 
 Context:
-${context}
+${context || "No additional context."}
 
-User question:
+Question:
 ${prompt}
 
-Answer:
+Answer (provide clear, professional response):
 `.trim();
 
-    // Windows fallback: return mock response if Ollama unavailable
+    // Windows fallback
     if (process.platform === "win32") {
-      return enforceBotName(`[Local Neon Vision mock response] ${prompt}`);
+      return enforceBotName(`[Local mock response] ${prompt}`);
     }
 
     return await runGemma(finalPrompt);
   } catch (err: any) {
-    console.error("⚠️ generateGemma FULL ERROR:", err?.message);
-    console.error(err?.stack);
-    throw err; // let it bubble to Express → 500
+    console.error("⚠️ generateGemma error:", err?.message);
+    return enforceBotName("I’m here to help, but something went wrong.");
   }
 }
 
@@ -58,7 +57,7 @@ function runGemma(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const gemma = spawn("ollama", ["run", "gemma", "--verbose=false"], {
       stdio: ["pipe", "pipe", "pipe"],
-      shell: true,
+      shell: true
     });
 
     let output = "";
@@ -67,7 +66,7 @@ function runGemma(prompt: string): Promise<string> {
     gemma.stdout.on("data", (d) => (output += d.toString()));
     gemma.stderr.on("data", (d) => (error += d.toString()));
 
-    // Timeout safeguard: kill Gemma after 60s
+    // Timeout safeguard
     const timeout = setTimeout(() => {
       gemma.kill("SIGTERM");
       reject(new Error("Gemma timeout after 60 seconds"));

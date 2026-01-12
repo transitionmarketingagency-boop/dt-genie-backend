@@ -1,6 +1,8 @@
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { generateGemma } from "./gemmaClient.js";
+import { generateGemini } from "./geminiClient.js";
 
 /* ---------------- ESM-safe __filename & __dirname ---------------- */
 const __filename = fileURLToPath(import.meta.url);
@@ -9,14 +11,7 @@ const __dirname = path.dirname(__filename);
 /* ---------------- Load .env ---------------- */
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
-
-// server/services/hybridClient.ts
-import { generateGemma } from "./gemmaClient.js";
-import { generateGemini } from "./geminiClient.js";
-
-/**
- * Keywords that indicate complex/high-reasoning prompts
- */
+/* ---------------- Keywords for complex prompts ---------------- */
 const COMPLEX_KEYWORDS = [
   "strategy",
   "plan",
@@ -45,22 +40,25 @@ function isComplex(prompt: string): boolean {
  * - Simple prompts → Gemma (local, free)
  * - Complex prompts → Gemini (cloud, free tier)
  * - Automatic fallback if Gemma fails
- * 
+ *
  * Accepts optional `context` string from vector store to improve answers
  */
 export async function generateHybridResponse(
   prompt: string,
   context?: string
 ): Promise<string> {
-  // Include context in the prompt if available
+  // Construct the full prompt with context if available
   const fullPrompt = context
-    ? `Use the following context to answer the question:\n${context}\nQuestion: ${prompt}`
-    : prompt;
+    ? `Use the following context to answer the question professionally and concisely:\n${context}\nQuestion: ${prompt}`
+    : `Answer professionally and concisely: ${prompt}`;
 
   try {
+    // Use Gemma for simpler prompts first
     if (!isComplex(fullPrompt)) {
       const gemmaResponse = await generateGemma(fullPrompt);
+
       if (gemmaResponse && gemmaResponse.trim().length > 20) {
+        // Return Gemma response if valid
         return gemmaResponse;
       }
     }
@@ -68,5 +66,15 @@ export async function generateHybridResponse(
     console.warn("⚠️ Gemma failed, falling back to Gemini:", err);
   }
 
-  return generateGemini(fullPrompt);
+  // Fallback to Gemini for complex prompts or if Gemma fails
+  try {
+    const geminiResponse = await generateGemini(fullPrompt);
+    return geminiResponse;
+  } catch (err) {
+    console.error("❌ Gemini failed:", err);
+    return "I’m here to help, but something went wrong. Please try again later.";
+  }
 }
+
+/* ---------------- Backward compatibility ---------------- */
+export const hybridClient = generateHybridResponse;

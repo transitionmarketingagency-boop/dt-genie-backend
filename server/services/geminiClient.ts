@@ -7,10 +7,10 @@ import fetch from "node-fetch";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/* ---------------- Load .env from project root ---------------- */
+/* ---------------- Load .env ---------------- */
 dotenv.config({ path: join(__dirname, "../../.env") });
 
-/* ---------------- ✅ FIXED: import compiled JS, not TS ---------------- */
+/* ---------------- Import compiled JS identity ---------------- */
 const { BOT_IDENTITY, enforceBotName } = await import(
   pathToFileURL(join(__dirname, "../system/identity.js")).href
 );
@@ -21,16 +21,13 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generate
 
 export async function generateGemini(prompt: string): Promise<string> {
   const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY) {
-    throw new Error(
-      "❌ GEMINI_API_KEY missing. Add it to your .env in project root."
-    );
-  }
+  if (!API_KEY)
+    throw new Error("❌ GEMINI_API_KEY missing. Add it to your .env in project root.");
 
   const finalPrompt = `
 ${BOT_IDENTITY}
+Answer the following professionally and concisely. Limit repeated mentions of the bot name.
 User request: "${prompt}"
-Respond as Neon Vision from Digital Transition Marketing.
 `.trim();
 
   const maxRetries = 3;
@@ -41,7 +38,7 @@ Respond as Neon Vision from Digital Transition Marketing.
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: finalPrompt }] }],
+          contents: [{ parts: [{ text: finalPrompt }] }]
         }),
       });
 
@@ -56,11 +53,8 @@ Respond as Neon Vision from Digital Transition Marketing.
       }
 
       const data: any = await res.json();
-      const text =
-        data?.candidates?.[0]?.content?.parts?.[0]?.text ??
-        "Gemini returned no content.";
-
-      return enforceBotName(text);
+      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Gemini returned no content.";
+      return enforceBotName(text.trim());
     } catch (e) {
       if (attempt === maxRetries) throw e;
     }
