@@ -10,9 +10,9 @@ const __dirname = dirname(__filename);
 /* ---------------- Load .env from project root ---------------- */
 dotenv.config({ path: join(__dirname, "../../.env") });
 
-/* ---------------- Windows-safe dynamic import ---------------- */
+/* ---------------- ✅ FIXED: import compiled JS, not TS ---------------- */
 const { BOT_IDENTITY, enforceBotName } = await import(
-  pathToFileURL(join(__dirname, "../system/identity.ts")).href
+  pathToFileURL(join(__dirname, "../system/identity.js")).href
 );
 
 /* ---------------- Gemini config ---------------- */
@@ -21,7 +21,11 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generate
 
 export async function generateGemini(prompt: string): Promise<string> {
   const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY) throw new Error("❌ GEMINI_API_KEY missing. Add it to your .env in project root.");
+  if (!API_KEY) {
+    throw new Error(
+      "❌ GEMINI_API_KEY missing. Add it to your .env in project root."
+    );
+  }
 
   const finalPrompt = `
 ${BOT_IDENTITY}
@@ -30,12 +34,15 @@ Respond as Neon Vision from Digital Transition Marketing.
 `.trim();
 
   const maxRetries = 3;
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] }),
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: finalPrompt }] }],
+        }),
       });
 
       if (!res.ok) {
@@ -49,7 +56,10 @@ Respond as Neon Vision from Digital Transition Marketing.
       }
 
       const data: any = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Gemini returned no content.";
+      const text =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+        "Gemini returned no content.";
+
       return enforceBotName(text);
     } catch (e) {
       if (attempt === maxRetries) throw e;
