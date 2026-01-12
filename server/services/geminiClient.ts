@@ -48,7 +48,7 @@ Respond as Neon Vision from Digital Transition Marketing.
         throw new Error(`❌ Gemini API Error ${res.status}: ${err}`);
       }
 
-      const data = await res.json();
+      const data: any = await res.json();
       const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Gemini returned no content.";
       return enforceBotName(text);
     } catch (e) {
