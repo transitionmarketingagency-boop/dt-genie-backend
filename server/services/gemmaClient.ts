@@ -32,9 +32,7 @@ function commandExists(cmd: string): boolean {
 export async function generateGemma(prompt: string): Promise<string> {
   try {
     /* ---- Embed user prompt ---- */
-    const embedding = await getPromptEmbedding(prompt, {
-      basePath: join(__dirname, "../utils/embed_prompt.py"),
-    });
+    const embedding = await getPromptEmbedding(prompt);
 
     if (!Array.isArray(embedding)) {
       throw new Error("Invalid embedding returned from Python");
@@ -44,15 +42,15 @@ export async function generateGemma(prompt: string): Promise<string> {
     const contextChunks = await getRelevantChunks(embedding, 5);
     const context = contextChunks.map((c) => c.content).join("\n\n");
 
-    const isSimpleQuery = prompt.trim().length <= 20;
-
-    /* ---- Build FINAL prompt (ALWAYS generates an answer) ---- */
+    /* ---- Build final prompt for Gemma ---- */
     const finalPrompt = `
-Use the following information to answer professionally and clearly.
-If the information is insufficient, respond helpfully based on your expertise.
+You are a professional digital marketing and growth strategist.
+
+Use the information below if it is relevant.
+If not, answer clearly and helpfully using your expertise.
 
 Information:
-${context || "No additional internal information available."}
+${context || "No internal context available."}
 
 User question:
 ${prompt}
@@ -63,21 +61,20 @@ Answer:
     /* ---- If Ollama exists, use Gemma ---- */
     if (commandExists("ollama")) {
       const response = await runGemma(finalPrompt);
-      return enforceBotName(response);
+      return enforceBotName(response, prompt);
     }
 
-    /* ---- Fallback: context-driven answer (NO echoing prompts) ---- */
-    const fallbackResponse = isSimpleQuery
-      ? context
-        ? context.split("\n").slice(0, 2).join(" ")
-        : "Hello! How can Digital Transition Marketing assist you today?"
-      : context || "I’m happy to help — could you please clarify your request?";
+    /* ---- Safe fallback (NO branding, NO echoing) ---- */
+    const fallbackResponse = context
+      ? context.slice(0, 600)
+      : "Could you please provide a bit more detail so I can help you properly?";
 
-    return enforceBotName(fallbackResponse);
+    return enforceBotName(fallbackResponse, prompt);
   } catch (err: any) {
     console.error("⚠️ generateGemma error:", err?.message);
     return enforceBotName(
-      "I’m here to help, but something went wrong. Please try again."
+      "Something went wrong while processing your request. Please try again.",
+      prompt
     );
   }
 }

@@ -10,8 +10,8 @@ const __dirname = dirname(__filename);
 /* ---------------- Load .env ---------------- */
 dotenv.config({ path: join(__dirname, "../../.env") });
 
-/* ---------------- Import compiled JS identity ---------------- */
-const { BOT_IDENTITY, enforceBotName } = await import(
+/* ---------------- Import identity helpers ---------------- */
+const { enforceBotName } = await import(
   pathToFileURL(join(__dirname, "../system/identity.js")).href
 );
 
@@ -21,13 +21,16 @@ const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generate
 
 export async function generateGemini(prompt: string): Promise<string> {
   const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY)
-    throw new Error("❌ GEMINI_API_KEY missing. Add it to your .env in project root.");
+  if (!API_KEY) {
+    throw new Error("❌ GEMINI_API_KEY missing. Add it to your .env.");
+  }
 
   const finalPrompt = `
-${BOT_IDENTITY}
-Answer the following professionally and concisely. Limit repeated mentions of the bot name.
-User request: "${prompt}"
+Answer the following request clearly, professionally, and concisely.
+Do NOT repeat your name unless explicitly asked.
+
+User request:
+${prompt}
 `.trim();
 
   const maxRetries = 3;
@@ -45,22 +48,24 @@ User request: "${prompt}"
       if (!res.ok) {
         const err = await res.text();
         if (res.status === 503 && attempt < maxRetries) {
-          console.warn(`Gemini 503, retrying attempt ${attempt}...`);
-          await new Promise((r) => setTimeout(r, 2000 * attempt));
+          await new Promise(r => setTimeout(r, 1500 * attempt));
           continue;
         }
-        throw new Error(`❌ Gemini API Error ${res.status}: ${err}`);
+        throw new Error(`Gemini API Error ${res.status}: ${err}`);
       }
 
       const data: any = await res.json();
-      const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "Gemini returned no content.";
-      return enforceBotName(text.trim());
-    } catch (e) {
-      if (attempt === maxRetries) throw e;
+      const text =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+        "No response generated.";
+
+      return enforceBotName(text.trim(), prompt);
+    } catch (err) {
+      if (attempt === maxRetries) throw err;
     }
   }
 
-  throw new Error("Gemini failed after 3 attempts");
+  throw new Error("Gemini failed after retries");
 }
 
 /* ---------------- Backward compatibility ---------------- */

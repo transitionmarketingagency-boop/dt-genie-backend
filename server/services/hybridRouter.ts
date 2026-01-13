@@ -1,4 +1,3 @@
-// server/services/hybridRouter.ts
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { getRelevantChunks } from "../db/vectorStore.js";
@@ -9,17 +8,13 @@ import { dirname, join } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/* ---------------- ESM-safe dynamic imports ---------------- */
-const cleanResponseUrl = pathToFileURL(
-  join(__dirname, "../utils/cleanResponse.js")
-).href;
-
-const identityUrl = pathToFileURL(
-  join(__dirname, "../system/identity.js")
-).href;
-
-const { cleanResponse } = await import(cleanResponseUrl);
-const { BOT_IDENTITY, enforceBotName } = await import(identityUrl);
+/* ---------------- Dynamic imports ---------------- */
+const { cleanResponse } = await import(
+  pathToFileURL(join(__dirname, "../utils/cleanResponse.js")).href
+);
+const { enforceBotName } = await import(
+  pathToFileURL(join(__dirname, "../system/identity.js")).href
+);
 
 /* ---------------- Keywords for complex prompts ---------------- */
 const COMPLEX_KEYWORDS = [
@@ -36,9 +31,6 @@ const COMPLEX_KEYWORDS = [
   "system",
 ];
 
-/**
- * Determine if a prompt is complex
- */
 function isComplex(prompt: string): boolean {
   if (prompt.length > 300) return true;
   const lower = prompt.toLowerCase();
@@ -47,55 +39,38 @@ function isComplex(prompt: string): boolean {
 
 /* ---------------- Hybrid response router ---------------- */
 export async function generateHybridResponse(prompt: string): Promise<string> {
-  const complex = isComplex(prompt);
-
-  console.log(" M- Router decision:");
-  console.log(" - complexity:", complex ? "COMPLEX" : "SIMPLE");
-  console.log(" - prompt length:", prompt.length);
-
   let rawResponse = "";
 
   try {
-    // ---------------- Inject context from similarity search ----------------
-    // TS-safe cast ONLY (runtime logic unchanged)
-    const contextChunks = await getRelevantChunks(prompt as any, 10);
+    /* ---- Similarity search context ---- */
+    const contextChunks = await getRelevantChunks(prompt as any, 8);
     const context = contextChunks.map(c => c.content).join("\n\n");
-    const augmentedPrompt = context ? `${context}\n\n${prompt}` : prompt;
+    const augmentedPrompt = context
+      ? `${context}\n\nUser question:\n${prompt}`
+      : prompt;
 
-    // ---------------- GEMMA for simple prompts ----------------
-    if (!complex) {
-      console.log(" - selected model: GEMMA (local)");
-      const gemmaResponse = await generateGemma(augmentedPrompt);
-      if (gemmaResponse && gemmaResponse.trim().length > 20) {
-        rawResponse = gemmaResponse;
-      }
+    /* ---- Gemma for simple queries ---- */
+    if (!isComplex(prompt)) {
+      rawResponse = await generateGemma(augmentedPrompt);
     }
-  } catch (err) {
-    console.warn("⚠️ Gemma failed, falling back to Gemini:", err);
+  } catch {
+    // Silent fallback
   }
 
-  // ---------------- GEMINI for complex prompts or fallback ----------------
-  if (!rawResponse) {
-    console.log(" - selected model: GEMINI (cloud)");
-
-    // TS-safe cast ONLY (runtime logic unchanged)
-    const contextChunks = await getRelevantChunks(prompt as any, 10);
+  /* ---- Gemini fallback ---- */
+  if (!rawResponse || rawResponse.trim().length < 20) {
+    const contextChunks = await getRelevantChunks(prompt as any, 8);
     const context = contextChunks.map(c => c.content).join("\n\n");
-    const augmentedPrompt = context ? `${context}\n\n${prompt}` : prompt;
+    const augmentedPrompt = context
+      ? `${context}\n\nUser question:\n${prompt}`
+      : prompt;
 
     rawResponse = await generateGemini(augmentedPrompt);
   }
 
-  // ---------------- Clean & polish ----------------
-  let polished = cleanResponse(rawResponse);
-
-  // Lock bot name (single source of truth)
-  polished = enforceBotName(polished);
-
-  // Prefix with bot identity
-  polished = `${BOT_IDENTITY}: ${polished}`;
-
-  return polished;
+  /* ---- Clean + enforce naming rules ---- */
+  const cleaned = cleanResponse(rawResponse);
+  return enforceBotName(cleaned, prompt);
 }
 
 /* ---------------- Backward compatibility ---------------- */
