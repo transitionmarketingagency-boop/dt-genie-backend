@@ -1,21 +1,12 @@
+// server/services/hybridRouter.ts
+
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { getRelevantChunks } from "../db/vectorStore.js";
 import { getPromptEmbedding } from "../system/identity.js";
-import { fileURLToPath, pathToFileURL } from "url";
-import { dirname, join } from "path";
-
-/* ---------------- ESM-safe __filename & __dirname ---------------- */
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-/* ---------------- Dynamic imports ---------------- */
-const { cleanResponse } = await import(
-  pathToFileURL(join(__dirname, "../utils/cleanResponse.js")).href
-);
-const { enforceBotName } = await import(
-  pathToFileURL(join(__dirname, "../system/identity.js")).href
-);
+import { buildSynthPrompt } from "../system/synthPrompt.js";
+import { cleanResponse } from "../utils/cleanResponse.js";
+import { enforceBotName } from "../system/identity.js";
 
 /* ---------------- Keywords for complex prompts ---------------- */
 const COMPLEX_KEYWORDS = [
@@ -39,35 +30,35 @@ function isComplex(prompt: string): boolean {
 }
 
 function isGreeting(prompt: string): boolean {
-  return /^(hi|hello|hey|how are you|good morning|good evening)$/i.test(
-    prompt.trim()
-  );
+  return /^(hi|hello|hey|yo|sup|how are you)$/i.test(prompt.trim());
 }
 
 /* ---------------- Hybrid response router ---------------- */
-export async function generateHybridResponse(prompt: string): Promise<string> {
-  // ⚡ Instant response for greetings
+export async function generateHybridResponse(
+  prompt: string
+): Promise<string> {
+  /* ⚡ Instant greeting response (NO DB / NO LLM) */
   if (isGreeting(prompt)) {
-    return "Hello! How can I help you today?";
+    return "Hello! I’m Neon Vision from Digital Transition Marketing. How can I help you today?";
   }
 
-  let rawResponse = "";
-
-  /* ---------------- Embed ONCE ---------------- */
   let context = "";
+
+  /* ---------------- Similarity search (EMBED ONCE) ---------------- */
   try {
     const embedding = await getPromptEmbedding(prompt);
     const chunks = await getRelevantChunks(embedding, 6);
     context = chunks.map(c => c.content).join("\n\n");
   } catch {
-    // context is optional
+    // Context is optional – fail silently
   }
 
-  const augmentedPrompt = context
-    ? `${context}\n\nUser question:\n${prompt}`
-    : prompt;
+  /* ---------------- Build final system-aware prompt ---------------- */
+  const augmentedPrompt = buildSynthPrompt(context, prompt);
 
-  /* ---------------- Try Gemma for simple ---------------- */
+  let rawResponse = "";
+
+  /* ---------------- Gemma for simple queries ---------------- */
   try {
     if (!isComplex(prompt)) {
       rawResponse = await generateGemma(augmentedPrompt);
@@ -81,7 +72,7 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
     rawResponse = await generateGemini(augmentedPrompt);
   }
 
-  /* ---------------- Clean & enforce naming ---------------- */
+  /* ---------------- Clean & enforce identity rules ---------------- */
   const cleaned = cleanResponse(rawResponse);
   return enforceBotName(cleaned, prompt);
 }
