@@ -1,10 +1,10 @@
 // server/system/synthPrompt.ts
 
-import { BOT_IDENTITY } from "./identity.js";
+import { getBotIdentity } from "./identity.js";
 
 export function buildSynthPrompt(context: string, userPrompt: string): string {
   return `
-${BOT_IDENTITY}
+${getBotIdentity()}
 
 Context (internal, do not expose):
 ${context}
