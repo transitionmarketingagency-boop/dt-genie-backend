@@ -3,9 +3,11 @@ import { spawn } from "child_process";
 /* ---------------- Bot name (single source of truth) ---------------- */
 export const BOT_NAME = "Neon Vision";
 
+/* ---------------- Embedding cache (speed boost) ---------------- */
+const embeddingCache = new Map<string, number[]>();
+
 /**
  * Enforce branding ONLY when the user explicitly asks
- * Never inject name otherwise
  */
 export function enforceBotName(
   response: string,
@@ -20,7 +22,7 @@ export function enforceBotName(
 
   let cleaned = response.trim();
 
-  // Remove accidental model mentions (defensive)
+  // Defensive cleanup
   cleaned = cleaned.replace(/\b(Gemma|Gemini|LLM|AI model)\b/gi, "");
 
   if (askedIdentity) {
@@ -32,6 +34,10 @@ export function enforceBotName(
 
 /* ---------------- Get prompt embedding via Python ---------------- */
 export async function getPromptEmbedding(prompt: string): Promise<number[]> {
+  if (embeddingCache.has(prompt)) {
+    return embeddingCache.get(prompt)!;
+  }
+
   return new Promise((resolve, reject) => {
     const pythonBin =
       process.env.RENDER === "true"
@@ -56,7 +62,10 @@ export async function getPromptEmbedding(prompt: string): Promise<number[]> {
         if (!Array.isArray(arr)) {
           throw new Error("Invalid embedding output");
         }
-        resolve(arr.map(Number));
+
+        const vector = arr.map(Number);
+        embeddingCache.set(prompt, vector);
+        resolve(vector);
       } catch (err) {
         reject(err);
       }

@@ -1,6 +1,7 @@
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { getRelevantChunks } from "../db/vectorStore.js";
+import { getPromptEmbedding } from "../system/identity.js";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
 
@@ -37,38 +38,50 @@ function isComplex(prompt: string): boolean {
   return COMPLEX_KEYWORDS.some(word => lower.includes(word));
 }
 
+function isGreeting(prompt: string): boolean {
+  return /^(hi|hello|hey|how are you|good morning|good evening)$/i.test(
+    prompt.trim()
+  );
+}
+
 /* ---------------- Hybrid response router ---------------- */
 export async function generateHybridResponse(prompt: string): Promise<string> {
+  // ⚡ Instant response for greetings
+  if (isGreeting(prompt)) {
+    return "Hello! How can I help you today?";
+  }
+
   let rawResponse = "";
 
+  /* ---------------- Embed ONCE ---------------- */
+  let context = "";
   try {
-    /* ---- Similarity search context ---- */
-    const contextChunks = await getRelevantChunks(prompt as any, 8);
-    const context = contextChunks.map(c => c.content).join("\n\n");
-    const augmentedPrompt = context
-      ? `${context}\n\nUser question:\n${prompt}`
-      : prompt;
+    const embedding = await getPromptEmbedding(prompt);
+    const chunks = await getRelevantChunks(embedding, 6);
+    context = chunks.map(c => c.content).join("\n\n");
+  } catch {
+    // context is optional
+  }
 
-    /* ---- Gemma for simple queries ---- */
+  const augmentedPrompt = context
+    ? `${context}\n\nUser question:\n${prompt}`
+    : prompt;
+
+  /* ---------------- Try Gemma for simple ---------------- */
+  try {
     if (!isComplex(prompt)) {
       rawResponse = await generateGemma(augmentedPrompt);
     }
   } catch {
-    // Silent fallback
+    // silent fallback
   }
 
-  /* ---- Gemini fallback ---- */
+  /* ---------------- Gemini fallback ---------------- */
   if (!rawResponse || rawResponse.trim().length < 20) {
-    const contextChunks = await getRelevantChunks(prompt as any, 8);
-    const context = contextChunks.map(c => c.content).join("\n\n");
-    const augmentedPrompt = context
-      ? `${context}\n\nUser question:\n${prompt}`
-      : prompt;
-
     rawResponse = await generateGemini(augmentedPrompt);
   }
 
-  /* ---- Clean + enforce naming rules ---- */
+  /* ---------------- Clean & enforce naming ---------------- */
   const cleaned = cleanResponse(rawResponse);
   return enforceBotName(cleaned, prompt);
 }
