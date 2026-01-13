@@ -13,7 +13,7 @@ process.env.PYTHON_BIN =
     ? "/opt/render/project/src/.venv/bin/python"
     : "python";
 
-/* ---------------- Import system identity ---------------- */
+/* ---------------- Import identity helpers ---------------- */
 const { enforceBotName, getPromptEmbedding } = await import(
   pathToFileURL(join(__dirname, "../system/identity.js")).href
 );
@@ -28,51 +28,52 @@ function commandExists(cmd: string): boolean {
   }
 }
 
-/* ---------------- Gemma live runner ---------------- */
+/* ---------------- Gemma response generator ---------------- */
 export async function generateGemma(prompt: string): Promise<string> {
   try {
-    // Get prompt embedding
+    /* ---- Embed user prompt ---- */
     const embedding = await getPromptEmbedding(prompt, {
       basePath: join(__dirname, "../utils/embed_prompt.py"),
     });
 
-    if (!Array.isArray(embedding))
+    if (!Array.isArray(embedding)) {
       throw new Error("Invalid embedding returned from Python");
+    }
 
-    // Fetch top relevant chunks from DB
+    /* ---- Fetch relevant DB context ---- */
     const contextChunks = await getRelevantChunks(embedding, 5);
     const context = contextChunks.map((c) => c.content).join("\n\n");
 
-    // Determine if simple (greetings / short queries)
     const isSimpleQuery = prompt.trim().length <= 20;
 
-    // Build dynamic final prompt
-    let finalPrompt: string;
-    if (isSimpleQuery) {
-      // Use DB context if available
-      finalPrompt = context
-        ? `Answer the question concisely using the following information:\n${context}\nQuestion: ${prompt}`
-        : `Answer the question concisely: ${prompt}`;
-      return enforceBotName(finalPrompt);
-    }
+    /* ---- Build FINAL prompt (ALWAYS generates an answer) ---- */
+    const finalPrompt = `
+Use the following information to answer professionally and clearly.
+If the information is insufficient, respond helpfully based on your expertise.
 
-    // Complex queries → include context dynamically
-    finalPrompt = `
-Use the following information to answer the question professionally and concisely:
-${context || "No additional context available."}
+Information:
+${context || "No additional internal information available."}
 
-Question:
+User question:
 ${prompt}
 
 Answer:
 `.trim();
 
-    // Call Ollama Gemma only if available
+    /* ---- If Ollama exists, use Gemma ---- */
     if (commandExists("ollama")) {
-      return await runGemma(finalPrompt);
-    } else {
-      return enforceBotName(finalPrompt);
+      const response = await runGemma(finalPrompt);
+      return enforceBotName(response);
     }
+
+    /* ---- Fallback: context-driven answer (NO echoing prompts) ---- */
+    const fallbackResponse = isSimpleQuery
+      ? context
+        ? context.split("\n").slice(0, 2).join(" ")
+        : "Hello! How can Digital Transition Marketing assist you today?"
+      : context || "I’m happy to help — could you please clarify your request?";
+
+    return enforceBotName(fallbackResponse);
   } catch (err: any) {
     console.error("⚠️ generateGemma error:", err?.message);
     return enforceBotName(
@@ -102,9 +103,11 @@ function runGemma(prompt: string): Promise<string> {
 
     gemma.on("close", (code) => {
       clearTimeout(timeout);
-      if (code !== 0 && !output.trim())
+      if (code !== 0 && !output.trim()) {
         reject(new Error(error || "Gemma error"));
-      else resolve(enforceBotName(output.trim()));
+      } else {
+        resolve(output.trim());
+      }
     });
 
     gemma.stdin.write(prompt);

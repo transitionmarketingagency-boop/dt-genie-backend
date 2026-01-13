@@ -26,39 +26,42 @@ const COMPLEX_KEYWORDS = [
   "system",
 ];
 
-/* ---------------- Detect short/simple queries ---------------- */
-function isSimpleQuery(prompt: string) {
-  const greetings = ["hi", "hello", "hey", "yo", "good morning", "good afternoon"];
-  return prompt.trim().length <= 20 || greetings.some((g) => prompt.toLowerCase().includes(g));
+/* ---------------- Detect simple queries ---------------- */
+function isSimpleQuery(prompt: string): boolean {
+  return prompt.trim().length <= 20;
 }
 
 /* ---------------- Detect complex queries ---------------- */
-function isComplex(prompt: string) {
+function isComplex(prompt: string): boolean {
   if (prompt.length > 300) return true;
   const lower = prompt.toLowerCase();
   return COMPLEX_KEYWORDS.some((word) => lower.includes(word));
 }
 
 /* ---------------- Hybrid response generator ---------------- */
-export async function generateHybridResponse(prompt: string, context?: string): Promise<string> {
+export async function generateHybridResponse(
+  prompt: string,
+  context?: string
+): Promise<string> {
   const fullPrompt = context
-    ? `Answer professionally and concisely using the following context:\n${context}\n\nQuestion: ${prompt}`
+    ? `Context:\n${context}\n\nQuestion:\n${prompt}`
     : prompt;
 
   try {
-    // Short/simple → Gemma
-    if (!isComplex(fullPrompt) || isSimpleQuery(fullPrompt)) {
+    /* ---- Prefer Gemma for most queries ---- */
+    if (!isComplex(fullPrompt)) {
       const gemmaResponse = await generateGemma(fullPrompt);
-      if (gemmaResponse && gemmaResponse.trim().length > 5) return gemmaResponse;
+      if (gemmaResponse && gemmaResponse.trim().length > 10) {
+        return gemmaResponse;
+      }
     }
   } catch (err) {
-    console.warn("⚠️ Gemma failed, fallback to Gemini:", err);
+    console.warn("⚠️ Gemma failed, falling back to Gemini:", err);
   }
 
-  // Fallback → Gemini for complex or failed Gemma
+  /* ---- Fallback to Gemini ---- */
   try {
-    const geminiResponse = await generateGemini(fullPrompt);
-    return geminiResponse;
+    return await generateGemini(fullPrompt);
   } catch (err) {
     console.error("❌ Gemini failed:", err);
     return "I’m here to help, but something went wrong. Please try again later.";
