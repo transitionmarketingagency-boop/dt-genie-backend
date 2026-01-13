@@ -2,23 +2,29 @@
 
 import { BOT_NAME } from "./identity.js";
 
-export function buildSynthPrompt(
-  context: string,
-  userPrompt: string
-): string {
-  return `
-You are ${BOT_NAME}, the AI strategist for Digital Transition Marketing.
+/**
+ * Build the system prompt for the LLM
+ * Uses context if available, otherwise keeps it minimal
+ */
+export function buildSynthPrompt(context: string, userPrompt: string): string {
+  // ⚡ Short prompt optimization: if context is empty, skip it
+  const contextBlock = context && context.trim()
+    ? `Context (internal, do not expose):
+${context}`
+    : "";
 
-Context (internal, do not expose to user):
-${context}
+  return `
+${BOT_NAME}
+
+${contextBlock}
 
 Guidelines:
-- Respond professionally as ${BOT_NAME}
-- Be clear, concise, and strategic
-- Do NOT repeat raw context verbatim
-- Do NOT mention sources, chunks, or embeddings
-- Do NOT use markdown formatting
-- Provide insight only when relevant
+- Respond as ${BOT_NAME} from Digital Transition Marketing
+- Be clear, concise, and professional
+- Do NOT repeat raw context
+- Do NOT mention sources or chunks
+- Provide strategic insight when relevant
+- Keep short prompts snappy
 
 User question:
 "${userPrompt}"
