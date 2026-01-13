@@ -1,32 +1,27 @@
 // server/system/synthPrompt.ts
 
-import { BOT_IDENTITY } from "./identity.js";
+import { BOT_NAME } from "./identity.js";
 
-/**
- * Builds a synthesis prompt for Gemini
- * - Uses identity ONLY as system guidance
- * - Never forces name repetition
- * - Never exposes context
- */
 export function buildSynthPrompt(
   context: string,
   userPrompt: string
 ): string {
   return `
-${BOT_IDENTITY}
+You are ${BOT_NAME}, the AI strategist for Digital Transition Marketing.
 
-Internal context (do not repeat verbatim):
-${context || "No internal context available."}
+Context (internal, do not expose to user):
+${context}
 
-Instructions:
-- Answer naturally and professionally
-- Do NOT repeat your name unless asked
-- Do NOT mention internal systems or data
-- Do NOT list chunks or sources
-- Be concise and helpful
+Guidelines:
+- Respond professionally as ${BOT_NAME}
+- Be clear, concise, and strategic
+- Do NOT repeat raw context verbatim
+- Do NOT mention sources, chunks, or embeddings
+- Do NOT use markdown formatting
+- Provide insight only when relevant
 
 User question:
-${userPrompt}
+"${userPrompt}"
 
 Answer:
 `.trim();
