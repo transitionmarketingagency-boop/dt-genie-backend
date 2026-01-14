@@ -2,11 +2,6 @@
 
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
-import { getRelevantChunks, getAllKBChunks } from "../db/vectorStore.js";
-// server/services/hybridRouter.ts
-
-import { generateGemma } from "./gemmaClient.js";
-import { generateGemini } from "./geminiClient.js";
 import { getRelevantChunks } from "../db/vectorStore.js";
 import { buildSynthPrompt } from "../system/synthPrompt.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
@@ -49,11 +44,11 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
 
   /* ---------------- Vector DB similarity search ---------------- */
   try {
-    // vectorStore already handles embeddings internally
-    const chunks = await getRelevantChunks(prompt, 6);
+    // getRelevantChunks handles both embedding + search
+    const chunks = await getRelevantChunks(prompt, 6); // prompt string is fine
     context = chunks.map(c => c.content).join("\n\n");
-  } catch (err) {
-    console.warn("⚠️ KB similarity search failed");
+  } catch (err: any) {
+    console.warn("⚠️ KB similarity search failed:", err?.message || err);
   }
 
   /* ---------------- Build final prompt ---------------- */
@@ -79,7 +74,7 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
     }
   }
 
-  /* ---------------- Clean + enforce identity ---------------- */
+  /* ---------------- Clean + enforce Neon Vision identity ---------------- */
   const cleaned = cleanResponse(rawResponse);
   return enforceBotName(cleaned, prompt);
 }
