@@ -2,7 +2,7 @@
 
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
-import { getRelevantChunks } from "../db/vectorStore.js";
+import { getAllKBChunks } from "../db/vectorStore.js";
 import { buildSynthPrompt } from "../system/synthPrompt.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { enforceBotName } from "../system/identity.js";
@@ -26,15 +26,39 @@ const COMPLEX_KEYWORDS = [
 function isComplex(prompt: string): boolean {
   if (prompt.length > 300) return true;
   const lower = prompt.toLowerCase();
-  return COMPLEX_KEYWORDS.some(word => lower.includes(word));
+  return COMPLEX_KEYWORDS.some((word) => lower.includes(word));
 }
 
 function isGreeting(prompt: string): boolean {
   return /^(hi|hello|hey|yo|sup|how are you)$/i.test(prompt.trim());
 }
 
+/* ---------------- JS-based similarity (cosine) ---------------- */
+function cosineSim(a: number[], b: number[]): number {
+  const dot = a.reduce((sum, val, i) => sum + val * (b[i] || 0), 0);
+  const magA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+  const magB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+  if (magA === 0 || magB === 0) return 0;
+  return dot / (magA * magB);
+}
+
+/* ---------------- Top-N similarity search ---------------- */
+function topChunks(
+  embedding: number[],
+  chunks: { content: string; vector: number[] }[],
+  topN = 6
+) {
+  const scored = chunks
+    .map((c) => ({ ...c, score: cosineSim(embedding, c.vector) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN);
+  return scored;
+}
+
 /* ---------------- Hybrid response router ---------------- */
-export async function generateHybridResponse(prompt: string): Promise<string> {
+export async function generateHybridResponse(
+  prompt: string
+): Promise<string> {
   // ⚡ Instant greeting
   if (isGreeting(prompt)) {
     return "Hello! I’m Neon Vision from Digital Transition Marketing. How can I help you today?";
@@ -42,12 +66,17 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
 
   let context = "";
 
-  /* ---------------- Local similarity search fallback ---------------- */
+  /* ---------------- Load KB chunks and select top matches ---------------- */
   try {
-    // getRelevantChunks expects number[] embedding, so we pass a dummy vector fallback
-    const dummyEmbedding = Array.from({ length: 1536 }, () => 0); // placeholder
-    const chunks = await getRelevantChunks(dummyEmbedding, 6); 
-    context = chunks.map(c => c.content).join("\n\n");
+    const allChunks = await getAllKBChunks(); // includes persona, sales, marketing, training
+
+    // Use JS-based text embedding fallback (replace with real vectors if available)
+    const promptVector = Array.from(prompt)
+      .map((c) => c.charCodeAt(0))
+      .slice(0, 1536);
+
+    const relevantChunks = topChunks(promptVector, allChunks, 6);
+    context = relevantChunks.map((c) => c.content).join("\n\n");
   } catch (err: any) {
     console.warn("⚠️ KB similarity search failed:", err?.message || err);
   }
@@ -57,7 +86,7 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
 
   let rawResponse = "";
 
-  /* ---------------- Gemma for simple queries (local only) ---------------- */
+  /* ---------------- Gemma for simple queries ---------------- */
   try {
     if (!isComplex(prompt)) {
       rawResponse = await generateGemma(augmentedPrompt);
@@ -66,12 +95,13 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
     // silent fallback
   }
 
-  /* ---------------- Gemini fallback (primary on Render) ---------------- */
-  if (!rawResponse || rawResponse.trim().length < 20) {
+  /* ---------------- Gemini for complex queries OR fallback ---------------- */
+  if (!rawResponse || rawResponse.trim().length < 20 || isComplex(prompt)) {
     try {
       rawResponse = await generateGemini(augmentedPrompt);
     } catch {
-      rawResponse = "I’m having trouble processing that right now. Please try again.";
+      rawResponse =
+        "I’m having trouble processing that right now. Please try again.";
     }
   }
 
