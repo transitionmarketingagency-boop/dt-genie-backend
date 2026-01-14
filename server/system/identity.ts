@@ -15,3 +15,12 @@ export function enforceBotName(response: string, userPrompt: string): string {
 
   return response.trim();
 }
+
+/**
+ * Phase-1 stub for embedding
+ * Returns a dummy embedding array for now
+ */
+export async function getPromptEmbedding(prompt: string): Promise<number[]> {
+  // TODO: replace with real embedding logic
+  return [0]; 
+}
