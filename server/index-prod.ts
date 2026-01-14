@@ -22,9 +22,11 @@ try {
   }
 
   // Populate DB only if needed
+if (process.env.NODE_ENV !== "production") {
   execSync("python server/utils/fill_chunks.py", {
     stdio: "inherit"
   });
+}
 
   console.log("✅ SQLite chunks ready");
 } catch (e) {

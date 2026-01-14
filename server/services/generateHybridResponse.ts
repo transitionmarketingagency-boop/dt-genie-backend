@@ -9,7 +9,6 @@ const personaPath = path.join(
   __dirname,
   "../knowledge_base/persona/system_persona.json"
 );
-
 const systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
 
 // ------------------ HELPER: USER ROLE DETECTION ------------------
@@ -30,7 +29,9 @@ function detectUserRole(userMessage: string): string {
 
 // ------------------ CONTEXT BUILDER ------------------
 async function buildDeepContext(userId: string, userMessage: string) {
+  // Fetch top relevant chunks (Phase-1 safe)
   const relevantChunks = await fetchRelevantChunks(userMessage, 5);
+
   const sessionMemory = memoryClient.getSessionMemory(userId);
   const userMemory = memoryClient.getUserMemory(userId);
   const role = detectUserRole(userMessage);
@@ -64,13 +65,14 @@ export async function generateHybridResponse(
   try {
     const context = await buildDeepContext(userId, userMessage);
 
+    // Generate response via Gemma
     const response = await generateGemma(context);
 
+    // Append memory safely
     memoryClient.appendSessionMemory(userId, {
       user: userMessage,
       bot: response,
     });
-
     memoryClient.appendUserMemory(userId, {
       user: userMessage,
       bot: response,

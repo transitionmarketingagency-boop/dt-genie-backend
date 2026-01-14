@@ -57,7 +57,6 @@ export const setupApp = async (app: Application) => {
     await populateChunks();
   }
 
-  // Health check
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
@@ -125,7 +124,7 @@ Answer in a professional, confident marketing tone.
       console.error(err);
       res.status(500).json({ ok: false, error: "Chat failed" });
     }
-   });
+  });
 };
 
 // =====================================================

@@ -1,11 +1,11 @@
+// server/queryChunks.ts
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
-import path from "path";
+import { DB_PATH } from "./utils/dbPath.js"; // <-- use the canonical DB path
 
-// Correct absolute DB path
-const DB_PATH = path.join(process.cwd(), "vector_store/unified_chunks.db"); // <-- removed extra 'server'
-
-// Open SQLite database
+/**
+ * Open SQLite database
+ */
 export async function openDB() {
   return open({
     filename: DB_PATH,
