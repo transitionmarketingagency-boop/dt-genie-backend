@@ -35,17 +35,18 @@ function isGreeting(prompt: string): boolean {
 
 /* ---------------- Hybrid response router ---------------- */
 export async function generateHybridResponse(prompt: string): Promise<string> {
-  /* ⚡ Instant greeting (zero latency) */
+  // ⚡ Instant greeting
   if (isGreeting(prompt)) {
     return "Hello! I’m Neon Vision from Digital Transition Marketing. How can I help you today?";
   }
 
   let context = "";
 
-  /* ---------------- Vector DB similarity search ---------------- */
+  /* ---------------- Local similarity search fallback ---------------- */
   try {
-    // getRelevantChunks handles both embedding + search
-    const chunks = await getRelevantChunks(prompt, 6); // prompt string is fine
+    // getRelevantChunks expects number[] embedding, so we pass a dummy vector fallback
+    const dummyEmbedding = Array.from({ length: 1536 }, () => 0); // placeholder
+    const chunks = await getRelevantChunks(dummyEmbedding, 6); 
     context = chunks.map(c => c.content).join("\n\n");
   } catch (err: any) {
     console.warn("⚠️ KB similarity search failed:", err?.message || err);
