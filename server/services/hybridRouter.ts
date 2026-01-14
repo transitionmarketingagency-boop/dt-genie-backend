@@ -1,9 +1,10 @@
+// server/services/hybridRouter.ts
+
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
-import { getRelevantChunks } from "../db/vectorStore.js";
-import { enforceBotName } from "../system/identity.js";
+import { getRelevantChunks, getAllKBChunks } from "../db/vectorStore.js";
 import { buildSynthPrompt } from "../system/synthPrompt.js";
-import { cleanResponse } from "../utils/cleanResponse.js";
+import { cleanResponse, enforceBotName } from "../utils/cleanResponse.js";
 
 /* ---------------- Keywords for complex prompts ---------------- */
 const COMPLEX_KEYWORDS = [
@@ -20,67 +21,63 @@ const COMPLEX_KEYWORDS = [
   "system",
 ];
 
-/* ---------------- Greeting detection ---------------- */
-function isGreeting(prompt: string): boolean {
-  const p = prompt.toLowerCase().trim();
-  return ["hi", "hello", "hey", "yo", "sup", "how are you"].includes(p);
-}
-
+/* ---------------- Prompt classification ---------------- */
 function isComplex(prompt: string): boolean {
   if (prompt.length > 300) return true;
   const lower = prompt.toLowerCase();
   return COMPLEX_KEYWORDS.some(word => lower.includes(word));
 }
 
-/* ---------------- Minimal local KB fallback ---------------- */
-const LOCAL_KB = [
-  "Digital Transition Marketing offers full-service digital marketing solutions.",
-  "We specialize in social media marketing, AI tools, branding, SEO, and performance marketing.",
-  "We help e-commerce, real estate, travel, and technology businesses grow online.",
-  "Our AI assistant can provide business growth strategies and marketing insights instantly."
-].join("\n");
+function isGreeting(prompt: string): boolean {
+  return /^(hi|hello|hey|yo|sup|how are you)$/i.test(prompt.trim());
+}
 
+/* ---------------- Hybrid response router ---------------- */
 export async function generateHybridResponse(prompt: string): Promise<string> {
-  const cleanPrompt = prompt.trim();
-
-  /* ---------------- Instant greetings ---------------- */
-  if (isGreeting(cleanPrompt)) {
+  // ⚡ Instant greeting
+  if (isGreeting(prompt)) {
     return "Hello! I’m Neon Vision from Digital Transition Marketing. How can I help you today?";
   }
 
-  /* ---------------- Build context ---------------- */
   let context = "";
 
-  if (process.env.RENDER !== "true") {
-    try {
-      const embedding = await import("../system/identity.js").then(m => m.getPromptEmbedding(cleanPrompt));
-      const chunks = await getRelevantChunks(embedding, 6);
-      context = chunks.map(c => c.content).join("\n\n");
-    } catch {
-      // fallback silently
-    }
+  /* ---------------- Local KB similarity search ---------------- */
+  try {
+    const allChunks = await getAllKBChunks(); // Get all persona, sales, marketing, training KB
+    const relevant = getRelevantChunks(prompt, 6, allChunks); // Node.js similarity search
+    context = relevant.map(c => c.content).join("\n\n");
+  } catch (err) {
+    console.warn("⚠️ KB similarity search failed:", err?.message);
   }
 
-  /* ---------------- Use local KB if context empty ---------------- */
-  if (!context) context = LOCAL_KB;
+  /* ---------------- Build final prompt ---------------- */
+  const augmentedPrompt = buildSynthPrompt(context, prompt);
 
-  const augmentedPrompt = buildSynthPrompt(context, cleanPrompt);
   let rawResponse = "";
 
-  /* ---------------- Gemma for simple prompts ---------------- */
+  /* ---------------- Gemma for simple queries ---------------- */
   try {
-    if (!isComplex(cleanPrompt)) {
+    if (!isComplex(prompt)) {
       rawResponse = await generateGemma(augmentedPrompt);
     }
-  } catch {}
+  } catch (err) {
+    console.warn("⚠️ Gemma failed:", err?.message);
+  }
 
   /* ---------------- Gemini fallback ---------------- */
   if (!rawResponse || rawResponse.trim().length < 20) {
-    rawResponse = await generateGemini(augmentedPrompt);
+    try {
+      rawResponse = await generateGemini(augmentedPrompt);
+    } catch (err) {
+      console.error("❌ Gemini failed:", err?.message);
+      rawResponse = "I’m having trouble processing that right now. Can you rephrase?";
+    }
   }
 
+  /* ---------------- Clean + enforce Neon Vision identity ---------------- */
   const cleaned = cleanResponse(rawResponse);
-  return enforceBotName(cleaned, cleanPrompt);
+  return enforceBotName(cleaned, prompt);
 }
 
+/* ---------------- Backward compatibility ---------------- */
 export const hybridClient = generateHybridResponse;
