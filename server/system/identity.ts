@@ -1,4 +1,5 @@
 import { spawn } from "child_process";
+const PYTHON_DISABLED = process.env.RENDER === "true";
 
 /* ---------------- Bot name (single source of truth) ---------------- */
 export const BOT_NAME = "Neon Vision";
@@ -32,8 +33,13 @@ export function enforceBotName(
   return cleaned;
 }
 
-/* ---------------- Get prompt embedding via Python ---------------- */
+/* ---------------- Get prompt embedding via Python (disabled on Render) ---------------- */
 export async function getPromptEmbedding(prompt: string): Promise<number[]> {
+  // 🚀 Hard-disable embeddings on Render to avoid Python slowdown
+  if (process.env.RENDER === "true") {
+    return [];
+  }
+
   if (embeddingCache.has(prompt)) {
     return embeddingCache.get(prompt)!;
   }

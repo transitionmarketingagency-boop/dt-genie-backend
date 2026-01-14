@@ -17,10 +17,10 @@ function commandExists(cmd: string): boolean {
 export async function generateGemma(prompt: string): Promise<string> {
   // ❗ IMPORTANT:
   // Gemma is ONLY used when Ollama exists (local dev).
-  // On Render, this will gracefully return empty and let Gemini handle it.
+  // On Render, this returns empty FAST and Gemini handles it.
 
   if (!commandExists("ollama")) {
-    return ""; // 🚀 FAST EXIT — no dumb fallback
+    return ""; // ⚡ FAST EXIT — no dumb fallback
   }
 
   try {
@@ -55,8 +55,13 @@ function runGemma(prompt: string): Promise<string> {
     let output = "";
     let error = "";
 
-    gemma.stdout.on("data", (d) => (output += d.toString()));
-    gemma.stderr.on("data", (d) => (error += d.toString()));
+    gemma.stdout.on("data", (d) => {
+      output += d.toString();
+    });
+
+    gemma.stderr.on("data", (d) => {
+      error += d.toString();
+    });
 
     const timeout = setTimeout(() => {
       gemma.kill("SIGTERM");
@@ -65,6 +70,7 @@ function runGemma(prompt: string): Promise<string> {
 
     gemma.on("close", (code) => {
       clearTimeout(timeout);
+
       if (code !== 0 || !output.trim()) {
         reject(new Error(error || "Gemma error"));
       } else {
