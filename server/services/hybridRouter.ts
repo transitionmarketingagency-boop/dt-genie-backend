@@ -44,7 +44,7 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
 
   /* ---------------- Compute real prompt embedding ---------------- */
   try {
-    const promptEmbedding = await getPromptEmbedding(prompt); // ← real embedding via Python
+    const promptEmbedding = await getPromptEmbedding(prompt); // ← Phase-2 Python embeddings
     const chunks = await getRelevantChunks(promptEmbedding, 6); // top 6 KB matches
     context = chunks.map((c) => c.content).join("\n\n");
   } catch (err: any) {
@@ -55,8 +55,7 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
   const augmentedPrompt = buildSynthPrompt(context, prompt);
 
   let rawResponse = "";
-
-  /* ---------------- Gemma for simple queries ---------------- */
+   /* ---------------- Gemma for simple queries ---------------- */
   try {
     if (!isComplex(prompt)) {
       rawResponse = await generateGemma(augmentedPrompt);

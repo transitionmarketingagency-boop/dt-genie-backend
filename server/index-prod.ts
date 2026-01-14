@@ -21,12 +21,16 @@ try {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  // Populate DB only if needed
-if (process.env.NODE_ENV !== "production") {
-  execSync("python server/utils/fill_chunks.py", {
-    stdio: "inherit"
-  });
-}
+  // Populate DB only if needed (non-production)
+  if (process.env.NODE_ENV !== "production") {
+    try {
+      execSync("python server/utils/fill_chunks.py", {
+        stdio: "inherit",
+      });
+    } catch (err) {
+      console.warn("⚠️ fill_chunks.py skipped or failed:", err.message);
+    }
+  }
 
   console.log("✅ SQLite chunks ready");
 } catch (e) {
@@ -35,7 +39,9 @@ if (process.env.NODE_ENV !== "production") {
 
 // ------------------ REQUIRED ENV CHECK ------------------
 if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY is missing. Check Render environment variables.");
+  console.error(
+    "❌ GEMINI_API_KEY is missing. Check Render environment variables."
+  );
   process.exit(1);
 }
 
@@ -50,7 +56,6 @@ import { generateHybridResponse } from "./services/hybridClient.js";
 // ------------------ SERVER BOOTSTRAP ------------------
 (async () => {
   await runApp(async (app: Application, server) => {
-
     // Enable CORS for Framer
     app.use(cors({ origin: "*", credentials: true }));
     app.use(express.json());
@@ -71,14 +76,13 @@ import { generateHybridResponse } from "./services/hybridClient.js";
           return res.status(400).json({ reply: "Message is required." });
         }
 
-        console.log("📩 Chat request:", message);
+        console.log(" M-) Chat request:", message);
 
         // Generate professional hybrid response
         const reply = await generateHybridResponse(message);
 
-        console.log("📤 Chat response sent");
+        console.log(" M-$ Chat response sent");
         return res.json({ reply });
-
       } catch (err: any) {
         console.error("❌ Chat Error:", err?.message || err);
         console.error(err?.stack);
@@ -88,7 +92,7 @@ import { generateHybridResponse } from "./services/hybridClient.js";
 
     const PORT = process.env.PORT || 5000;
     server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(` ~@ Server running on port ${PORT}`);
     });
   });
 

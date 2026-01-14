@@ -9,7 +9,18 @@ const personaPath = path.join(
   __dirname,
   "../knowledge_base/persona/system_persona.json"
 );
-const systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
+
+// Safe file read
+let systemPersona = {};
+try {
+  if (fs.existsSync(personaPath)) {
+    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
+  } else {
+    console.warn("⚠️ system_persona.json not found, using empty persona");
+  }
+} catch (err) {
+  console.error("❌ Failed to load system persona:", err);
+}
 
 // ------------------ HELPER: USER ROLE DETECTION ------------------
 function detectUserRole(userMessage: string): string {

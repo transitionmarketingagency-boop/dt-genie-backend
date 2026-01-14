@@ -1,5 +1,7 @@
 // server/system/identity.ts
 
+import { getTopChunks } from "../queryChunks.js";
+
 export const COMPANY_NAME = "Digital Transition Marketing";
 export const BOT_NAME = "Neon Vision";
 
@@ -17,10 +19,16 @@ export function enforceBotName(response: string, userPrompt: string): string {
 }
 
 /**
- * Phase-1 stub for embedding
- * Returns a dummy embedding array for now
+ * Phase-1 embedding stub for local testing
+ * Returns the embedding of top-matching chunk for now
  */
 export async function getPromptEmbedding(prompt: string): Promise<number[]> {
-  // TODO: replace with real embedding logic
-  return [0]; 
+  try {
+    // Use first chunk embedding as placeholder for testing
+    const chunks = await getTopChunks([0], 1);
+    if (chunks.length) return chunks[0].embedding;
+  } catch (err) {
+    console.warn("⚠️ getPromptEmbedding fallback triggered:", err);
+  }
+  return [0]; // fallback
 }

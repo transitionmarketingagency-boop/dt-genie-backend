@@ -1,7 +1,7 @@
 // server/queryChunks.ts
 import sqlite3 from "sqlite3";
 import { open } from "sqlite";
-import { DB_PATH } from "./utils/dbPath.js"; // <-- use the canonical DB path
+import { DB_PATH } from "./utils/dbPath.js"; // canonical DB path
 
 /**
  * Open SQLite database
@@ -17,6 +17,7 @@ export async function openDB() {
  * Compute cosine similarity between two vectors
  */
 function cosineSim(vecA: number[], vecB: number[]): number {
+  if (!vecA || !vecB) return 0;
   const dot = vecA.reduce((sum, val, i) => sum + val * (vecB[i] || 0), 0);
   const magA = Math.sqrt(vecA.reduce((sum, val) => sum + val * val, 0));
   const magB = Math.sqrt(vecB.reduce((sum, val) => sum + val * val, 0));
@@ -33,7 +34,7 @@ export async function getTopChunks(queryEmbedding: number[], topN = 5) {
 
   const parsedRows = rows.map((r: any) => ({
     ...r,
-    embedding: JSON.parse(r.embedding),
+    embedding: r.embedding ? JSON.parse(r.embedding) : [],
   }));
 
   const ranked = parsedRows
