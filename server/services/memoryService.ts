@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { ChatMessage } from '../shared/types';
 import crypto from 'crypto';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /* ---------------- ESM-safe __dirname ---------------- */
@@ -9,7 +10,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ---------------- Database setup ---------------- */
-const dbPath = path.join(__dirname, '../memory/chat_memory.db');
+const memoryDir = path.join(__dirname, '../memory');
+const dbPath = path.join(memoryDir, 'chat_memory.db');
+
+/* ✅ ENSURE DIRECTORY EXISTS (CRITICAL FIX) */
+if (!fs.existsSync(memoryDir)) {
+  fs.mkdirSync(memoryDir, { recursive: true });
+  console.log('✅ Memory directory created:', memoryDir);
+}
+
+/* Open database ONLY after directory exists */
 const db = new Database(dbPath);
 
 /* Create table if not exists */
@@ -23,6 +33,7 @@ db.prepare(`
   )
 `).run();
 
+/* Create index */
 db.prepare(`
   CREATE INDEX IF NOT EXISTS idx_sessionId
   ON chat_messages (sessionId)
@@ -39,8 +50,8 @@ export class MemoryService {
       id: crypto.randomUUID(),
       sessionId,
       role,
-      content: content ?? '',          // Ensure content is never undefined
-      timestamp: new Date().toISOString(), // Store timestamp as ISO string
+      content: content ?? '',
+      timestamp: new Date().toISOString(),
     };
 
     db.prepare(`
@@ -58,7 +69,6 @@ export class MemoryService {
       ORDER BY timestamp ASC
     `).all(sessionId);
 
-    // Convert timestamps back to Date objects
     return rows.map(r => ({
       ...r,
       timestamp: new Date(r.timestamp),
