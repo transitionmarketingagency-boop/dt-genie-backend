@@ -1,6 +1,7 @@
-// ✅ Correct imports
+// server/populate-test-data.ts
+
 import { storage, InsertChatMessage } from "./storage.js";
-import { memoryStore } from "./services/memory";
+import { memoryService } from "./services/memoryService";
 import { ConversationMemory, ChatMessage } from "../shared/types";
 
 export default async function populateTestData() {
@@ -45,8 +46,7 @@ export default async function populateTestData() {
     console.log("ℹ️ Chat history already exists. Skipping insertion.");
   }
 
-  const existingMemory = memoryStore.getAllMemory();
-
+  // FIXED: Use memoryService instead of memoryStore
   const testMemory: ConversationMemory[] = [
     {
       id: "mem1",
@@ -78,12 +78,10 @@ export default async function populateTestData() {
       created_at: new Date().toISOString(),
       timestamp: new Date(),
     }
-  ]; // ✅ THIS WAS MISSING
+  ];
 
   for (const mem of testMemory) {
-    if (!existingMemory.some((m) => m.id === mem.id)) {
-      memoryStore.addMemory(mem);
-    }
+    await memoryService.addMessage(sessionId, 'user', JSON.stringify(mem));
   }
 
   console.log("✅ Test memory inserted!");

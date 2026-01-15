@@ -13,10 +13,15 @@
   "exclude": [
     "node_modules",
     "dist",
+
     "**/*.test.ts",
     "**/*.spec.ts",
+
     "server/test-*",
     "server/**/test-*",
+    "server/testHybridSystem.ts",
+    "server/populate-test-data.ts",
+
     "server/backup_services/**",
     "server/training_pipeline/**"
   ]

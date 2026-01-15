@@ -32,7 +32,10 @@ const testQueries = [
       console.log("Prompt:", query);
 
       const start = Date.now();
-      const response = await generateHybridResponse(query);
+      const response = await generateHybridResponse(
+        query,
+        "test-session"
+      );
       const duration = ((Date.now() - start) / 1000).toFixed(2);
 
       console.log("Response:", response);
