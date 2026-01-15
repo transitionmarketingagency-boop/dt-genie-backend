@@ -1,9 +1,11 @@
-import { fetchRelevantChunks } from "../query-chunks.js";
+// server/services/generateHybridResponse.ts
+
+import { fetchRelevantChunks } from "../queryChunksWrapper.js";
 import { generateGemma } from "./gemmaClient.js";
-import { generateGemini } from "./geminiClient.js"; // ✅ fallback
-import { memoryClient } from "./memoryClient.js";
-import { getPromptEmbedding, enforceBotName } from "../system/identity.js";
-import { cleanResponse } from "../utils/cleanResponse.js"; // ✅ fixed path
+import { generateGemini } from "./geminiClient.js"; // fallback
+import { memoryService } from "./memoryService.js"; // <-- FIXED
+import { getPromptEmbedding, enforceBotName, BOT_NAME } from "../system/identity.js";
+import { cleanResponse } from "../utils/cleanResponse.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -30,11 +32,12 @@ function detectUserRole(userMessage: string): string {
 
 // ------------------ CONTEXT BUILDER ------------------
 async function buildDeepContext(userId: string, userMessage: string) {
-  const embedding = await getPromptEmbedding(userMessage); // ✅ compute embedding once
-  const relevantChunks = await fetchRelevantChunks(userMessage, 5); // ✅ top chunks
+  const embedding = await getPromptEmbedding(userMessage);
+  const relevantChunks = await fetchRelevantChunks(userMessage, 5);
 
-  const sessionMemory = memoryClient.getSessionMemory(userId);
-  const userMemory = memoryClient.getUserMemory(userId);
+  // FIXED: Use memoryService instead of memoryClient
+  const sessionMemory = await memoryService.getHistory(userId);
+  const userMemory = await memoryService.getHistory(userId);
   const role = detectUserRole(userMessage);
 
   return `
@@ -79,16 +82,24 @@ export async function generateHybridResponse(
       response = cleanResponse(response || "");
     }
 
-    // ------------------ ENFORCE BOT NAME ------------------
+    // ------------------ ENFORCE BOT NAME & BRAND ------------------
     response = enforceBotName(response, userMessage);
 
+    // ------------------ CALENDLY LINK INJECTION ------------------
+    if (/book.*call/i.test(userMessage)) {
+      response += "\n\nSchedule a call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+    }
+
     // ------------------ MEMORY PERSISTENCE ------------------
-    memoryClient.appendSessionMemory(userId, { user: userMessage, bot: response });
-    memoryClient.appendUserMemory(userId, { user: userMessage, bot: response });
+    await memoryService.addMessage(userId, 'user', userMessage);
+    await memoryService.addMessage(userId, 'assistant', response);
+
+    // ------------------ LOG SUCCESS ------------------
+    console.log("Hybrid response generated for session:", userId);
 
     return response;
   } catch (error) {
     console.error("Hybrid response error:", error);
-    return "Sorry, something went wrong while generating the response.";
+    return `Sorry, ${BOT_NAME} could not generate a response at this time.`;
   }
 }

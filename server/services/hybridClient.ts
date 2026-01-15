@@ -1,17 +1,32 @@
+// server/services/hybridClient.ts
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
+import { memoryService } from "./memoryService.js"; // memory persistence
 
-/* ---------------- ESM-safe __filename & __dirname ---------------- */
+/* ---------------- ESM-safe paths ---------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ---------------- Load .env ---------------- */
 dotenv.config({ path: path.join(__dirname, "../.env") });
 
-/* ---------------- Keywords for complex queries ---------------- */
+/* ---------------- Gemini circuit breaker ---------------- */
+let geminiDisabledUntil = 0;
+const GEMINI_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes
+
+function isGeminiAvailable(): boolean {
+  return Date.now() > geminiDisabledUntil;
+}
+
+function disableGemini(reason: string) {
+  geminiDisabledUntil = Date.now() + GEMINI_COOLDOWN_MS;
+  console.warn(`⚠️ Gemini disabled for 10 minutes (${reason})`);
+}
+
+/* ---------------- Strict complexity detection ---------------- */
 const COMPLEX_KEYWORDS = [
   "strategy",
   "plan",
@@ -24,48 +39,68 @@ const COMPLEX_KEYWORDS = [
   "automation",
   "architecture",
   "system",
+  "scaling",
+  "integration",
+  "workflow",
 ];
 
-/* ---------------- Detect simple queries ---------------- */
-function isSimpleQuery(prompt: string): boolean {
-  return prompt.trim().length <= 20;
+function isComplexQuery(prompt: string): boolean {
+  const text = prompt.toLowerCase();
+  if (text.length > 250) return true;
+  return COMPLEX_KEYWORDS.some((word) => text.includes(word));
 }
 
-/* ---------------- Detect complex queries ---------------- */
-function isComplex(prompt: string): boolean {
-  if (prompt.length > 300) return true;
-  const lower = prompt.toLowerCase();
-  return COMPLEX_KEYWORDS.some((word) => lower.includes(word));
-}
-
-/* ---------------- Hybrid response generator ---------------- */
+/* ---------------- Hybrid response ---------------- */
 export async function generateHybridResponse(
   prompt: string,
-  context?: string
+  sessionId: string
 ): Promise<string> {
-  const fullPrompt = context
-    ? `Context:\n${context}\n\nQuestion:\n${prompt}`
-    : prompt;
+  const cleanPrompt = prompt.trim();
+  let reply = "";
 
+  /* ======================================================
+     1️⃣ ALWAYS TRY GEMMA FIRST
+     ====================================================== */
   try {
-    /* ---- Prefer Gemma for most queries ---- */
-    if (!isComplex(fullPrompt)) {
-      const gemmaResponse = await generateGemma(fullPrompt);
-      if (gemmaResponse && gemmaResponse.trim().length > 10) {
-        return gemmaResponse;
-      }
+    reply = await generateGemma(cleanPrompt);
+    if (reply && reply.trim().length > 0) {
+      await memoryService.addMessage(sessionId, "assistant", reply);
+      return reply;
     }
   } catch (err) {
-    console.warn("⚠️ Gemma failed, falling back to Gemini:", err);
+    console.warn("⚠️ Gemma failed:", err);
   }
 
-  /* ---- Fallback to Gemini ---- */
-  try {
-    return await generateGemini(fullPrompt);
-  } catch (err) {
-    console.error("❌ Gemini failed:", err);
-    return "I’m here to help, but something went wrong. Please try again later.";
+  /* ======================================================
+     2️⃣ GEMINI ONLY FOR COMPLEX QUERIES
+     ====================================================== */
+  if (isComplexQuery(cleanPrompt) && isGeminiAvailable()) {
+    try {
+      reply = await generateGemini(cleanPrompt);
+      if (reply && reply.trim().length > 0) {
+        await memoryService.addMessage(sessionId, "assistant", reply);
+        return reply;
+      }
+    } catch (err: any) {
+      const msg = err?.message || "";
+      if (msg.includes("429") || msg.includes("RESOURCE_EXHAUSTED")) {
+        disableGemini("quota exceeded");
+        console.warn("Gemini quota exceeded — continuing with Gemma-only response.");
+      } else {
+        console.warn("⚠️ Gemini error:", msg);
+      }
+    }
   }
+
+  /* ======================================================
+     3️⃣ SAFE FINAL FALLBACK
+     ====================================================== */
+  reply =
+    "Sure — you can book a call with our team here:\n" +
+    "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+  await memoryService.addMessage(sessionId, "assistant", reply);
+
+  return reply;
 }
 
 /* ---------------- Backward compatibility ---------------- */

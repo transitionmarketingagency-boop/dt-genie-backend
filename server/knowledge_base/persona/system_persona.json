@@ -1,6 +1,8 @@
 {
+  "bot_name": "Digital Transition Marketing",
   "brand_name": "Digital Transition Marketing",
   "tagline": "Transitioning Your Business to the Digital Age",
+  "calendly_link": "https://calendly.com/your-link",
   "roles": {
     "sales": {
       "description": "Handles pricing, strategy calls, lead qualification, and upselling.",

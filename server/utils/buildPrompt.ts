@@ -1,5 +1,5 @@
 // server/utils/buildPrompt.ts
-import { fetchRelevantChunks } from "../query-chunks.js";
+import { fetchRelevantChunks } from "../queryChunksWrapper.js";
 
 export async function buildPrompt(
   question: string,

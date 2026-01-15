@@ -1,5 +1,3 @@
-// server/services/gemmaClient.ts
-
 import { spawn, execSync } from "child_process";
 import { enforceBotName } from "../system/identity.js";
 
@@ -15,17 +13,12 @@ function commandExists(cmd: string): boolean {
 
 /* ---------------- Gemma response generator ---------------- */
 export async function generateGemma(prompt: string): Promise<string> {
-  // ❗ IMPORTANT:
-  // Gemma is ONLY used when Ollama exists (local dev).
-  // On Render, this returns empty FAST and Gemini handles it.
-
-  if (!commandExists("ollama")) {
-    return ""; // ⚡ FAST EXIT — no dumb fallback
-  }
+  // Fast exit if Ollama not installed
+  if (!commandExists("ollama")) return "";
 
   try {
     const finalPrompt = `
-You are Neon Vision, a senior digital marketing and growth strategist.
+You are Neon Vision, senior digital marketing & growth strategist.
 
 Answer clearly, professionally, and confidently.
 Do not ask the user to clarify unless absolutely necessary.
@@ -39,7 +32,7 @@ Answer:
     const response = await runGemma(finalPrompt);
     return enforceBotName(response, prompt);
   } catch (err: any) {
-    console.error("⚠️ Gemma failed:", err?.message);
+    console.error("⚠️ Gemma failed:", err?.message || err);
     return "";
   }
 }
@@ -55,13 +48,8 @@ function runGemma(prompt: string): Promise<string> {
     let output = "";
     let error = "";
 
-    gemma.stdout.on("data", (d) => {
-      output += d.toString();
-    });
-
-    gemma.stderr.on("data", (d) => {
-      error += d.toString();
-    });
+    gemma.stdout.on("data", (d) => (output += d.toString()));
+    gemma.stderr.on("data", (d) => (error += d.toString()));
 
     const timeout = setTimeout(() => {
       gemma.kill("SIGTERM");
@@ -70,12 +58,8 @@ function runGemma(prompt: string): Promise<string> {
 
     gemma.on("close", (code) => {
       clearTimeout(timeout);
-
-      if (code !== 0 || !output.trim()) {
-        reject(new Error(error || "Gemma error"));
-      } else {
-        resolve(output.trim());
-      }
+      if (code !== 0 || !output.trim()) reject(new Error(error || "Gemma error"));
+      else resolve(output.trim());
     });
 
     gemma.stdin.write(prompt);

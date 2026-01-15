@@ -1,9 +1,11 @@
+// server/services/hybridTest.ts
+
 import fs from 'fs';
 import path, { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { generateHybridResponse } from './generateHybridResponse';
-import { fetchRelevantChunks } from '../training_pipeline/utils/query-chunks';
-import { memoryClient } from './memoryClient';
+import { fetchRelevantChunks } from '../queryChunksWrapper';
+import { memoryService } from './memoryService.js';
 
 // ES Module fix for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -13,9 +15,9 @@ const __dirname = dirname(__filename);
 const memoryDir = resolve(__dirname, '../memory');
 const logFile = resolve(memoryDir, 'testResults.log');
 
-// Ensure memory folder exists (async)
+// Ensure memory folder exists
 if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
-// Ensure log file exists (async-safe)
+// Ensure log file exists
 if (!fs.existsSync(logFile)) fs.writeFileSync(logFile, '', 'utf-8');
 
 // Async logging helper
@@ -50,12 +52,12 @@ async function runTests() {
             await log(`Top Chunks Retrieved:\n${JSON.stringify(chunks, null, 2)}`);
 
             // Generate hybrid response
-            const response = await generateHybridResponse(testUserId, query);
+            const response = await generateHybridResponse(query, testUserId);
             await log(`Hybrid Response:\n${response}`);
 
-            // Log latest memory updates
-            const sessionMemory = memoryClient.getSessionMemory(testUserId);
-            const userMemory = memoryClient.getUserMemory(testUserId);
+            // Log latest memory updates using memoryService
+            const sessionMemory = await memoryService.getHistory(testUserId);
+            const userMemory = await memoryService.getHistory(testUserId);
             await log(`Session Memory Updated (last entry):\n${JSON.stringify(sessionMemory.slice(-1), null, 2)}`);
             await log(`User Memory Updated (last entry):\n${JSON.stringify(userMemory.slice(-1), null, 2)}`);
         } catch (err) {

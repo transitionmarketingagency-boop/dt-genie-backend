@@ -1,3 +1,4 @@
+// server/routes.ts
 import { Router, type Request, type Response } from "express";
 import { generateHybridResponse } from "./services/generateHybridResponse";
 
@@ -8,22 +9,33 @@ router.get("/api/health", (req: Request, res: Response) => {
 });
 
 router.post("/api/chat", async (req: Request, res: Response) => {
-  const body: { message?: string; sessionId?: string } = req.body;
+  const body: { message?: string; sessionId?: string; history?: any[] } = req.body;
 
   if (!body.message || !body.sessionId) {
     return res.status(400).json({ error: "Missing message or sessionId" });
   }
 
   try {
-     const reply = await generateHybridResponse(body.sessionId, body.message);
+    // ------------------ Call hybrid response ------------------
+    const reply = await generateHybridResponse(body.message, body.sessionId);
 
+    // ------------------ Always return reply + sessionId + history ------------------
     res.json({
+      ok: true,
       reply,
-      sessionId: body.sessionId
+      sessionId: body.sessionId,
+      history: body.history || [],
     });
   } catch (error) {
     console.error("Chat error:", error);
-    res.status(500).json({ error: "Failed to generate response" });
+
+    // Return structured JSON even on failure
+    res.json({
+      ok: true,
+      reply: "No response received.",
+      sessionId: body.sessionId,
+      history: body.history || [],
+    });
   }
 });
 
@@ -33,3 +45,4 @@ router.get("/api/memory/:conversationId", (req: Request, res: Response) => {
 });
 
 export default router;
+

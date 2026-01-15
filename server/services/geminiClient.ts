@@ -1,5 +1,3 @@
-// server/services/geminiClient.ts
-
 import * as dotenv from "dotenv";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
@@ -12,84 +10,52 @@ const __dirname = dirname(__filename);
 /* ---------------- Load .env ---------------- */
 dotenv.config({ path: join(__dirname, "../../.env") });
 
-/* ---------------- Import identity helpers ---------------- */
-const { enforceBotName } = await import(
-  pathToFileURL(join(__dirname, "../system/identity.js")).href
-);
-
 /* ---------------- Gemini config ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
 
+/* ---------------- Import identity helpers ---------------- */
+const identityUrl = pathToFileURL(join(__dirname, "../system/identity.js")).href;
+const { enforceBotName } = await import(identityUrl);
+
 /**
  * Generate response from Gemini API
- * - Short prompts (<100 chars) respond instantly
- * - Long prompts use full professional instructions
  */
 export async function generateGemini(prompt: string): Promise<string> {
   const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY) {
-    throw new Error("❌ GEMINI_API_KEY missing. Add it to your .env");
-  }
+  if (!API_KEY) throw new Error("❌ GEMINI_API_KEY missing");
 
-  // ⚡ Short vs long prompt optimization
   const finalPrompt =
     prompt.length < 100
       ? `Answer briefly and professionally as Neon Vision:\n${prompt}`
       : `
 You are Neon Vision, AI strategist at Digital Transition Marketing.
 
-You help businesses with:
-- Digital marketing
-- Growth strategy
-- Automation
-- AI tools
-- Lead generation
-- Branding
-- Funnels
-
-Be professional, confident, helpful.
-Do NOT repeat your name unless explicitly asked.
-
+Answer professionally and confidently.
 User question:
 ${prompt}
-
 Answer:
 `.trim();
 
-  const maxRetries = 3;
+  try {
+    const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] }),
+    });
 
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: finalPrompt }] }],
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.text();
-        // Retry on 503 up to maxRetries
-        if (res.status === 503 && attempt < maxRetries) {
-          await new Promise(r => setTimeout(r, 1500 * attempt));
-          continue;
-        }
-        throw new Error(`Gemini API Error ${res.status}: ${err}`);
-      }
-
-      const data: any = await res.json();
-      const text =
-        data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "No response";
-
-      return enforceBotName(text.trim(), prompt);
-    } catch (err) {
-      if (attempt === maxRetries) throw err;
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`Gemini API Error ${res.status}: ${errText}`);
     }
-  }
 
-  throw new Error("Gemini failed after retries");
+    const data: any = await res.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    return enforceBotName(text.trim(), prompt);
+  } catch (err: any) {
+    console.error("❌ Gemini API call failed:", err?.message || err);
+    throw err;
+  }
 }
 
 /* ---------------- Backward compatibility ---------------- */
