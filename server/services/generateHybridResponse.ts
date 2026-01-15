@@ -1,47 +1,37 @@
-import { fetchRelevantChunks } from "../training_pipeline/utils/query-chunks";
+import { fetchRelevantChunks } from "../query-chunks.js";
 import { generateGemma } from "./gemmaClient.js";
+import { generateGemini } from "./geminiClient.js"; // ✅ fallback
 import { memoryClient } from "./memoryClient.js";
+import { getPromptEmbedding, enforceBotName } from "../system/identity.js";
+import { cleanResponse } from "../utils/cleanResponse.js"; // ✅ fixed path
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
+
+// ------------------ ESM __dirname FIX ------------------
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // ------------------ LOAD SYSTEM PERSONA ------------------
 const personaPath = path.join(
   __dirname,
   "../knowledge_base/persona/system_persona.json"
 );
+const systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
 
-// Safe file read
-let systemPersona = {};
-try {
-  if (fs.existsSync(personaPath)) {
-    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
-  } else {
-    console.warn("⚠️ system_persona.json not found, using empty persona");
-  }
-} catch (err) {
-  console.error("❌ Failed to load system persona:", err);
-}
-
-// ------------------ HELPER: USER ROLE DETECTION ------------------
+// ------------------ ROLE DETECTION ------------------
 function detectUserRole(userMessage: string): string {
   const msg = userMessage.toLowerCase();
-
-  if (msg.includes("buy") || msg.includes("pricing") || msg.includes("client"))
-    return "sales";
-
-  if (msg.includes("ad") || msg.includes("campaign") || msg.includes("marketing"))
-    return "marketing";
-
-  if (msg.includes("help") || msg.includes("issue") || msg.includes("support"))
-    return "support";
-
+  if (msg.includes("buy") || msg.includes("pricing") || msg.includes("client")) return "sales";
+  if (msg.includes("ad") || msg.includes("campaign") || msg.includes("marketing")) return "marketing";
+  if (msg.includes("help") || msg.includes("issue") || msg.includes("support")) return "support";
   return "general";
 }
 
 // ------------------ CONTEXT BUILDER ------------------
 async function buildDeepContext(userId: string, userMessage: string) {
-  // Fetch top relevant chunks (Phase-1 safe)
-  const relevantChunks = await fetchRelevantChunks(userMessage, 5);
+  const embedding = await getPromptEmbedding(userMessage); // ✅ compute embedding once
+  const relevantChunks = await fetchRelevantChunks(userMessage, 5); // ✅ top chunks
 
   const sessionMemory = memoryClient.getSessionMemory(userId);
   const userMemory = memoryClient.getUserMemory(userId);
@@ -68,26 +58,33 @@ ${userMessage}
 `;
 }
 
-// ------------------ MAIN GENERATOR ------------------
+// ------------------ HYBRID RESPONSE ------------------
 export async function generateHybridResponse(
-  userId: string,
-  userMessage: string
+  userMessage: string,
+  userId = "default-session"
 ): Promise<string> {
   try {
     const context = await buildDeepContext(userId, userMessage);
 
-    // Generate response via Gemma
-    const response = await generateGemma(context);
+    // ------------------ GEMMA FIRST ------------------
+    let response = await generateGemma(context);
 
-    // Append memory safely
-    memoryClient.appendSessionMemory(userId, {
-      user: userMessage,
-      bot: response,
-    });
-    memoryClient.appendUserMemory(userId, {
-      user: userMessage,
-      bot: response,
-    });
+    // ------------------ CLEAN RESPONSE ------------------
+    response = cleanResponse(response || "");
+
+    // ------------------ GEMINI FALLBACK ------------------
+    if (!response || response.trim() === "") {
+      console.warn("Gemma failed, trying Gemini fallback...");
+      response = await generateGemini(context);
+      response = cleanResponse(response || "");
+    }
+
+    // ------------------ ENFORCE BOT NAME ------------------
+    response = enforceBotName(response, userMessage);
+
+    // ------------------ MEMORY PERSISTENCE ------------------
+    memoryClient.appendSessionMemory(userId, { user: userMessage, bot: response });
+    memoryClient.appendUserMemory(userId, { user: userMessage, bot: response });
 
     return response;
   } catch (error) {
