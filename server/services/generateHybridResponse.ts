@@ -4,7 +4,7 @@ import { fetchRelevantChunks } from "../queryChunksWrapper.js";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
-import { getPromptEmbedding, enforceBotName, BOT_NAME } from "../system/identity.js";
+import { enforceBotName, BOT_NAME } from "../system/identity.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import fs from "fs";
 import path from "path";
@@ -14,12 +14,32 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ---------------- Load persona ---------------- */
+/* ---------------- Safe persona loader (RENDER SAFE) ---------------- */
 const personaPath = path.join(
   __dirname,
   "../knowledge_base/persona/system_persona.json"
 );
-const systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
+
+let systemPersona: any = {
+  name: BOT_NAME,
+  tone: "professional, helpful, concise",
+  rules: [
+    "Be accurate",
+    "Be honest",
+    "Never hallucinate",
+    "Help the user achieve their goal"
+  ]
+};
+
+try {
+  if (fs.existsSync(personaPath)) {
+    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
+  } else {
+    console.warn("⚠️ Persona file not found, using fallback persona");
+  }
+} catch (err) {
+  console.warn("⚠️ Failed to load persona, using fallback:", err);
+}
 
 /* ---------------- Role detection ---------------- */
 function detectUserRole(msg: string): string {
@@ -30,13 +50,24 @@ function detectUserRole(msg: string): string {
   return "general";
 }
 
-/* ---------------- Format memory ---------------- */
+/* ---------------- Memory formatter (compressed) ---------------- */
 function formatMemory(history: any[]) {
-  if (!history.length) return "No prior conversation.";
+  if (!history?.length) return "No prior conversation.";
+
   return history
-    .slice(-10)
+    .slice(-8)
     .map(m => `${m.role.toUpperCase()}: ${m.content}`)
     .join("\n");
+}
+
+/* ---------------- Persona instruction builder ---------------- */
+function buildPersonaInstructions(persona: any) {
+  return `
+You are ${persona.name || BOT_NAME}.
+Tone: ${persona.tone || "professional"}.
+Rules:
+${(persona.rules || []).map((r: string) => `- ${r}`).join("\n")}
+`;
 }
 
 /* ---------------- Context builder ---------------- */
@@ -46,8 +77,7 @@ async function buildDeepContext(userId: string, userMessage: string) {
   const role = detectUserRole(userMessage);
 
   return `
-SYSTEM PERSONA:
-${JSON.stringify(systemPersona)}
+${buildPersonaInstructions(systemPersona)}
 
 USER ROLE:
 ${role}
@@ -63,6 +93,34 @@ ${userMessage}
 `;
 }
 
+/* ---------------- Confidence heuristic ---------------- */
+function isLowConfidenceResponse(text: string) {
+  if (!text) return true;
+  if (text.length < 40) return true;
+  if (/i am not sure|cannot help|no information/i.test(text)) return true;
+  return false;
+}
+
+/* ---------------- CTA injector ---------------- */
+function injectSmartCTA(response: string, role: string, userMessage: string) {
+  if (/book|schedule|call|meeting/i.test(userMessage)) {
+    return (
+      response +
+      "\n\n📅 Book a call here:\nhttps://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future"
+    );
+  }
+
+  if (role === "marketing") {
+    return response + "\n\nWould you like a quick campaign strategy or funnel plan?";
+  }
+
+  if (role === "support") {
+    return response + "\n\nIf this didn’t fully solve it, I can investigate further.";
+  }
+
+  return response;
+}
+
 /* ---------------- Main hybrid response ---------------- */
 export async function generateHybridResponse(
   userMessage: string,
@@ -72,23 +130,23 @@ export async function generateHybridResponse(
     await memoryService.addMessage(userId, "user", userMessage);
 
     const context = await buildDeepContext(userId, userMessage);
+    const role = detectUserRole(userMessage);
 
     let response = await generateGemma(context);
     response = cleanResponse(response || "");
+    let modelUsed = "Gemma";
 
-    if (!response) {
+    if (isLowConfidenceResponse(response)) {
       response = await generateGemini(context);
       response = cleanResponse(response || "");
+      modelUsed = "Gemini";
     }
 
     response = enforceBotName(response, userMessage);
-
-    if (/book|schedule|call|meeting/i.test(userMessage)) {
-      response +=
-        "\n\n📅 Book a call here:\nhttps://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
-    }
+    response = injectSmartCTA(response, role, userMessage);
 
     await memoryService.addMessage(userId, "assistant", response);
+
     return response;
 
   } catch (err) {
