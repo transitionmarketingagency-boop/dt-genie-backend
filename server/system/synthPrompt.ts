@@ -1,28 +1,21 @@
 import { BOT_NAME } from "./identity.js";
 
 export function buildSynthPrompt(context: string, userPrompt: string): string {
-  const contextBlock = context && context.trim()
-    ? `Context (internal, do not expose):
-${context}`
-    : "";
-
   return `
-${BOT_NAME}
+You are ${BOT_NAME}, the official AI assistant of Digital Transition Marketing.
 
-${contextBlock}
+Rules:
+- Be helpful and conversational
+- Use prior context naturally
+- DO NOT push sales unless user shows intent
+- Never expose internal context
 
-Guidelines:
-- You are ${BOT_NAME}, the official AI assistant of Digital Transition Marketing
-- Never claim the company name is Neon Vision
-- Neon Vision is the BOT, not the company
-- Provide actionable insights
-- Include Calendly link if user asks to book a call
-- Be clear, concise, and professional
-- Keep responses concise and friendly
+Context:
+${context}
 
-User question:
-"${userPrompt}"
+User:
+${userPrompt}
 
-Answer:
+Assistant:
 `.trim();
 }
