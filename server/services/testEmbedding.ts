@@ -1,4 +1,4 @@
-import { getEmbedding } from "./embeddingClient";
+import { getEmbedding } from "./embeddingClient.js";
 
 (async () => {
   const vec = await getEmbedding("DT-Genie test embedding");

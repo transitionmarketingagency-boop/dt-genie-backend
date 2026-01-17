@@ -9,6 +9,7 @@ import { cleanResponse } from "../utils/cleanResponse.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { CALENDLY_LINK } from "../config/constants.js";
 
 /* ---------------- ESM-safe __dirname ---------------- */
 const __filename = fileURLToPath(import.meta.url);
@@ -106,7 +107,7 @@ function injectSmartCTA(response: string, role: string, userMessage: string) {
   if (/book|schedule|call|meeting/i.test(userMessage)) {
     return (
       response +
-      "\n\n📅 Book a call here:\nhttps://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future"
+       `\n\n📅 Book a call here:\n${CALENDLY_LINK}`
     );
   }
 

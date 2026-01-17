@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { ChatMessage } from '../shared/types';
+import { ChatMessage } from '../shared/types.js';
 import crypto from 'crypto';
 import path from 'node:path';
 import fs from 'node:fs';

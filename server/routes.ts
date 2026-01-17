@@ -1,6 +1,6 @@
 // server/routes.ts
 import { Router, type Request, type Response } from "express";
-import { generateHybridResponse } from "./services/generateHybridResponse";
+import { generateHybridResponse } from "./services/generateHybridResponse.js";
 
 const router = Router();
 

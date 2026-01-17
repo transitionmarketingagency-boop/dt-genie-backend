@@ -1,6 +1,6 @@
-import { generateGemma } from "./gemmaClient";
-import { generateGemini } from "./geminiClient";
-import { detectRole, getRoleRules } from "./roleRouter";
+import { generateGemma } from "./gemmaClient.js";
+import { generateGemini } from "./geminiClient.js";
+import { detectRole, getRoleRules } from "./roleRouter.js";
 
 /**
  * Keywords that indicate complex/high-reasoning prompts

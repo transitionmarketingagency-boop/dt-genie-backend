@@ -9,6 +9,7 @@ import { createServer, type Server } from "node:http";
 import { storage } from "./storage.js";
 import { populateChunks } from "./populate-chunks.js";
 import { generateHybridResponse } from "./services/hybridClient.js";
+import { CALENDLY_LINK } from "./config/constants.js";
 
 // ---------------- GOOGLE SERVICE ACCOUNT ----------------
 if (process.env.SERVICE_ACCOUNT_BASE64) {
@@ -68,7 +69,8 @@ export const setupApp = async (app: Application) => {
 
       // Fallback if empty
       if (!reply || reply.trim().length === 0) {
-        reply = "Sure — you can book a call with our team here:\nhttps://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+        
+      reply = `Sure — you can book a call with our team here:\n${CALENDLY_LINK}`;
       }
 
       // Save assistant message

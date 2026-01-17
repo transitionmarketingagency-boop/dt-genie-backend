@@ -1,5 +1,5 @@
 // server/services/app.ts
-import { MemoryEntry, ChatHistory } from "../../shared/types";
+import { MemoryEntry, ChatHistory } from "../../shared/types.js";
 
 /**
  * Format memory entries for prompts or logging

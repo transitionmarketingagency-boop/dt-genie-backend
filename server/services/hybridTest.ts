@@ -3,8 +3,8 @@
 import fs from 'fs';
 import path, { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { generateHybridResponse } from './generateHybridResponse';
-import { fetchRelevantChunks } from '../queryChunksWrapper';
+import { generateHybridResponse } from './generateHybridResponse.js';
+import { fetchRelevantChunks } from '../queryChunksWrapper.js';
 import { memoryService } from './memoryService.js';
 
 // ES Module fix for __dirname

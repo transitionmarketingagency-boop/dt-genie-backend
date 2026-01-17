@@ -1,6 +1,6 @@
 // server/storage.ts
 import Database from "better-sqlite3";
-import { ChatMessage } from "../shared/types";
+import { ChatMessage } from "../shared/types.js";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
