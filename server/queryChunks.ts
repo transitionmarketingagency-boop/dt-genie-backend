@@ -2,9 +2,7 @@ import sqlite3 from "sqlite3";
 import { open } from "sqlite";
 import { DB_PATH } from "./utils/dbPath.js";
 
-/**
- * Open SQLite database
- */
+/* ---------------- Open SQLite database ---------------- */
 export async function openDB() {
   return open({
     filename: DB_PATH,
@@ -12,9 +10,7 @@ export async function openDB() {
   });
 }
 
-/**
- * Compute cosine similarity between two vectors
- */
+/* ---------------- Cosine similarity ---------------- */
 function cosineSim(vecA: number[], vecB: number[]): number {
   if (!vecA || !vecB) return 0;
   const dot = vecA.reduce((sum, val, i) => sum + val * (vecB[i] || 0), 0);
@@ -23,9 +19,7 @@ function cosineSim(vecA: number[], vecB: number[]): number {
   return magA && magB ? dot / (magA * magB) : 0;
 }
 
-/**
- * Fetch top-N chunks using cosine similarity
- */
+/* ---------------- Get top-N relevant chunks ---------------- */
 export async function getTopChunks(queryEmbedding: number[], topN = 5) {
   const db = await openDB();
   const rows = await db.all("SELECT * FROM chunks");
@@ -34,10 +28,7 @@ export async function getTopChunks(queryEmbedding: number[], topN = 5) {
     embedding: r.embedding ? JSON.parse(r.embedding) : [],
   }));
   const ranked = parsedRows
-    .map((r: any) => ({
-      ...r,
-      score: cosineSim(queryEmbedding, r.embedding),
-    }))
+    .map((r: any) => ({ ...r, score: cosineSim(queryEmbedding, r.embedding) }))
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, topN);
   await db.close();
