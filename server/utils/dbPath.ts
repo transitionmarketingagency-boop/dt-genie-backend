@@ -17,8 +17,9 @@ const __dirname = path.dirname(__filename);
 const SERVER_DIR = path.resolve(__dirname, "..");
 const PROJECT_ROOT = path.resolve(SERVER_DIR, "..");
 
-export const DB_PATH = path.join(
-  PROJECT_ROOT,
+
+export const DB_PATH = path.resolve(
+  process.cwd(),
   "server",
   "vector_store",
   "unified_chunks.db"
