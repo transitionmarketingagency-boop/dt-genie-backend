@@ -1,32 +1,39 @@
-# env / secrets
+# Environment / secrets
 .env
 server/.env
-*.json.save
 sa-key.json
 server/sa-key.json
 
-# python / venv
+# Python / venv
 .venv/
 server/venv/
 __pycache__/
 
-# node_modules
+# Node modules
 server/node_modules/
+node_modules/
 
-# databases
+# Databases
 *.db
 website_chunks.db
 website_chunks_backup.db
 
-# misc
+# Logs
+server/memory/*.log
+
+# Build output
+dist/
+
+# Backup / test files
+server_BACKUP/
+server/backup_services/
+server/old_backups/
+server/test-*.ts
+server/vector_store/server/
+
+# Misc
 .tables
 embeddings_backup.json
-node_modules/
-
-
-dist/
-server_BACKUP/
-server/vector_store_BACKUP/
-.env
 venv/
 .schema
+server_file_map.txt
