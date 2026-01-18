@@ -6,19 +6,21 @@ import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
+import { formatResponse } from "../utils/formatResponse.js";
+import { CALENDLY_LINK } from "../config/constants.js";
+
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { CALENDLY_LINK } from "../config/constants.js";
 
 /* ---------------- ESM-safe __dirname ---------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ---------------- Safe persona loader (RENDER SAFE) ---------------- */
+/* ---------------- SAFE PERSONA LOADER (FIXED PATH) ---------------- */
 const personaPath = path.join(
   __dirname,
-  "../knowledge_base/persona/system_persona.json"
+  "../personas/neon-vision.json"
 );
 
 let systemPersona: any = {
@@ -51,12 +53,13 @@ function detectUserRole(msg: string): string {
   return "general";
 }
 
-/* ---------------- Memory formatter (compressed) ---------------- */
+/* ---------------- Memory formatter (FIXED) ---------------- */
 function formatMemory(history: any[]) {
-  if (!history?.length) return "No prior conversation.";
+  if (!history || history.length === 0) {
+    return "No prior conversation.";
+  }
 
   return history
-    .slice(-8)
     .map(m => `${m.role.toUpperCase()}: ${m.content}`)
     .join("\n");
 }
@@ -107,7 +110,7 @@ function injectSmartCTA(response: string, role: string, userMessage: string) {
   if (/book|schedule|call|meeting/i.test(userMessage)) {
     return (
       response +
-       `\n\n📅 Book a call here:\n${CALENDLY_LINK}`
+      `\n\n📅 Book a call here:\n${CALENDLY_LINK}`
     );
   }
 
@@ -122,7 +125,7 @@ function injectSmartCTA(response: string, role: string, userMessage: string) {
   return response;
 }
 
-/* ---------------- Main hybrid response ---------------- */
+/* ---------------- MAIN HYBRID RESPONSE ---------------- */
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -148,7 +151,19 @@ export async function generateHybridResponse(
 
     await memoryService.addMessage(userId, "assistant", response);
 
-    return response;
+    /* ✅ PHASE-2 FINAL FORMAT (ONLY HERE) */
+    return formatResponse(
+      "Neon Vision — Digital Transition Marketing",
+      [
+        {
+          heading: "Response",
+          content: response
+        }
+      ],
+      {
+        includeCalendly: role === "sales"
+      }
+    );
 
   } catch (err) {
     console.error("Hybrid response error:", err);
