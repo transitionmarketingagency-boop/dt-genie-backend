@@ -17,7 +17,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ---------------- SAFE PERSONA LOADER ---------------- */
-const personaPath = path.resolve(__dirname, "../personas/neon-vision.json");
+const personaDir = path.join(__dirname, "../personas");
+const personaFile = "neon-vision.json";
+const personaPath = path.join(personaDir, personaFile);
+
 let systemPersona: any = {
   name: BOT_NAME,
   tone: "professional, helpful, concise",
@@ -31,9 +34,11 @@ let systemPersona: any = {
 
 try {
   if (fs.existsSync(personaPath)) {
-    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
+    const personaData = fs.readFileSync(personaPath, "utf-8");
+    systemPersona = JSON.parse(personaData);
+    console.log(`✅ Persona loaded: ${personaFile}`);
   } else {
-    console.warn("⚠️ Persona file not found, using fallback persona");
+    console.warn(`⚠️ Persona file "${personaFile}" not found at ${personaDir}, using fallback persona`);
   }
 } catch (err) {
   console.warn("⚠️ Failed to load persona, using fallback:", err);
@@ -67,11 +72,12 @@ ${(persona.rules || []).map((r: string) => `- ${r}`).join("\n")}
 /* ---------------- Small LLM summarizer for sources ---------------- */
 async function summarizeSource(sourceText: string): Promise<string> {
   try {
+    if (!sourceText || sourceText.trim() === "") return "(no info)";
     const prompt = `Summarize the following source into a concise bullet point:\n${sourceText}`;
     const summary = await generateGemma(prompt); // Using Gemma as summarizer
     return cleanResponse(summary || sourceText);
   } catch {
-    return sourceText;
+    return sourceText || "(no info)";
   }
 }
 
@@ -81,13 +87,13 @@ async function buildDeepContext(userId: string, userMessage: string) {
   const history = await memoryService.getHistory(userId);
   const role = detectUserRole(userMessage);
 
-  // Phase 4+: automatic summarization of each source
+  // Phase 4+: automatic summarization of each source with safe fallback
   let sourcesSummary: string;
   if (relevantChunks.length > 0) {
     const summaries = await Promise.all(
-      relevantChunks.map((c: any) => summarizeSource(c.summary || c.source))
+      relevantChunks.map((c: any) => summarizeSource(c.summary || c.source || "(no info)"))
     );
-    sourcesSummary = summaries.map((s, i) => `• ${s}`).join("\n");
+    sourcesSummary = summaries.map((s) => `• ${s}`).join("\n");
   } else {
     sourcesSummary = "No relevant sources found.";
   }
@@ -156,6 +162,7 @@ export async function generateHybridResponse(
     }
 
     console.log(`[Hybrid Phase4+] Model used: ${modelUsed}, User: ${userId}, Role: ${role}`);
+    console.log(`[Hybrid Phase4+] Sources Summary:\n${sourcesSummary}`);
 
     response = enforceBotName(response, userMessage);
     response = injectSmartCTA(response, role, userMessage);
