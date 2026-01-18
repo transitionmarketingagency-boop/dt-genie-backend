@@ -8,10 +8,11 @@
     "dev": "tsx server/app.ts",
     "frontend": "vite",
 
-    "build": "tsc -p tsconfig.build.json && npm run copy-public",
+    "build": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-personas",
     "build:backend": "npm run build",
 
     "copy-public": "mkdirp dist/public && cpy \"public/**/*\" dist/public",
+    "copy-personas": "mkdirp dist/server/personas && cpy \"server/personas/**/*\" dist/server/personas",
 
     "start": "node dist/server/index-prod.js",
     "postinstall": "echo 'Skipping Python install on Render'"
