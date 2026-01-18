@@ -31,11 +31,11 @@ export function formatResponse(
       output += `${section.content}\n`;
     }
 
-    output += `\n`;
+    output += "\n";
   }
 
   if (options.includeCalendly) {
-    output += `📅 **Schedule a strategy call:**\n${CALENDLY_LINK}\n`;
+    output += ` ~E **Schedule a strategy call:**\n${CALENDLY_LINK}\n`;
   }
 
   return output.trim();

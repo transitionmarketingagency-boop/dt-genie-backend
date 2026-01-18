@@ -8,7 +8,6 @@ import { enforceBotName, BOT_NAME } from "../system/identity.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { formatResponse } from "../utils/formatResponse.js";
 import { CALENDLY_LINK } from "../config/constants.js";
-
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -17,12 +16,8 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ---------------- SAFE PERSONA LOADER (FIXED PATH) ---------------- */
-const personaPath = path.join(
-  __dirname,
-  "../personas/neon-vision.json"
-);
-
+/* ---------------- SAFE PERSONA LOADER ---------------- */
+const personaPath = path.resolve(__dirname, "../personas/neon-vision.json");
 let systemPersona: any = {
   name: BOT_NAME,
   tone: "professional, helpful, concise",
@@ -53,15 +48,10 @@ function detectUserRole(msg: string): string {
   return "general";
 }
 
-/* ---------------- Memory formatter (FIXED) ---------------- */
+/* ---------------- Memory formatter ---------------- */
 function formatMemory(history: any[]) {
-  if (!history || history.length === 0) {
-    return "No prior conversation.";
-  }
-
-  return history
-    .map(m => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n");
+  if (!history || history.length === 0) return "No prior conversation.";
+  return history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
 }
 
 /* ---------------- Persona instruction builder ---------------- */
@@ -74,13 +64,36 @@ ${(persona.rules || []).map((r: string) => `- ${r}`).join("\n")}
 `;
 }
 
+/* ---------------- Small LLM summarizer for sources ---------------- */
+async function summarizeSource(sourceText: string): Promise<string> {
+  try {
+    const prompt = `Summarize the following source into a concise bullet point:\n${sourceText}`;
+    const summary = await generateGemma(prompt); // Using Gemma as summarizer
+    return cleanResponse(summary || sourceText);
+  } catch {
+    return sourceText;
+  }
+}
+
 /* ---------------- Context builder ---------------- */
 async function buildDeepContext(userId: string, userMessage: string) {
   const relevantChunks = await fetchRelevantChunks(userMessage, 5);
   const history = await memoryService.getHistory(userId);
   const role = detectUserRole(userMessage);
 
-  return `
+  // Phase 4+: automatic summarization of each source
+  let sourcesSummary: string;
+  if (relevantChunks.length > 0) {
+    const summaries = await Promise.all(
+      relevantChunks.map((c: any) => summarizeSource(c.summary || c.source))
+    );
+    sourcesSummary = summaries.map((s, i) => `• ${s}`).join("\n");
+  } else {
+    sourcesSummary = "No relevant sources found.";
+  }
+
+  return {
+    context: `
 ${buildPersonaInstructions(systemPersona)}
 
 USER ROLE:
@@ -94,7 +107,9 @@ ${JSON.stringify(relevantChunks)}
 
 USER MESSAGE:
 ${userMessage}
-`;
+`,
+    sourcesSummary
+  };
 }
 
 /* ---------------- Confidence heuristic ---------------- */
@@ -108,24 +123,18 @@ function isLowConfidenceResponse(text: string) {
 /* ---------------- CTA injector ---------------- */
 function injectSmartCTA(response: string, role: string, userMessage: string) {
   if (/book|schedule|call|meeting/i.test(userMessage)) {
-    return (
-      response +
-      `\n\n📅 Book a call here:\n${CALENDLY_LINK}`
-    );
+    return response + `\n\n ~E Book a call here:\n${CALENDLY_LINK}`;
   }
-
   if (role === "marketing") {
     return response + "\n\nWould you like a quick campaign strategy or funnel plan?";
   }
-
   if (role === "support") {
     return response + "\n\nIf this didn’t fully solve it, I can investigate further.";
   }
-
   return response;
 }
 
-/* ---------------- MAIN HYBRID RESPONSE ---------------- */
+/* ---------------- MAIN HYBRID RESPONSE (Phase 4+) ---------------- */
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -133,7 +142,7 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    const context = await buildDeepContext(userId, userMessage);
+    const { context, sourcesSummary } = await buildDeepContext(userId, userMessage);
     const role = detectUserRole(userMessage);
 
     let response = await generateGemma(context);
@@ -146,27 +155,25 @@ export async function generateHybridResponse(
       modelUsed = "Gemini";
     }
 
+    console.log(`[Hybrid Phase4+] Model used: ${modelUsed}, User: ${userId}, Role: ${role}`);
+
     response = enforceBotName(response, userMessage);
     response = injectSmartCTA(response, role, userMessage);
 
     await memoryService.addMessage(userId, "assistant", response);
 
-    /* ✅ PHASE-2 FINAL FORMAT (ONLY HERE) */
+    /* ---------------- PHASE-4+ FINAL FORMAT ---------------- */
     return formatResponse(
       "Neon Vision — Digital Transition Marketing",
       [
-        {
-          heading: "Response",
-          content: response
-        }
+        { heading: "Response", content: response },
+        { heading: "Sources Summary", content: sourcesSummary.split("\n") }
       ],
-      {
-        includeCalendly: role === "sales"
-      }
+      { includeCalendly: role === "sales" }
     );
 
   } catch (err) {
-    console.error("Hybrid response error:", err);
+    console.error("Hybrid Phase4+ response error:", err);
     return `Sorry — ${BOT_NAME} is temporarily unavailable.`;
   }
 }
