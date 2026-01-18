@@ -26,7 +26,7 @@ Politely say you do not have enough information to answer.
     .map(
       (chunk, index) => `
 [Context ${index + 1}]
-${chunk.content}
+${chunk.source}
 `
     )
     .join("\n");

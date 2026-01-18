@@ -1,5 +1,3 @@
-// server/services/generateHybridResponse.ts
-
 import { fetchRelevantChunks } from "../queryChunksWrapper.js";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
@@ -23,124 +21,112 @@ const personaPath = path.join(personaDir, personaFile);
 
 let systemPersona: any = {
   name: BOT_NAME,
-  tone: "professional, helpful, concise",
+  tone: "professional, confident, clear",
   rules: [
-    "Be accurate",
-    "Be honest",
-    "Never hallucinate",
-    "Help the user achieve their goal"
+    "Use company knowledge accurately",
+    "Mention services when relevant",
+    "Never say services do not exist if knowledge is available",
+    "Be concise but informative"
   ]
 };
 
 try {
   if (fs.existsSync(personaPath)) {
-    const personaData = fs.readFileSync(personaPath, "utf-8");
-    systemPersona = JSON.parse(personaData);
+    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
     console.log(`✅ Persona loaded: ${personaFile}`);
-  } else {
-    console.warn(`⚠️ Persona file "${personaFile}" not found at ${personaDir}, using fallback persona`);
   }
-} catch (err) {
-  console.warn("⚠️ Failed to load persona, using fallback:", err);
+} catch {
+  console.warn("⚠️ Persona fallback active");
 }
 
 /* ---------------- Role detection ---------------- */
 function detectUserRole(msg: string): string {
   const t = msg.toLowerCase();
-  if (t.includes("price") || t.includes("buy") || t.includes("call")) return "sales";
-  if (t.includes("campaign") || t.includes("marketing")) return "marketing";
-  if (t.includes("issue") || t.includes("help")) return "support";
+  if (t.includes("price") || t.includes("pricing") || t.includes("buy") || t.includes("call"))
+    return "sales";
+  if (t.includes("campaign") || t.includes("marketing"))
+    return "marketing";
+  if (t.includes("issue") || t.includes("help"))
+    return "support";
   return "general";
 }
 
 /* ---------------- Memory formatter ---------------- */
 function formatMemory(history: any[]) {
-  if (!history || history.length === 0) return "No prior conversation.";
+  if (!history || history.length === 0) return "";
   return history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n");
 }
 
 /* ---------------- Persona instruction builder ---------------- */
 function buildPersonaInstructions(persona: any) {
   return `
-You are ${persona.name || BOT_NAME}.
-Tone: ${persona.tone || "professional"}.
+You are ${persona.name}.
+Tone: ${persona.tone}.
 Rules:
-${(persona.rules || []).map((r: string) => `- ${r}`).join("\n")}
+${persona.rules.map((r: string) => `- ${r}`).join("\n")}
 `;
 }
 
-/* ---------------- Small LLM summarizer for sources ---------------- */
-async function summarizeSource(sourceText: string): Promise<string> {
-  try {
-    if (!sourceText || sourceText.trim() === "") return "(no info)";
-    const prompt = `Summarize the following source into a concise bullet point:\n${sourceText}`;
-    const summary = await generateGemma(prompt); // Using Gemma as summarizer
-    return cleanResponse(summary || sourceText);
-  } catch {
-    return sourceText || "(no info)";
-  }
+/* ---------------- Source summarizer ---------------- */
+async function summarizeSource(text: string) {
+  if (!text || text.trim().length < 30) return null;
+  const summary = await generateGemma(
+    `Summarize this into one factual bullet:\n${text}`
+  );
+  return cleanResponse(summary || "");
 }
 
 /* ---------------- Context builder ---------------- */
 async function buildDeepContext(userId: string, userMessage: string) {
-  const relevantChunks = await fetchRelevantChunks(userMessage, 5);
+  const relevantChunks = await fetchRelevantChunks(userMessage, 8);
   const history = await memoryService.getHistory(userId);
   const role = detectUserRole(userMessage);
 
-  // Phase 4+: automatic summarization of each source with safe fallback
-  let sourcesSummary: string;
-  if (relevantChunks.length > 0) {
-    const summaries = await Promise.all(
-      relevantChunks.map((c: any) => summarizeSource(c.summary || c.source || "(no info)"))
-    );
-    sourcesSummary = summaries.map((s) => `• ${s}`).join("\n");
-  } else {
-    sourcesSummary = "No relevant sources found.";
-  }
+  const knowledgeText = relevantChunks
+    .map(c => c.source)
+    .filter(Boolean)
+    .join("\n\n");
+
+  const summaries = await Promise.all(
+    relevantChunks.map(c => summarizeSource(c.source))
+  );
 
   return {
+    role,
     context: `
 ${buildPersonaInstructions(systemPersona)}
-
-USER ROLE:
-${role}
 
 CONVERSATION HISTORY:
 ${formatMemory(history)}
 
-RELEVANT KNOWLEDGE:
-${JSON.stringify(relevantChunks)}
+COMPANY KNOWLEDGE (USE THIS FIRST):
+${knowledgeText}
 
-USER MESSAGE:
+USER QUESTION:
 ${userMessage}
 `,
-    sourcesSummary
+    sourcesSummary: summaries.filter(Boolean)
   };
 }
 
 /* ---------------- Confidence heuristic ---------------- */
 function isLowConfidenceResponse(text: string) {
-  if (!text) return true;
-  if (text.length < 40) return true;
-  if (/i am not sure|cannot help|no information/i.test(text)) return true;
-  return false;
+  return !text || text.length < 60 || /no information|not available/i.test(text);
 }
 
 /* ---------------- CTA injector ---------------- */
 function injectSmartCTA(response: string, role: string, userMessage: string) {
-  if (/book|schedule|call|meeting/i.test(userMessage)) {
-    return response + `\n\n ~E Book a call here:\n${CALENDLY_LINK}`;
-  }
-  if (role === "marketing") {
-    return response + "\n\nWould you like a quick campaign strategy or funnel plan?";
-  }
-  if (role === "support") {
-    return response + "\n\nIf this didn’t fully solve it, I can investigate further.";
+  if (
+    role === "sales" &&
+    /call|book|schedule/i.test(userMessage) &&
+    !response.includes(CALENDLY_LINK)
+  ) {
+    response += `\n\n📞 Book a strategy call:\n${CALENDLY_LINK}`;
   }
   return response;
 }
 
-/* ---------------- MAIN HYBRID RESPONSE (Phase 4+) ---------------- */
+/* ---------------- MAIN HYBRID RESPONSE ---------------- */
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -148,39 +134,39 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    const { context, sourcesSummary } = await buildDeepContext(userId, userMessage);
-    const role = detectUserRole(userMessage);
+    const { context, sourcesSummary, role } =
+      await buildDeepContext(userId, userMessage);
 
-    let response = await generateGemma(context);
-    response = cleanResponse(response || "");
+    let response = cleanResponse(await generateGemma(context));
     let modelUsed = "Gemma";
 
     if (isLowConfidenceResponse(response)) {
-      response = await generateGemini(context);
-      response = cleanResponse(response || "");
+      response = cleanResponse(await generateGemini(context));
       modelUsed = "Gemini";
     }
 
-    console.log(`[Hybrid Phase4+] Model used: ${modelUsed}, User: ${userId}, Role: ${role}`);
-    console.log(`[Hybrid Phase4+] Sources Summary:\n${sourcesSummary}`);
+    console.log(`[Hybrid] Model: ${modelUsed} | Role: ${role}`);
 
     response = enforceBotName(response, userMessage);
     response = injectSmartCTA(response, role, userMessage);
 
     await memoryService.addMessage(userId, "assistant", response);
 
-    /* ---------------- PHASE-4+ FINAL FORMAT ---------------- */
     return formatResponse(
       "Neon Vision — Digital Transition Marketing",
       [
         { heading: "Response", content: response },
-        { heading: "Sources Summary", content: sourcesSummary.split("\n") }
+        {
+          heading: "Sources Summary",
+          content: (sourcesSummary.filter(Boolean) as string[]).length
+            ? (sourcesSummary.filter(Boolean) as string[])
+            : ["Internal knowledge base"]
+        }
       ],
-      { includeCalendly: role === "sales" }
+      { includeCalendly: false }
     );
-
   } catch (err) {
-    console.error("Hybrid Phase4+ response error:", err);
+    console.error("Hybrid response error:", err);
     return `Sorry — ${BOT_NAME} is temporarily unavailable.`;
   }
 }
