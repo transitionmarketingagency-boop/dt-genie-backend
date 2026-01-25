@@ -1,7 +1,8 @@
+// server/utils/formatResponse.ts
 import { CALENDLY_LINK } from "../config/constants.js";
 
 type Section = {
-  heading: string;
+  heading?: string;
   content: string | string[];
 };
 
@@ -10,22 +11,24 @@ type FormatOptions = {
 };
 
 export function formatResponse(
-  title: string,
+  _title: string | null,
   sections: Section[],
   options: FormatOptions = {}
 ) {
   let output = "";
 
-  if (title) {
-    output += `${title}\n\n`;
-  }
-
   for (const section of sections) {
-    output += `## ${section.heading}\n`;
+    if (!section.content) continue;
+
+    if (section.heading) {
+      output += `${section.heading}\n`;
+    }
 
     if (Array.isArray(section.content)) {
       for (const item of section.content) {
-        output += `• ${item}\n`;
+        if (item && item.trim()) {
+          output += `- ${item}\n`;
+        }
       }
     } else {
       output += `${section.content}\n`;
@@ -35,7 +38,7 @@ export function formatResponse(
   }
 
   if (options.includeCalendly) {
-    output += ` ~E **Schedule a strategy call:**\n${CALENDLY_LINK}\n`;
+    output += `If you’d like, you can book a short strategy call here:\n${CALENDLY_LINK}\n`;
   }
 
   return output.trim();

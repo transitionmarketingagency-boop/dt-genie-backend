@@ -7,25 +7,27 @@ export async function buildPrompt(
 ): Promise<string> {
   const chunks = await fetchRelevantChunks(question, limit);
 
-  // Safety: no context found
   if (!chunks || chunks.length === 0) {
     return `
 SYSTEM:
 You are DT-Genie, the official AI assistant for Digital Transition Marketing.
 
-USER QUESTION:
-"${question}"
+INSTRUCTIONS:
+- You do NOT have relevant internal knowledge to answer this question.
+- Do NOT guess, assume, or invent information.
+- Respond politely and honestly that the information is not available.
 
-INSTRUCTION:
-No relevant information was found in the knowledge base.
-Politely say you do not have enough information to answer.
+USER QUESTION:
+${question}
+
+RESPONSE:
 `;
   }
 
   const contextText = chunks
     .map(
       (chunk, index) => `
-[Context ${index + 1}]
+[Source ${index + 1}]
 ${chunk.source}
 `
     )
@@ -35,20 +37,19 @@ ${chunk.source}
 SYSTEM:
 You are DT-Genie, the official AI assistant for Digital Transition Marketing.
 
-RULES:
-- Answer using ONLY the context below
+STRICT RULES:
+- Answer using ONLY the information in the sources below
 - Do NOT use outside knowledge
-- Be clear, professional, and confident
-- If the answer is not in the context, say you do not have enough information
+- Do NOT invent services, pricing, or capabilities
+- If the answer is not explicitly stated, say you do not have enough information
+- Keep the response clear, professional, and structured
 
-====================
-CONTEXT:
+SOURCES:
 ${contextText}
-====================
 
 USER QUESTION:
 ${question}
 
-ANSWER AS DT-GENIE:
+FINAL ANSWER:
 `;
 }

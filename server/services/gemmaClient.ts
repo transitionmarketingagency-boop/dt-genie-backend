@@ -30,7 +30,7 @@ Answer:
 `.trim();
 
     const response = await runGemma(finalPrompt);
-    return enforceBotName(response, prompt);
+    return enforceBotName(response);
   } catch (err: any) {
     console.error("⚠️ Gemma failed:", err?.message || err);
     return "";

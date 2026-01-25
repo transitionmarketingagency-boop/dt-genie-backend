@@ -2,10 +2,10 @@
 
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
-import { getRelevantChunks } from "../db/vectorStore.js";
+import { fetchRelevantChunks } from "../queryChunksWrapper.js"; // ✅ Python embeddings
 import { buildSynthPrompt } from "../system/synthPrompt.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
-import { enforceBotName, getPromptEmbedding } from "../system/identity.js";
+import { enforceBotName } from "../system/identity.js";
 
 /* ---------------- Keywords for complex prompts ---------------- */
 const COMPLEX_KEYWORDS = [
@@ -33,6 +33,13 @@ function isGreeting(prompt: string): boolean {
   return /^(hi|hello|hey|yo|sup|how are you)$/i.test(prompt.trim());
 }
 
+/* ---------------- Confidence check ---------------- */
+function isLowConfidence(response: string): boolean {
+  if (!response || response.trim().length < 80) return true;
+  const patterns = [/no information/i, /not available/i, /cannot answer/i];
+  return patterns.some((p) => p.test(response));
+}
+
 /* ---------------- Hybrid response router ---------------- */
 export async function generateHybridResponse(prompt: string): Promise<string> {
   // ⚡ Instant greeting
@@ -41,42 +48,57 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
   }
 
   let context = "";
+  let chunks: any[] = [];
 
-  /* ---------------- Compute real prompt embedding ---------------- */
+  // ---------------- Retrieve relevant knowledge (Python embeddings + vector DB)
   try {
-    const promptEmbedding = await getPromptEmbedding(prompt); // ← Phase-2 Python embeddings
-    const chunks = await getRelevantChunks(promptEmbedding, 6); // top 6 KB matches
-    context = chunks.map((c) => c.content).join("\n\n");
+    chunks = await fetchRelevantChunks(prompt, 6); // top 6 KB matches
+    context = chunks.map((c) => c.source).join("\n\n");
+
+    console.log(
+      "Top 3 chunks for query:",
+      chunks.slice(0, 3).map((c) => c.source.slice(0, 80))
+    );
   } catch (err: any) {
-    console.warn("⚠️ KB similarity search failed:", err?.message || err);
+    console.warn("⚠️ Knowledge retrieval failed:", err?.message || err);
   }
 
-  /* ---------------- Build final prompt ---------------- */
   const augmentedPrompt = buildSynthPrompt(context, prompt);
 
   let rawResponse = "";
-   /* ---------------- Gemma for simple queries ---------------- */
+  let modelUsed = "";
+
+  // ---------------- Gemma for simple queries
   try {
     if (!isComplex(prompt)) {
       rawResponse = await generateGemma(augmentedPrompt);
+      modelUsed = "Gemma";
     }
-  } catch {
-    // silent fallback
+  } catch (err) {
+    console.warn("⚠️ Gemma API failed, fallback to Gemini:", err?.message || err);
   }
 
-  /* ---------------- Gemini for complex queries or fallback ---------------- */
-  if (!rawResponse || rawResponse.trim().length < 20 || isComplex(prompt)) {
+  // ---------------- Gemini for complex queries or fallback
+  if (!rawResponse || isLowConfidence(rawResponse) || isComplex(prompt)) {
     try {
       rawResponse = await generateGemini(augmentedPrompt);
-    } catch {
-      rawResponse =
-        "I’m having trouble processing that right now. Please try again.";
+      modelUsed = "Gemini";
+    } catch (err) {
+      console.warn("❌ Gemini API failed:", err?.message || err);
+      rawResponse = rawResponse || "I’m having trouble processing that right now. Please try again.";
+      modelUsed = modelUsed || "Fallback";
     }
   }
 
-  /* ---------------- Clean + enforce Neon Vision identity ---------------- */
+  // ---------------- Clean + enforce identity ----------------
   const cleaned = cleanResponse(rawResponse);
-  return enforceBotName(cleaned, prompt);
+  const finalResponse = enforceBotName(cleaned);
+
+  console.log(
+    `[${new Date().toISOString()}][Hybrid] Model: ${modelUsed} | Response length: ${finalResponse.length}`
+  );
+
+  return finalResponse;
 }
 
 /* ---------------- Backward compatibility ---------------- */
