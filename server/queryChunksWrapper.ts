@@ -12,18 +12,10 @@ export async function fetchRelevantChunks(
   limit = 8
 ): Promise<NormalizedChunk[]> {
 
-  let queryEmbedding: number[];
+  // ⚠️ Production: embeddings retrieved externally
+  const queryEmbedding: number[] = Array(512).fill(0); // placeholder, satisfies TS
 
-  // ⚠️ Local embedding disabled in production (Render-safe)
-  if (process.env.NODE_ENV !== "production") {
-    const { embedQueryLocally } = await import("./utils/localEmbedding.js");
-    queryEmbedding = await embedQueryLocally(query); // returns number[]
-  } else {
-    // Use a **dummy numeric array** to satisfy TypeScript.
-    // Actual vector DB retrieval will happen externally.
-    queryEmbedding = Array(512).fill(0); // placeholder embedding
-  }
-
+  // ---------------- Retrieve top chunks
   const rawChunks = await getTopChunks(queryEmbedding, limit);
   if (!Array.isArray(rawChunks)) return [];
 
@@ -41,7 +33,7 @@ export async function fetchRelevantChunks(
         summary: source.slice(0, 240)
       };
     })
-    // Drop empty / junk chunks only
+    // Drop empty / junk chunks
     .filter(c => c.source.length > 40)
     .slice(0, limit);
 
