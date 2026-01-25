@@ -2,7 +2,7 @@
 
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
-import { fetchRelevantChunks } from "../queryChunksWrapper.js"; // ✅ Python embeddings
+import { fetchRelevantChunks } from "../queryChunksWrapper.js"; // Python embeddings
 import { buildSynthPrompt } from "../system/synthPrompt.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { enforceBotName } from "../system/identity.js";
@@ -59,8 +59,12 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
       "Top 3 chunks for query:",
       chunks.slice(0, 3).map((c) => c.source.slice(0, 80))
     );
-  } catch (err: any) {
-    console.warn("⚠️ Knowledge retrieval failed:", err?.message || err);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.warn("⚠️ Knowledge retrieval failed:", err.message);
+    } else {
+      console.warn("⚠️ Knowledge retrieval failed:", err);
+    }
   }
 
   const augmentedPrompt = buildSynthPrompt(context, prompt);
@@ -74,8 +78,12 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
       rawResponse = await generateGemma(augmentedPrompt);
       modelUsed = "Gemma";
     }
-  } catch (err) {
-    console.warn("⚠️ Gemma API failed, fallback to Gemini:", err?.message || err);
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      console.warn("⚠️ Gemma API failed, fallback to Gemini:", err.message);
+    } else {
+      console.warn("⚠️ Gemma API failed, fallback to Gemini:", err);
+    }
   }
 
   // ---------------- Gemini for complex queries or fallback
@@ -83,8 +91,12 @@ export async function generateHybridResponse(prompt: string): Promise<string> {
     try {
       rawResponse = await generateGemini(augmentedPrompt);
       modelUsed = "Gemini";
-    } catch (err) {
-      console.warn("❌ Gemini API failed:", err?.message || err);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.warn("❌ Gemini API failed:", err.message);
+      } else {
+        console.warn("❌ Gemini API failed:", err);
+      }
       rawResponse = rawResponse || "I’m having trouble processing that right now. Please try again.";
       modelUsed = modelUsed || "Fallback";
     }
