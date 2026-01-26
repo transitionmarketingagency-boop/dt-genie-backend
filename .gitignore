@@ -37,3 +37,24 @@ embeddings_backup.json
 venv/
 .schema
 server_file_map.txt
+
+# Runtime & AI artifacts
+server/db/
+server/vector_store/
+server/legacy_embeddings/
+server/legacy_KB/
+_local_runtime_backup/
+batchResults.json
+
+# Memory
+*sessionMemory.json
+*userMemory.json
+*geminiCache.json
+
+
+node_modules_backup/
+package-lock_backup.json
+server/vector_store_backup/
+testBatch.ts
+testHybrid.js
+server/utils/localEmbedding.ts
