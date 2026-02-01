@@ -1,6 +1,5 @@
-// server/queryChunksWrapper.ts
-
 import { getTopChunks } from "./queryChunks.js";
+import { getEmbedding } from "./embeddings.js"; // correct path
 
 export type NormalizedChunk = {
   source: string;
@@ -12,8 +11,8 @@ export async function fetchRelevantChunks(
   limit = 8
 ): Promise<NormalizedChunk[]> {
 
-  // ⚠️ Production: embeddings retrieved externally
-  const queryEmbedding: number[] = Array(512).fill(0); // placeholder, satisfies TS
+  // ⚡ Real embeddings
+  const queryEmbedding: number[] = await getEmbedding(query);
 
   // ---------------- Retrieve top chunks
   const rawChunks = await getTopChunks(queryEmbedding, limit);

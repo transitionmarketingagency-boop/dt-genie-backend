@@ -22,15 +22,27 @@ function cosineSim(vecA: number[], vecB: number[]): number {
 /* ---------------- Get top-N relevant chunks ---------------- */
 export async function getTopChunks(queryEmbedding: number[], topN = 5) {
   const db = await openDB();
-  const rows = await db.all("SELECT * FROM chunks");
+
+  // ✅ Correct table
+  const rows = await db.all("SELECT * FROM embeddings");
+
+  // ✅ Safe embedding parsing
   const parsedRows = rows.map((r: any) => ({
     ...r,
-    embedding: r.embedding ? JSON.parse(r.embedding) : [],
+    embedding:
+      typeof r.embedding === "string"
+        ? JSON.parse(r.embedding)
+        : r.embedding ?? [],
   }));
+
   const ranked = parsedRows
-    .map((r: any) => ({ ...r, score: cosineSim(queryEmbedding, r.embedding) }))
+    .map((r: any) => ({
+      ...r,
+      score: cosineSim(queryEmbedding, r.embedding),
+    }))
     .sort((a: any, b: any) => b.score - a.score)
     .slice(0, topN);
+
   await db.close();
   return ranked;
 }

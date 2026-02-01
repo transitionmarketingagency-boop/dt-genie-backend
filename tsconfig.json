@@ -1,23 +1,41 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ESNext",
-    "moduleResolution": "node",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+
     "outDir": "dist",
     "rootDir": ".",
+
     "types": ["node"],
-    "baseUrl": ".",
     "resolveJsonModule": true,
     "allowJs": true,
-    "allowSyntheticDefaultImports": true,
+
     "noEmitOnError": false,
     "strictPropertyInitialization": false,
     "noImplicitAny": false
   },
-  "include": ["server/**/*", "shared/**/*"],
-  "exclude": ["client", "frontend", "public", "vite.config.ts", "dist", "**/*.test.ts"]
+
+  "include": [
+    "server/**/*.ts"
+  ],
+
+  "exclude": [
+    "dist",
+    "node_modules",
+
+    "**/*.test.ts",
+
+    "server/backup_services",
+    "server/vector_store_backup",
+    "server/vector_store",
+    "server/training_pipeline",
+    "server/test-*",
+    "server/**/test-*.ts"
+  ]
 }

@@ -1,4 +1,5 @@
-import { fetchRelevantChunks } from "../queryChunksWrapper.js";
+import { getEmbedding } from "../embeddings.js";
+import { getTopChunks } from "../queryChunks.js";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
@@ -12,16 +13,11 @@ import { fileURLToPath } from "url";
 /* ================= GEMINI QUOTA MANAGER ================= */
 
 const GEMINI_DAILY_LIMIT = 20;
-
-let geminiUsage = {
-  count: 0,
-  lastReset: Date.now()
-};
+let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function resetIfNeeded() {
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
-
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
@@ -39,14 +35,11 @@ function markGeminiUsed() {
 }
 
 /* ---------------- ESM-safe __dirname ---------------- */
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ---------------- Persona loader ---------------- */
-
 const personaPath = path.join(__dirname, "../personas/neon-vision.json");
-
 let systemPersona: any = {
   name: BOT_NAME,
   tone: "professional, clear, helpful",
@@ -67,8 +60,31 @@ try {
   console.warn("⚠️ Persona fallback active");
 }
 
-/* ---------------- Complexity detector ---------------- */
+/* ---------------- AI Logic loader ---------------- */
+const aiLogicDir = path.join(process.cwd(), "server", "ai_logic");
+let aiLogicRules: any[] = [];
 
+function collectJsonFiles(dir: string): string[] {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      return collectJsonFiles(fullPath);
+    }
+    return entry.name.endsWith(".json") ? [fullPath] : [];
+  });
+}
+
+try {
+  if (fs.existsSync(aiLogicDir)) {
+    const files = collectJsonFiles(aiLogicDir);
+    aiLogicRules = files.map(f => JSON.parse(fs.readFileSync(f, "utf-8")));
+    console.log(`✅ Loaded ${aiLogicRules.length} AI logic JSON files`);
+  }
+} catch (err) {
+  console.warn("⚠️ Failed to load AI logic JSONs", err);
+}
+
+/* ---------------- Complexity detector ---------------- */
 function isComplexQuery(message: string): boolean {
   const t = message.toLowerCase();
   return (
@@ -78,7 +94,6 @@ function isComplexQuery(message: string): boolean {
 }
 
 /* ---------------- Memory formatter ---------------- */
-
 function formatMemory(history: any[]) {
   if (!history?.length) return "";
   return history
@@ -96,16 +111,22 @@ ${persona.rules.map((r: string) => `- ${r}`).join("\n")}
 `;
 }
 
-/* ---------------- Context builder ---------------- */
-
+/* ---------------- Context builder (FIXED) ---------------- */
 async function buildDeepContext(userId: string, userMessage: string) {
-  const relevantChunks = await fetchRelevantChunks(userMessage, 8);
+  // ✅ REAL embeddings + REAL similarity search
+  const embedding = await getEmbedding(userMessage);
+  const relevantChunks = await getTopChunks(embedding, 8);
+
   const history = await memoryService.getHistory(userId);
 
   const knowledgeText = relevantChunks
-    .map(c => c.source)
+    .map(c => c.content || "")
     .filter(Boolean)
     .join("\n\n");
+
+  const aiLogicText = aiLogicRules
+    .map(rule => JSON.stringify(rule))
+    .join("\n");
 
   return {
     hasKnowledge: Boolean(knowledgeText.trim()),
@@ -118,6 +139,9 @@ ${formatMemory(history)}
 COMPANY KNOWLEDGE:
 ${knowledgeText}
 
+AI LOGIC:
+${aiLogicText}
+
 USER QUESTION:
 ${userMessage}
 `
@@ -125,7 +149,6 @@ ${userMessage}
 }
 
 /* ---------------- Answer quality detector ---------------- */
-
 function isNonAnswer(text: string) {
   return (
     !text ||
@@ -136,7 +159,6 @@ function isNonAnswer(text: string) {
 }
 
 /* ================= MAIN HYBRID RESPONSE ================= */
-
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -150,32 +172,24 @@ export async function generateHybridResponse(
     const complex = isComplexQuery(userMessage);
 
     /* ---------- GEMMA ALWAYS FIRST ---------- */
-
     let response = cleanResponse(await generateGemma(context));
     let modelUsed = "Gemma";
 
     /* ---------- GEMINI (COMPLEX + QUOTA) ---------- */
-
-    if (
-      complex &&
-      isNonAnswer(response) &&
-      hasKnowledge &&
-      canUseGemini()
-    ) {
+    if (complex && isNonAnswer(response) && hasKnowledge && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(context));
         markGeminiUsed();
         modelUsed = "Gemini";
       } catch {
-        console.warn("❌ Gemini error — skipping Gemini for now");
+        console.warn("❌ Gemini error — skipping Gemini");
       }
     }
 
     /* ---------- FINAL GUARANTEE ---------- */
-
     if (isNonAnswer(response)) {
       response = hasKnowledge
-        ? "Based on our internal knowledge, we provide end-to-end digital marketing services, AI-driven analytics, CGI virtual tours, performance advertising, SEO, automation, and scalable growth strategies for modern businesses."
+        ? "Based on our internal knowledge, we provide end-to-end digital marketing services, AI-driven analytics, CGI virtual tours, performance advertising, SEO, automation, and scalable growth strategies."
         : "I don’t currently have enough confirmed information to answer that accurately.";
     }
 

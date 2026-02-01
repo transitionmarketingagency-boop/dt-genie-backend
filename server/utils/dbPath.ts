@@ -1,28 +1,27 @@
-import path from "path";
 import { fileURLToPath } from "url";
+import { dirname, resolve } from "path";
 
 /**
  * Canonical DB path resolver
  * Works in:
- * - ts-node
  * - compiled dist/
- * - Render
+ * - NodeNext / ESM
  * - local dev
+ * - production
  */
 
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = dirname(__filename);
 
-// utils → server → project root
-const SERVER_DIR = path.resolve(__dirname, "..");
-const PROJECT_ROOT = path.resolve(SERVER_DIR, "..");
-
-
-export const DB_PATH = path.resolve(
+/**
+ * Canonical embeddings DB
+ * Always points to the real vector store (418 embeddings)
+ */
+export const DB_PATH = resolve(
   process.cwd(),
   "server",
   "vector_store",
-  "unified_chunks.db"
+  "vector_store.db"
 );
 
 export default DB_PATH;
