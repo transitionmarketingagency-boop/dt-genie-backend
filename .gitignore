@@ -1,60 +1,67 @@
-# Environment / secrets
+# ---------------- Environment / Secrets ----------------
 .env
 server/.env
 sa-key.json
 server/sa-key.json
 
-# Python / venv
+# ---------------- Python / venv ----------------
 .venv/
 server/venv/
 __pycache__/
 
-# Node modules
-server/node_modules/
+# ---------------- Node modules ----------------
 node_modules/
+server/node_modules/
+node_modules_backup/
 
-# Databases
+# ---------------- Databases ----------------
+# Only ignore temp/untracked DBs, keep runtime memory/vector stores safe
 *.db
 website_chunks.db
 website_chunks_backup.db
 
-# Logs
+# ---------------- Logs ----------------
+*.log
 server/memory/*.log
 
-# Build output
+# ---------------- Build output ----------------
 dist/
 
-# Backup / test files
+# ---------------- Backup / Test files ----------------
 server_BACKUP/
 server/backup_services/
 server/old_backups/
 server/test-*.ts
 server/vector_store/server/
+server/vector_store_backup/
 
-# Misc
-.tables
-embeddings_backup.json
-venv/
-.schema
-server_file_map.txt
-
-# Runtime & AI artifacts
+# ---------------- Runtime & AI artifacts ----------------
 server/db/
-server/vector_store/
 server/legacy_embeddings/
 server/legacy_KB/
 _local_runtime_backup/
 batchResults.json
 
-# Memory
+# ---------------- Memory / cache ----------------
 *sessionMemory.json
 *userMemory.json
 *geminiCache.json
 
+# ---------------- Local memory / knowledge base ----------------
+server/knowledge_base/
 
-node_modules_backup/
-package-lock_backup.json
-server/vector_store_backup/
-testBatch.ts
-testHybrid.js
+# ---------------- Scripts / Misc ----------------
+*.bak
+*.sh
+*.md
 server/utils/localEmbedding.ts
+server_file_map.txt
+.schema
+.tables
+venv/
+
+# ---------------- Dedup / Safe ----------------
+# Ensure memory/vector_store DBs are NOT deleted
+!server/memory/chat_memory.db
+!server/vector_store/vector_store.db
+!server/vector_store/unified_chunks.db
