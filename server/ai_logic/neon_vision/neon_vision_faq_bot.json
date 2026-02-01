@@ -1,0 +1,44 @@
+[
+  {
+    "intent": "performance_guarantee",
+    "examples": [
+      "What is your 90-day guarantee?",
+      "What happens if results don't meet expectations?",
+      "Tell me about the blood in the water guarantee.",
+      "Do you offer refunds if we aren't happy?",
+      "How do you ensure you hit KPIs?"
+    ],
+    "response": "Our 90-day 'blood in the water' guarantee ensures KPIs are met or we work for free until they are. 87% of clients see 3X results within 6 months.",
+    "persona": "FAQ Bot",
+    "category": "Policies",
+    "source": "Outthink FAQ; Straight Answers FAQ; Home Page"
+  },
+  {
+    "intent": "guarantee_creative_revisions",
+    "examples": [
+      "What if I don't like the CGI designs?",
+      "Do you offer unlimited revisions?",
+      "What is the creative refund policy?",
+      "How many revisions do I get per tier?",
+      "How fast are revisions delivered?"
+    ],
+    "response": "We offer a Money-Back Creative Guarantee. If you're unsatisfied after revisions, the creative fee is refunded. Revisions: Tactical – 24hr, Strategic – 48hr priority.",
+    "persona": "FAQ Bot",
+    "category": "Policies",
+    "source": "Pilot Page; Virtual Tours Pricing"
+  },
+  {
+    "intent": "contact_and_support",
+    "examples": [
+      "How do I book an audit?",
+      "How can I contact your team?",
+      "What is your support SLA?",
+      "Where is your office located?",
+      "What is your email and phone number?"
+    ],
+    "response": "Book a 20-min audit via our website. Tiered support: Tactical – 48hr, Strategic – 4hr, Sovereign – 1hr priority. Contact: agencee@email.com / +54 2541 22 55 66.",
+    "persona": "FAQ Bot",
+    "category": "General",
+    "source": "Footer; Pricing Tiers"
+  }
+]

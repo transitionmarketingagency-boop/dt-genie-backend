@@ -1,0 +1,198 @@
+[
+  {
+    "intent": "dtm_differentiation",
+    "examples": [
+      "What makes Digital Transition Marketing different?",
+      "Why choose DTM over other agencies?",
+      "What is unique about your agency?",
+      "How are you different from a standard marketing firm?",
+      "Why is your approach better?",
+      "What makes your agency stand out?"
+    ],
+    "response": "We don’t just run campaigns—we engineer unfair advantages. DTM fuses patented AI, predictive analytics, and algorithmic warfare that competitors simply cannot replicate. We are operators who prioritize 'Brain > Billboards,' outthinking the market to ensure you outlast it. [1-3]",
+    "category": "General / About Us",
+    "source": "Website Content - FAQs [1]; Straight Answers FAQ [3]"
+  },
+  {
+    "intent": "performance_timeline",
+    "examples": [
+      "How quickly can you improve our marketing performance?",
+      "How long until I see results?",
+      "When will my ads start working better?",
+      "What is the timeline for campaign improvement?",
+      "How fast do your AI systems show results?",
+      "When can I expect a ROI increase?"
+    ],
+    "response": "Our AI-driven systems typically show measurable improvements within 30-45 days. In fact, 87% of our clients see 40%+ better results within this timeframe. We prioritize speed because markets won’t wait, offering 48-hour deployment for most clients. [1, 4]",
+    "category": "General / About Us",
+    "source": "Website Content - FAQs [1]; Website Content - FAQs [4]"
+  },
+  {
+    "intent": "vso_cost",
+    "examples": [
+      "How much does voice search optimization cost?",
+      "What are your VSO pricing tiers?",
+      "Is voice search optimization expensive?",
+      "How much for Alexa or Siri optimization?",
+      "What is the price for voice SEO?",
+      "Can I afford voice search marketing?"
+    ],
+    "response": "Plans start at $1,250/month for local voice dominance (Tactical tier) and scale to $4,000+/month for enterprise AI solutions. Most SMBs see a 3X ROI within 90 days on our Strategic tier, priced at $1,850/month. [5]",
+    "category": "Voice Search Optimization",
+    "source": "Voice Search Decoded FAQ [5]"
+  },
+  {
+    "intent": "email_open_rate_improvement",
+    "examples": [
+      "Can you improve my current email open rates?",
+      "How do I boost my email engagement?",
+      "Can you fix my low open rates?",
+      "What does AI do for email marketing?",
+      "How much can you increase email opens?",
+      "Can your email system help my click-through rate?"
+    ],
+    "response": "Yes! Our AI analyzes 17+ behavioral factors, such as send times and subject lines, to boost open rates by an average of 58%. We've seen clients increase their open rates from 12% to 29% in as little as 60 days. [6, 7]",
+    "category": "AI-Powered Email Marketing",
+    "source": "Benefits - Email [6]; Email Marketing FAQs [7]"
+  },
+  {
+    "intent": "youtube_roas_guarantee",
+    "examples": [
+      "What is your 3X ROAS guarantee?",
+      "How do you guarantee sales on YouTube?",
+      "What happens if my YouTube ads don't perform?",
+      "Do you offer a refund for YouTube ads?",
+      "What is the YouTube ad performance guarantee?",
+      "How do you back your YouTube marketing results?"
+    ],
+    "response": "We contractually guarantee a 3X return on ad spend (ROAS) within 90 days. If we miss this target, we will work for free until it is achieved, refund 50% of our fees, and share our proprietary competitor ad data with you. [8]",
+    "category": "YouTube Ads",
+    "source": "Ad Hijack FAQ [8]"
+  },
+  {
+    "intent": "website_redesign_seo",
+    "examples": [
+      "Do you redesign existing websites without losing SEO?",
+      "Will a redesign hurt my Google rankings?",
+      "How do you protect SEO during a site refresh?",
+      "Can I update my site without losing traffic?",
+      "Do you handle SEO migration for new websites?",
+      "Will my keywords stay ranked after a redesign?"
+    ],
+    "response": "Guaranteed. Our redesigns include full SEO migration audits, 301 redirects, and content preservation to ensure zero traffic loss while providing you with a modern, higher-converting digital growth engine. [9]",
+    "category": "AI-Powered Website Design",
+    "source": "Website Design FAQs [9]"
+  },
+  {
+    "intent": "virtual_tour_vs_matterport",
+    "examples": [
+      "Why shouldn't I just use Matterport for virtual tours?",
+      "How are DTM tours better than Matterport?",
+      "What is the difference between your tours and standard photogrammetry?",
+      "Why choose your virtual tours over competitors?",
+      "Are your property tours higher quality than Matterport?",
+      "What makes your virtual engineering unique?"
+    ],
+    "response": "We dominate standard providers in five key areas: 12K HDR resolution (vs. their 8K), interactive AI Q&A vs. static boxes, 24-hour edit SLAs vs. 5 days, unlimited pricing models, and a dedicated UK-based production team. [10, 11]",
+    "category": "CGI Virtual Home Tours",
+    "source": "Virtual Tour FAQ [10, 11]"
+  },
+  {
+    "intent": "ai_ppc_vs_manual",
+    "examples": [
+      "How does AI outperform manual PPC?",
+      "Why is AI better than a human ads manager?",
+      "What is the advantage of AI-powered ad warfare?",
+      "Can't a person do what your AI does for ads?",
+      "Why switch from a manual PPC team to AI?",
+      "How much faster is AI at ad optimization?"
+    ],
+    "response": "AI reacts in milliseconds, adjusting bids, creatives, and targeting based on live data 24/7. Manual human teams simply cannot match that velocity or scale, leading to far more efficient spend and total market dominance. [12]",
+    "category": "Performance Marketing",
+    "source": "AI Performance Marketing FAQ [12]"
+  },
+  {
+    "intent": "ai_automation_security",
+    "examples": [
+      "How secure is your AI automation?",
+      "Is my data safe with AI agents?",
+      "Are your automation systems compliant?",
+      "Do you protect my company's data privacy?",
+      "What security measures do you use for AI?",
+      "Is your AI GDPR or HIPAA ready?"
+    ],
+    "response": "Our systems are built with military-grade encryption and are GDPR/HIPAA-ready by design. We have a zero third-party data sharing policy and offer optional on-premise deployment for enterprise clients requiring maximum data sovereignty. [13, 14]",
+    "category": "AI Business Automation",
+    "source": "AI Business Automation FAQs [13]; Straight Answers FAQ [14]"
+  },
+  {
+    "intent": "social_shadowban_reversal",
+    "examples": [
+      "Can you really reverse shadowbans?",
+      "How do you fix a banned TikTok account?",
+      "Can you get my Instagram unbanned?",
+      "Fix social media account restrictions",
+      "How do you unban social profiles?",
+      "Shadowban recovery services"
+    ],
+    "response": "We have a 94% success rate unbanning TikTok and Instagram accounts within 72 hours. We use proprietary methods to spoof device fingerprints and automatically scrub flagged content to restore your reach. [15]",
+    "category": "Social Media Management",
+    "source": "Algorithm-Hacking Social FAQ [15]"
+  },
+  {
+    "intent": "geo_vs_seo",
+    "examples": [
+      "How is GEO different from traditional SEO?",
+      "What is Generative Engine Optimization?",
+      "Why do I need GEO if I already have SEO?",
+      "Do I need to optimize for ChatGPT and Gemini?",
+      "Difference between AI search optimization and Google SEO",
+      "What is AI search warfare?"
+    ],
+    "response": "Traditional SEO optimizes for Google's algorithm. GEO rewires your content for AI engines like ChatGPT and Gemini using patented NLP alignment to force-index your pages and dominate 'zero-click' answers. [16]",
+    "category": "GEO & AI SEO",
+    "source": "AI Optimized GEO & SEO FAQ [16]"
+  },
+  {
+    "intent": "pilot_offer_overview",
+    "examples": [
+      "What is a CGI & Performance Ads Pilot?",
+      "How does the 21-day pilot work?",
+      "What is included in the AI growth pilot?",
+      "Tell me about the traffic test and cinematic ad.",
+      "How do I start a pilot campaign?",
+      "What is the purpose of the pilot?"
+    ],
+    "response": "The Pilot is a short, focused 14–21 day campaign designed to measure real-world demand. We create a cinematic CGI video of your product or service and run targeted ads to give you predictable clarity on whether you can scale profitably. [17, 18]",
+    "category": "Pilot Offer",
+    "source": "Pilot FAQ [17]; Pilot FAQ [18]"
+  },
+  {
+    "intent": "dissatisfaction_guarantee",
+    "examples": [
+      "What if results don't meet expectations?",
+      "What is your 'blood in the water' guarantee?",
+      "What happens if you miss your KPIs?",
+      "Do you offer a refund if you fail?",
+      "What is the 90-day performance clause?",
+      "How do you handle underperformance?"
+    ],
+    "response": "Our 90-day 'blood in the water' guarantee ensures we hit your KPIs or we work for free until we do. If key metrics aren't achieved, we re-engineer the entire approach at our own cost to deliver the results we promised. [4, 14]",
+    "category": "Policies & Guarantees",
+    "source": "Website Content - FAQs [4]; Straight Answers FAQ [14]"
+  },
+  {
+    "intent": "trending_faq_ai_creative",
+    "examples": [
+      "Can AI really create viral content?",
+      "How do you make content that trends?",
+      "Will AI help my brand go viral?",
+      "Can AI replace a creative team?",
+      "How fast can your AI create social posts?",
+      "Can AI generate high-converting video ads?"
+    ],
+    "response": "Yes! Our AI tracks viral trends across platforms in real-time, generates content in minutes, and optimizes for maximum engagement using predictive analytics and trend-hijacking algorithms. Most clients see viral-level performance within the first 7 days. [19]",
+    "category": "AI & Neon Vision",
+    "source": "AI Creative & Trend Exploitation FAQ [19]"
+  }
+]

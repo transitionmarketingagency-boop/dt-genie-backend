@@ -65,3 +65,11 @@ venv/
 !server/memory/chat_memory.db
 !server/vector_store/vector_store.db
 !server/vector_store/unified_chunks.db
+
+
+# One-off local repair scripts
+fixJsonTrailingCommas.js
+fixNeonVisionIntents.js
+
+# Compiled JS artifacts
+server/services/*.js

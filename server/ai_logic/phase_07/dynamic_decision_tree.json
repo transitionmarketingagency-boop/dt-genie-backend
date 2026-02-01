@@ -1,0 +1,86 @@
+[
+  {
+    "intent": "pilot_workflow",
+    "persona": "Pilot Onboarding Assistant",
+    "branching": [
+      {
+        "condition": "pilot_step == 1",
+        "response": "Step 1: Discovery Audit initiated. Let's schedule your 20-min kickoff call. Ready to book?",
+        "next_step": 2,
+        "proactive_suggestion": "Offer Strategic tier if Tactical selected"
+      },
+      {
+        "condition": "pilot_step == 2",
+        "response": "Step 2: CGI Production is underway. Cinematic visuals are being generated. Do you want a sneak peek?",
+        "next_step": 3,
+        "proactive_suggestion": "Suggest multi-platform launch for increased ROI"
+      },
+      {
+        "condition": "pilot_step == 3",
+        "response": "Step 3: Ad Launch & Optimization. Your 14-day campaign is live with AI targeting. Need tips to maximize CTR?",
+        "next_step": 4,
+        "proactive_suggestion": "Upsell Sovereign tier for advanced analytics"
+      },
+      {
+        "condition": "pilot_step == 4",
+        "response": "Step 4: Results & Scale. Report is ready showing leads, CPA, and engagement. Shall we discuss scaling?",
+        "next_step": null,
+        "proactive_suggestion": "Offer full-service retainer based on performance"
+      }
+    ]
+  },
+  {
+    "intent": "service_ai_automation",
+    "persona": "Technical Advisor",
+    "branching": [
+      {
+        "condition": "user_previous_service == null",
+        "response": "We automate {user_preferred_tasks} for {user_company}. Integration includes Salesforce, Shopify, HubSpot. Interested in a demo?",
+        "next_step": null,
+        "proactive_suggestion": "Recommend GEO + Predictive Analytics for full stack optimization"
+      },
+      {
+        "condition": "user_previous_service == 'pilot_completed'",
+        "response": "Now that your pilot is complete, AI automation can boost efficiency by 40%. Want me to configure it for your workflow?",
+        "next_step": null,
+        "proactive_suggestion": "Upsell cross-service bundle: AI Automation + GEO + Social Media"
+      }
+    ]
+  },
+  {
+    "intent": "service_social_domination",
+    "persona": "Sales Advisor",
+    "branching": [
+      {
+        "condition": "shadowban_detected == true",
+        "response": "We detected restrictions on your account. Our AI restores reach in 72 hours. Shall we proceed?",
+        "next_step": null,
+        "proactive_suggestion": "Offer content generation for 30-day social schedule"
+      },
+      {
+        "condition": "shadowban_detected == false",
+        "response": "Your account is healthy. Our AI can now push content to non-followers and hijack LinkedIn feeds for maximum engagement.",
+        "next_step": null,
+        "proactive_suggestion": "Suggest adding YouTube Ads for cross-platform dominance"
+      }
+    ]
+  },
+  {
+    "intent": "performance_guarantee",
+    "persona": "FAQ Bot",
+    "branching": [
+      {
+        "condition": "user_dissatisfied == true",
+        "response": "Our 90-day 'blood in the water' guarantee ensures KPIs are hit or we work for free. Want to schedule a review call?",
+        "next_step": null,
+        "proactive_suggestion": "Offer Creative Guarantee or pilot extension"
+      },
+      {
+        "condition": "user_dissatisfied == false",
+        "response": "All KPIs are on track. Shall we discuss next steps or scaling options?",
+        "next_step": null,
+        "proactive_suggestion": "Upsell next tier or complementary service"
+      }
+    ]
+  }
+]

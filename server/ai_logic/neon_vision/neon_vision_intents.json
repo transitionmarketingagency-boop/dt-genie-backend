@@ -1,0 +1,58 @@
+[
+  {
+    "intent": "agency_overview",
+    "examples": [
+      "Who is Digital Transition Marketing?",
+      "Tell me about your agency.",
+      "What is the mission of DTM?",
+      "What does Digital Transition Marketing do?",
+      "Can you give me an overview of your company?"
+    ],
+    "response": "Digital Transition Marketing was founded on the belief that the future belongs to those who adapt. We bridge the gap between AI and human creativity to deliver measurable transformation.",
+    "persona": "FAQ Bot",
+    "category": "General",
+    "source": "Inside The Forge; Home Page"
+  },
+  {
+    "intent": "agency_differentiation",
+    "examples": [
+      "What makes your agency different?",
+      "Why should I choose DTM over others?",
+      "What is your unique edge?",
+      "How do you outperform traditional agencies?",
+      "What is your brand philosophy?"
+    ],
+    "response": "We don’t just run campaigns—we engineer unfair advantages. Our philosophy is 'Brain > Billboards,' meaning we outthink rather than outspend the competition using patented AI, predictive analytics, and CGI-driven marketing.",
+    "persona": "Sales Advisor",
+    "category": "General",
+    "source": "Outthink FAQ; Why Us"
+  },
+  {
+    "intent": "performance_guarantee",
+    "examples": [
+      "What is your 90-day guarantee?",
+      "What happens if results don't meet expectations?",
+      "Tell me about the blood in the water guarantee.",
+      "Do you offer refunds if we aren't happy?",
+      "How do you ensure you hit KPIs?"
+    ],
+    "response": "Our 90-day 'blood in the water' guarantee is simple: we hit your KPIs or we work for free until we do. We prioritize speed and measurable growth, with 87% of our clients seeing 3X results within 3 months.",
+    "persona": "FAQ Bot",
+    "category": "Policies",
+    "source": "Outthink FAQ; Straight Answers FAQ; Home Page"
+  },
+  {
+    "intent": "pilot_overview",
+    "examples": [
+      "What is the CGI & Performance Ads Pilot?",
+      "Tell me about your 21-day growth system.",
+      "How does the pilot work?",
+      "What is included in the fast-impact pilot?",
+      "Explain your growth pilot program."
+    ],
+    "response": "The CGI & Performance Ads Pilot is a short, focused 14–21 day campaign. We create cinematic CGI visual assets for your brand and run a full traffic test to measure real-world demand and conversion potential.",
+    "persona": "Sales Advisor",
+    "category": "Pilot",
+    "source": "Pilot Page FAQ"
+  }
+]
