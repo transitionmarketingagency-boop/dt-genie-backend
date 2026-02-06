@@ -35,23 +35,36 @@ if (!fs.existsSync(dbDir)) {
 }
 
 /* ------------------------------------------------------------------ */
-/* SAFETY: ensure embeddings table exists (NO data loss)               */
+/* Open DB (do NOT mutate schema incorrectly)                          */
 /* ------------------------------------------------------------------ */
 const db = new Database(DB_PATH);
 
+/* ------------------------------------------------------------------ */
+/* SAFETY: ensure REAL embeddings table exists (schema-aligned)        */
+/* ------------------------------------------------------------------ */
+/**
+ * IMPORTANT:
+ * This matches the ACTUAL schema used by your embedding pipeline.
+ * No data loss. No schema drift.
+ */
 db.prepare(`
   CREATE TABLE IF NOT EXISTS embeddings (
-    id TEXT PRIMARY KEY,
-    content TEXT NOT NULL,
-    embedding BLOB NOT NULL,
-    source TEXT,
-    metadata TEXT
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_file TEXT,
+    chunk_index INTEGER,
+    embedding TEXT,
+    section TEXT,
+    tags TEXT,
+    internal_only INTEGER
   )
 `).run();
 
+/* ------------------------------------------------------------------ */
+/* SAFE indexes (only on existing columns)                             */
+/* ------------------------------------------------------------------ */
 db.prepare(`
-  CREATE INDEX IF NOT EXISTS idx_embeddings_source
-  ON embeddings (source)
+  CREATE UNIQUE INDEX IF NOT EXISTS uniq_source_chunk
+  ON embeddings (source_file, chunk_index)
 `).run();
 
 /* ------------------------------------------------------------------ */

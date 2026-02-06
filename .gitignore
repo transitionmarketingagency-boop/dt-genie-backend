@@ -15,7 +15,7 @@ server/node_modules/
 node_modules_backup/
 
 # ---------------- Databases ----------------
-# Only ignore temp/untracked DBs, keep runtime memory/vector stores safe
+# Ignore all DBs by default
 *.db
 website_chunks.db
 website_chunks_backup.db
@@ -36,7 +36,6 @@ server/vector_store/server/
 server/vector_store_backup/
 
 # ---------------- Runtime & AI artifacts ----------------
-server/db/
 server/legacy_embeddings/
 server/legacy_KB/
 _local_runtime_backup/
@@ -60,17 +59,25 @@ server_file_map.txt
 .tables
 venv/
 
-# ---------------- Dedup / Safe ----------------
-# Ensure memory/vector_store DBs are NOT deleted
-!server/memory/chat_memory.db
+# =====================================================
+# ✅ EXPLICITLY ALLOW AI RUNTIME STORAGE (ORDER MATTERS)
+# =====================================================
+
+# Allow directories first
+!server/vector_store/
+!server/vector_store/**
+
+!server/memory/
+!server/memory/**
+
+# Allow specific DBs
 !server/vector_store/vector_store.db
 !server/vector_store/unified_chunks.db
+!server/memory/chat_memory.db
 
-
-# One-off local repair scripts
+# ---------------- One-off local repair scripts ----------------
 fixJsonTrailingCommas.js
 fixNeonVisionIntents.js
 
-# Compiled JS artifacts
+# ---------------- Compiled JS artifacts ----------------
 server/services/*.js
-server/vector_store/vector_store.db
