@@ -13,7 +13,6 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 /* ================= GEMINI QUOTA MANAGER ================= */
-
 const GEMINI_DAILY_LIMIT = 20;
 let geminiUsage = { count: 0, lastReset: Date.now() };
 
@@ -37,12 +36,10 @@ function markGeminiUsed() {
 }
 
 /* ---------------- ESM-safe __dirname ---------------- */
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ---------------- Persona loader ---------------- */
-
 const personaPath = path.join(__dirname, "../personas/neon-vision.json");
 let systemPersona: any = {
   name: BOT_NAME,
@@ -54,7 +51,6 @@ let systemPersona: any = {
     "Sound calm and premium, not promotional",
   ],
 };
-
 try {
   if (fs.existsSync(personaPath)) {
     systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
@@ -65,7 +61,6 @@ try {
 }
 
 /* ---------------- AI Logic loader ---------------- */
-
 const aiLogicDir = path.join(process.cwd(), "server", "ai_logic");
 let aiLogicRules: any[] = [];
 
@@ -89,20 +84,7 @@ try {
   console.warn("⚠️ Failed to load AI logic JSONs", err);
 }
 
-/* ---------------- Complexity detector ---------------- */
-
-function isComplexQuery(message: string): boolean {
-  const t = message.toLowerCase();
-  return (
-    t.length > 120 ||
-    /strategy|architecture|predictive|analytics|ai model|workflow|pipeline|integration|automation/.test(
-      t
-    )
-  );
-}
-
 /* ---------------- Memory helpers ---------------- */
-
 function formatMemory(history: any[]) {
   if (!history?.length) return "";
   return history
@@ -121,7 +103,6 @@ ${persona.rules.map((r: string) => `- ${r}`).join("\n")}
 }
 
 /* ---------------- Context builder ---------------- */
-
 async function buildDeepContext(userId: string, userMessage: string) {
   const embedding = await getEmbedding(userMessage);
   const relevantChunks = await getTopChunks(embedding, 8);
@@ -155,13 +136,11 @@ ${userMessage}
 }
 
 /* ---------------- Quality detector ---------------- */
-
 function isNonAnswer(text: string) {
   return !text || text.trim().length < 80;
 }
 
 /* ================= MAIN HYBRID RESPONSE ================= */
-
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -169,20 +148,14 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    const { context, hasKnowledge } = await buildDeepContext(
-      userId,
-      userMessage
-    );
+    const { context, hasKnowledge } = await buildDeepContext(userId, userMessage);
 
+    // Step 1: always try Gemma first
     let response = cleanResponse(await generateGemma(context));
     let modelUsed = "Gemma";
 
-    if (
-      isComplexQuery(userMessage) &&
-      isNonAnswer(response) &&
-      hasKnowledge &&
-      canUseGemini()
-    ) {
+    // Step 2: If Gemma fails or is generic, use Gemini if KB exists
+    if (isNonAnswer(response) && hasKnowledge && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(context));
         markGeminiUsed();
@@ -192,18 +165,20 @@ export async function generateHybridResponse(
       }
     }
 
-    /* ---------- GUARANTEED ANSWER ---------- */
-
+    // Step 3: Smart dynamic fallback if still non-answer
     if (isNonAnswer(response)) {
       response = hasKnowledge
-        ? "Digital Transition Marketing provides end-to-end digital marketing solutions including AI-driven marketing systems, performance advertising, SEO, CGI virtual tours for real estate, automation workflows, analytics, and scalable business growth strategies."
-        : "I’m DT-Genie, the AI assistant for Digital Transition Marketing. I can help you understand our services, strategies, and how we help businesses transition into the digital future.";
+        ? `Based on our internal knowledge, here is what Digital Transition Marketing can offer:\n\n${context
+            .split("COMPANY KNOWLEDGE:")[1]
+            .split("AI LOGIC:")[0]
+            .trim()}`
+        : `I’m ${BOT_NAME}, the AI assistant for Digital Transition Marketing. I can help you understand our services, strategies, and digital solutions.`;
     }
 
     response = enforceBotName(response);
 
     console.log(
-      `[Hybrid] Model=${modelUsed} Gemini=${geminiUsage.count}/${GEMINI_DAILY_LIMIT}`
+      `[Hybrid] Model=${modelUsed} Gemini=${geminiUsage.count}/${GEMINI_DAILY_LIMIT} | User="${userMessage}" | ResponseLength=${response.length}`
     );
 
     await memoryService.addMessage(userId, "assistant", response);

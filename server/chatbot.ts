@@ -11,6 +11,22 @@ const rl = readline.createInterface({
 
 console.log(" ~V DT-Genie is ready. Type your message below.\n");
 
+// ---------------- Simple intent detector (FAST PATH) ----------------
+function isSimpleIntent(text: string) {
+  const t = text.toLowerCase().trim();
+  return (
+    t === "hi" ||
+    t === "hello" ||
+    t === "hey" ||
+    t === "are you there" ||
+    t === "who are you" ||
+    t.includes("your services") ||
+    t.includes("what services") ||
+    t.includes("tell me about")
+  );
+}
+
+// ---------------- Ask loop ----------------
 async function ask() {
   rl.question("You: ", async (input) => {
     if (input.toLowerCase() === "exit") {
@@ -20,20 +36,34 @@ async function ask() {
     }
 
     try {
-      // Step 1: Embed input using real semantic embeddings
+      // 🔹 FAST PATH — simple intents bypass embeddings
+      if (isSimpleIntent(input)) {
+        const response = await generateHybridResponse(input, "default-session");
+        console.log("\n🤖 AI Response:", response, "\n");
+        return ask();
+      }
+
+      // Step 1: Embed input
       const queryEmbedding: number[] = await getEmbedding(input);
 
-      // Step 2: Retrieve top 3 relevant chunks from vector DB
-      const chunks = await getTopChunks(queryEmbedding, 3);
-      const context = chunks.map((c) => c.content).join("\n---\n");
+      // Step 2: Retrieve top relevant KB chunks
+      const chunks = await getTopChunks(queryEmbedding, 5);
 
-      // Step 3: Send input + context to hybrid LLM
-      const response = await generateHybridResponse(input, context);
+      // Step 3: Prepare context dynamically
+      const context =
+        chunks.length > 0
+          ? chunks.map((c) => c.content).join("\n---\n")
+          : "You are DT-Genie, the AI assistant for Digital Transition Marketing. Answer clearly and confidently.";
 
-      console.log("\n M-, AI Response:", response, "\n");
+      // Step 4: Hybrid response with dynamic context
+      const response = await generateHybridResponse(input, "default-session");
+
+      console.log("\n🤖 AI Response:", response, "\n");
     } catch (err) {
       console.error("⚠️ Error generating response:", err);
-      console.log("I'm sorry, something went wrong while processing your request.\n");
+      console.log(
+        "I'm sorry — something went wrong while processing your request.\n"
+      );
     }
 
     ask();
