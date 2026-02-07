@@ -1,3 +1,5 @@
+// server/services/generateHybridResponse.ts
+
 import { getEmbedding } from "../embeddings.js";
 import { getTopChunks } from "../queryChunks.js";
 import { generateGemma } from "./gemmaClient.js";
@@ -35,10 +37,12 @@ function markGeminiUsed() {
 }
 
 /* ---------------- ESM-safe __dirname ---------------- */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ---------------- Persona loader ---------------- */
+
 const personaPath = path.join(__dirname, "../personas/neon-vision.json");
 let systemPersona: any = {
   name: BOT_NAME,
@@ -47,8 +51,8 @@ let systemPersona: any = {
     "Answer only using company knowledge",
     "Do not exaggerate or invent services",
     "Be concise and structured",
-    "Sound calm and premium, not promotional"
-  ]
+    "Sound calm and premium, not promotional",
+  ],
 };
 
 try {
@@ -61,15 +65,14 @@ try {
 }
 
 /* ---------------- AI Logic loader ---------------- */
+
 const aiLogicDir = path.join(process.cwd(), "server", "ai_logic");
 let aiLogicRules: any[] = [];
 
 function collectJsonFiles(dir: string): string[] {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      return collectJsonFiles(fullPath);
-    }
+    if (entry.isDirectory()) return collectJsonFiles(fullPath);
     return entry.name.endsWith(".json") ? [fullPath] : [];
   });
 }
@@ -77,7 +80,9 @@ function collectJsonFiles(dir: string): string[] {
 try {
   if (fs.existsSync(aiLogicDir)) {
     const files = collectJsonFiles(aiLogicDir);
-    aiLogicRules = files.map(f => JSON.parse(fs.readFileSync(f, "utf-8")));
+    aiLogicRules = files.map((f) =>
+      JSON.parse(fs.readFileSync(f, "utf-8"))
+    );
     console.log(`✅ Loaded ${aiLogicRules.length} AI logic JSON files`);
   }
 } catch (err) {
@@ -85,20 +90,24 @@ try {
 }
 
 /* ---------------- Complexity detector ---------------- */
+
 function isComplexQuery(message: string): boolean {
   const t = message.toLowerCase();
   return (
     t.length > 120 ||
-    /strategy|architecture|predictive|analytics|ai model|workflow|pipeline|integration|automation/.test(t)
+    /strategy|architecture|predictive|analytics|ai model|workflow|pipeline|integration|automation/.test(
+      t
+    )
   );
 }
 
-/* ---------------- Memory formatter ---------------- */
+/* ---------------- Memory helpers ---------------- */
+
 function formatMemory(history: any[]) {
   if (!history?.length) return "";
   return history
     .slice(-6)
-    .map(m => `${m.role.toUpperCase()}: ${m.content}`)
+    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
     .join("\n");
 }
 
@@ -111,22 +120,19 @@ ${persona.rules.map((r: string) => `- ${r}`).join("\n")}
 `;
 }
 
-/* ---------------- Context builder (FIXED) ---------------- */
+/* ---------------- Context builder ---------------- */
+
 async function buildDeepContext(userId: string, userMessage: string) {
-  // ✅ REAL embeddings + REAL similarity search
   const embedding = await getEmbedding(userMessage);
   const relevantChunks = await getTopChunks(embedding, 8);
-
   const history = await memoryService.getHistory(userId);
 
   const knowledgeText = relevantChunks
-    .map(c => c.content || "")
+    .map((c) => c.content || "")
     .filter(Boolean)
     .join("\n\n");
 
-  const aiLogicText = aiLogicRules
-    .map(rule => JSON.stringify(rule))
-    .join("\n");
+  const aiLogicText = aiLogicRules.map((r) => JSON.stringify(r)).join("\n");
 
   return {
     hasKnowledge: Boolean(knowledgeText.trim()),
@@ -144,21 +150,18 @@ ${aiLogicText}
 
 USER QUESTION:
 ${userMessage}
-`
+`,
   };
 }
 
-/* ---------------- Answer quality detector ---------------- */
+/* ---------------- Quality detector ---------------- */
+
 function isNonAnswer(text: string) {
-  return (
-    !text ||
-    text.trim().length < 120 ||
-    /^here’s what i found/i.test(text) ||
-    /clarify your request/i.test(text)
-  );
+  return !text || text.trim().length < 80;
 }
 
 /* ================= MAIN HYBRID RESPONSE ================= */
+
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -166,37 +169,41 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    const { context, hasKnowledge } =
-      await buildDeepContext(userId, userMessage);
+    const { context, hasKnowledge } = await buildDeepContext(
+      userId,
+      userMessage
+    );
 
-    const complex = isComplexQuery(userMessage);
-
-    /* ---------- GEMMA ALWAYS FIRST ---------- */
     let response = cleanResponse(await generateGemma(context));
     let modelUsed = "Gemma";
 
-    /* ---------- GEMINI (COMPLEX + QUOTA) ---------- */
-    if (complex && isNonAnswer(response) && hasKnowledge && canUseGemini()) {
+    if (
+      isComplexQuery(userMessage) &&
+      isNonAnswer(response) &&
+      hasKnowledge &&
+      canUseGemini()
+    ) {
       try {
         response = cleanResponse(await generateGemini(context));
         markGeminiUsed();
         modelUsed = "Gemini";
       } catch {
-        console.warn("❌ Gemini error — skipping Gemini");
+        console.warn("❌ Gemini failed — continuing with Gemma");
       }
     }
 
-    /* ---------- FINAL GUARANTEE ---------- */
+    /* ---------- GUARANTEED ANSWER ---------- */
+
     if (isNonAnswer(response)) {
       response = hasKnowledge
-        ? "Based on our internal knowledge, we provide end-to-end digital marketing services, AI-driven analytics, CGI virtual tours, performance advertising, SEO, automation, and scalable growth strategies."
-        : "I don’t currently have enough confirmed information to answer that accurately.";
+        ? "Digital Transition Marketing provides end-to-end digital marketing solutions including AI-driven marketing systems, performance advertising, SEO, CGI virtual tours for real estate, automation workflows, analytics, and scalable business growth strategies."
+        : "I’m DT-Genie, the AI assistant for Digital Transition Marketing. I can help you understand our services, strategies, and how we help businesses transition into the digital future.";
     }
 
     response = enforceBotName(response);
 
     console.log(
-      `[${new Date().toISOString()}][Hybrid] Model: ${modelUsed} | GeminiUsed: ${geminiUsage.count}/${GEMINI_DAILY_LIMIT} | Length: ${response.length}`
+      `[Hybrid] Model=${modelUsed} Gemini=${geminiUsage.count}/${GEMINI_DAILY_LIMIT}`
     );
 
     await memoryService.addMessage(userId, "assistant", response);
