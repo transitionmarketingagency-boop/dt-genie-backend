@@ -1,6 +1,5 @@
 // server/services/generateHybridResponse.ts
 
-import { getEmbedding } from "../embeddings.js";
 import { getTopChunks } from "../queryChunks.js";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
@@ -63,12 +62,12 @@ Digital Transition Marketing helps businesses transition into the digital future
 
 Our core services include:
 
-• AI-powered marketing & automation systems  
-• Performance advertising (Google, paid social, funnels)  
-• SEO, AI SEO, and voice search optimization  
-• CGI ads and virtual property tours for real estate  
-• Analytics, tracking, and growth intelligence  
-• Scalable growth strategies and systemized marketing execution  
+• AI-powered marketing & automation systems
+• Performance advertising (Google, paid social, funnels)
+• SEO, AI SEO, and voice search optimization
+• CGI ads and virtual property tours for real estate
+• Analytics, tracking, and growth intelligence
+• Scalable growth strategies and systemized marketing execution
 
 We don’t just run campaigns — we build digital growth systems designed to scale.
 `.trim();
@@ -78,7 +77,6 @@ We don’t just run campaigns — we build digital growth systems designed to sc
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const personaPath = path.join(__dirname, "../personas/neon-vision.json");
 
 let systemPersona: any = {
@@ -120,13 +118,16 @@ export async function generateHybridResponse(
       return r;
     }
 
-    /* ---------- DEEP AI FLOW ---------- */
+    /* ---------- KNOWLEDGE RETRIEVAL (FIXED) ---------- */
 
-    const embedding = await getEmbedding(userMessage);
-    const chunks = await getTopChunks(embedding, 8);
+    // 🔥 FIX: use text query, not embedding
+    const chunks = getTopChunks(userMessage, 6);
+
     const history = await memoryService.getHistory(userId);
 
-    const knowledge = chunks.map(c => c.content).join("\n\n");
+    const knowledge = chunks
+      .map((c: any) => c.text)
+      .join("\n\n");
 
     const context = `
 You are ${systemPersona.name}.
@@ -150,8 +151,8 @@ ${userMessage}
         response = cleanResponse(await generateGemini(context));
         markGeminiUsed();
         modelUsed = "Gemini";
-      } catch {
-        console.warn("⚠️ Gemini disabled or unavailable");
+      } catch (err) {
+        console.warn("⚠️ Gemini failed:", err);
       }
     }
 
@@ -165,9 +166,10 @@ ${userMessage}
     console.log(`[Hybrid] Model=${modelUsed}`);
 
     await memoryService.addMessage(userId, "assistant", response);
+
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
-    console.error("Hybrid error:", err);
-    return `Sorry — ${BOT_NAME} is temporarily unavailable.`;
+    console.error("Hybrid error FULL:", err);
+    return `I’m experiencing a temporary processing issue, but I can still help with our services, pricing, CGI marketing, AI systems, or booking a call. What would you like to explore?`;
   }
 }
