@@ -12,22 +12,25 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-/* ================= GEMINI QUOTA MANAGER ================= */
+/* ================= GEMINI HARD GATE ================= */
+
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GEMINI_ENABLED = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 20);
 const GEMINI_DAILY_LIMIT = 20;
+
 let geminiUsage = { count: 0, lastReset: Date.now() };
 
-function resetIfNeeded() {
+function canUseGemini(): boolean {
+  if (!GEMINI_ENABLED) return false;
+
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
+
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
-    console.log("♻️ Gemini quota reset");
   }
-}
 
-function canUseGemini(): boolean {
-  resetIfNeeded();
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
 
@@ -35,112 +38,67 @@ function markGeminiUsed() {
   geminiUsage.count++;
 }
 
-/* ---------------- ESM-safe __dirname ---------------- */
+/* ================= INTENT ROUTERS ================= */
+
+function isGreeting(text: string) {
+  const t = text.toLowerCase().trim();
+  return ["hi", "hello", "hey", "who are you"].includes(t);
+}
+
+function isServicesIntent(text: string) {
+  const t = text.toLowerCase();
+  return (
+    t.includes("services") ||
+    t.includes("what do you do") ||
+    t.includes("tell me about your company") ||
+    t.includes("what does digital transition marketing")
+  );
+}
+
+/* ================= STATIC TRUSTED ANSWERS ================= */
+
+function servicesAnswer() {
+  return `
+Digital Transition Marketing helps businesses transition into the digital future using high-impact, AI-driven systems.
+
+Our core services include:
+
+• AI-powered marketing & automation systems  
+• Performance advertising (Google, paid social, funnels)  
+• SEO, AI SEO, and voice search optimization  
+• CGI ads and virtual property tours for real estate  
+• Analytics, tracking, and growth intelligence  
+• Scalable growth strategies and systemized marketing execution  
+
+We don’t just run campaigns — we build digital growth systems designed to scale.
+`.trim();
+}
+
+/* ---------------- Persona loader ---------------- */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ---------------- Persona loader ---------------- */
 const personaPath = path.join(__dirname, "../personas/neon-vision.json");
+
 let systemPersona: any = {
   name: BOT_NAME,
   tone: "professional, clear, helpful",
-  rules: [
-    "Answer only using company knowledge",
-    "Do not exaggerate or invent services",
-    "Be concise and structured",
-    "Sound calm and premium, not promotional",
-  ],
 };
-try {
-  if (fs.existsSync(personaPath)) {
-    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
-    console.log("✅ Persona loaded");
-  }
-} catch {
-  console.warn("⚠️ Persona fallback active");
+
+if (fs.existsSync(personaPath)) {
+  systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
+  console.log("✅ Persona loaded");
 }
 
-/* ---------------- AI Logic loader ---------------- */
-const aiLogicDir = path.join(process.cwd(), "server", "ai_logic");
-let aiLogicRules: any[] = [];
+/* ================= QUALITY CHECK ================= */
 
-function collectJsonFiles(dir: string): string[] {
-  return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
-    const fullPath = path.join(dir, entry.name);
-    if (entry.isDirectory()) return collectJsonFiles(fullPath);
-    return entry.name.endsWith(".json") ? [fullPath] : [];
-  });
-}
-
-try {
-  if (fs.existsSync(aiLogicDir)) {
-    const files = collectJsonFiles(aiLogicDir);
-    aiLogicRules = files.map((f) =>
-      JSON.parse(fs.readFileSync(f, "utf-8"))
-    );
-    console.log(`✅ Loaded ${aiLogicRules.length} AI logic JSON files`);
-  }
-} catch (err) {
-  console.warn("⚠️ Failed to load AI logic JSONs", err);
-}
-
-/* ---------------- Memory helpers ---------------- */
-function formatMemory(history: any[]) {
-  if (!history?.length) return "";
-  return history
-    .slice(-6)
-    .map((m) => `${m.role.toUpperCase()}: ${m.content}`)
-    .join("\n");
-}
-
-function buildPersonaInstructions(persona: any) {
-  return `
-You are ${persona.name}.
-Tone: ${persona.tone}.
-Rules:
-${persona.rules.map((r: string) => `- ${r}`).join("\n")}
-`;
-}
-
-/* ---------------- Context builder ---------------- */
-async function buildDeepContext(userId: string, userMessage: string) {
-  const embedding = await getEmbedding(userMessage);
-  const relevantChunks = await getTopChunks(embedding, 8);
-  const history = await memoryService.getHistory(userId);
-
-  const knowledgeText = relevantChunks
-    .map((c) => c.content || "")
-    .filter(Boolean)
-    .join("\n\n");
-
-  const aiLogicText = aiLogicRules.map((r) => JSON.stringify(r)).join("\n");
-
-  return {
-    hasKnowledge: Boolean(knowledgeText.trim()),
-    context: `
-${buildPersonaInstructions(systemPersona)}
-
-CONVERSATION HISTORY:
-${formatMemory(history)}
-
-COMPANY KNOWLEDGE:
-${knowledgeText}
-
-AI LOGIC:
-${aiLogicText}
-
-USER QUESTION:
-${userMessage}
-`,
-  };
-}
-
-/* ---------------- Quality detector ---------------- */
 function isNonAnswer(text: string) {
-  return !text || text.trim().length < 80;
+  return !text || text.trim().length < 60;
 }
 
-/* ================= MAIN HYBRID RESPONSE ================= */
+/* ================= MAIN RESPONSE ================= */
+
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -148,44 +106,68 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    const { context, hasKnowledge } = await buildDeepContext(userId, userMessage);
+    /* ---------- GREETING ---------- */
+    if (isGreeting(userMessage)) {
+      const r = `I’m ${BOT_NAME}, the AI assistant for Digital Transition Marketing.`;
+      await memoryService.addMessage(userId, "assistant", r);
+      return r;
+    }
 
-    // Step 1: always try Gemma first
+    /* ---------- SERVICES ---------- */
+    if (isServicesIntent(userMessage)) {
+      const r = servicesAnswer();
+      await memoryService.addMessage(userId, "assistant", r);
+      return r;
+    }
+
+    /* ---------- DEEP AI FLOW ---------- */
+
+    const embedding = await getEmbedding(userMessage);
+    const chunks = await getTopChunks(embedding, 8);
+    const history = await memoryService.getHistory(userId);
+
+    const knowledge = chunks.map(c => c.content).join("\n\n");
+
+    const context = `
+You are ${systemPersona.name}.
+Answer clearly and professionally.
+
+CONVERSATION HISTORY:
+${history.map(h => `${h.role}: ${h.content}`).join("\n")}
+
+COMPANY KNOWLEDGE:
+${knowledge}
+
+USER QUESTION:
+${userMessage}
+`;
+
     let response = cleanResponse(await generateGemma(context));
     let modelUsed = "Gemma";
 
-    // Step 2: If Gemma fails or is generic, use Gemini if KB exists
-    if (isNonAnswer(response) && hasKnowledge && canUseGemini()) {
+    if (isNonAnswer(response) && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(context));
         markGeminiUsed();
         modelUsed = "Gemini";
       } catch {
-        console.warn("❌ Gemini failed — continuing with Gemma");
+        console.warn("⚠️ Gemini disabled or unavailable");
       }
     }
 
-    // Step 3: Smart dynamic fallback if still non-answer
     if (isNonAnswer(response)) {
-      response = hasKnowledge
-        ? `Based on our internal knowledge, here is what Digital Transition Marketing can offer:\n\n${context
-            .split("COMPANY KNOWLEDGE:")[1]
-            .split("AI LOGIC:")[0]
-            .trim()}`
-        : `I’m ${BOT_NAME}, the AI assistant for Digital Transition Marketing. I can help you understand our services, strategies, and digital solutions.`;
+      response =
+        "I can help with our services, AI systems, growth strategy, or automation solutions. What would you like to explore?";
     }
 
     response = enforceBotName(response);
 
-    console.log(
-      `[Hybrid] Model=${modelUsed} Gemini=${geminiUsage.count}/${GEMINI_DAILY_LIMIT} | User="${userMessage}" | ResponseLength=${response.length}`
-    );
+    console.log(`[Hybrid] Model=${modelUsed}`);
 
     await memoryService.addMessage(userId, "assistant", response);
-
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
-    console.error("Hybrid response error:", err);
+    console.error("Hybrid error:", err);
     return `Sorry — ${BOT_NAME} is temporarily unavailable.`;
   }
 }

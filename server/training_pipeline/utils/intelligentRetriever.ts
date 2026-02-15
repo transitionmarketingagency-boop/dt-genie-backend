@@ -12,24 +12,29 @@ export async function intelligentRetrieve(query: string, topK = 6): Promise<Retr
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(DB_PATH, sqlite3.OPEN_READONLY);
 
-    db.all("SELECT content, metadata FROM chunks", [], (err, rows) => {
-      if (err) { db.close(); return reject(err); }
+    // NEW: read canonical embeddings table
+    db.all(
+      "SELECT section AS content, tags AS metadata FROM embeddings",
+      [],
+      (err, rows) => {
+        if (err) { db.close(); return reject(err); }
 
-      const ranked = rows
-        .map((row: any) => {
-          const meta = JSON.parse(row.metadata);
-          let score = 0;
-          if (meta.intent === intent) score += 3;
-          if (meta.type === role) score += 2;
-          if (meta.purpose?.includes(intent)) score += 1;
-          return { content: row.content, metadata: meta, score };
-        })
-        .filter(r => r.score > 0)
-        .sort((a, b) => b.score - a.score)
-        .slice(0, topK);
+        const ranked = rows
+          .map((row: any) => {
+            const meta = JSON.parse(row.metadata || '{}');
+            let score = 0;
+            if (meta.intent === intent) score += 3;
+            if (meta.type === role) score += 2;
+            if (meta.purpose?.includes(intent)) score += 1;
+            return { content: row.content || row.section || '', metadata: meta, score };
+          })
+          .filter(r => r.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, topK);
 
-      db.close();
-      resolve(ranked);
-    });
+        db.close();
+        resolve(ranked);
+      }
+    );
   });
 }

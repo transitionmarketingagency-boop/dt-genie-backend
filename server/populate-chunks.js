@@ -1,56 +1,33 @@
 // server/populate-chunks.js
 import fs from "fs";
-import sqlite3 from "sqlite3";
-import { DB_PATH } from "./utils/dbPath";
+import path from "path";
+import { spawnSync } from "child_process";
 
-// Open canonical DB
-function openDB() {
-  return new sqlite3.Database(DB_PATH);
-}
+const mdFolder = path.join("server/data/md");
+const chunksFile = path.join("server/data/chunks.json");
 
-// Chunk text into smaller pieces
-function chunkText(text, size = 1000) {
-  const chunks = [];
-  let i = 0;
-  while (i < text.length) {
-    chunks.push(text.slice(i, i + size));
-    i += size;
-  }
-  return chunks;
-}
+// Create folders if missing
+if (!fs.existsSync(mdFolder)) fs.mkdirSync(mdFolder, { recursive: true });
+if (!fs.existsSync(path.dirname(chunksFile))) fs.mkdirSync(path.dirname(chunksFile), { recursive: true });
 
-export function populateChunks() {
-  const db = openDB();
+const chunkSize = 500; // words per chunk
+const chunks = [];
 
-  db.serialize(() => {
-    db.run(`
-      CREATE TABLE IF NOT EXISTS chunks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        page_url TEXT,
-        heading TEXT,
-        content TEXT
-      )
-    `);
+const mdFiles = fs.readdirSync(mdFolder).filter(f => f.endsWith(".md"));
+for (const file of mdFiles) {
+    const content = fs.readFileSync(path.join(mdFolder, file), "utf8");
+    const words = content.split(/\s+/);
+    for (let i = 0; i < words.length; i += chunkSize) {
+        const chunkText = words.slice(i, i + chunkSize).join(" ");
 
-    const text = fs.readFileSync("./server/website_content.txt", "utf-8");
-    const chunks = chunkText(text, 1000);
+        // Call Python to get embedding
+        const result = spawnSync("python", ["server/utils/embed_text.py", chunkText]);
+        const embedding = JSON.parse(result.stdout.toString());
 
-    const stmt = db.prepare(
-      "INSERT INTO chunks (page_url, heading, content) VALUES (?, ?, ?)"
-    );
-
-    for (const chunk of chunks) {
-      stmt.run("", "", chunk);
+        chunks.push({ text: chunkText, embedding });
     }
-
-    stmt.finalize();
-    console.log(`Inserted ${chunks.length} chunks into database.`);
-  });
-
-  db.close();
 }
 
-// ES module entry
-if (import.meta.url === `file://${process.cwd()}/server/populate-chunks.js`) {
-  populateChunks();
-}
+// Save all chunks
+fs.writeFileSync(chunksFile, JSON.stringify(chunks, null, 2));
+console.log(`Done. Total chunks: ${chunks.length}`);

@@ -1,102 +1,34 @@
 // server/populate-chunks.ts
-import fs from "fs";
-import sqlite3 from "sqlite3";
-import path from "path";
-import { getEmbedding as embedText } from "./services/embeddingClient.js";
-import { DB_PATH } from "./utils/dbPath.js";
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import sqlite3 from 'sqlite3';
 
-const CONTENT_PATH = path.join(process.cwd(), "server", "website_content.txt");
-const CONCURRENCY = 5; // number of chunks processed in parallel
+const dbFile = path.join(process.cwd(), 'server/vector_store/vectors.db');
+const db = new sqlite3.Database(dbFile);
 
-function chunkText(text: string, size = 1000) {
-  const chunks: string[] = [];
-  let i = 0;
-  while (i < text.length) {
-    chunks.push(text.slice(i, i + size));
-    i += size;
-  }
-  return chunks;
+// Read chunks JSON
+const chunksFile = path.join(process.cwd(), 'server/data/chunks.json');
+const chunks = JSON.parse(fs.readFileSync(chunksFile, 'utf-8'));
+
+// Function to get Python embedding
+function getEmbedding(text: string) {
+  const output = execSync(
+    `python server/utils/embed_text.py "${text.replace(/"/g, '\\"')}"`,
+    { encoding: 'utf-8' }
+  );
+  return JSON.parse(output.replace(/'/g, '"'));
 }
 
-async function processChunk(stmt: sqlite3.Statement, chunk: string, idx: number) {
-  try {
-    const embedding = await embedText(chunk);
-    stmt.run("", "", chunk, JSON.stringify(embedding));
-    console.log(`✅ Chunk ${idx + 1} embedded`);
-  } catch (err) {
-    console.error(`❌ Failed to embed chunk ${idx + 1}:`, err);
-  }
-}
-
-export async function populateChunks(): Promise<void> {
-  console.log(" ~@ populateChunks() started");
-  console.log("DB path:", DB_PATH);
-  console.log("Content path:", CONTENT_PATH);
-
-  return new Promise((resolve, reject) => {
-    if (!fs.existsSync(CONTENT_PATH)) {
-      return reject(new Error(`❌ website_content.txt not found at ${CONTENT_PATH}`));
+// Populate DB
+chunks.forEach((chunk: { id: string; text: string }) => {
+  const embedding = getEmbedding(chunk.text);
+  db.run(
+    'INSERT OR REPLACE INTO embeddings (id, content, vector) VALUES (?, ?, ?)',
+    [chunk.id, chunk.text, JSON.stringify(embedding)],
+    (err) => {
+      if (err) console.error('DB insert error:', err);
+      else console.log(`Chunk ${chunk.id} inserted`);
     }
-
-    const db = new sqlite3.Database(DB_PATH, (err) => {
-      if (err) return reject(err);
-    });
-
-    db.serialize(async () => {
-      console.log(" M-& Creating table if not exists...");
-      db.run(
-        `
-        CREATE TABLE IF NOT EXISTS chunks (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          page_url TEXT,
-          heading TEXT,
-          content TEXT,
-          embedding TEXT
-        )
-        `,
-        (err) => {
-          if (err) return reject(err);
-        }
-      );
-
-      const text = fs.readFileSync(CONTENT_PATH, "utf-8");
-      const chunks = chunkText(text, 1000);
-      console.log(`✂️ Chunked into ${chunks.length} pieces`);
-
-      db.run("DELETE FROM chunks");
-
-      const stmt = db.prepare(
-        "INSERT INTO chunks (page_url, heading, content, embedding) VALUES (?, ?, ?, ?)"
-      );
-
-      // process chunks in batches
-      for (let i = 0; i < chunks.length; i += CONCURRENCY) {
-        const batch = chunks.slice(i, i + CONCURRENCY);
-        await Promise.all(batch.map((chunk, idx) => processChunk(stmt, chunk, i + idx)));
-      }
-
-      stmt.finalize((err) => {
-        if (err) return reject(err);
-
-        console.log(`✅ Inserted ${chunks.length} chunks with embeddings`);
-
-        db.close(() => {
-          console.log(" ~R DB closed");
-          resolve();
-        });
-      });
-    });
-  });
-}
-
-if (process.argv[1]?.endsWith("populate-chunks.ts")) {
-  populateChunks()
-    .then(() => {
-      console.log(" ~I populate-chunks finished successfully");
-      process.exit(0);
-    })
-    .catch((err) => {
-      console.error("❌ populate-chunks failed:", err);
-      process.exit(1);
-    });
-}
+  );
+});
