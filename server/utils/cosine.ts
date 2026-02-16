@@ -1,21 +1,13 @@
-export function cosineSimilarity(a: number[] | null, b: number[] | null): number {
-  if (!a || !b) return -1;
-
+export function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) {
-    throw new Error("Vector length mismatch");
+    // Pad the shorter vector with zeros
+    const maxLength = Math.max(a.length, b.length);
+    a = [...a, ...Array(maxLength - a.length).fill(0)];
+    b = [...b, ...Array(maxLength - b.length).fill(0)];
   }
 
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-
-  if (normA === 0 || normB === 0) return -1;
-
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+  const dot = a.reduce((sum, val, i) => sum + val * b[i], 0);
+  const magA = Math.sqrt(a.reduce((sum, val) => sum + val * val, 0));
+  const magB = Math.sqrt(b.reduce((sum, val) => sum + val * val, 0));
+  return magA && magB ? dot / (magA * magB) : 0;
 }

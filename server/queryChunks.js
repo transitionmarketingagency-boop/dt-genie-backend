@@ -14,10 +14,17 @@ export function getTopChunks(queryText, limit = 10) {
 
     const chunks = JSON.parse(fs.readFileSync(chunksPath, 'utf-8'));
 
+    // Defensive: ensure queryText is a string
+    if (typeof queryText !== 'string') {
+        console.warn('⚠️ getTopChunks called with non-string queryText:', queryText);
+        queryText = String(queryText || '');
+    }
+
+    const queryLower = queryText.toLowerCase();
+
     const results = chunks
         .filter(c =>
-            c.text &&
-            c.text.toLowerCase().includes(queryText.toLowerCase())
+            c.text && typeof c.text === 'string' && c.text.toLowerCase().includes(queryLower)
         )
         .slice(0, limit);
 

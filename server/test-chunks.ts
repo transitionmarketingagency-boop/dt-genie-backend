@@ -1,9 +1,8 @@
-import { fetchRelevantChunks } from './query-chunks'; // <-- include .ts extension
+import { fetchRelevantChunks } from './query-chunks.js';
 
-(async () => {
-  const queries = ['Digital Transformation', 'AI automation', 'Marketing strategy'];
-  for (const q of queries) {
-    const chunks = await fetchRelevantChunks(q, 5);
-    console.log(q, '->', chunks.map(c => c.id));
-  }
-})();
+async function testChunks() {
+  const chunks = await fetchRelevantChunks('Test query');
+  console.log('Relevant chunks:', chunks);
+}
+
+testChunks().catch(console.error);

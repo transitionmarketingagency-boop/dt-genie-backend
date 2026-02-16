@@ -50,10 +50,15 @@ export const setupApp = async (app: Application) => {
   // ---------------- CHAT HANDLER ----------------
   const chatHandler = async (req: any, res: any) => {
     try {
-      const { message, sessionId } = req.body;
-      if (!message || !sessionId) return res.status(400).json({ ok: false, error: "Missing message or sessionId" });
+      let { message, sessionId } = req.body;
 
-      console.log("💬 Chat request:", message);
+      // Ensure strings
+      if (!message || typeof message !== "string") message = "";
+      if (!sessionId || typeof sessionId !== "string") sessionId = "default";
+
+      if (!message.trim()) return res.status(400).json({ ok: false, error: "Missing message or sessionId" });
+
+      console.log(" M-, Chat request:", message);
 
       // Save user message
       await storage.addChatMessage({ sessionId, role: "user", content: message });
@@ -69,8 +74,7 @@ export const setupApp = async (app: Application) => {
 
       // Fallback if empty
       if (!reply || reply.trim().length === 0) {
-        
-      reply = `Sure — you can book a call with our team here:\n${CALENDLY_LINK}`;
+        reply = `Sure — you can book a call with our team here:\n${CALENDLY_LINK}`;
       }
 
       // Save assistant message

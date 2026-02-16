@@ -1,7 +1,8 @@
-import { generateGemini } from "./services/geminiClient";
+import { generateGemini } from './services/geminiClient.js';
 
-(async () => {
-  console.log("Testing Gemini response...");
-  const reply = await generateGemini("List available Gemini capabilities.");
-  console.log("Response:", reply);
-})();
+async function listModels() {
+  const response = await generateGemini('List models');
+  console.log('Gemini response:', response);
+}
+
+listModels().catch(console.error);

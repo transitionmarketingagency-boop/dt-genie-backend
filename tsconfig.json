@@ -3,39 +3,24 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-
     "outDir": "dist",
     "rootDir": ".",
-
     "types": ["node"],
     "resolveJsonModule": true,
     "allowJs": true,
-
     "noEmitOnError": false,
     "strictPropertyInitialization": false,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "allowImportingTsExtensions": true
   },
-
-  "include": [
-    "server/**/*.ts"
-  ],
-
-  "exclude": [
-    "dist",
-    "node_modules",
-
-    "**/*.test.ts",
-
-    "server/backup_services",
-    "server/vector_store_backup",
-    "server/vector_store",
-    "server/training_pipeline",
-    "server/test-*",
-    "server/**/test-*.ts"
-  ]
+  "include": ["server/**/*.ts"],
+  "exclude": ["dist", "node_modules"],
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  }
 }

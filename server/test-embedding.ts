@@ -1,6 +1,8 @@
-import { embedText } from "./services/embeddingClient";
+import { embedText } from './services/embeddingClient.js';
 
-(async () => {
-  const vec = await embedText("Tell me about your AI services");
-  console.log("Vector length:", vec.length);
-})();
+async function testEmbedding() {
+  const result = await embedText('Hello World');
+  console.log('Embedding result:', result);
+}
+
+testEmbedding().catch(console.error);

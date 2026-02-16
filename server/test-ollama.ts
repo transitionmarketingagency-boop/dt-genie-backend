@@ -1,12 +1,8 @@
-import { generateWithOllama } from "./services/ollamaClient";
+import { generateWithOllama } from './services/ollamaClient.js';
 
-async function test() {
-  const response = await generateWithOllama(
-    "Say hello as DT-Genie in one sentence."
-  );
-
-  console.log("\nOLLAMA RESPONSE:\n");
-  console.log(response);
+async function testOllama() {
+  const response = await generateWithOllama('Hello Ollama');
+  console.log('Ollama response:', response);
 }
 
-test().catch(console.error);
+testOllama().catch(console.error);

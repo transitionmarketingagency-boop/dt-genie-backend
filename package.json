@@ -1,17 +1,14 @@
 {
   "name": "dt-genie-backend",
   "version": "1.0.0",
-  "description": "Backend for DT Genie",
-  "main": "dist/app.js",
   "type": "module",
   "scripts": {
     "dev": "tsx server/app.ts",
-    "frontend": "vite",
-    "build": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-personas",
-    "build:backend": "npm run build",
+    "build": "tsc && npm run copy-public && npm run copy-personas",
     "copy-public": "mkdirp dist/public && cpy \"public/**/*\" dist/public",
     "copy-personas": "mkdirp dist/server/personas && cpy \"server/personas/**/*\" dist/server/personas",
     "start": "node dist/server/index-prod.js",
+    "test": "tsx server/test-end-to-end.ts",
     "postinstall": "echo 'Skipping Python install on Render'"
   },
   "dependencies": {
@@ -29,7 +26,7 @@
     "node-fetch": "^3.3.2",
     "pdf-parse": "^1.1.1",
     "sqlite": "^5.1.1",
-    "sqlite3": "^5.0.2",
+    "sqlite3": "^5.1.2",
     "uuid": "^9.0.1",
     "zod": "^4.1.13"
   },
@@ -40,12 +37,11 @@
     "@types/node": "^20.19.32",
     "cpy-cli": "^6.0.0",
     "mkdirp": "^3.0.1",
-    "ts-node": "^1.7.3",
+    "ts-node": "^10.9.2",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "engines": {
     "node": ">=22.0.0"
-  },
-  "license": "MIT"
+  }
 }
