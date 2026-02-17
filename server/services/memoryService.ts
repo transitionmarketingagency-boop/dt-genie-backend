@@ -1,80 +1,86 @@
-import Database from 'better-sqlite3';
-import { ChatMessage } from '../shared/types.js';
+// server/services/memoryService.ts
+import * as sqlite from 'sqlite';
+import sqlite3 from 'sqlite3';
+import { ChatMessage } from '../../shared/types.js';
 import crypto from 'crypto';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-/* ---------------- ESM-safe __dirname ---------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ---------------- Database setup ---------------- */
+// Ensure memory folder exists
 const memoryDir = path.join(__dirname, '../memory');
+if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
+
 const dbPath = path.join(memoryDir, 'chat_memory.db');
 
-/* ✅ ENSURE DIRECTORY EXISTS (CRITICAL FIX) */
-if (!fs.existsSync(memoryDir)) {
-  fs.mkdirSync(memoryDir, { recursive: true });
-  console.log('✅ Memory directory created:', memoryDir);
-}
+// Open sqlite database
+const dbPromise = sqlite.open({
+  filename: dbPath,
+  driver: sqlite3.Database
+});
 
-/* Open database ONLY after directory exists */
-const db = new Database(dbPath);
+// Initialize table and index
+(async () => {
+  const db = await dbPromise;
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      sessionId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      timestamp TEXT NOT NULL
+    )
+  `);
 
-/* Create table if not exists */
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS chat_messages (
-    id TEXT PRIMARY KEY,
-    sessionId TEXT NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    timestamp TEXT NOT NULL
-  )
-`).run();
+  await db.run(`
+    CREATE INDEX IF NOT EXISTS idx_sessionId
+    ON chat_messages (sessionId)
+  `);
+})();
 
-/* Create index */
-db.prepare(`
-  CREATE INDEX IF NOT EXISTS idx_sessionId
-  ON chat_messages (sessionId)
-`).run();
-
-/* ---------------- Memory Service ---------------- */
 export class MemoryService {
-  async addMessage(
-    sessionId: string,
-    role: 'user' | 'assistant',
-    content: string
-  ): Promise<ChatMessage> {
+  async addMessage(sessionId: string, role: 'user' | 'assistant', content: string): Promise<ChatMessage> {
+    const db = await dbPromise;
+
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId,
       role,
       content: content ?? '',
-      timestamp: new Date().toISOString(),
+      timestamp: new Date()
     };
 
-    db.prepare(`
-      INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
-      VALUES (@id, @sessionId, @role, @content, @timestamp)
-    `).run(msg);
+    await db.run(
+      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
+       VALUES (?, ?, ?, ?, ?)`,
+      msg.id,
+      msg.sessionId,
+      msg.role,
+      msg.content,
+      (msg.timestamp as Date).toISOString()
+    );
 
     return msg;
   }
 
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
-    const rows = db.prepare(`
-      SELECT * FROM chat_messages
-      WHERE sessionId = ?
-      ORDER BY timestamp ASC
-    `).all(sessionId);
+    const db = await dbPromise;
+    const rows = await db.all(
+      `SELECT * FROM chat_messages WHERE sessionId = ? ORDER BY timestamp ASC`,
+      sessionId
+    );
 
     return rows.map(r => ({
-      ...r,
-      timestamp: new Date(r.timestamp),
+      id: r.id,
+      sessionId: r.sessionId,
+      role: r.role,
+      content: r.content,
+      timestamp: new Date(r.timestamp)
     }));
   }
 }
 
-/* ---------------- Export singleton ---------------- */
 export const memoryService = new MemoryService();

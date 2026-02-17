@@ -1,5 +1,6 @@
 // server/storage.ts
-import Database from "better-sqlite3";
+import * as sqlite from 'sqlite';
+import sqlite3 from 'sqlite3';
 import { ChatMessage } from "../shared/types.js";
 import crypto from "crypto";
 import path from "path";
@@ -11,7 +12,7 @@ export interface InsertChatMessage {
   content: string;
 }
 
-// ensure memory folder exists
+// Ensure memory folder exists
 const MEMORY_DIR = path.join(process.cwd(), "server", "memory");
 if (!fs.existsSync(MEMORY_DIR)) {
   fs.mkdirSync(MEMORY_DIR, { recursive: true });
@@ -19,27 +20,35 @@ if (!fs.existsSync(MEMORY_DIR)) {
 
 const DB_PATH = path.join(MEMORY_DIR, "chat_memory.db");
 
-// open sqlite db
-const db = new Database(DB_PATH);
+// Open sqlite database
+const dbPromise = sqlite.open({
+  filename: DB_PATH,
+  driver: sqlite3.Database
+});
 
-// ensure table exists (safe on every boot)
-db.prepare(`
-  CREATE TABLE IF NOT EXISTS chat_messages (
-    id TEXT PRIMARY KEY,
-    sessionId TEXT NOT NULL,
-    role TEXT NOT NULL,
-    content TEXT NOT NULL,
-    timestamp TEXT NOT NULL
-  )
-`).run();
+// Initialize table and index
+(async () => {
+  const db = await dbPromise;
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      sessionId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      timestamp TEXT NOT NULL
+    )
+  `);
 
-db.prepare(`
-  CREATE INDEX IF NOT EXISTS idx_sessionId
-  ON chat_messages (sessionId)
-`).run();
+  await db.run(`
+    CREATE INDEX IF NOT EXISTS idx_sessionId
+    ON chat_messages (sessionId)
+  `);
+})();
 
 export class Storage {
   async addChatMessage(message: InsertChatMessage): Promise<ChatMessage> {
+    const db = await dbPromise;
+
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId: message.sessionId,
@@ -48,54 +57,66 @@ export class Storage {
       timestamp: new Date(),
     };
 
-    db.prepare(`
-      INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(
+    await db.run(
+      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
+       VALUES (?, ?, ?, ?, ?)`,
       msg.id,
       msg.sessionId,
       msg.role,
       msg.content,
-      msg.timestamp.toISOString()
+      (msg.timestamp as Date).toISOString()
     );
 
     return msg;
   }
 
   async getChatHistory(sessionId: string): Promise<ChatMessage[]> {
-    const rows = db.prepare(`
-      SELECT * FROM chat_messages
-      WHERE sessionId = ?
-      ORDER BY timestamp ASC
-    `).all(sessionId);
+    const db = await dbPromise;
 
-    return rows.map((row: any) => ({
-      ...row,
-      timestamp: new Date(row.timestamp),
+    const rows = await db.all(
+      `SELECT * FROM chat_messages
+       WHERE sessionId = ?
+       ORDER BY timestamp ASC`,
+      sessionId
+    );
+
+    return rows.map(row => ({
+      id: row.id,
+      sessionId: row.sessionId,
+      role: row.role,
+      content: row.content,
+      timestamp: new Date(row.timestamp)
     }));
   }
 
   async saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void> {
-    db.prepare(`DELETE FROM chat_messages WHERE sessionId = ?`).run(sessionId);
+    const db = await dbPromise;
 
-    const insert = db.prepare(`
-      INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
-      VALUES (?, ?, ?, ?, ?)
-    `);
+    await db.run(`DELETE FROM chat_messages WHERE sessionId = ?`, sessionId);
 
-    const trx = db.transaction((msgs: ChatMessage[]) => {
-      for (const msg of msgs) {
-        insert.run(
+    await db.exec('BEGIN TRANSACTION');
+    try {
+      const insertStmt = await db.prepare(`
+        INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      for (const msg of messages) {
+        await insertStmt.run(
           msg.id,
           msg.sessionId,
           msg.role,
           msg.content,
-          msg.timestamp.toISOString()
+          (msg.timestamp as Date).toISOString()
         );
       }
-    });
 
-    trx(messages);
+      await insertStmt.finalize();
+      await db.exec('COMMIT');
+    } catch (err) {
+      await db.exec('ROLLBACK');
+      throw err;
+    }
   }
 }
 

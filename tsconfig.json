@@ -12,12 +12,11 @@
     "types": ["node"],
     "resolveJsonModule": true,
     "allowJs": true,
-    "noEmitOnError": false,
+    "noEmitOnError": true,
     "strictPropertyInitialization": false,
-    "noImplicitAny": false,
-    "allowImportingTsExtensions": true
+    "noImplicitAny": false
   },
-  "include": ["server/**/*.ts"],
+  "include": ["server/**/*.ts", "shared/**/*.ts"],
   "exclude": ["dist", "node_modules"],
   "ts-node": {
     "esm": true,

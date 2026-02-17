@@ -21,8 +21,10 @@ export interface ChatHistory {
   content: string;
 }
 
-export interface ChatMessage extends ChatHistory {
+export interface ChatMessage {
   id: string;
   sessionId: string;
-  timestamp: Date;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: string | Date;
 }
