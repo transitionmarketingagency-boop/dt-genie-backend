@@ -84,3 +84,10 @@ server/services/*.js
 
 _archive_*/
 archive/
+
+server/memory/
+*.db
+*.log
+env_files_list.txt
+last_modified_50.txt
+nul
