@@ -5,7 +5,7 @@ Safe sync of chunks.json -> vector_store.db for Neon Vision / Digital Transition
 
 ✅ Ensures all chunks are in the DB
 ✅ Keeps schema intact
-✅ Avoids breaking paths or runtime scripts
+✅ Inserts 'content' column for similarity search scripts
 """
 
 import json
@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS embeddings (
     embedding TEXT,
     section TEXT,
     tags TEXT,
-    internal_only INTEGER
+    internal_only INTEGER,
+    content TEXT
 )
 """)
 c.execute("""
@@ -49,11 +50,12 @@ for chunk in chunks:
     source_file = chunk["file"]
     chunk_index = chunk["chunk_index"]
     embedding = json.dumps(chunk["embedding"])
-    # Insert or replace ensures we update existing rows safely
+    content = chunk.get("text", "")
+
     c.execute("""
-    INSERT OR REPLACE INTO embeddings (source_file, chunk_index, embedding)
-    VALUES (?, ?, ?)
-    """, (source_file, chunk_index, embedding))
+    INSERT OR REPLACE INTO embeddings (source_file, chunk_index, embedding, content)
+    VALUES (?, ?, ?, ?)
+    """, (source_file, chunk_index, embedding, content))
     inserted += 1
 
 conn.commit()

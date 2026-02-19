@@ -1,3 +1,5 @@
+// server/services/geminiClient.ts
+
 import * as dotenv from "dotenv";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
@@ -32,8 +34,10 @@ export async function generateGemini(prompt: string): Promise<string> {
 You are Neon Vision, AI strategist at Digital Transition Marketing.
 
 Answer professionally and confidently.
+
 User question:
 ${prompt}
+
 Answer:
 `.trim();
 
@@ -41,7 +45,9 @@ Answer:
     const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents: [{ parts: [{ text: finalPrompt }] }] }),
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: finalPrompt }] }]
+      })
     });
 
     if (!res.ok) {
@@ -50,8 +56,11 @@ Answer:
     }
 
     const data: any = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-    return enforceBotName(text.trim(), prompt);
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+    if (!text) throw new Error("Gemini returned empty response");
+
+    return enforceBotName(text);
   } catch (err: any) {
     console.error("❌ Gemini API call failed:", err?.message || err);
     throw err;

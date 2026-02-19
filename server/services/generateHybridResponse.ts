@@ -21,15 +21,12 @@ let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
-
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
-
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
   }
-
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
 
@@ -54,6 +51,31 @@ function isServicesIntent(text: string) {
   );
 }
 
+function isTaglineIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("tagline") || t.includes("slogan");
+}
+
+function isTargetMarketIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("target market") || t.includes("audience") || t.includes("clients");
+}
+
+function isMissionIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("mission");
+}
+
+function isNichesIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("niches") || t.includes("specialize") || t.includes("industry");
+}
+
+function isAIContentIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("ai content") || t.includes("content marketing") || t.includes("repurposing");
+}
+
 /* ================= STATIC TRUSTED ANSWERS ================= */
 
 function servicesAnswer() {
@@ -73,7 +95,48 @@ We don’t just run campaigns — we build digital growth systems designed to sc
 `.trim();
 }
 
-/* ---------------- Persona loader ---------------- */
+function taglineAnswer() {
+  return "Transitioning your business to the digital age.";
+}
+
+function targetMarketAnswer() {
+  return `
+Our ideal clients are forward-thinking businesses seeking digital transformation, including:
+
+• Real Estate Developers & Agencies
+• Travel and Tour Agencies
+• E-commerce Brands
+`.trim();
+}
+
+function missionAnswer() {
+  return `
+Our mission is to empower businesses to confidently navigate and dominate the digital future through AI-driven marketing, automation, and growth systems.
+`.trim();
+}
+
+function nichesAnswer() {
+  return `
+Digital Transition Marketing specializes in:
+
+• Real Estate Developers & Agencies — CGI ads and virtual tours
+• Travel & Tour Agencies — AI-driven marketing & automation
+• E-commerce Brands — scalable digital growth systems
+`.trim();
+}
+
+function aiContentAnswer() {
+  return `
+AI-Optimized Content Creation & Repurposing includes:
+
+• Strategic ideation & market research
+• Drafting, SEO & voice search optimization
+• Automated content repurposing across platforms
+• Audience personalization & ROI maximization
+`.trim();
+}
+
+/* ---------------- Persona Loader ---------------- */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -85,8 +148,12 @@ let systemPersona: any = {
 };
 
 if (fs.existsSync(personaPath)) {
-  systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
-  console.log("✅ Persona loaded");
+  try {
+    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
+    console.log("✅ Persona loaded");
+  } catch (err) {
+    console.warn("⚠️ Persona JSON invalid, using fallback.");
+  }
 }
 
 /* ================= QUALITY CHECK ================= */
@@ -111,30 +178,29 @@ export async function generateHybridResponse(
       return r;
     }
 
-    /* ---------- SERVICES ---------- */
-    if (isServicesIntent(userMessage)) {
-      const r = servicesAnswer();
-      await memoryService.addMessage(userId, "assistant", r);
-      return r;
-    }
+    /* ---------- STATIC INTENT ANSWERS ---------- */
+    if (isServicesIntent(userMessage)) return await returnStatic(servicesAnswer(), userId);
+    if (isTaglineIntent(userMessage)) return await returnStatic(taglineAnswer(), userId);
+    if (isTargetMarketIntent(userMessage)) return await returnStatic(targetMarketAnswer(), userId);
+    if (isMissionIntent(userMessage)) return await returnStatic(missionAnswer(), userId);
+    if (isNichesIntent(userMessage)) return await returnStatic(nichesAnswer(), userId);
+    if (isAIContentIntent(userMessage)) return await returnStatic(aiContentAnswer(), userId);
 
-    /* ---------- KNOWLEDGE RETRIEVAL (FIXED) ---------- */
-
-    // 🔥 FIX: use text query, not embedding
+    /* ---------- KNOWLEDGE RETRIEVAL ---------- */
     const chunks = getTopChunks(userMessage, 6);
-
     const history = await memoryService.getHistory(userId);
 
-    const knowledge = chunks
-      .map((c: any) => c.text)
-      .join("\n\n");
+    const knowledge =
+      chunks.length > 0
+        ? chunks.map((c: any) => c.text || "").join("\n\n")
+        : "No direct knowledge match found.";
 
     const context = `
 You are ${systemPersona.name}.
-Answer clearly and professionally.
+Respond clearly, professionally, and concisely.
 
 CONVERSATION HISTORY:
-${history.map(h => `${h.role}: ${h.content}`).join("\n")}
+${history.map((h: any) => `${h.role}: ${h.content}`).join("\n")}
 
 COMPANY KNOWLEDGE:
 ${knowledge}
@@ -158,18 +224,23 @@ ${userMessage}
 
     if (isNonAnswer(response)) {
       response =
-        "I can help with our services, AI systems, growth strategy, or automation solutions. What would you like to explore?";
+        "I can help with our services, AI systems, growth strategy, automation solutions, or booking a strategy call. What would you like to explore?";
     }
 
     response = enforceBotName(response);
-
     console.log(`[Hybrid] Model=${modelUsed}`);
 
     await memoryService.addMessage(userId, "assistant", response);
-
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
     console.error("Hybrid error FULL:", err);
-    return `I’m experiencing a temporary processing issue, but I can still help with our services, pricing, CGI marketing, AI systems, or booking a call. What would you like to explore?`;
+    return `I’m experiencing a temporary processing issue, but I can still help with our services, CGI marketing, AI systems, or booking a call. What would you like to explore?`;
   }
+}
+
+/* ---------- Helper ---------- */
+
+async function returnStatic(text: string, userId: string) {
+  await memoryService.addMessage(userId, "assistant", text);
+  return text;
 }

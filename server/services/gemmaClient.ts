@@ -1,70 +1,59 @@
-import { spawn, execSync } from "child_process";
-import { enforceBotName } from "../system/identity.js";
+import fetch from "node-fetch";
 
-/* ---------------- Helper: Check if command exists ---------------- */
-function commandExists(cmd: string): boolean {
-  try {
-    execSync(`command -v ${cmd}`, { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
+/**
+ * Gemma Client (Ollama HTTP-based)
+ * - Clean timeout handling
+ * - No child_process
+ * - Safe fallback behavior
+ */
 
-/* ---------------- Gemma response generator ---------------- */
+const GEMMA_URL =
+  process.env.GEMMA_URL || "http://localhost:11434/api/generate";
+
+const GEMMA_MODEL = process.env.GEMMA_MODEL || "gemma";
+const GEMMA_TIMEOUT = 8000; // 8 seconds max
+
 export async function generateGemma(prompt: string): Promise<string> {
-  // Fast exit if Ollama not installed
-  if (!commandExists("ollama")) return "";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), GEMMA_TIMEOUT);
 
   try {
-    const finalPrompt = `
-You are Neon Vision, senior digital marketing & growth strategist.
+    const res = await fetch(GEMMA_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: GEMMA_MODEL,
+        prompt,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
 
-Answer clearly, professionally, and confidently.
-Do not ask the user to clarify unless absolutely necessary.
+    clearTimeout(timeout);
 
-User question:
-${prompt}
+    if (!res.ok) {
+      throw new Error(`Gemma HTTP ${res.status}`);
+    }
 
-Answer:
-`.trim();
+    const data: any = await res.json();
 
-    const response = await runGemma(finalPrompt);
-    return enforceBotName(response);
+    if (!data || !data.response) {
+      console.warn("⚠️ Gemma returned empty response");
+      return "";
+    }
+
+    return data.response.trim();
   } catch (err: any) {
-    console.error("⚠️ Gemma failed:", err?.message || err);
+    clearTimeout(timeout);
+
+    if (err.name === "AbortError") {
+      console.warn("⚠️ Gemma timeout");
+    } else {
+      console.warn("⚠️ Gemma failed:", err.message || err);
+    }
+
     return "";
   }
-}
-
-/* ---------------- Spawn Ollama Gemma ---------------- */
-function runGemma(prompt: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const gemma = spawn("ollama", ["run", "gemma", "--verbose=false"], {
-      stdio: ["pipe", "pipe", "pipe"],
-      shell: true,
-    });
-
-    let output = "";
-    let error = "";
-
-    gemma.stdout.on("data", (d) => (output += d.toString()));
-    gemma.stderr.on("data", (d) => (error += d.toString()));
-
-    const timeout = setTimeout(() => {
-      gemma.kill("SIGTERM");
-      reject(new Error("Gemma timeout"));
-    }, 30_000);
-
-    gemma.on("close", (code) => {
-      clearTimeout(timeout);
-      if (code !== 0 || !output.trim()) reject(new Error(error || "Gemma error"));
-      else resolve(output.trim());
-    });
-
-    gemma.stdin.write(prompt);
-    gemma.stdin.end();
-  });
 }
 
 /* ---------------- Backward compatibility ---------------- */
