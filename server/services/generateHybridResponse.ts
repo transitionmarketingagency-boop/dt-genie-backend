@@ -1,5 +1,3 @@
-// server/services/generateHybridResponse.ts
-
 import { getTopChunks } from "../queryChunks.js";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
@@ -21,12 +19,15 @@ let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
+
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
+
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
   }
+
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
 
@@ -41,13 +42,11 @@ function isGreeting(text: string) {
   return ["hi", "hello", "hey", "who are you"].includes(t);
 }
 
-function isServicesIntent(text: string) {
+function isServiceCountIntent(text: string) {
   const t = text.toLowerCase();
   return (
-    t.includes("services") ||
-    t.includes("what do you do") ||
-    t.includes("tell me about your company") ||
-    t.includes("what does digital transition marketing")
+    t.includes("how many services") ||
+    t.includes("number of services")
   );
 }
 
@@ -58,60 +57,61 @@ function isTaglineIntent(text: string) {
 
 function isTargetMarketIntent(text: string) {
   const t = text.toLowerCase();
-  return t.includes("target market") || t.includes("audience") || t.includes("clients");
+  return (
+    t.includes("target market") ||
+    t.includes("ideal client") ||
+    t.includes("who do you serve")
+  );
 }
 
 function isMissionIntent(text: string) {
-  const t = text.toLowerCase();
-  return t.includes("mission");
+  return text.toLowerCase().includes("mission");
 }
 
 function isNichesIntent(text: string) {
   const t = text.toLowerCase();
-  return t.includes("niches") || t.includes("specialize") || t.includes("industry");
+  return (
+    t.includes("niches") ||
+    t.includes("specialize") ||
+    t.includes("industry")
+  );
 }
 
-function isAIContentIntent(text: string) {
-  const t = text.toLowerCase();
-  return t.includes("ai content") || t.includes("content marketing") || t.includes("repurposing");
-}
-
-/* ================= STATIC TRUSTED ANSWERS ================= */
-
-function servicesAnswer() {
-  return `
-Digital Transition Marketing helps businesses transition into the digital future using high-impact, AI-driven systems.
-
-Our core services include:
-
-• AI-powered marketing & automation systems
-• Performance advertising (Google, paid social, funnels)
-• SEO, AI SEO, and voice search optimization
-• CGI ads and virtual property tours for real estate
-• Analytics, tracking, and growth intelligence
-• Scalable growth strategies and systemized marketing execution
-
-We don’t just run campaigns — we build digital growth systems designed to scale.
-`.trim();
-}
+/* ================= STATIC ANSWERS ================= */
 
 function taglineAnswer() {
   return "Transitioning your business to the digital age.";
 }
 
+function serviceCountAnswer() {
+  return `
+Digital Transition Marketing offers five core service pillars:
+
+1. AI-Powered Marketing & Automation Systems  
+2. Performance Advertising (Google, Paid Social & Funnels)  
+3. SEO, AI SEO & Voice Search Optimization  
+4. CGI Ads & Virtual Property Tours  
+5. Analytics, Tracking & Growth Intelligence  
+
+Each service integrates into a scalable digital growth system designed for long-term performance.
+`.trim();
+}
+
 function targetMarketAnswer() {
   return `
-Our ideal clients are forward-thinking businesses seeking digital transformation, including:
+Our ideal clients include:
 
-• Real Estate Developers & Agencies
-• Travel and Tour Agencies
-• E-commerce Brands
+• Real Estate Developers & Agencies  
+• Travel and Tour Agencies  
+• E-commerce Brands  
+
+We work with businesses ready to scale through AI-driven digital systems.
 `.trim();
 }
 
 function missionAnswer() {
   return `
-Our mission is to empower businesses to confidently navigate and dominate the digital future through AI-driven marketing, automation, and growth systems.
+Our mission is to empower businesses to dominate the digital future using AI-driven marketing, automation, and performance growth systems.
 `.trim();
 }
 
@@ -119,24 +119,13 @@ function nichesAnswer() {
   return `
 Digital Transition Marketing specializes in:
 
-• Real Estate Developers & Agencies — CGI ads and virtual tours
-• Travel & Tour Agencies — AI-driven marketing & automation
-• E-commerce Brands — scalable digital growth systems
+• Real Estate — CGI ads & virtual property tours  
+• Travel & Tourism — AI marketing & automation  
+• E-commerce — Scalable growth systems & paid acquisition
 `.trim();
 }
 
-function aiContentAnswer() {
-  return `
-AI-Optimized Content Creation & Repurposing includes:
-
-• Strategic ideation & market research
-• Drafting, SEO & voice search optimization
-• Automated content repurposing across platforms
-• Audience personalization & ROI maximization
-`.trim();
-}
-
-/* ---------------- Persona Loader ---------------- */
+/* ================= PERSONA LOADER ================= */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -144,14 +133,14 @@ const personaPath = path.join(__dirname, "../personas/neon-vision.json");
 
 let systemPersona: any = {
   name: BOT_NAME,
-  tone: "professional, clear, helpful",
+  tone: "professional, strategic, confident",
 };
 
 if (fs.existsSync(personaPath)) {
   try {
     systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
     console.log("✅ Persona loaded");
-  } catch (err) {
+  } catch {
     console.warn("⚠️ Persona JSON invalid, using fallback.");
   }
 }
@@ -159,7 +148,22 @@ if (fs.existsSync(personaPath)) {
 /* ================= QUALITY CHECK ================= */
 
 function isNonAnswer(text: string) {
-  return !text || text.trim().length < 60;
+  if (!text) return true;
+
+  const lower = text.toLowerCase();
+
+  if (text.trim().length < 60) return true;
+
+  if (
+    lower.includes("as a large language model") ||
+    lower.includes("as an ai language model") ||
+    lower.includes("i am an ai") ||
+    lower.includes("i do not have access")
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /* ================= MAIN RESPONSE ================= */
@@ -173,68 +177,108 @@ export async function generateHybridResponse(
 
     /* ---------- GREETING ---------- */
     if (isGreeting(userMessage)) {
-      const r = `I’m ${BOT_NAME}, the AI assistant for Digital Transition Marketing.`;
+      const r = `I’m ${BOT_NAME}, the AI operating system behind Digital Transition Marketing. How can I assist you today?`;
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
 
-    /* ---------- STATIC INTENT ANSWERS ---------- */
-    if (isServicesIntent(userMessage)) return await returnStatic(servicesAnswer(), userId);
-    if (isTaglineIntent(userMessage)) return await returnStatic(taglineAnswer(), userId);
-    if (isTargetMarketIntent(userMessage)) return await returnStatic(targetMarketAnswer(), userId);
-    if (isMissionIntent(userMessage)) return await returnStatic(missionAnswer(), userId);
-    if (isNichesIntent(userMessage)) return await returnStatic(nichesAnswer(), userId);
-    if (isAIContentIntent(userMessage)) return await returnStatic(aiContentAnswer(), userId);
+    /* ---------- DETERMINISTIC ANSWERS ---------- */
+    if (isServiceCountIntent(userMessage))
+      return await returnStatic(serviceCountAnswer(), userId);
+
+    if (isTaglineIntent(userMessage))
+      return await returnStatic(taglineAnswer(), userId);
+
+    if (isTargetMarketIntent(userMessage))
+      return await returnStatic(targetMarketAnswer(), userId);
+
+    if (isMissionIntent(userMessage))
+      return await returnStatic(missionAnswer(), userId);
+
+    if (isNichesIntent(userMessage))
+      return await returnStatic(nichesAnswer(), userId);
 
     /* ---------- KNOWLEDGE RETRIEVAL ---------- */
-    const chunks = getTopChunks(userMessage, 6);
-    const history = await memoryService.getHistory(userId);
+
+    const chunks = getTopChunks(userMessage, 3);
 
     const knowledge =
       chunks.length > 0
         ? chunks.map((c: any) => c.text || "").join("\n\n")
-        : "No direct knowledge match found.";
+        : "No additional knowledge retrieved.";
 
-    const context = `
-You are ${systemPersona.name}.
-Respond clearly, professionally, and concisely.
+    const history = await memoryService.getHistory(userId);
 
-CONVERSATION HISTORY:
-${history.map((h: any) => `${h.role}: ${h.content}`).join("\n")}
+    // FIX: Removed role prefix to prevent "Assistant:" bleed
+    const shortHistory =
+      history.slice(-4).map((h: any) => h.content).join("\n") || "None";
+
+    /* ---------- GEMMA-OPTIMIZED PROMPT ---------- */
+
+    const prompt = `
+You are ${BOT_NAME}, the official AI system of Digital Transition Marketing.
+You represent the company directly.
+Never say you are an AI model.
+Never mention being a language model.
+Answer confidently and professionally.
+Base answers strictly on company services and strategy.
 
 COMPANY KNOWLEDGE:
 ${knowledge}
 
+RECENT CONTEXT:
+${shortHistory}
+
 USER QUESTION:
 ${userMessage}
+
+FINAL ANSWER:
 `;
 
-    let response = cleanResponse(await generateGemma(context));
+    /* ---------- PRIMARY: GEMMA ---------- */
+
+    let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
+
+    /* ---------- DRIFT RESET ---------- */
+
+    if (
+      response.toLowerCase().includes("large language model") ||
+      response.toLowerCase().includes("as an ai")
+    ) {
+      response = "";
+    }
+
+    /* ---------- FALLBACK: GEMINI ---------- */
 
     if (isNonAnswer(response) && canUseGemini()) {
       try {
-        response = cleanResponse(await generateGemini(context));
+        const geminiResponse = await generateGemini(prompt);
+        response = cleanResponse(geminiResponse);
         markGeminiUsed();
         modelUsed = "Gemini";
-      } catch (err) {
-        console.warn("⚠️ Gemini failed:", err);
+      } catch {
+        console.warn("⚠️ Gemini fallback failed.");
       }
     }
 
+    /* ---------- FINAL SAFETY ---------- */
+
     if (isNonAnswer(response)) {
       response =
-        "I can help with our services, AI systems, growth strategy, automation solutions, or booking a strategy call. What would you like to explore?";
+        "Digital Transition Marketing provides AI-driven marketing systems, CGI advertising solutions, automation frameworks, and scalable growth strategies. How would you like to explore our services?";
     }
 
     response = enforceBotName(response);
+
     console.log(`[Hybrid] Model=${modelUsed}`);
 
     await memoryService.addMessage(userId, "assistant", response);
+
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
     console.error("Hybrid error FULL:", err);
-    return `I’m experiencing a temporary processing issue, but I can still help with our services, CGI marketing, AI systems, or booking a call. What would you like to explore?`;
+    return `We’re experiencing a temporary processing issue, but I can still guide you through our services and growth systems.`;
   }
 }
 

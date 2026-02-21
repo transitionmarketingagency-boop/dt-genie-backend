@@ -91,3 +91,8 @@ server/memory/
 env_files_list.txt
 last_modified_50.txt
 nul
+# Vector databases
+server/vector_store/*.db
+server/vector_store/*.bak
+server/vector_store/*.db_*
+server/vector_store/archived/
