@@ -96,3 +96,37 @@ server/vector_store/*.db
 server/vector_store/*.bak
 server/vector_store/*.db_*
 server/vector_store/archived/
+
+
+# Experimental / local scripts
+buildPrompt.ts
+check_ai_logic.ts
+cleanResponse.ts
+compute_embedding.py
+cosine.ts
+embed_prompt.py
+embed_text.py
+fill_chunks.py
+fix_similarity_search.py
+fix_vector_store.py
+formatResponse.ts
+full_system_test.ts
+full_system_test_wrapper.js
+full_system_test_wrapper.mjs
+gemma_simple_test.ts
+live_bot_test.ts
+mergeDBs.ts
+rebuild_vector_store.js
+test-cosine.ts
+
+# Debug / forensic artifacts
+git_history.txt
+git_status.txt
+node_modules_list.txt
+full_project_structure.txt
+
+# Local project copies
+project_blueprint_copy/
+
+# Generated data (if not production)
+chunks.json
