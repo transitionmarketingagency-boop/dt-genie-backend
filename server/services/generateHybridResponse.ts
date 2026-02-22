@@ -7,6 +7,9 @@ import { memoryService } from "./memoryService.js";
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { formatResponse } from "../utils/formatResponse.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
 
 /* ================= GEMINI HARD GATE ================= */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -29,17 +32,89 @@ function markGeminiUsed() {
   geminiUsage.count++;
 }
 
-/* ================= INTENT ROUTERS ================= */
+/* ================= INTENT HANDLERS ================= */
 function isGreeting(text: string) {
   const t = text.toLowerCase().trim();
   return ["hi", "hello", "hey", "who are you"].includes(t);
 }
 
-/* ================= PERSISTENT EMBEDDING CACHE ================= */
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+function isServiceIntent(text: string) {
+  const t = text.toLowerCase();
+  return (
+    t.includes("services") ||
+    t.includes("offer") ||
+    t.includes("what do you do") ||
+    t.includes("tell me about your services")
+  );
+}
 
+function isTaglineIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("tagline") || t.includes("slogan");
+}
+
+function isTargetMarketIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("target market") || t.includes("ideal client") || t.includes("who do you serve");
+}
+
+function isMissionIntent(text: string) {
+  return text.toLowerCase().includes("mission");
+}
+
+function isNichesIntent(text: string) {
+  const t = text.toLowerCase();
+  return t.includes("niches") || t.includes("specialize") || t.includes("industry");
+}
+
+/* ================= STATIC ANSWERS ================= */
+function taglineAnswer() {
+  return "Transitioning your business to the digital age.";
+}
+
+function serviceCountAnswer() {
+  return `
+Digital Transition Marketing offers five core service pillars:
+
+1. AI-Powered Marketing & Automation Systems
+2. Performance Advertising (Google, Paid Social & Funnels)
+3. SEO, AI SEO & Voice Search Optimization
+4. CGI Ads & Virtual Property Tours
+5. Analytics, Tracking & Growth Intelligence
+
+Each service integrates into a scalable digital growth system designed for long-term performance.
+`.trim();
+}
+
+function targetMarketAnswer() {
+  return `
+Our ideal clients include:
+
+• Real Estate Developers & Agencies
+• Travel and Tour Agencies
+• E-commerce Brands
+
+We work with businesses ready to scale through AI-driven digital systems.
+`.trim();
+}
+
+function missionAnswer() {
+  return `
+Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.
+`.trim();
+}
+
+function nichesAnswer() {
+  return `
+Digital Transition Marketing specializes in:
+
+• Real Estate — CGI ads & virtual property tours
+• Travel & Tourism — AI marketing & automation
+• E-commerce — Scalable growth systems & paid acquisition
+`.trim();
+}
+
+/* ================= PERSISTENT EMBEDDING CACHE ================= */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const EMB_CACHE_FILE = path.join(__dirname, ".embeddingCache.json");
@@ -72,7 +147,7 @@ async function getCachedEmbeddings(userMessage: string) {
   let chunks: any[] = [];
   try {
     const allChunks = await getTopChunks(userMessage, 10, 0.5);
-    const MAX_CHARS = 8000; // increase limit to capture full service/sub-service info
+    const MAX_CHARS = 8000;
     let charCount = 0;
     chunks = [];
     for (const c of allChunks) {
@@ -113,14 +188,21 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    // Simple dynamic greeting
+    // Dynamic greeting
     if (isGreeting(userMessage)) {
       const r = `I’m ${BOT_NAME}, the AI operating system behind Digital Transition Marketing. How can I assist you today?`;
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
 
-    // ================= EMBEDDING-BASED KNOWLEDGE =================
+    // Static intents
+    if (isServiceIntent(userMessage)) return await returnStatic(serviceCountAnswer(), userId);
+    if (isTaglineIntent(userMessage)) return await returnStatic(taglineAnswer(), userId);
+    if (isTargetMarketIntent(userMessage)) return await returnStatic(targetMarketAnswer(), userId);
+    if (isMissionIntent(userMessage)) return await returnStatic(missionAnswer(), userId);
+    if (isNichesIntent(userMessage)) return await returnStatic(nichesAnswer(), userId);
+
+    // Embedding-based knowledge
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
 
     const history = await memoryService.getHistory(userId);
@@ -150,11 +232,11 @@ ${userMessage}
 Provide a structured, expert-level response directly from the knowledge.
 `;
 
-    // PRIMARY MODEL: Gemma
+    // Primary model: Gemma
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
-    // FALLBACK MODEL: Gemini
+    // Fallback: Gemini
     if (isNonAnswer(response) && canUseGemini()) {
       try {
         const geminiResponse = await generateGemini(prompt);
@@ -167,7 +249,7 @@ Provide a structured, expert-level response directly from the knowledge.
       }
     }
 
-    // FINAL RETRY WITH Gemma
+    // Final retry with Gemma
     if (isNonAnswer(response)) {
       response = cleanResponse(await generateGemma(prompt + "\n\nBe more detailed and specific using only the knowledge provided."));
       modelUsed = "Gemma-Retry";
@@ -178,10 +260,16 @@ Provide a structured, expert-level response directly from the knowledge.
 
     await memoryService.addMessage(userId, "assistant", response);
 
+    // Final output
     return formatResponse(null, [{ content: response }], {});
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("Hybrid error FULL:", msg);
     return `We’re experiencing a temporary processing issue, but I can still guide you strategically.`;
   }
+}
+
+async function returnStatic(text: string, userId: string) {
+  await memoryService.addMessage(userId, "assistant", text);
+  return text;
 }
