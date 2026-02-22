@@ -1,4 +1,3 @@
-// server/queryChunks.js
 import fs from "fs";
 import path from "path";
 import { getEmbedding } from "./services/embeddingClient.js";
@@ -6,17 +5,12 @@ import { getEmbedding } from "./services/embeddingClient.js";
 const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
 const DEBUG = false;
 
-// ================= COSINE SIMILARITY =================
 function cosineSimilarity(vecA, vecB) {
-  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) {
-    return 0;
-  }
-
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) return 0;
   if (vecA.length !== vecB.length) {
     if (DEBUG) console.warn("Embedding dimension mismatch:", vecA.length, vecB.length);
     return 0;
   }
-
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < vecA.length; i++) {
     const a = vecA[i] || 0;
@@ -25,14 +19,11 @@ function cosineSimilarity(vecA, vecB) {
     normA += a * a;
     normB += b * b;
   }
-
   if (normA === 0 || normB === 0) return 0;
-
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-// ================= MAIN RETRIEVAL =================
-export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.30) {
+export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.20) { // lowered threshold
   try {
     if (!fs.existsSync(chunksPath)) {
       console.warn("chunks.json not found at", chunksPath);
@@ -40,32 +31,22 @@ export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.30) {
     }
 
     let chunks = [];
-    try {
-      chunks = JSON.parse(fs.readFileSync(chunksPath, "utf-8"));
-    } catch (err) {
-      console.error("Invalid chunks.json format:", err);
-      return [];
-    }
+    try { chunks = JSON.parse(fs.readFileSync(chunksPath, "utf-8")); }
+    catch (err) { console.error("Invalid chunks.json format:", err); return []; }
 
     if (!Array.isArray(chunks) || chunks.length === 0) {
-      console.warn("chunks.json is empty or invalid structure.");
-      return [];
+      console.warn("chunks.json is empty or invalid structure."); return [];
     }
 
     if (typeof queryText !== "string") queryText = String(queryText || "");
     if (!queryText.trim()) return [];
 
     let queryEmbedding;
-    try {
-      queryEmbedding = await getEmbedding(queryText);
-    } catch (err) {
-      console.error("Failed to generate query embedding:", err);
-      return [];
-    }
+    try { queryEmbedding = await getEmbedding(queryText); }
+    catch (err) { console.error("Failed to generate query embedding:", err); return []; }
 
     if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
-      console.error("Invalid query embedding.");
-      return [];
+      console.error("Invalid query embedding."); return [];
     }
 
     const scored = chunks

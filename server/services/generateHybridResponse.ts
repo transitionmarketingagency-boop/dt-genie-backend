@@ -200,9 +200,7 @@ function findMatchingIntent(userMessage: string) {
 
 function isNonAnswer(text: string) {
   if (!text) return true;
-  const trimmed = text.trim();
-  const lower = trimmed.toLowerCase();
-  if (trimmed.length < 40) return true;
+  const lower = text.toLowerCase();
   if (
     lower.includes("as a large language model") ||
     lower.includes("as an ai language model") ||
@@ -210,7 +208,7 @@ function isNonAnswer(text: string) {
     lower.includes("i am just an ai")
   )
     return true;
-  return false;
+  return false; // allow short factual answers
 }
 
 /* ================= EMBEDDING CACHE ================= */
@@ -244,7 +242,7 @@ function saveEmbeddingCache() {
 async function getCachedEmbeddings(userMessage: string) {
   let chunks: any[] = [];
   try {
-    const allChunks = await getTopChunks(userMessage, 20, 0.35);
+    const allChunks = await getTopChunks(userMessage, 20, 0.20); // lower threshold for niche queries
     const MAX_CHARS = 12000;
     let charCount = 0;
     for (const c of allChunks) {
@@ -297,7 +295,12 @@ export async function generateHybridResponse(
     const intentKnowledge = findMatchingIntent(userMessage);
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
 
-    const knowledge = [intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
+    // ALWAYS merge static service knowledge for fallback
+    const combinedKnowledge = [
+      serviceCountAnswer(),
+      intentKnowledge,
+      embeddingKnowledge,
+    ].filter(Boolean).join("\n\n");
 
     const history = await memoryService.getHistory(userId);
     const shortHistory = history.slice(-6).map(h => h.content).join("\n") || "None";
@@ -309,7 +312,7 @@ Never say you are an AI model.
 Use strategic, confident, professional tone from persona.
 
 COMPANY KNOWLEDGE:
-${knowledge || "Use internal strategic reasoning."}
+${combinedKnowledge}
 
 RECENT CONTEXT:
 ${shortHistory}
@@ -324,22 +327,18 @@ Provide a structured, expert-level response based on official services and brand
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
-    // FALLBACK: Gemini
-    if (isNonAnswer(response) && canUseGemini()) {
-      try {
-        const geminiResponse = await generateGemini(prompt);
-        response = cleanResponse(geminiResponse);
-        markGeminiUsed();
-        modelUsed = "Gemini";
-      } catch {
-        console.warn("⚠️ Gemini fallback failed");
+    // FALLBACK: Gemini only if truly empty
+    if (!response || isNonAnswer(response)) {
+      if (canUseGemini()) {
+        try {
+          const geminiResponse = await generateGemini(prompt);
+          response = cleanResponse(geminiResponse);
+          markGeminiUsed();
+          modelUsed = "Gemini";
+        } catch {
+          console.warn("⚠️ Gemini fallback failed");
+        }
       }
-    }
-
-    // FINAL RETRY
-    if (isNonAnswer(response)) {
-      response = cleanResponse(await generateGemma(prompt + "\n\nBe more detailed and specific."));
-      modelUsed = "Gemma-Retry";
     }
 
     response = enforceBotName(response);
