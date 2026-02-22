@@ -1,5 +1,4 @@
 // server/queryChunks.js
-
 import fs from "fs";
 import path from "path";
 import { getEmbedding } from "./services/embeddingClient.js";
@@ -9,29 +8,19 @@ const DEBUG = false;
 
 // ================= COSINE SIMILARITY =================
 function cosineSimilarity(vecA, vecB) {
-  if (
-    !Array.isArray(vecA) ||
-    !Array.isArray(vecB) ||
-    vecA.length === 0 ||
-    vecB.length === 0
-  ) return 0;
-
-  // Ensure equal dimensions
-  if (vecA.length !== vecB.length) {
-    if (DEBUG) {
-      console.warn("Embedding dimension mismatch:", vecA.length, vecB.length);
-    }
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) {
     return 0;
   }
 
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
+  if (vecA.length !== vecB.length) {
+    if (DEBUG) console.warn("Embedding dimension mismatch:", vecA.length, vecB.length);
+    return 0;
+  }
 
+  let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < vecA.length; i++) {
-    const a = vecA[i];
-    const b = vecB[i];
-
+    const a = vecA[i] || 0;
+    const b = vecB[i] || 0;
     dot += a * b;
     normA += a * a;
     normB += b * b;
@@ -66,7 +55,6 @@ export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.30) {
     if (typeof queryText !== "string") queryText = String(queryText || "");
     if (!queryText.trim()) return [];
 
-    // Generate query embedding
     let queryEmbedding;
     try {
       queryEmbedding = await getEmbedding(queryText);
@@ -91,20 +79,13 @@ export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.30) {
 
     if (scored.length === 0) return [];
 
-    // Apply similarity threshold
     const filtered = scored.filter(c => c.score >= minSimilarity);
+    const result = filtered.length > 0 ? filtered.slice(0, limit) : scored.slice(0, limit);
 
-    const result =
-      filtered.length > 0
-        ? filtered.slice(0, limit)
-        : scored.slice(0, limit); // fallback to best available
-
-    if (DEBUG) {
-      console.log("Top retrieval results:");
+    if (DEBUG && result.length > 0) {
+      console.log("Top chunks retrieved:");
       result.slice(0, 5).forEach((c, i) =>
-        console.log(
-          `${i + 1}. Score=${c.score.toFixed(4)} | ${c.text.slice(0, 80)}...`
-        )
+        console.log(`${i + 1}. Score=${c.score.toFixed(4)} | ${c.text.slice(0, 80)}...`)
       );
     }
 

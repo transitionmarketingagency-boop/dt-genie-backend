@@ -1,3 +1,4 @@
+// server/services/embeddingClient.ts
 import { execFile } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -10,9 +11,7 @@ const SCRIPT_PATH = path.resolve(__dirname, "../embeddings.py");
 
 export async function getEmbedding(text: string): Promise<number[]> {
   return new Promise((resolve, reject) => {
-    if (!text || !text.trim()) {
-      return resolve([]);
-    }
+    if (!text || !text.trim()) return resolve([]);
 
     execFile(
       PYTHON_PATH,
@@ -29,9 +28,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
         }
 
         try {
-          // Clean stdout in case Python prints logs
           const clean = stdout.trim();
-
           const parsed = JSON.parse(clean);
 
           if (!Array.isArray(parsed)) {
