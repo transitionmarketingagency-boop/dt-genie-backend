@@ -10,20 +10,37 @@ const SCRIPT_PATH = path.resolve(__dirname, "../embeddings.py");
 
 export async function getEmbedding(text: string): Promise<number[]> {
   return new Promise((resolve, reject) => {
+    if (!text || !text.trim()) {
+      return resolve([]);
+    }
+
     execFile(
       PYTHON_PATH,
       [SCRIPT_PATH, "--text", text],
-      { encoding: "utf8" },
+      { encoding: "utf8", maxBuffer: 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {
-          reject(error);
-          return;
+          console.error("Embedding process error:", error);
+          return reject(error);
+        }
+
+        if (stderr && stderr.trim()) {
+          console.warn("Embedding stderr:", stderr);
         }
 
         try {
-          const parsed = JSON.parse(stdout);
+          // Clean stdout in case Python prints logs
+          const clean = stdout.trim();
+
+          const parsed = JSON.parse(clean);
+
+          if (!Array.isArray(parsed)) {
+            throw new Error("Embedding response is not an array");
+          }
+
           resolve(parsed);
         } catch (err) {
+          console.error("Failed to parse embedding output:", stdout);
           reject(err);
         }
       }
@@ -31,5 +48,5 @@ export async function getEmbedding(text: string): Promise<number[]> {
   });
 }
 
-// backward compatibility (DO NOT REMOVE)
+// backward compatibility
 export { getEmbedding as embedText };
