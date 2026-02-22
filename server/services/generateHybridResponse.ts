@@ -12,19 +12,24 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 /* ================= GEMINI HARD GATE ================= */
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENABLED = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 20);
 const GEMINI_DAILY_LIMIT = 20;
+
 let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
+
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
+
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
   }
+
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
 
@@ -33,43 +38,73 @@ function markGeminiUsed() {
 }
 
 /* ================= INTENT HANDLERS ================= */
+
+function normalize(text: string) {
+  return text.toLowerCase().trim();
+}
+
 function isGreeting(text: string) {
-  const t = text.toLowerCase().trim();
-  return ["hi", "hello", "hey", "who are you"].includes(t);
+  const t = normalize(text);
+  return t === "hi" || t === "hello" || t === "hey";
+}
+
+function isIdentityIntent(text: string) {
+  const t = normalize(text);
+  return (
+    t.includes("who are you") ||
+    t.includes("about yourself") ||
+    t.includes("tell me about yourself")
+  );
 }
 
 function isServiceIntent(text: string) {
-  const t = text.toLowerCase();
+  const t = normalize(text);
   return (
-    t.includes("services") ||
-    t.includes("offer") ||
-    t.includes("what do you do") ||
+    t.includes("what services") ||
+    t.includes("list services") ||
     t.includes("tell me about your services") ||
-    t.includes("explain") ||
-    t.includes("describe")
+    t === "services"
+  );
+}
+
+function isPricingIntent(text: string) {
+  const t = normalize(text);
+  return (
+    t.includes("pricing") ||
+    t.includes("price") ||
+    t.includes("cost") ||
+    t.includes("how much")
   );
 }
 
 function isTaglineIntent(text: string) {
-  const t = text.toLowerCase();
-  return t.includes("tagline") || t.includes("slogan");
+  return normalize(text).includes("tagline") || normalize(text).includes("slogan");
 }
 
 function isTargetMarketIntent(text: string) {
-  const t = text.toLowerCase();
-  return t.includes("target market") || t.includes("ideal client") || t.includes("who do you serve");
+  const t = normalize(text);
+  return (
+    t.includes("target market") ||
+    t.includes("ideal client") ||
+    t.includes("who do you serve")
+  );
 }
 
 function isMissionIntent(text: string) {
-  return text.toLowerCase().includes("mission");
+  return normalize(text).includes("mission");
 }
 
 function isNichesIntent(text: string) {
-  const t = text.toLowerCase();
-  return t.includes("niches") || t.includes("specialize") || t.includes("industry");
+  const t = normalize(text);
+  return (
+    t.includes("niches") ||
+    t.includes("specialize") ||
+    t.includes("industry")
+  );
 }
 
 /* ================= STATIC ANSWERS ================= */
+
 function taglineAnswer() {
   return "Transitioning your business to the digital age.";
 }
@@ -83,14 +118,24 @@ function serviceCountAnswer() {
 4. CGI Ads & Virtual Property Tours
 5. Analytics, Tracking & Growth Intelligence
 
-Each service integrates into a scalable digital growth system designed for long-term performance.`;
+Each pillar integrates into a scalable digital growth system designed for long-term performance.`;
+}
+
+function pricingAnswer() {
+  return `Our pricing is customized based on:
+
+• Scope of services
+• Business size and objectives
+• Required automation and growth systems
+
+We develop tailored strategic proposals after understanding your goals and growth roadmap.`;
 }
 
 function targetMarketAnswer() {
   return `Our ideal clients include:
 
 • Real Estate Developers & Agencies
-• Travel and Tour Agencies
+• Travel & Tour Agencies
 • E-commerce Brands
 
 We work with businesses ready to scale through AI-driven digital systems.`;
@@ -105,15 +150,17 @@ function nichesAnswer() {
 
 • Real Estate — CGI ads & virtual property tours
 • Travel & Tourism — AI marketing & automation
-• E-commerce — Scalable growth systems & paid acquisition`;
+• E-commerce — scalable growth systems & paid acquisition`;
 }
 
 /* ================= PERSISTENT EMBEDDING CACHE ================= */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const EMB_CACHE_FILE = path.join(__dirname, ".embeddingCache.json");
 
 let embeddingCache: Map<string, string> = new Map();
+
 try {
   if (fs.existsSync(EMB_CACHE_FILE)) {
     const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
@@ -121,8 +168,8 @@ try {
     embeddingCache = new Map(Object.entries(obj));
     console.log(`✅ Loaded persistent embedding cache (${embeddingCache.size} entries)`);
   }
-} catch (err) {
-  console.warn("⚠️ Failed to load persistent embedding cache, starting fresh.");
+} catch {
+  console.warn("⚠️ Failed to load embedding cache, starting fresh.");
 }
 
 function saveEmbeddingCache() {
@@ -132,49 +179,68 @@ function saveEmbeddingCache() {
       JSON.stringify(Object.fromEntries(embeddingCache)),
       "utf-8"
     );
-  } catch (err) {
-    console.warn("⚠️ Failed to save embedding cache:", err);
+  } catch {
+    console.warn("⚠️ Failed to save embedding cache.");
   }
 }
 
 async function getCachedEmbeddings(userMessage: string) {
   let chunks: any[] = [];
+
   try {
-    const allChunks = await getTopChunks(userMessage, 20, 0.5); // increased for better coverage
-    const MAX_CHARS = 12000; // larger char limit to capture full service/sub-service info
+    const allChunks = await getTopChunks(userMessage, 20, 0.35);
+
+    const MAX_CHARS = 12000;
     let charCount = 0;
-    chunks = [];
+
     for (const c of allChunks) {
       let text = c.text || "";
-      if (embeddingCache.has(text)) text = embeddingCache.get(text)!;
-      else embeddingCache.set(text, text);
+
+      if (embeddingCache.has(text)) {
+        text = embeddingCache.get(text)!;
+      } else {
+        embeddingCache.set(text, text);
+      }
+
       if (charCount + text.length > MAX_CHARS) break;
+
       chunks.push({ ...c, text });
       charCount += text.length;
     }
+
     saveEmbeddingCache();
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn("⚠️ Retrieval failed, continuing without knowledge. Error:", msg);
+  } catch (err) {
+    console.warn("⚠️ Retrieval failed:", err);
   }
-  return chunks.map(c => c.text || "").join("\n\n");
+
+  const combined = chunks.map(c => c.text || "").join("\n\n");
+  console.log("🔎 Embedding length:", combined.length);
+
+  return combined;
 }
 
 /* ================= NON-ANSWER CHECK ================= */
+
 function isNonAnswer(text: string) {
   if (!text) return true;
-  const lower = text.toLowerCase();
-  if (text.trim().length < 25) return false; // reduced threshold
+
+  const trimmed = text.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (trimmed.length < 40) return true;
+
   if (
     lower.includes("as a large language model") ||
     lower.includes("as an ai language model") ||
-    lower.includes("i am an ai") ||
-    lower.includes("i do not have access")
+    lower.includes("i don't have access") ||
+    lower.includes("i am just an ai")
   ) return true;
+
   return false;
 }
 
 /* ================= MAIN RESPONSE ================= */
+
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -182,41 +248,50 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    // Dynamic greeting
+    /* ===== DIRECT ROUTING ===== */
+
     if (isGreeting(userMessage)) {
       const r = `I’m ${BOT_NAME}, the AI operating system behind Digital Transition Marketing. How can I assist you today?`;
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
 
-    // Static intents
+    if (isIdentityIntent(userMessage)) {
+      return await returnStatic(
+        `I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`,
+        userId
+      );
+    }
+
     if (isServiceIntent(userMessage)) return await returnStatic(serviceCountAnswer(), userId);
+    if (isPricingIntent(userMessage)) return await returnStatic(pricingAnswer(), userId);
     if (isTaglineIntent(userMessage)) return await returnStatic(taglineAnswer(), userId);
     if (isTargetMarketIntent(userMessage)) return await returnStatic(targetMarketAnswer(), userId);
     if (isMissionIntent(userMessage)) return await returnStatic(missionAnswer(), userId);
     if (isNichesIntent(userMessage)) return await returnStatic(nichesAnswer(), userId);
 
-    // Embedding-based knowledge
+    /* ===== EMBEDDING-DRIVEN RESPONSE ===== */
+
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
 
     const history = await memoryService.getHistory(userId);
-    const shortHistory = history.slice(-6).map(h => h.content).join("\n") || "None"; // slightly larger context
+    const shortHistory =
+      history.slice(-6).map(h => h.content).join("\n") || "None";
 
     const prompt = `
 You are ${BOT_NAME}, the official AI system of Digital Transition Marketing.
 You represent the company directly.
 Never say you are an AI model.
-Answer confidently and strategically.
 
-COMPANY KNOWLEDGE (from refined embeddings, all services & sub-services):
-${embeddingKnowledge || "Use only official knowledge from embedded data."}
+COMPANY KNOWLEDGE:
+${embeddingKnowledge || "No direct match found. Use structured brand knowledge logically."}
 
-IMPORTANT INSTRUCTIONS:
-1. Use only the provided knowledge to answer.
-2. Organize answers hierarchically by service/sub-service.
-3. Do not invent services or capabilities.
-4. Always provide a structured, professional, concise answer.
-5. Never insert links to book calls or Calendly.
+IMPORTANT:
+- Base your response primarily on company knowledge.
+- If knowledge is partial, answer strategically without inventing services.
+- Never fabricate offerings.
+- Structure responses clearly with headings where relevant.
+- Do not insert booking links unless explicitly asked.
 
 RECENT CONTEXT:
 ${shortHistory}
@@ -224,29 +299,27 @@ ${shortHistory}
 USER QUESTION:
 ${userMessage}
 
-Provide a complete, expert-level response directly from the knowledge.
+Provide a clear, expert-level response.
 `;
 
-    // Primary model: Gemma
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
-    // Fallback: Gemini (only if truly empty)
     if (isNonAnswer(response) && canUseGemini()) {
       try {
         const geminiResponse = await generateGemini(prompt);
         response = cleanResponse(geminiResponse);
         markGeminiUsed();
         modelUsed = "Gemini";
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn("⚠️ Gemini fallback failed. Error:", msg);
+      } catch (err) {
+        console.warn("⚠️ Gemini fallback failed:", err);
       }
     }
 
-    // Final retry with Gemma (use only knowledge)
     if (isNonAnswer(response)) {
-      response = cleanResponse(await generateGemma(prompt + "\n\nProvide a more detailed and structured answer using ONLY the knowledge above."));
+      response = cleanResponse(
+        await generateGemma(prompt + "\n\nProvide a more structured and detailed response.")
+      );
       modelUsed = "Gemma-Retry";
     }
 
@@ -256,9 +329,8 @@ Provide a complete, expert-level response directly from the knowledge.
     await memoryService.addMessage(userId, "assistant", response);
 
     return formatResponse(null, [{ content: response }], {});
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error("Hybrid error FULL:", msg);
+  } catch (err) {
+    console.error("Hybrid error FULL:", err);
     return `We’re experiencing a temporary processing issue, but I can still guide you strategically.`;
   }
 }
