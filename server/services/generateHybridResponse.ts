@@ -1,5 +1,4 @@
 // server/services/generateHybridResponse.ts
-
 import { getTopChunks } from "../queryChunks.js";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
@@ -110,7 +109,6 @@ function nichesAnswer() {
 • Real Estate — CGI ads & virtual property tours
 • Travel & Tourism — AI marketing & automation
 • E-commerce — scalable growth systems & paid acquisition`;
-}
 
 /* ================= PERSONA & AI INTENTS ================= */
 const __filename = fileURLToPath(import.meta.url);
@@ -214,12 +212,13 @@ async function getCachedEmbeddings(userMessage: string) {
   return chunks.map(c => c.text || "").join("\n\n");
 }
 
-/* ================= MAIN RESPONSE ================= */
+/* ================= STATIC HELPER ================= */
 async function returnStatic(text: string, userId: string) {
   await memoryService.addMessage(userId, "assistant", text);
   return text;
 }
 
+/* ================= MAIN RESPONSE ================= */
 export async function generateHybridResponse(userMessage: string, userId = "default-session"): Promise<string> {
   try {
     await memoryService.addMessage(userId, "user", userMessage);
@@ -297,5 +296,3 @@ Do NOT invent new services.
     return `We’re experiencing a temporary processing issue, but I can still guide you strategically.`;
   }
 }
-
-export { generateHybridResponse };

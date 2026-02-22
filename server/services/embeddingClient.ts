@@ -40,4 +40,5 @@ export async function getEmbedding(text: string): Promise<number[]> {
   });
 }
 
+// Alias for consistency
 export { getEmbedding as embedText };

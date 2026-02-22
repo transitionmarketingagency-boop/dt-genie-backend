@@ -5,6 +5,12 @@ import { getEmbedding } from "./services/embeddingClient.js";
 const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
 const DEBUG = true;
 
+interface Chunk {
+  text: string;
+  source?: string;
+  embedding: number[];
+}
+
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) return 0;
   if (vecA.length !== vecB.length) {
@@ -23,14 +29,18 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export async function getTopChunks(queryText: string, limit = 8, minSimilarity = 0.25) {
+export async function getTopChunks(
+  queryText: string,
+  limit = 8,
+  minSimilarity = 0.25
+): Promise<{ text: string; source: string | null; score: number }[]> {
   try {
     if (!fs.existsSync(chunksPath)) {
       console.warn("⚠️ chunks.json not found at", chunksPath);
       return [];
     }
 
-    let chunks: { text: string; source?: string; embedding: number[] }[] = [];
+    let chunks: Chunk[] = [];
     try {
       chunks = JSON.parse(fs.readFileSync(chunksPath, "utf-8"));
     } catch (err) {
