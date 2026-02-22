@@ -44,7 +44,9 @@ function isServiceIntent(text: string) {
     t.includes("services") ||
     t.includes("offer") ||
     t.includes("what do you do") ||
-    t.includes("tell me about your services")
+    t.includes("tell me about your services") ||
+    t.includes("explain") ||
+    t.includes("describe")
   );
 }
 
@@ -73,8 +75,7 @@ function taglineAnswer() {
 }
 
 function serviceCountAnswer() {
-  return `
-Digital Transition Marketing offers five core service pillars:
+  return `Digital Transition Marketing offers five core service pillars:
 
 1. AI-Powered Marketing & Automation Systems
 2. Performance Advertising (Google, Paid Social & Funnels)
@@ -82,36 +83,29 @@ Digital Transition Marketing offers five core service pillars:
 4. CGI Ads & Virtual Property Tours
 5. Analytics, Tracking & Growth Intelligence
 
-Each service integrates into a scalable digital growth system designed for long-term performance.
-`.trim();
+Each service integrates into a scalable digital growth system designed for long-term performance.`;
 }
 
 function targetMarketAnswer() {
-  return `
-Our ideal clients include:
+  return `Our ideal clients include:
 
 • Real Estate Developers & Agencies
 • Travel and Tour Agencies
 • E-commerce Brands
 
-We work with businesses ready to scale through AI-driven digital systems.
-`.trim();
+We work with businesses ready to scale through AI-driven digital systems.`;
 }
 
 function missionAnswer() {
-  return `
-Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.
-`.trim();
+  return `Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.`;
 }
 
 function nichesAnswer() {
-  return `
-Digital Transition Marketing specializes in:
+  return `Digital Transition Marketing specializes in:
 
 • Real Estate — CGI ads & virtual property tours
 • Travel & Tourism — AI marketing & automation
-• E-commerce — Scalable growth systems & paid acquisition
-`.trim();
+• E-commerce — Scalable growth systems & paid acquisition`;
 }
 
 /* ================= PERSISTENT EMBEDDING CACHE ================= */
@@ -146,8 +140,8 @@ function saveEmbeddingCache() {
 async function getCachedEmbeddings(userMessage: string) {
   let chunks: any[] = [];
   try {
-    const allChunks = await getTopChunks(userMessage, 10, 0.5);
-    const MAX_CHARS = 8000;
+    const allChunks = await getTopChunks(userMessage, 20, 0.5); // increased for better coverage
+    const MAX_CHARS = 12000; // larger char limit to capture full service/sub-service info
     let charCount = 0;
     chunks = [];
     for (const c of allChunks) {
@@ -170,7 +164,7 @@ async function getCachedEmbeddings(userMessage: string) {
 function isNonAnswer(text: string) {
   if (!text) return true;
   const lower = text.toLowerCase();
-  if (text.trim().length < 40) return true;
+  if (text.trim().length < 25) return false; // reduced threshold
   if (
     lower.includes("as a large language model") ||
     lower.includes("as an ai language model") ||
@@ -206,7 +200,7 @@ export async function generateHybridResponse(
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
 
     const history = await memoryService.getHistory(userId);
-    const shortHistory = history.slice(-4).map(h => h.content).join("\n") || "None";
+    const shortHistory = history.slice(-6).map(h => h.content).join("\n") || "None"; // slightly larger context
 
     const prompt = `
 You are ${BOT_NAME}, the official AI system of Digital Transition Marketing.
@@ -218,10 +212,11 @@ COMPANY KNOWLEDGE (from refined embeddings, all services & sub-services):
 ${embeddingKnowledge || "Use only official knowledge from embedded data."}
 
 IMPORTANT INSTRUCTIONS:
-1. Always use the provided knowledge to answer questions.
-2. Organize answers using service/sub-service hierarchy.
+1. Use only the provided knowledge to answer.
+2. Organize answers hierarchically by service/sub-service.
 3. Do not invent services or capabilities.
-4. Be structured, professional, and concise.
+4. Always provide a structured, professional, concise answer.
+5. Never insert links to book calls or Calendly.
 
 RECENT CONTEXT:
 ${shortHistory}
@@ -229,14 +224,14 @@ ${shortHistory}
 USER QUESTION:
 ${userMessage}
 
-Provide a structured, expert-level response directly from the knowledge.
+Provide a complete, expert-level response directly from the knowledge.
 `;
 
     // Primary model: Gemma
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
-    // Fallback: Gemini
+    // Fallback: Gemini (only if truly empty)
     if (isNonAnswer(response) && canUseGemini()) {
       try {
         const geminiResponse = await generateGemini(prompt);
@@ -249,9 +244,9 @@ Provide a structured, expert-level response directly from the knowledge.
       }
     }
 
-    // Final retry with Gemma
+    // Final retry with Gemma (use only knowledge)
     if (isNonAnswer(response)) {
-      response = cleanResponse(await generateGemma(prompt + "\n\nBe more detailed and specific using only the knowledge provided."));
+      response = cleanResponse(await generateGemma(prompt + "\n\nProvide a more detailed and structured answer using ONLY the knowledge above."));
       modelUsed = "Gemma-Retry";
     }
 
@@ -260,7 +255,6 @@ Provide a structured, expert-level response directly from the knowledge.
 
     await memoryService.addMessage(userId, "assistant", response);
 
-    // Final output
     return formatResponse(null, [{ content: response }], {});
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
