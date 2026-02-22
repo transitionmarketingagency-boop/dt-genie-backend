@@ -221,6 +221,11 @@ Answer confidently and strategically.
 COMPANY KNOWLEDGE:
 ${knowledge || "Use internal strategic reasoning."}
 
+IMPORTANT:
+If knowledge conflicts with official service structure,
+prioritize the official 5 core service pillars of Digital Transition Marketing.
+Do NOT invent additional services.
+
 RECENT CONTEXT:
 ${shortHistory}
 
