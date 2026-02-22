@@ -5,13 +5,13 @@ import path from "path";
 import { getEmbedding } from "./services/embeddingClient.js";
 
 const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
-const DEBUG = false; // set true to log top chunks for debugging
+const DEBUG = false; // set true to log top chunks
 
 // ================= COSINE SIMILARITY =================
 function cosineSimilarity(vecA, vecB) {
-  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) return 0;
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0)
+    return 0;
 
-  // Pad shorter vector with zeros
   const len = Math.max(vecA.length, vecB.length);
   let dot = 0,
     normA = 0,
@@ -68,29 +68,30 @@ export async function getTopChunks(queryText, limit = 6, minSimilarity = 0.55) {
     }
 
     // Score chunks
-    const scored = [];
-    for (const chunk of chunks) {
-      if (!chunk || !chunk.text || !Array.isArray(chunk.embedding)) continue;
+    const scored = chunks
+      .filter(chunk => chunk && chunk.text && Array.isArray(chunk.embedding))
+      .map(chunk => ({
+        text: chunk.text,
+        source: chunk.source || null,
+        score: cosineSimilarity(queryEmbedding, chunk.embedding),
+      }))
+      // Sort descending by similarity
+      .sort((a, b) => b.score - a.score);
 
-      const similarity = cosineSimilarity(queryEmbedding, chunk.embedding);
+    // Fallback: if none meet minSimilarity, return top N anyway
+    const filtered = scored.filter(c => c.score >= minSimilarity);
+    const result = filtered.length > 0 ? filtered : scored.slice(0, limit);
 
-      if (similarity >= minSimilarity) {
-        scored.push({
-          text: chunk.text,
-          source: chunk.source || null,
-          score: similarity,
-        });
-      }
+    // Debug logging top chunks
+    if (DEBUG && result.length > 0) {
+      console.log("Top chunks:");
+      result.slice(0, 3).forEach((c, i) =>
+        console.log(`${i + 1}:`, c.text.slice(0, 100), "... Score:", c.score.toFixed(3))
+      );
     }
 
-    scored.sort((a, b) => b.score - a.score);
-
-    if (DEBUG && scored.length > 0) {
-      console.log("Top chunk:", scored[0].text.slice(0, 100), "...", "Score:", scored[0].score.toFixed(3));
-    }
-
-    // Handle limit = 0 as "no limit"
-    return limit > 0 ? scored.slice(0, limit) : scored;
+    // Return limited chunks, or all if limit = 0
+    return limit > 0 ? result.slice(0, limit) : result;
   } catch (err) {
     console.error("Vector retrieval error:", err);
     return [];
