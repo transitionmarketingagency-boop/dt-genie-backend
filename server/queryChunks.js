@@ -2,47 +2,33 @@
 
 import fs from "fs";
 import path from "path";
+import { getEmbedding } from "./services/embeddingClient.js";
 
 const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
 
-// Lightweight stopword list
-const STOPWORDS = new Set([
-  "the","is","are","a","an","and","or","of","to","in",
-  "for","on","with","by","at","from","as","that","this",
-  "it","be","was","were","will","can","could","should"
-]);
+// Cosine similarity
+function cosineSimilarity(vecA, vecB) {
+  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
 
-function tokenize(text) {
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .split(/\s+/)
-    .filter(word => word.length > 2 && !STOPWORDS.has(word));
-}
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
 
-function scoreChunk(queryTokens, chunkText) {
-  const chunkTokens = tokenize(chunkText);
-  const tokenSet = new Set(chunkTokens);
-
-  let score = 0;
-
-  for (const token of queryTokens) {
-    if (tokenSet.has(token)) score += 3;
-
-    for (const ct of chunkTokens) {
-      if (ct.includes(token) || token.includes(ct)) score += 1;
-    }
+  for (let i = 0; i < vecA.length; i++) {
+    dot += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
   }
 
-  for (const token of queryTokens) {
-    const frequency = chunkTokens.filter(t => t === token).length;
-    score += frequency;
-  }
+  normA = Math.sqrt(normA);
+  normB = Math.sqrt(normB);
 
-  return score;
+  if (normA === 0 || normB === 0) return 0;
+
+  return dot / (normA * normB);
 }
 
-export function getTopChunks(queryText, limit = 6) {
+export async function getTopChunks(queryText, limit = 6) {
   if (!fs.existsSync(chunksPath)) {
     console.warn("chunks.json not found.");
     return [];
@@ -57,36 +43,29 @@ export function getTopChunks(queryText, limit = 6) {
   }
 
   if (typeof queryText !== "string") queryText = String(queryText || "");
+  if (!queryText.trim()) return [];
 
-  const queryTokens = tokenize(queryText);
-  if (queryTokens.length === 0) return [];
+  let queryEmbedding;
+  try {
+    queryEmbedding = await getEmbedding(queryText);
+  } catch (err) {
+    console.error("Failed to generate query embedding:", err);
+    return [];
+  }
 
   const scored = [];
 
   for (const chunk of chunks) {
-    if (!chunk?.text || typeof chunk.text !== "string") continue;
+    if (!chunk?.embedding || !Array.isArray(chunk.embedding)) continue;
 
-    const score = scoreChunk(queryTokens, chunk.text);
-    if (score > 0) scored.push({ ...chunk, score });
+    const similarity = cosineSimilarity(queryEmbedding, chunk.embedding);
+
+    if (similarity > 0.55) { // safe relevance threshold
+      scored.push({ ...chunk, score: similarity });
+    }
   }
 
   scored.sort((a, b) => b.score - a.score);
 
   return scored.slice(0, limit);
-}
-
-/* ---------- CLI Mode ---------- */
-if (process.argv[1] && process.argv[1].includes("queryChunks.js")) {
-  const queryText = process.argv[2];
-  if (!queryText) {
-    console.log("Please provide a query text as the first argument");
-    process.exit(1);
-  }
-
-  const results = getTopChunks(queryText).map(c => ({
-    file: c.file,
-    score: c.score
-  }));
-
-  console.log("Top results:", results);
 }

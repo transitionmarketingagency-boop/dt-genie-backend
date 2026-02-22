@@ -44,10 +44,7 @@ function isGreeting(text: string) {
 
 function isServiceCountIntent(text: string) {
   const t = text.toLowerCase();
-  return (
-    t.includes("how many services") ||
-    t.includes("number of services")
-  );
+  return t.includes("how many services") || t.includes("number of services");
 }
 
 function isTaglineIntent(text: string) {
@@ -87,11 +84,11 @@ function serviceCountAnswer() {
   return `
 Digital Transition Marketing offers five core service pillars:
 
-1. AI-Powered Marketing & Automation Systems  
-2. Performance Advertising (Google, Paid Social & Funnels)  
-3. SEO, AI SEO & Voice Search Optimization  
-4. CGI Ads & Virtual Property Tours  
-5. Analytics, Tracking & Growth Intelligence  
+1. AI-Powered Marketing & Automation Systems
+2. Performance Advertising (Google, Paid Social & Funnels)
+3. SEO, AI SEO & Voice Search Optimization
+4. CGI Ads & Virtual Property Tours
+5. Analytics, Tracking & Growth Intelligence
 
 Each service integrates into a scalable digital growth system designed for long-term performance.
 `.trim();
@@ -101,9 +98,9 @@ function targetMarketAnswer() {
   return `
 Our ideal clients include:
 
-• Real Estate Developers & Agencies  
-• Travel and Tour Agencies  
-• E-commerce Brands  
+• Real Estate Developers & Agencies
+• Travel and Tour Agencies
+• E-commerce Brands
 
 We work with businesses ready to scale through AI-driven digital systems.
 `.trim();
@@ -111,7 +108,7 @@ We work with businesses ready to scale through AI-driven digital systems.
 
 function missionAnswer() {
   return `
-Our mission is to empower businesses to dominate the digital future using AI-driven marketing, automation, and performance growth systems.
+Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.
 `.trim();
 }
 
@@ -119,8 +116,8 @@ function nichesAnswer() {
   return `
 Digital Transition Marketing specializes in:
 
-• Real Estate — CGI ads & virtual property tours  
-• Travel & Tourism — AI marketing & automation  
+• Real Estate — CGI ads & virtual property tours
+• Travel & Tourism — AI marketing & automation
 • E-commerce — Scalable growth systems & paid acquisition
 `.trim();
 }
@@ -152,7 +149,7 @@ function isNonAnswer(text: string) {
 
   const lower = text.toLowerCase();
 
-  if (text.trim().length < 60) return true;
+  if (text.trim().length < 40) return true;
 
   if (
     lower.includes("as a large language model") ||
@@ -175,14 +172,12 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
-    /* ---------- GREETING ---------- */
     if (isGreeting(userMessage)) {
       const r = `I’m ${BOT_NAME}, the AI operating system behind Digital Transition Marketing. How can I assist you today?`;
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
 
-    /* ---------- DETERMINISTIC ANSWERS ---------- */
     if (isServiceCountIntent(userMessage))
       return await returnStatic(serviceCountAnswer(), userId);
 
@@ -198,33 +193,33 @@ export async function generateHybridResponse(
     if (isNichesIntent(userMessage))
       return await returnStatic(nichesAnswer(), userId);
 
-    /* ---------- KNOWLEDGE RETRIEVAL ---------- */
+    /* ===== FIXED: Await embedding-based retrieval ===== */
 
-    const chunks = getTopChunks(userMessage, 3);
+    let chunks: any[] = [];
+    try {
+      chunks = await getTopChunks(userMessage, 3);
+    } catch (err) {
+      console.warn("⚠️ Retrieval failed, continuing without knowledge.");
+    }
 
     const knowledge =
-      chunks.length > 0
+      chunks && chunks.length > 0
         ? chunks.map((c: any) => c.text || "").join("\n\n")
-        : "No additional knowledge retrieved.";
+        : "";
 
     const history = await memoryService.getHistory(userId);
 
-    // FIX: Removed role prefix to prevent "Assistant:" bleed
     const shortHistory =
       history.slice(-4).map((h: any) => h.content).join("\n") || "None";
-
-    /* ---------- GEMMA-OPTIMIZED PROMPT ---------- */
 
     const prompt = `
 You are ${BOT_NAME}, the official AI system of Digital Transition Marketing.
 You represent the company directly.
 Never say you are an AI model.
-Never mention being a language model.
-Answer confidently and professionally.
-Base answers strictly on company services and strategy.
+Answer confidently and strategically.
 
 COMPANY KNOWLEDGE:
-${knowledge}
+${knowledge || "Use internal strategic reasoning."}
 
 RECENT CONTEXT:
 ${shortHistory}
@@ -232,24 +227,11 @@ ${shortHistory}
 USER QUESTION:
 ${userMessage}
 
-FINAL ANSWER:
+Provide a structured, expert-level response.
 `;
-
-    /* ---------- PRIMARY: GEMMA ---------- */
 
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
-
-    /* ---------- DRIFT RESET ---------- */
-
-    if (
-      response.toLowerCase().includes("large language model") ||
-      response.toLowerCase().includes("as an ai")
-    ) {
-      response = "";
-    }
-
-    /* ---------- FALLBACK: GEMINI ---------- */
 
     if (isNonAnswer(response) && canUseGemini()) {
       try {
@@ -262,11 +244,11 @@ FINAL ANSWER:
       }
     }
 
-    /* ---------- FINAL SAFETY ---------- */
-
     if (isNonAnswer(response)) {
-      response =
-        "Digital Transition Marketing provides AI-driven marketing systems, CGI advertising solutions, automation frameworks, and scalable growth strategies. How would you like to explore our services?";
+      response = cleanResponse(
+        await generateGemma(prompt + "\n\nBe more detailed and specific.")
+      );
+      modelUsed = "Gemma-Retry";
     }
 
     response = enforceBotName(response);
@@ -278,11 +260,9 @@ FINAL ANSWER:
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
     console.error("Hybrid error FULL:", err);
-    return `We’re experiencing a temporary processing issue, but I can still guide you through our services and growth systems.`;
+    return `We’re experiencing a temporary processing issue, but I can still guide you strategically.`;
   }
 }
-
-/* ---------- Helper ---------- */
 
 async function returnStatic(text: string, userId: string) {
   await memoryService.addMessage(userId, "assistant", text);
