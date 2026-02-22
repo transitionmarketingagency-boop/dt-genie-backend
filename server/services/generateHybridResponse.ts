@@ -11,12 +11,10 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
-/* ================= GEMINI HARD GATE ================= */
-
+/* ================= GEMINI CONFIG ================= */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENABLED = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 20);
 const GEMINI_DAILY_LIMIT = 20;
-
 let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
@@ -35,126 +33,85 @@ function markGeminiUsed() {
 }
 
 /* ================= INTENT HANDLERS ================= */
-
 function normalize(text: string) {
-  return text.toLowerCase().trim();
+  return text.toLowerCase().trim().replace(/[^\w\s]/gi, "");
 }
 
 function isGreeting(text: string) {
   const t = normalize(text);
   return ["hi", "hello", "hey", "who are you"].includes(t);
 }
-
 function isIdentityIntent(text: string) {
   const t = normalize(text);
-  return (
-    t.includes("who are you") ||
-    t.includes("about yourself") ||
-    t.includes("tell me about yourself")
-  );
+  return t.includes("who are you") || t.includes("about yourself") || t.includes("tell me about yourself");
 }
-
 function isServiceIntent(text: string) {
   const t = normalize(text);
-  return (
-    t.includes("what services") ||
-    t.includes("list services") ||
-    t.includes("tell me about your services") ||
-    t === "services" ||
-    t.includes("how many services") ||
-    t.includes("number of services")
-  );
+  return t.includes("service") || t.includes("what services") || t.includes("list services");
 }
-
 function isPricingIntent(text: string) {
   const t = normalize(text);
-  return (
-    t.includes("pricing") ||
-    t.includes("price") ||
-    t.includes("cost") ||
-    t.includes("how much")
-  );
+  return t.includes("pricing") || t.includes("price") || t.includes("cost") || t.includes("how much");
 }
-
 function isTaglineIntent(text: string) {
   const t = normalize(text);
   return t.includes("tagline") || t.includes("slogan");
 }
-
 function isTargetMarketIntent(text: string) {
   const t = normalize(text);
-  return (
-    t.includes("target market") ||
-    t.includes("ideal client") ||
-    t.includes("who do you serve")
-  );
+  return t.includes("target market") || t.includes("ideal client") || t.includes("who do you serve");
 }
-
 function isMissionIntent(text: string) {
   return normalize(text).includes("mission");
 }
-
 function isNichesIntent(text: string) {
   const t = normalize(text);
-  return (
-    t.includes("niches") ||
-    t.includes("specialize") ||
-    t.includes("industry")
-  );
+  return t.includes("niches") || t.includes("specialize") || t.includes("industry");
 }
 
 /* ================= STATIC ANSWERS ================= */
-
 function taglineAnswer() {
   return "Transitioning your business to the digital age.";
 }
-
 function serviceCountAnswer() {
-  return `Digital Transition Marketing offers five core service pillars:
+  return `Digital Transition Marketing offers 14 official AI-powered services:
 
-1. AI-Powered Marketing & Automation Systems
-2. Performance Advertising (Google, Paid Social & Funnels)
-3. SEO, AI SEO & Voice Search Optimization
-4. CGI Ads & Virtual Property Tours
-5. Analytics, Tracking & Growth Intelligence
-
-Each pillar integrates into a scalable digital growth system designed for long-term performance.`;
+1. Voice Search Optimization (VSO)
+2. AI-Driven Email Marketing
+3. AI-Powered YouTube Ad Domination
+4. AI-Powered Website Design
+5. AI Virtual Tours
+6. AI-Powered Ad Warfare (Performance Marketing)
+7. AI Business Automation & Agents
+8. Next-Level Music Production
+9. Immersive CGI Marketing
+10. AI Video and Audio Production
+11. AI-Optimized Content
+12. AI-Powered Social Domination
+13. AI Search Domination (GEO & AI SEO)
+14. AI Predictive Analytics`;
 }
-
 function pricingAnswer() {
-  return `Our pricing is customized based on:
-
-• Scope of services
-• Business size and objectives
-• Required automation and growth systems
-
-We develop tailored strategic proposals after understanding your goals and growth roadmap.`;
+  return `Our pricing is customized based on scope, business size, and required growth systems. Tailored strategic proposals are provided after assessing client goals.`;
 }
-
 function targetMarketAnswer() {
-  return `Our ideal clients include:
+  return `Ideal clients:
 
 • Real Estate Developers & Agencies
-• Travel & Tour Agencies
-• E-commerce Brands
-
-We work with businesses ready to scale through AI-driven digital systems.`;
+• Travel & Tourism Agencies
+• E-commerce Brands`;
 }
-
 function missionAnswer() {
   return `Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.`;
 }
-
 function nichesAnswer() {
-  return `Digital Transition Marketing specializes in:
+  return `Specialties:
 
 • Real Estate — CGI ads & virtual property tours
 • Travel & Tourism — AI marketing & automation
 • E-commerce — scalable growth systems & paid acquisition`;
-}
 
 /* ================= PERSONA & AI INTENTS ================= */
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -180,15 +137,15 @@ if (fs.existsSync(intentFolder)) {
       console.warn(`⚠️ Failed to load ${f}, skipping`);
     }
   }
-  console.log(`✅ Loaded ${aiIntents.length} Neon Vision JSONs`);
+  console.log(`✅ Loaded ${aiIntents.length} Neon Vision JSON intents`);
 }
 
 function findMatchingIntent(userMessage: string) {
-  const msg = userMessage.toLowerCase();
+  const msg = normalize(userMessage);
   for (const intent of aiIntents) {
     if (!intent || !intent.triggers || !intent.responses) continue;
     for (const trig of intent.triggers) {
-      if (msg.includes(trig.toLowerCase())) {
+      if (msg.includes(normalize(trig))) {
         return intent.responses.join("\n\n");
       }
     }
@@ -197,25 +154,21 @@ function findMatchingIntent(userMessage: string) {
 }
 
 /* ================= NON-ANSWER CHECK ================= */
-
 function isNonAnswer(text: string) {
   if (!text) return true;
   const lower = text.toLowerCase();
-  if (
-    lower.includes("as a large language model") ||
-    lower.includes("as an ai language model") ||
-    lower.includes("i don't have access") ||
-    lower.includes("i am just an ai")
-  )
-    return true;
-  return false; // allow short factual answers
+  const blockPhrases = [
+    "as a large language model",
+    "as an ai language model",
+    "i don't have access",
+    "i am just an ai"
+  ];
+  return blockPhrases.some(p => lower.includes(p));
 }
 
 /* ================= EMBEDDING CACHE ================= */
-
 const EMB_CACHE_FILE = path.join(__dirname, ".embeddingCache.json");
 let embeddingCache: Map<string, string> = new Map();
-
 try {
   if (fs.existsSync(EMB_CACHE_FILE)) {
     const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
@@ -229,11 +182,7 @@ try {
 
 function saveEmbeddingCache() {
   try {
-    fs.writeFileSync(
-      EMB_CACHE_FILE,
-      JSON.stringify(Object.fromEntries(embeddingCache)),
-      "utf-8"
-    );
+    fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(embeddingCache)), "utf-8");
   } catch {
     console.warn("⚠️ Failed to save embedding cache.");
   }
@@ -242,7 +191,8 @@ function saveEmbeddingCache() {
 async function getCachedEmbeddings(userMessage: string) {
   let chunks: any[] = [];
   try {
-    const allChunks = await getTopChunks(userMessage, 20, 0.20); // lower threshold for niche queries
+    const allChunks = await getTopChunks(userMessage, 20, 0.25); // safer threshold
+    console.log(`🟢 Retrieved ${allChunks.length} chunks for message: "${userMessage}"`);
     const MAX_CHARS = 12000;
     let charCount = 0;
     for (const c of allChunks) {
@@ -258,17 +208,13 @@ async function getCachedEmbeddings(userMessage: string) {
     }
     saveEmbeddingCache();
   } catch (err) {
-    console.warn("⚠️ Retrieval failed:", err);
+    console.warn("⚠️ Embedding retrieval failed:", err);
   }
   return chunks.map(c => c.text || "").join("\n\n");
 }
 
 /* ================= MAIN RESPONSE ================= */
-
-export async function generateHybridResponse(
-  userMessage: string,
-  userId = "default-session"
-): Promise<string> {
+export async function generateHybridResponse(userMessage: string, userId = "default-session"): Promise<string> {
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
@@ -278,12 +224,7 @@ export async function generateHybridResponse(
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
-    if (isIdentityIntent(userMessage)) {
-      return await returnStatic(
-        `I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`,
-        userId
-      );
-    }
+    if (isIdentityIntent(userMessage)) return await returnStatic(`I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`, userId);
     if (isServiceIntent(userMessage)) return await returnStatic(serviceCountAnswer(), userId);
     if (isPricingIntent(userMessage)) return await returnStatic(pricingAnswer(), userId);
     if (isTaglineIntent(userMessage)) return await returnStatic(taglineAnswer(), userId);
@@ -295,20 +236,14 @@ export async function generateHybridResponse(
     const intentKnowledge = findMatchingIntent(userMessage);
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
 
-    // ALWAYS merge static service knowledge for fallback
-    const combinedKnowledge = [
-      serviceCountAnswer(),
-      intentKnowledge,
-      embeddingKnowledge,
-    ].filter(Boolean).join("\n\n");
+    const combinedKnowledge = [serviceCountAnswer(), intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
 
     const history = await memoryService.getHistory(userId);
-    const shortHistory = history.slice(-6).map(h => h.content).join("\n") || "None";
+    const shortHistory = history.slice(-10).map(h => h.content).join("\n") || "None";
 
     const prompt = `
 You are ${BOT_NAME}, the official AI system of Digital Transition Marketing.
-You represent the company directly.
-Never say you are an AI model.
+Represent the company directly. Never say you are an AI model.
 Use strategic, confident, professional tone from persona.
 
 COMPANY KNOWLEDGE:
@@ -320,7 +255,8 @@ ${shortHistory}
 USER QUESTION:
 ${userMessage}
 
-Provide a structured, expert-level response based on official services and brand knowledge.
+Provide an expert-level response based on official services, persona, and brand knowledge.
+Do NOT invent new services.
 `;
 
     // PRIMARY MODEL: Gemma
@@ -342,7 +278,7 @@ Provide a structured, expert-level response based on official services and brand
     }
 
     response = enforceBotName(response);
-    console.log(`[Hybrid] Model=${modelUsed}`);
+    console.log(`[Hybrid] Model=${modelUsed}, UserMessage="${userMessage}"`);
     await memoryService.addMessage(userId, "assistant", response);
 
     return formatResponse(null, [{ content: response }], {});

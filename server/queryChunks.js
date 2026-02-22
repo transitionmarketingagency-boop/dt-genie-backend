@@ -1,9 +1,10 @@
+// server/queryChunks.js
 import fs from "fs";
 import path from "path";
 import { getEmbedding } from "./services/embeddingClient.js";
 
 const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
-const DEBUG = false;
+const DEBUG = true;
 
 function cosineSimilarity(vecA, vecB) {
   if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) return 0;
@@ -23,7 +24,7 @@ function cosineSimilarity(vecA, vecB) {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.20) { // lowered threshold
+export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.25) {
   try {
     if (!fs.existsSync(chunksPath)) {
       console.warn("chunks.json not found at", chunksPath);
@@ -38,39 +39,32 @@ export async function getTopChunks(queryText, limit = 8, minSimilarity = 0.20) {
       console.warn("chunks.json is empty or invalid structure."); return [];
     }
 
-    if (typeof queryText !== "string") queryText = String(queryText || "");
-    if (!queryText.trim()) return [];
+    if (!queryText || !queryText.trim()) return [];
 
-    let queryEmbedding;
-    try { queryEmbedding = await getEmbedding(queryText); }
-    catch (err) { console.error("Failed to generate query embedding:", err); return []; }
-
+    const queryEmbedding = await getEmbedding(queryText);
     if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
       console.error("Invalid query embedding."); return [];
     }
 
     const scored = chunks
-      .filter(chunk => chunk && chunk.text && Array.isArray(chunk.embedding))
-      .map(chunk => ({
-        text: chunk.text,
-        source: chunk.source || null,
-        score: cosineSimilarity(queryEmbedding, chunk.embedding),
+      .filter(c => c && c.text && Array.isArray(c.embedding))
+      .map(c => ({
+        text: c.text,
+        source: c.source || null,
+        score: cosineSimilarity(queryEmbedding, c.embedding),
       }))
       .sort((a, b) => b.score - a.score);
 
-    if (scored.length === 0) return [];
-
-    const filtered = scored.filter(c => c.score >= minSimilarity);
-    const result = filtered.length > 0 ? filtered.slice(0, limit) : scored.slice(0, limit);
-
-    if (DEBUG && result.length > 0) {
-      console.log("Top chunks retrieved:");
-      result.slice(0, 5).forEach((c, i) =>
-        console.log(`${i + 1}. Score=${c.score.toFixed(4)} | ${c.text.slice(0, 80)}...`)
-      );
+    if (DEBUG) {
+      console.log(`🟢 ${scored.length} chunks scored for query "${queryText}"`);
+      scored.slice(0, 5).forEach((c, i) => {
+        console.log(`${i + 1}. Score=${c.score.toFixed(3)} | ${c.text.slice(0, 80)}...`);
+      });
     }
 
-    return result;
+    const filtered = scored.filter(c => c.score >= minSimilarity);
+    return filtered.length > 0 ? filtered.slice(0, limit) : scored.slice(0, limit);
+
   } catch (err) {
     console.error("Vector retrieval error:", err);
     return [];
