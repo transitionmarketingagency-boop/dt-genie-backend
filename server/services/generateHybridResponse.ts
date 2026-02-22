@@ -1,3 +1,5 @@
+// server/services/generateHybridResponse.ts
+
 import { getTopChunks } from "../queryChunks.js";
 import { generateGemma } from "./gemmaClient.js";
 import { generateGemini } from "./geminiClient.js";
@@ -19,15 +21,12 @@ let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
-
   const now = Date.now();
   const ONE_DAY = 24 * 60 * 60 * 1000;
-
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
   }
-
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
 
@@ -67,11 +66,7 @@ function isMissionIntent(text: string) {
 
 function isNichesIntent(text: string) {
   const t = text.toLowerCase();
-  return (
-    t.includes("niches") ||
-    t.includes("specialize") ||
-    t.includes("industry")
-  );
+  return t.includes("niches") || t.includes("specialize") || t.includes("industry");
 }
 
 /* ================= STATIC ANSWERS ================= */
@@ -137,30 +132,110 @@ if (fs.existsSync(personaPath)) {
   try {
     systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8"));
     console.log("✅ Persona loaded");
-  } catch {
-    console.warn("⚠️ Persona JSON invalid, using fallback.");
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("⚠️ Persona JSON invalid, using fallback. Error:", msg);
   }
+}
+
+/* ================= AI INTENT JSON LOADER ================= */
+
+const intentFolder = path.join(__dirname, "../ai_logic/neon_vision");
+const aiIntents: any[] = [];
+
+if (fs.existsSync(intentFolder)) {
+  const files = fs.readdirSync(intentFolder).filter(f => f.endsWith(".json"));
+  for (const f of files) {
+    try {
+      const data = JSON.parse(fs.readFileSync(path.join(intentFolder, f), "utf-8"));
+      aiIntents.push(data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`⚠️ Failed to load ${f}:`, msg);
+    }
+  }
+  console.log(`✅ Loaded ${aiIntents.length} Neon Vision JSONs`);
 }
 
 /* ================= QUALITY CHECK ================= */
 
 function isNonAnswer(text: string) {
   if (!text) return true;
-
   const lower = text.toLowerCase();
-
   if (text.trim().length < 40) return true;
-
   if (
     lower.includes("as a large language model") ||
     lower.includes("as an ai language model") ||
     lower.includes("i am an ai") ||
     lower.includes("i do not have access")
-  ) {
-    return true;
-  }
-
+  ) return true;
   return false;
+}
+
+/* ================= INTENT MATCHER ================= */
+
+function findMatchingIntent(userMessage: string) {
+  const msg = userMessage.toLowerCase();
+  for (const intent of aiIntents) {
+    if (!intent || !intent.triggers || !intent.responses) continue;
+    for (const trig of intent.triggers) {
+      if (msg.includes(trig.toLowerCase())) {
+        return intent.responses.join("\n\n");
+      }
+    }
+  }
+  return null;
+}
+
+/* ================= PERSISTENT EMBEDDING CACHE ================= */
+
+const EMB_CACHE_FILE = path.join(__dirname, ".embeddingCache.json");
+let embeddingCache: Map<string, string> = new Map();
+
+try {
+  if (fs.existsSync(EMB_CACHE_FILE)) {
+    const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
+    const obj = JSON.parse(raw);
+    embeddingCache = new Map(Object.entries(obj));
+    console.log(`✅ Loaded persistent embedding cache (${embeddingCache.size} entries)`);
+  }
+} catch (err) {
+  console.warn("⚠️ Failed to load persistent embedding cache, starting fresh.");
+}
+
+function saveEmbeddingCache() {
+  try {
+    fs.writeFileSync(
+      EMB_CACHE_FILE,
+      JSON.stringify(Object.fromEntries(embeddingCache)),
+      "utf-8"
+    );
+  } catch (err) {
+    console.warn("⚠️ Failed to save embedding cache:", err);
+  }
+}
+
+async function getCachedEmbeddings(userMessage: string) {
+  let chunks: any[] = [];
+  try {
+    const allChunks = await getTopChunks(userMessage, 0);
+    const MAX_CHARS = 4000;
+    let charCount = 0;
+    chunks = [];
+    for (const c of allChunks) {
+      let text = c.text || "";
+      if (embeddingCache.has(text)) text = embeddingCache.get(text)!;
+      else embeddingCache.set(text, text);
+      if (charCount + text.length > MAX_CHARS) break;
+      chunks.push({ ...c, text });
+      charCount += text.length;
+    }
+    saveEmbeddingCache();
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("⚠️ Retrieval failed, continuing without knowledge. Error:", msg);
+  }
+  return chunks.map(c => c.text || "").join("\n\n");
 }
 
 /* ================= MAIN RESPONSE ================= */
@@ -172,45 +247,29 @@ export async function generateHybridResponse(
   try {
     await memoryService.addMessage(userId, "user", userMessage);
 
+    // STATIC INTENT HANDLERS
     if (isGreeting(userMessage)) {
       const r = `I’m ${BOT_NAME}, the AI operating system behind Digital Transition Marketing. How can I assist you today?`;
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
+    if (isServiceCountIntent(userMessage)) return await returnStatic(serviceCountAnswer(), userId);
+    if (isTaglineIntent(userMessage)) return await returnStatic(taglineAnswer(), userId);
+    if (isTargetMarketIntent(userMessage)) return await returnStatic(targetMarketAnswer(), userId);
+    if (isMissionIntent(userMessage)) return await returnStatic(missionAnswer(), userId);
+    if (isNichesIntent(userMessage)) return await returnStatic(nichesAnswer(), userId);
 
-    if (isServiceCountIntent(userMessage))
-      return await returnStatic(serviceCountAnswer(), userId);
+    // ================= INTENT MATCHING
+    let intentKnowledge = findMatchingIntent(userMessage);
 
-    if (isTaglineIntent(userMessage))
-      return await returnStatic(taglineAnswer(), userId);
+    // ================= EMBEDDING-BASED KNOWLEDGE =================
+    const embeddingKnowledge = await getCachedEmbeddings(userMessage);
 
-    if (isTargetMarketIntent(userMessage))
-      return await returnStatic(targetMarketAnswer(), userId);
-
-    if (isMissionIntent(userMessage))
-      return await returnStatic(missionAnswer(), userId);
-
-    if (isNichesIntent(userMessage))
-      return await returnStatic(nichesAnswer(), userId);
-
-    /* ===== FIXED: Await embedding-based retrieval ===== */
-
-    let chunks: any[] = [];
-    try {
-      chunks = await getTopChunks(userMessage, 3);
-    } catch (err) {
-      console.warn("⚠️ Retrieval failed, continuing without knowledge.");
-    }
-
-    const knowledge =
-      chunks && chunks.length > 0
-        ? chunks.map((c: any) => c.text || "").join("\n\n")
-        : "";
+    // MERGE INTENT + EMBEDDING
+    const knowledge = [intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
 
     const history = await memoryService.getHistory(userId);
-
-    const shortHistory =
-      history.slice(-4).map((h: any) => h.content).join("\n") || "None";
+    const shortHistory = history.slice(-4).map(h => h.content).join("\n") || "None";
 
     const prompt = `
 You are ${BOT_NAME}, the official AI system of Digital Transition Marketing.
@@ -235,24 +294,26 @@ ${userMessage}
 Provide a structured, expert-level response.
 `;
 
+    // PRIMARY MODEL: Gemma
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
+    // FALLBACK MODEL: Gemini
     if (isNonAnswer(response) && canUseGemini()) {
       try {
         const geminiResponse = await generateGemini(prompt);
         response = cleanResponse(geminiResponse);
         markGeminiUsed();
         modelUsed = "Gemini";
-      } catch {
-        console.warn("⚠️ Gemini fallback failed.");
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn("⚠️ Gemini fallback failed. Error:", msg);
       }
     }
 
+    // FINAL RETRY WITH Gemma
     if (isNonAnswer(response)) {
-      response = cleanResponse(
-        await generateGemma(prompt + "\n\nBe more detailed and specific.")
-      );
+      response = cleanResponse(await generateGemma(prompt + "\n\nBe more detailed and specific."));
       modelUsed = "Gemma-Retry";
     }
 
@@ -263,8 +324,9 @@ Provide a structured, expert-level response.
     await memoryService.addMessage(userId, "assistant", response);
 
     return formatResponse(null, [{ content: response }], {});
-  } catch (err) {
-    console.error("Hybrid error FULL:", err);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("Hybrid error FULL:", msg);
     return `We’re experiencing a temporary processing issue, but I can still guide you strategically.`;
   }
 }

@@ -4,57 +4,40 @@ import fs from "fs";
 import path from "path";
 import { getEmbedding } from "./services/embeddingClient.js";
 
-const chunksPath = path.join(
-  process.cwd(),
-  "server",
-  "vector_store",
-  "chunks.json"
-);
+const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
+const DEBUG = false; // set true to log top chunks for debugging
 
 // ================= COSINE SIMILARITY =================
-
 function cosineSimilarity(vecA, vecB) {
-  if (
-    !Array.isArray(vecA) ||
-    !Array.isArray(vecB) ||
-    vecA.length !== vecB.length ||
-    vecA.length === 0
-  ) {
-    return 0;
-  }
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) return 0;
 
-  let dot = 0;
-  let normA = 0;
-  let normB = 0;
+  // Pad shorter vector with zeros
+  const len = Math.max(vecA.length, vecB.length);
+  let dot = 0,
+    normA = 0,
+    normB = 0;
 
-  for (let i = 0; i < vecA.length; i++) {
-    const a = vecA[i];
-    const b = vecB[i];
-
+  for (let i = 0; i < len; i++) {
+    const a = vecA[i] || 0;
+    const b = vecB[i] || 0;
     dot += a * b;
     normA += a * a;
     normB += b * b;
   }
 
-  normA = Math.sqrt(normA);
-  normB = Math.sqrt(normB);
-
   if (normA === 0 || normB === 0) return 0;
-
-  return dot / (normA * normB);
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 // ================= MAIN RETRIEVAL =================
-
-export async function getTopChunks(queryText, limit = 6) {
+export async function getTopChunks(queryText, limit = 6, minSimilarity = 0.55) {
   try {
     if (!fs.existsSync(chunksPath)) {
-      console.warn("chunks.json not found.");
+      console.warn("chunks.json not found at", chunksPath);
       return [];
     }
 
     let chunks = [];
-
     try {
       chunks = JSON.parse(fs.readFileSync(chunksPath, "utf-8"));
     } catch (err) {
@@ -62,14 +45,16 @@ export async function getTopChunks(queryText, limit = 6) {
       return [];
     }
 
-    if (typeof queryText !== "string") {
-      queryText = String(queryText || "");
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      console.warn("chunks.json is empty or invalid structure.");
+      return [];
     }
 
+    if (typeof queryText !== "string") queryText = String(queryText || "");
     if (!queryText.trim()) return [];
 
+    // Generate query embedding
     let queryEmbedding;
-
     try {
       queryEmbedding = await getEmbedding(queryText);
     } catch (err) {
@@ -82,25 +67,14 @@ export async function getTopChunks(queryText, limit = 6) {
       return [];
     }
 
-    const MIN_SIMILARITY = 0.75; // safer production threshold
+    // Score chunks
     const scored = [];
-
     for (const chunk of chunks) {
-      if (
-        !chunk ||
-        !chunk.text ||
-        !Array.isArray(chunk.embedding) ||
-        chunk.embedding.length !== queryEmbedding.length
-      ) {
-        continue;
-      }
+      if (!chunk || !chunk.text || !Array.isArray(chunk.embedding)) continue;
 
-      const similarity = cosineSimilarity(
-        queryEmbedding,
-        chunk.embedding
-      );
+      const similarity = cosineSimilarity(queryEmbedding, chunk.embedding);
 
-      if (similarity >= MIN_SIMILARITY) {
+      if (similarity >= minSimilarity) {
         scored.push({
           text: chunk.text,
           source: chunk.source || null,
@@ -111,7 +85,12 @@ export async function getTopChunks(queryText, limit = 6) {
 
     scored.sort((a, b) => b.score - a.score);
 
-    return scored.slice(0, limit);
+    if (DEBUG && scored.length > 0) {
+      console.log("Top chunk:", scored[0].text.slice(0, 100), "...", "Score:", scored[0].score.toFixed(3));
+    }
+
+    // Handle limit = 0 as "no limit"
+    return limit > 0 ? scored.slice(0, limit) : scored;
   } catch (err) {
     console.error("Vector retrieval error:", err);
     return [];
