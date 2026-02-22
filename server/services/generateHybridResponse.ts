@@ -110,6 +110,7 @@ function nichesAnswer() {
 • Real Estate — CGI ads & virtual property tours
 • Travel & Tourism — AI marketing & automation
 • E-commerce — scalable growth systems & paid acquisition`;
+}
 
 /* ================= PERSONA & AI INTENTS ================= */
 const __filename = fileURLToPath(import.meta.url);
@@ -191,7 +192,7 @@ function saveEmbeddingCache() {
 async function getCachedEmbeddings(userMessage: string) {
   let chunks: any[] = [];
   try {
-    const allChunks = await getTopChunks(userMessage, 20, 0.25); // safer threshold
+    const allChunks = await getTopChunks(userMessage, 20, 0.25);
     console.log(`🟢 Retrieved ${allChunks.length} chunks for message: "${userMessage}"`);
     const MAX_CHARS = 12000;
     let charCount = 0;
@@ -214,6 +215,11 @@ async function getCachedEmbeddings(userMessage: string) {
 }
 
 /* ================= MAIN RESPONSE ================= */
+async function returnStatic(text: string, userId: string) {
+  await memoryService.addMessage(userId, "assistant", text);
+  return text;
+}
+
 export async function generateHybridResponse(userMessage: string, userId = "default-session"): Promise<string> {
   try {
     await memoryService.addMessage(userId, "user", userMessage);
@@ -224,7 +230,11 @@ export async function generateHybridResponse(userMessage: string, userId = "defa
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
-    if (isIdentityIntent(userMessage)) return await returnStatic(`I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`, userId);
+    if (isIdentityIntent(userMessage))
+      return await returnStatic(
+        `I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`,
+        userId
+      );
     if (isServiceIntent(userMessage)) return await returnStatic(serviceCountAnswer(), userId);
     if (isPricingIntent(userMessage)) return await returnStatic(pricingAnswer(), userId);
     if (isTaglineIntent(userMessage)) return await returnStatic(taglineAnswer(), userId);
@@ -288,7 +298,4 @@ Do NOT invent new services.
   }
 }
 
-async function returnStatic(text: string, userId: string) {
-  await memoryService.addMessage(userId, "assistant", text);
-  return text;
-}
+export { generateHybridResponse };
