@@ -38,11 +38,9 @@ if (!fs.existsSync(dbDir)) {
   console.log("✅ Vector DB folder exists:", dbDir);
 }
 
-// ---------------- PYTHON PATH (cross-platform auto-detect, Render safe) ----------------
+// ---------------- PYTHON PATH (local only, Render-safe) ----------------
 let pythonPath = "";
 const venvDir = path.resolve(process.cwd(), ".venv");
-
-// Render detection
 const isRender = !!process.env.RENDER || !!process.env.RENDER_SERVICE_NAME;
 
 if (!isRender) {
@@ -54,13 +52,9 @@ if (!isRender) {
     pythonPath = fs.existsSync(linuxPython) ? linuxPython : "";
   }
 
-  if (!pythonPath) {
-    console.log("⚠️ Python not found locally. Embeddings disabled.");
-  } else {
-    console.log(`✅ Python detected: ${pythonPath}`);
-  }
+  if (!pythonPath) console.log("⚠️ Python not found locally. Embeddings disabled.");
+  else console.log(`✅ Python detected: ${pythonPath}`);
 } else {
-  // On Render: do not use Python
   pythonPath = "";
   console.log("⚠️ Render detected: embeddings disabled.");
 }
@@ -93,7 +87,6 @@ if (!isRender) {
 
         const cleanMessage = message.trim();
 
-        // Delegate to response manager
         const answer = await getBotResponse(cleanMessage, sessionId || "default", { pythonPath });
         return res.json({ answer });
       } catch (err) {

@@ -71,33 +71,44 @@ export async function getBotResponse(
     }
   }
 
-  // 3️⃣ Embedding-based retrieval ONLY if Python is available
+  // 3️⃣ Embedding-based retrieval (only if Python available and not Render)
   let knowledgeContext = "";
-  if (context?.pythonPath) {
+  const isRender = !!process.env.RENDER || !!process.env.RENDER_SERVICE_NAME;
+
+  if (context?.pythonPath && !isRender) {
     try {
       const chunks = await fetchRelevantChunks(question, 5);
       if (chunks.length > 0) {
         knowledgeContext = chunks.map((c) => c.summary).join("\n\n");
       }
     } catch (err) {
-      console.warn("⚠️ Embedding retrieval skipped (Python not available):", err);
+      console.warn("⚠️ Embedding retrieval skipped:", err);
     }
+  } else if (isRender) {
+    console.log("⚠️ Skipping embeddings on Render (safe).");
   } else {
-    console.log("⚠️ Skipping embeddings, Python not available (Render safe).");
+    console.log("⚠️ Python not available locally. Embeddings skipped.");
   }
 
-  // 4️⃣ Hybrid LLM (always runs, guarantees response)
-  try {
-    const hybridInput = knowledgeContext
-      ? `${knowledgeContext}\n\nUser Question: ${question}`
-      : question;
+  // 4️⃣ Hybrid LLM (only if not Render)
+  if (!isRender) {
+    try {
+      const hybridInput = knowledgeContext
+        ? `${knowledgeContext}\n\nUser Question: ${question}`
+        : question;
 
-    const finalResponse = await generateHybridResponse(hybridInput, sessionId || "default");
-    return finalResponse;
-  } catch (err) {
-    console.error("⚠️ Hybrid LLM error:", err);
+      const finalResponse = await generateHybridResponse(hybridInput, sessionId || "default");
+      return finalResponse;
+    } catch (err) {
+      console.error("⚠️ Hybrid LLM error:", err);
+    }
+  } else {
+    console.log("⚠️ Hybrid LLM skipped on Render.");
   }
 
   // 5️⃣ Fallback
-  return "I can help with strategy, AI tools, marketing, and digital transformation. Could you clarify your question for a detailed answer?";
+  return (
+    knowledgeContext ||
+    "I can help with strategy, AI tools, marketing, and digital transformation. Could you clarify your question for a detailed answer?"
+  );
 }
