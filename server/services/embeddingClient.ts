@@ -1,3 +1,4 @@
+// server/services/embeddingClient.ts
 import { execFile } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -16,7 +17,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
     execFile(
       PYTHON_PATH,
       [SCRIPT_PATH, "--text", text],
-      { encoding: "utf8", maxBuffer: 4 * 1024 * 1024 }, // increased buffer for long input
+      { encoding: "utf8", maxBuffer: 4 * 1024 * 1024 },
       (error, stdout, stderr) => {
         if (error) {
           console.error("⚠️ Embedding process error:", error);

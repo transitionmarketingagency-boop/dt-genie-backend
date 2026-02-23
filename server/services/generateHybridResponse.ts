@@ -1,11 +1,11 @@
 // server/services/generateHybridResponse.ts
-import { getTopChunks } from "../queryChunks.js";
-import { generateGemma } from "./gemmaClient.js";
-import { generateGemini } from "./geminiClient.js";
-import { memoryService } from "./memoryService.js";
-import { enforceBotName, BOT_NAME } from "../system/identity.js";
-import { cleanResponse } from "../utils/cleanResponse.js";
-import { formatResponse } from "../utils/formatResponse.js";
+import { getTopChunks } from "../queryChunks.js"; // ✅ added .js
+import { generateGemma } from "./gemmaClient.js"; // ✅ added .js
+import { generateGemini } from "./geminiClient.js"; // ✅ added .js
+import { memoryService } from "./memoryService.js"; // ✅ added .js
+import { enforceBotName, BOT_NAME } from "../system/identity.js"; // ✅ added .js
+import { cleanResponse } from "../utils/cleanResponse.js"; // ✅ added .js
+import { formatResponse } from "../utils/formatResponse.js"; // ✅ added .js
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -109,6 +109,7 @@ function nichesAnswer() {
 • Real Estate — CGI ads & virtual property tours
 • Travel & Tourism — AI marketing & automation
 • E-commerce — scalable growth systems & paid acquisition`;
+}
 
 /* ================= PERSONA & AI INTENTS ================= */
 const __filename = fileURLToPath(import.meta.url);

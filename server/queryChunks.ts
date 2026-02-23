@@ -1,18 +1,12 @@
 import fs from "fs";
 import path from "path";
-import { getEmbedding } from "./services/embeddingClient.js";
+import { getEmbedding } from "./services/embeddingClient.js"; // ✅ Correct ESM path
 
 const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
 const DEBUG = true;
 
-interface Chunk {
-  text: string;
-  source?: string;
-  embedding: number[];
-}
-
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) return 0;
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0) return 0;
   if (vecA.length !== vecB.length) {
     if (DEBUG) console.warn("Embedding dimension mismatch:", vecA.length, vecB.length);
     return 0;
@@ -33,14 +27,14 @@ export async function getTopChunks(
   queryText: string,
   limit = 8,
   minSimilarity = 0.25
-): Promise<{ text: string; source: string | null; score: number }[]> {
+) {
   try {
     if (!fs.existsSync(chunksPath)) {
       console.warn("⚠️ chunks.json not found at", chunksPath);
       return [];
     }
 
-    let chunks: Chunk[] = [];
+    let chunks: { text: string; source?: string; embedding: number[] }[] = [];
     try {
       chunks = JSON.parse(fs.readFileSync(chunksPath, "utf-8"));
     } catch (err) {
@@ -71,7 +65,7 @@ export async function getTopChunks(
       .sort((a, b) => b.score - a.score);
 
     if (DEBUG) {
-      console.log(`🟢 ${scored.length} chunks scored for query: "${queryText}"`);
+      console.log(` M-" ${scored.length} chunks scored for query: "${queryText}"`);
       scored.slice(0, 5).forEach((c, i) => {
         console.log(`${i + 1}. Score=${c.score.toFixed(3)} | ${c.text.slice(0, 80)}...`);
       });

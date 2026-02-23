@@ -1,5 +1,5 @@
-import { getTopChunks } from "./queryChunks.js";
-import { getEmbedding } from "./embeddings.js"; // correct path
+import { getTopChunks } from "./queryChunks.js"; // ✅ ESM-safe
+import { getEmbedding } from "./services/embeddingClient.js"; // ✅ Correct ESM path
 
 export type NormalizedChunk = {
   source: string;
@@ -11,11 +11,11 @@ export async function fetchRelevantChunks(
   limit = 8
 ): Promise<NormalizedChunk[]> {
 
-  // ⚡ Real embeddings
+  if (!query || !query.trim()) return [];
+
   const queryEmbedding: number[] = await getEmbedding(query);
 
-  // ---------------- Retrieve top chunks
-  const rawChunks = await getTopChunks(queryEmbedding, limit);
+  const rawChunks = await getTopChunks(query, limit);
   if (!Array.isArray(rawChunks)) return [];
 
   const normalized = rawChunks
@@ -32,11 +32,9 @@ export async function fetchRelevantChunks(
         summary: source.slice(0, 240)
       };
     })
-    // Drop empty / junk chunks
     .filter(c => c.source.length > 40)
     .slice(0, limit);
 
-  // ~M DIAGNOSTIC LOGGING
   console.log(" M-) Retrieved Chunks:");
   if (normalized.length === 0) {
     console.log("⚠️ No relevant chunks found");
