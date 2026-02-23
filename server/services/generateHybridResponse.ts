@@ -16,7 +16,6 @@ const GEMINI_ENABLED = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 20);
 const GEMINI_DAILY_LIMIT = 20;
 
 let geminiUsage = { count: 0, lastReset: Date.now() };
-
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
   const now = Date.now();
@@ -27,12 +26,9 @@ function canUseGemini(): boolean {
   }
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
+function markGeminiUsed() { geminiUsage.count++; }
 
-function markGeminiUsed() {
-  geminiUsage.count++;
-}
-
-/* ================= INTENT HANDLERS ================= */
+/* ================= INTENT & STATIC RESPONSES ================= */
 function normalize(text: string) {
   return text.toLowerCase().trim().replace(/[^\w\s]/gi, "");
 }
@@ -48,39 +44,12 @@ const staticIntents = {
   niches: ["niches", "specialize", "industry"],
 };
 
-/* ================= STATIC RESPONSES ================= */
-function taglineAnswer() {
-  return "Transitioning your business to the digital age.";
-}
-function serviceCountAnswer() {
-  return `Digital Transition Marketing offers 14 official AI-powered services:
-1. Voice Search Optimization (VSO)
-2. AI-Driven Email Marketing
-3. AI-Powered YouTube Ad Domination
-4. AI-Powered Website Design
-5. AI Virtual Tours
-6. AI-Powered Ad Warfare (Performance Marketing)
-7. AI Business Automation & Agents
-8. Next-Level Music Production
-9. Immersive CGI Marketing
-10. AI Video and Audio Production
-11. AI-Optimized Content
-12. AI-Powered Social Domination
-13. AI Search Domination (GEO & AI SEO)
-14. AI Predictive Analytics`;
-}
-function pricingAnswer() {
-  return "Our pricing is customized based on scope, business size, and required growth systems. Tailored strategic proposals are provided after assessing client goals.";
-}
-function targetMarketAnswer() {
-  return "Ideal clients: • Real Estate Developers & Agencies • Travel & Tourism Agencies • E-commerce Brands";
-}
-function missionAnswer() {
-  return "Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.";
-}
-function nichesAnswer() {
-  return "Specialties: • Real Estate — CGI ads & virtual property tours • Travel & Tourism — AI marketing & automation • E-commerce — scalable growth systems & paid acquisition";
-}
+// Persona greeting variations
+const greetingVariations = [
+  `I’m ${BOT_NAME}, your AI strategist at Digital Transition Marketing. How can I assist you today?`,
+  `Hello! ${BOT_NAME} here, ready to guide your business growth with AI-powered strategies.`,
+  `Hi! I’m ${BOT_NAME}, the AI behind Digital Transition Marketing's marketing excellence.`,
+];
 
 /* ================= PERSONA & AI INTENTS ================= */
 const __filename = fileURLToPath(import.meta.url);
@@ -97,7 +66,7 @@ if (fs.existsSync(personaPath)) {
   }
 }
 
-// Load all AI logic JSONs from all subfolders
+// Load all AI JSON intents
 const aiLogicRoot = path.join(__dirname, "../ai_logic");
 const aiIntents: any[] = [];
 
@@ -109,14 +78,14 @@ function loadJSONRecursive(dir: string) {
     if (stat.isDirectory()) loadJSONRecursive(fullPath);
     else if (f.endsWith(".json")) {
       try {
-        aiIntents.push(JSON.parse(fs.readFileSync(fullPath, "utf-8")));
+        const json = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+        if (json.triggers && json.responses) aiIntents.push(json);
       } catch {
-        console.warn(`⚠️ Failed to load ${fullPath}, skipping`);
+        console.warn(`⚠️ Failed to load ${fullPath}`);
       }
     }
   }
 }
-
 loadJSONRecursive(aiLogicRoot);
 console.log(`✅ Loaded ${aiIntents.length} AI logic JSON intents`);
 
@@ -124,7 +93,6 @@ console.log(`✅ Loaded ${aiIntents.length} AI logic JSON intents`);
 function findMatchingIntent(userMessage: string) {
   const msg = normalize(userMessage);
   for (const intent of aiIntents) {
-    if (!intent || !intent.triggers || !intent.responses) continue;
     for (const trig of intent.triggers) {
       if (msg.includes(normalize(trig))) {
         return intent.responses.join("\n\n");
@@ -154,30 +122,22 @@ let embeddingCache: Map<string, string> = new Map();
 try {
   if (fs.existsSync(EMB_CACHE_FILE)) {
     const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
-    const obj = JSON.parse(raw);
-    embeddingCache = new Map(Object.entries(obj));
+    embeddingCache = new Map(Object.entries(JSON.parse(raw)));
     console.log(`✅ Loaded persistent embedding cache (${embeddingCache.size} entries)`);
   }
-} catch {
-  console.warn("⚠️ Failed to load embedding cache, starting fresh.");
-}
+} catch { console.warn("⚠️ Failed to load embedding cache, starting fresh."); }
 
 function saveEmbeddingCache() {
-  try {
-    fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(embeddingCache)), "utf-8");
-  } catch {
-    console.warn("⚠️ Failed to save embedding cache.");
-  }
+  try { fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(embeddingCache)), "utf-8"); }
+  catch { console.warn("⚠️ Failed to save embedding cache."); }
 }
 
 async function getCachedEmbeddings(userMessage: string) {
-  let chunks: any[] = [];
+  const chunks: any[] = [];
   try {
     const allChunks = await getTopChunks(userMessage, 20, 0.25);
     console.log(`M-" Retrieved ${allChunks.length} chunks for message: "${userMessage}"`);
-    const MAX_CHARS = 12000;
-    let charCount = 0;
-
+    let charCount = 0, MAX_CHARS = 12000;
     for (const c of allChunks) {
       let text = c.text || "";
       if (embeddingCache.has(text)) text = embeddingCache.get(text)!;
@@ -186,59 +146,87 @@ async function getCachedEmbeddings(userMessage: string) {
       chunks.push({ ...c, text });
       charCount += text.length;
     }
-
     saveEmbeddingCache();
-  } catch (err) {
-    console.warn("⚠️ Embedding retrieval failed:", err);
-  }
-  return chunks.map((c) => c.text || "").join("\n\n");
+  } catch (err) { console.warn("⚠️ Embedding retrieval failed:", err); }
+  return chunks.map(c => c.text || "").join("\n\n");
 }
 
-/* ================= STATIC HELPER ================= */
-async function returnStatic(text: string, userId: string) {
-  await memoryService.addMessage(userId, "assistant", text);
-  return text;
+/* ================= DYNAMIC SERVICE & PRICING ANSWERS ================= */
+async function dynamicServiceAnswer(userMessage: string, userId: string) {
+  const embeddingKnowledge = await getCachedEmbeddings(userMessage);
+  const jsonKnowledge = findMatchingIntent(userMessage);
+  const combined = [embeddingKnowledge, jsonKnowledge].filter(Boolean).join("\n\n");
+  const prompt = `
+You are ${BOT_NAME}, the official AI of Digital Transition Marketing. Represent the company directly.
+Use professional, strategic, confident tone from persona.
+USER QUERY: ${userMessage}
+COMPANY KNOWLEDGE: ${combined}
+Provide a concise, bullet-pointed, expert-level response about our services. Include optional sub-services or details, but do NOT invent services.
+`;
+  const response = cleanResponse(await generateGemma(prompt));
+  await memoryService.addMessage(userId, "assistant", response);
+  return response;
+}
+
+async function dynamicPricingAnswer(userMessage: string, userId: string) {
+  const embeddingKnowledge = await getCachedEmbeddings(userMessage);
+  const jsonKnowledge = findMatchingIntent(userMessage);
+  const combined = [embeddingKnowledge, jsonKnowledge].filter(Boolean).join("\n\n");
+  const prompt = `
+You are ${BOT_NAME}, representing Digital Transition Marketing.
+Provide a clear, concise, context-aware pricing explanation for the services requested in USER QUERY.
+Avoid listing unrelated services. Base answer on official knowledge.
+USER QUERY: ${userMessage}
+COMPANY KNOWLEDGE: ${combined}
+`;
+  const response = cleanResponse(await generateGemma(prompt));
+  await memoryService.addMessage(userId, "assistant", response);
+  return response;
 }
 
 /* ================= MAIN RESPONSE ================= */
 export async function generateHybridResponse(userMessage: string, userId = "default-session"): Promise<string> {
   try {
     await memoryService.addMessage(userId, "user", userMessage);
-
-    // ===== STATIC ROUTING =====
     const msg = normalize(userMessage);
+
+    // ===== STATIC ROUTING WITH VARIATIONS =====
     if (staticIntents.greeting.includes(msg)) {
-      const r = `I’m ${BOT_NAME}, the AI operating system behind Digital Transition Marketing. How can I assist you today?`;
+      const r = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
-    if (staticIntents.identity.some((t) => msg.includes(t))) return await returnStatic(`I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`, userId);
-    if (staticIntents.service.some((t) => msg.includes(t))) return await returnStatic(serviceCountAnswer(), userId);
-    if (staticIntents.pricing.some((t) => msg.includes(t))) return await returnStatic(pricingAnswer(), userId);
-    if (staticIntents.tagline.some((t) => msg.includes(t))) return await returnStatic(taglineAnswer(), userId);
-    if (staticIntents.targetMarket.some((t) => msg.includes(t))) return await returnStatic(targetMarketAnswer(), userId);
-    if (staticIntents.mission.some((t) => msg.includes(t))) return await returnStatic(missionAnswer(), userId);
-    if (staticIntents.niches.some((t) => msg.includes(t))) return await returnStatic(nichesAnswer(), userId);
+    if (staticIntents.identity.some(t => msg.includes(t))) {
+      const r = `I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`;
+      await memoryService.addMessage(userId, "assistant", r);
+      return r;
+    }
+    if (staticIntents.service.some(t => msg.includes(t))) return await dynamicServiceAnswer(userMessage, userId);
+    if (staticIntents.pricing.some(t => msg.includes(t))) return await dynamicPricingAnswer(userMessage, userId);
+    if (staticIntents.tagline.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Transitioning your business to the digital age.");
+    if (staticIntents.targetMarket.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Ideal clients: • Real Estate Developers & Agencies • Travel & Tourism Agencies • E-commerce Brands");
+    if (staticIntents.mission.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.");
+    if (staticIntents.niches.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Specialties: • Real Estate — CGI ads & virtual property tours • Travel & Tourism — AI marketing & automation • E-commerce — scalable growth systems & paid acquisition");
 
     // ===== AI JSON + Embedding Retrieval =====
     const intentKnowledge = findMatchingIntent(userMessage);
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
-    const combinedKnowledge = [serviceCountAnswer(), intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
+    const combinedKnowledge = [intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
 
     const history = await memoryService.getHistory(userId);
-    const shortHistory = history.slice(-10).map((h) => h.content).join("\n") || "None";
+    const shortHistory = history.slice(-20).map(h => h.content).join("\n") || "None";
 
-    const prompt = `You are ${BOT_NAME}, the official AI system of Digital Transition Marketing. Represent the company directly. Never say you are an AI model. Use strategic, confident, professional tone from persona.
+    const prompt = `You are ${BOT_NAME}, official AI of Digital Transition Marketing. Represent the company directly. Never say you are an AI model. Use persona tone: ${systemPersona.tone}.
 COMPANY KNOWLEDGE: ${combinedKnowledge}
 RECENT CONTEXT: ${shortHistory}
 USER QUESTION: ${userMessage}
-Provide an expert-level response based on official services, persona, and brand knowledge. Do NOT invent new services.`;
+Provide an expert-level, strategic, concise response based on official services and knowledge.`;
 
     // ===== PRIMARY MODEL: Gemma =====
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
-    // ===== FALLBACK: Gemini if response empty =====
+    // ===== FALLBACK: Gemini =====
     if (!response || isNonAnswer(response)) {
       if (canUseGemini()) {
         try {
@@ -246,9 +234,7 @@ Provide an expert-level response based on official services, persona, and brand 
           response = cleanResponse(geminiResponse);
           markGeminiUsed();
           modelUsed = "Gemini";
-        } catch {
-          console.warn("⚠️ Gemini fallback failed");
-        }
+        } catch { console.warn("⚠️ Gemini fallback failed"); }
       }
     }
 
