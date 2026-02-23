@@ -38,26 +38,22 @@ if (!fs.existsSync(dbDir)) {
   console.log("✅ Vector DB folder exists:", dbDir);
 }
 
-// ---------------- PYTHON PATH (cross-platform auto-detect) ----------------
+// ---------------- PYTHON PATH (cross-platform auto-detect, Render safe) ----------------
 let pythonPath = "";
 const venvDir = path.resolve(process.cwd(), ".venv");
 
 if (process.platform === "win32") {
-  const venvPython = path.join(venvDir, "Scripts", "python.exe");
-  pythonPath = fs.existsSync(venvPython) ? venvPython : "python";
+  const winPython = path.join(venvDir, "Scripts", "python.exe");
+  pythonPath = fs.existsSync(winPython) ? winPython : "";
 } else {
-  const venvPython = path.join(venvDir, "bin", "python");
-  pythonPath = fs.existsSync(venvPython) ? venvPython : "python3";
+  const linuxPython = path.join(venvDir, "bin", "python");
+  pythonPath = fs.existsSync(linuxPython) ? linuxPython : "";
 }
 
-// Test if Python is available
-const { spawnSync } = await import("node:child_process");
-const pyTest = spawnSync(pythonPath, ["--version"]);
-if (pyTest.error) {
-  console.warn(`⚠️ Python not found or not executable (${pythonPath}). Embeddings will be disabled.`);
-  pythonPath = "";
+if (!pythonPath) {
+  console.log("⚠️ Python not found or not needed on Render. Embeddings disabled.");
 } else {
-  console.log(`✅ Python detected: ${pyTest.stdout.toString().trim() || pyTest.stderr.toString().trim()}`);
+  console.log(`✅ Python detected: ${pythonPath}`);
 }
 
 // ---------------- START SERVER ----------------

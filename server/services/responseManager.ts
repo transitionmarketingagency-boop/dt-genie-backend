@@ -1,4 +1,3 @@
-// server/services/responseManager.ts
 import fs from "fs";
 import { fetchRelevantChunks } from "../queryChunksWrapper.js";
 import { generateHybridResponse } from "./hybridClient.js";
@@ -72,21 +71,24 @@ export async function getBotResponse(
     }
   }
 
-  // 3️⃣ Embedding-based retrieval (only if Python is available)
+  // 3️⃣ Embedding-based retrieval ONLY if Python is available
   let knowledgeContext = "";
   if (context?.pythonPath) {
     try {
-      // FIXED: fetchRelevantChunks only accepts 1-2 arguments
+      // fetchRelevantChunks only takes question + optional limit
       const chunks = await fetchRelevantChunks(question, 5);
       if (chunks.length > 0) {
         knowledgeContext = chunks.map((c) => c.summary).join("\n\n");
       }
     } catch (err) {
-      console.error("⚠️ Embedding retrieval error:", err);
+      console.warn("⚠️ Embedding retrieval skipped (Python not available):", err);
     }
+  } else {
+    // Python not available — skip embeddings
+    console.log("⚠️ Skipping embeddings, Python not available.");
   }
 
-  // 4️⃣ Hybrid LLM
+  // 4️⃣ Hybrid LLM (always runs, guarantees response)
   try {
     const hybridInput = knowledgeContext
       ? `${knowledgeContext}\n\nUser Question: ${question}`
