@@ -1,6 +1,6 @@
 import fs from "fs";
 import { fetchRelevantChunks } from "../queryChunksWrapper.js";
-import { generateHybridResponse } from "./hybridClient.js";
+import { generateHybridResponse } from "./generateHybridResponse.js"; // Correct main brain
 
 // In-memory conversation memory
 const conversationMemory: Record<string, string[]> = {};
@@ -18,7 +18,7 @@ function isRepeated(sessionId: string, question: string) {
 export async function getBotResponse(
   question: string,
   sessionId: string,
-  context?: { pythonPath?: string }
+  context?: { pythonPath?: string; isRender?: boolean }
 ): Promise<string> {
   if (!question || !question.trim()) return "Could you please rephrase that?";
 
@@ -71,44 +71,36 @@ export async function getBotResponse(
     }
   }
 
-  // 3️⃣ Embedding-based retrieval (only if Python available and not Render)
+  // 3️⃣ Embedding-based retrieval (only if Python is available locally)
   let knowledgeContext = "";
-  const isRender = !!process.env.RENDER || !!process.env.RENDER_SERVICE_NAME;
-
-  if (context?.pythonPath && !isRender) {
-    try {
-      const chunks = await fetchRelevantChunks(question, 5);
-      if (chunks.length > 0) {
-        knowledgeContext = chunks.map((c) => c.summary).join("\n\n");
-      }
-    } catch (err) {
-      console.warn("⚠️ Embedding retrieval skipped:", err);
+  try {
+    let chunks: { summary: string }[] = [];
+    if (context?.pythonPath) {
+      chunks = await fetchRelevantChunks(question, 5);
+      console.log(`✅ Retrieved ${chunks.length} chunks locally`);
+    } else if (context?.isRender) {
+      console.log("⚠️ Python unavailable on Render: skipping embeddings");
     }
-  } else if (isRender) {
-    console.log("⚠️ Skipping embeddings on Render (safe).");
-  } else {
-    console.log("⚠️ Python not available locally. Embeddings skipped.");
+
+    if (chunks.length > 0) {
+      knowledgeContext = chunks.map((c) => c.summary).join("\n\n");
+    }
+  } catch (err) {
+    console.warn("⚠️ Embedding retrieval error:", err);
   }
 
-  // 4️⃣ Hybrid LLM (only if not Render)
-  if (!isRender) {
-    try {
-      const hybridInput = knowledgeContext
-        ? `${knowledgeContext}\n\nUser Question: ${question}`
-        : question;
+  // 4️⃣ Hybrid LLM (always run via generateHybridResponse)
+  try {
+    const hybridInput = knowledgeContext
+      ? `${knowledgeContext}\n\nUser Question: ${question}`
+      : question;
 
-      const finalResponse = await generateHybridResponse(hybridInput, sessionId || "default");
-      return finalResponse;
-    } catch (err) {
-      console.error("⚠️ Hybrid LLM error:", err);
-    }
-  } else {
-    console.log("⚠️ Hybrid LLM skipped on Render.");
+    const finalResponse = await generateHybridResponse(hybridInput, sessionId || "default");
+    return finalResponse;
+  } catch (err) {
+    console.error("⚠️ Hybrid LLM error:", err);
   }
 
   // 5️⃣ Fallback
-  return (
-    knowledgeContext ||
-    "I can help with strategy, AI tools, marketing, and digital transformation. Could you clarify your question for a detailed answer?"
-  );
+  return "I can help with strategy, AI tools, marketing, and digital transformation. Could you clarify your question for a detailed answer?";
 }

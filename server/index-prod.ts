@@ -38,12 +38,13 @@ if (!fs.existsSync(dbDir)) {
   console.log("✅ Vector DB folder exists:", dbDir);
 }
 
-// ---------------- PYTHON PATH (local only, Render-safe) ----------------
+// ---------------- PYTHON PATH (cross-platform auto-detect, Render safe) ----------------
 let pythonPath = "";
 const venvDir = path.resolve(process.cwd(), ".venv");
 const isRender = !!process.env.RENDER || !!process.env.RENDER_SERVICE_NAME;
 
 if (!isRender) {
+  // Local dev
   if (process.platform === "win32") {
     const winPython = path.join(venvDir, "Scripts", "python.exe");
     pythonPath = fs.existsSync(winPython) ? winPython : "";
@@ -55,7 +56,8 @@ if (!isRender) {
   if (!pythonPath) console.log("⚠️ Python not found locally. Embeddings disabled.");
   else console.log(`✅ Python detected: ${pythonPath}`);
 } else {
-  pythonPath = "";
+  // Render
+  pythonPath = ""; // No Python on Render
   console.log("⚠️ Render detected: embeddings disabled.");
 }
 
@@ -87,7 +89,11 @@ if (!isRender) {
 
         const cleanMessage = message.trim();
 
-        const answer = await getBotResponse(cleanMessage, sessionId || "default", { pythonPath });
+        const answer = await getBotResponse(cleanMessage, sessionId || "default", {
+          pythonPath,
+          isRender,
+        });
+
         return res.json({ answer });
       } catch (err) {
         console.error("❌ Chat route error:", err);
