@@ -1,11 +1,10 @@
 import fs from "fs";
 import { fetchRelevantChunks } from "../queryChunksWrapper.js";
-import { generateHybridResponse } from "./generateHybridResponse.js"; // Correct main brain
+import { generateHybridResponse } from "./generateHybridResponse.js";
 
 // In-memory conversation memory
 const conversationMemory: Record<string, string[]> = {};
 
-/** Check if a question is repeated in the session */
 function isRepeated(sessionId: string, question: string) {
   const lowerQ = question.trim().toLowerCase();
   if (!conversationMemory[sessionId]) conversationMemory[sessionId] = [];
@@ -14,7 +13,6 @@ function isRepeated(sessionId: string, question: string) {
   return repeated;
 }
 
-/** Core response manager for Neon Vision */
 export async function getBotResponse(
   question: string,
   sessionId: string,
@@ -71,34 +69,33 @@ export async function getBotResponse(
     }
   }
 
-  // 3️⃣ Embedding-based retrieval (only if Python is available locally)
+  // 3️⃣ Embedding-based retrieval ONLY if Python is available
   let knowledgeContext = "";
-  try {
-    let chunks: { summary: string }[] = [];
-    if (context?.pythonPath) {
-      chunks = await fetchRelevantChunks(question, 5);
-      console.log(`✅ Retrieved ${chunks.length} chunks locally`);
-    } else if (context?.isRender) {
-      console.log("⚠️ Python unavailable on Render: skipping embeddings");
+  if (context?.pythonPath) {
+    try {
+      const chunks = await fetchRelevantChunks(question, 5);
+      console.log(`✅ Retrieved ${chunks.length} chunks via Python embeddings`);
+      if (chunks.length > 0) {
+        knowledgeContext = chunks.map((c) => c.summary).join("\n\n");
+      }
+    } catch (err) {
+      console.warn("⚠️ Embedding retrieval error:", err);
     }
-
-    if (chunks.length > 0) {
-      knowledgeContext = chunks.map((c) => c.summary).join("\n\n");
-    }
-  } catch (err) {
-    console.warn("⚠️ Embedding retrieval error:", err);
+  } else {
+    console.log("⚠️ Skipping Python embeddings (Render safe or missing)");
   }
 
-  // 4️⃣ Hybrid LLM (always run via generateHybridResponse)
+  // 4️⃣ Hybrid LLM (always run)
   try {
     const hybridInput = knowledgeContext
       ? `${knowledgeContext}\n\nUser Question: ${question}`
       : question;
 
     const finalResponse = await generateHybridResponse(hybridInput, sessionId || "default");
+    console.log("✅ Hybrid LLM response generated");
     return finalResponse;
   } catch (err) {
-    console.error("⚠️ Hybrid LLM error:", err);
+    console.error("❌ Hybrid LLM error:", err);
   }
 
   // 5️⃣ Fallback
