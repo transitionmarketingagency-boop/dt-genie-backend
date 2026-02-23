@@ -42,18 +42,27 @@ if (!fs.existsSync(dbDir)) {
 let pythonPath = "";
 const venvDir = path.resolve(process.cwd(), ".venv");
 
-if (process.platform === "win32") {
-  const winPython = path.join(venvDir, "Scripts", "python.exe");
-  pythonPath = fs.existsSync(winPython) ? winPython : "";
-} else {
-  const linuxPython = path.join(venvDir, "bin", "python");
-  pythonPath = fs.existsSync(linuxPython) ? linuxPython : "";
-}
+// Render detection
+const isRender = !!process.env.RENDER || !!process.env.RENDER_SERVICE_NAME;
 
-if (!pythonPath) {
-  console.log("⚠️ Python not found or not needed on Render. Embeddings disabled.");
+if (!isRender) {
+  if (process.platform === "win32") {
+    const winPython = path.join(venvDir, "Scripts", "python.exe");
+    pythonPath = fs.existsSync(winPython) ? winPython : "";
+  } else {
+    const linuxPython = path.join(venvDir, "bin", "python");
+    pythonPath = fs.existsSync(linuxPython) ? linuxPython : "";
+  }
+
+  if (!pythonPath) {
+    console.log("⚠️ Python not found locally. Embeddings disabled.");
+  } else {
+    console.log(`✅ Python detected: ${pythonPath}`);
+  }
 } else {
-  console.log(`✅ Python detected: ${pythonPath}`);
+  // On Render: do not use Python
+  pythonPath = "";
+  console.log("⚠️ Render detected: embeddings disabled.");
 }
 
 // ---------------- START SERVER ----------------

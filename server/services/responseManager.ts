@@ -75,7 +75,6 @@ export async function getBotResponse(
   let knowledgeContext = "";
   if (context?.pythonPath) {
     try {
-      // fetchRelevantChunks only takes question + optional limit
       const chunks = await fetchRelevantChunks(question, 5);
       if (chunks.length > 0) {
         knowledgeContext = chunks.map((c) => c.summary).join("\n\n");
@@ -84,8 +83,7 @@ export async function getBotResponse(
       console.warn("⚠️ Embedding retrieval skipped (Python not available):", err);
     }
   } else {
-    // Python not available — skip embeddings
-    console.log("⚠️ Skipping embeddings, Python not available.");
+    console.log("⚠️ Skipping embeddings, Python not available (Render safe).");
   }
 
   // 4️⃣ Hybrid LLM (always runs, guarantees response)
