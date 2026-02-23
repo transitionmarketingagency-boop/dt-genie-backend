@@ -3,9 +3,9 @@ import fs from "fs";
 import path from "path";
 import cors from "cors";
 import express, { type Application } from "express";
-import { type Server } from "node:http";
+import { createServer, type Server } from "node:http";
 
-import runApp, { setupApp } from "./app.js";
+import { setupApp } from "./app.js";
 import { generateHybridResponse } from "./services/hybridClient.js";
 import { fetchRelevantChunks } from "./queryChunksWrapper.js";
 import { storage } from "./storage.js";
@@ -46,46 +46,30 @@ if (!fs.existsSync(dbDir)) {
 }
 
 // ---------------- STATIC INTENT LOGIC ----------------
-
 function detectStaticIntent(question: string): string | null {
   const q = question.toLowerCase().trim();
 
-  // Identity
   if (q.includes("who are you") || q.includes("describe your persona")) {
     return "I am Neon Vision — the AI operating system behind Digital Transition Marketing. I design strategy, automate execution, analyze performance, and architect scalable digital growth systems.";
   }
 
-  // Mission
   if (q.includes("mission")) {
     return "Our mission is to transition businesses into the digital future using AI-driven automation, performance systems, and intelligent growth infrastructure.";
   }
 
-  // Pricing
-  if (
-    q.includes("pricing") ||
-    q.includes("cost") ||
-    q.includes("how much") ||
-    q.includes("price")
-  ) {
+  if (q.includes("pricing") || q.includes("cost") || q.includes("how much") || q.includes("price")) {
     return "Our pricing is customized based on scope, growth targets, and system complexity. Strategic proposals are delivered after evaluating your objectives.";
   }
 
-  // Tagline
   if (q.includes("tagline")) {
     return "Transitioning your business to the digital age.";
   }
 
-  // Target Market
   if (q.includes("ideal client") || q.includes("target market")) {
     return "We specialize in Real Estate, Travel & Tourism, and E-commerce brands seeking AI-powered growth systems.";
   }
 
-  // Services overview (only if explicitly asking for list)
-  if (
-    q.includes("what services") ||
-    q.includes("list your services") ||
-    q === "services"
-  ) {
+  if (q.includes("what services") || q.includes("list your services") || q === "services") {
     return `Digital Transition Marketing offers 14 AI-powered services:
 
 1. Voice Search Optimization (VSO)
@@ -110,75 +94,72 @@ function detectStaticIntent(question: string): string | null {
 // ---------------- START SERVER ----------------
 (async () => {
   try {
-    await runApp(async (app: Application, httpServer: Server) => {
-      app.use(cors({ origin: "*", credentials: true }));
-      app.use(express.json({ limit: "10mb" }));
-      app.use(express.urlencoded({ extended: true }));
+    // Create Express instance
+    const app: Application = express();
+    const httpServer: Server = createServer(app);
 
-      const publicPath = path.resolve(process.cwd(), "public");
-      if (fs.existsSync(publicPath)) {
-        app.use(express.static(publicPath));
-        console.log("✅ Public folder served:", publicPath);
-      }
+    app.use(cors({ origin: "*", credentials: true }));
+    app.use(express.json({ limit: "10mb" }));
+    app.use(express.urlencoded({ extended: true }));
 
-      // -------- SMART CHAT ROUTE --------
-      app.post("/chat", async (req, res) => {
-        try {
-          const { message, sessionId } = req.body;
+    // Serve public folder
+    const publicPath = path.resolve(process.cwd(), "public");
+    if (fs.existsSync(publicPath)) {
+      app.use(express.static(publicPath));
+      console.log("✅ Public folder served:", publicPath);
+    }
 
-          if (!message || !message.trim()) {
-            return res.json({ answer: "Please provide a valid message." });
-          }
+    // -------- SMART CHAT ROUTE --------
+    app.post("/chat", async (req, res) => {
+      console.log("🔥 /chat route HIT");
 
-          const cleanMessage = message.trim();
+      try {
+        const { message, sessionId } = req.body;
 
-          // 1️⃣ Static intent first
-          const staticResponse = detectStaticIntent(cleanMessage);
-          if (staticResponse) {
-            return res.json({ answer: staticResponse });
-          }
-
-          // 2️⃣ Embedding retrieval
-          let knowledgeContext = "";
-          try {
-            const chunks = await fetchRelevantChunks(cleanMessage, 5);
-            if (chunks && chunks.length > 0) {
-              knowledgeContext = chunks
-                .map((c) => c.summary)
-                .join("\n\n");
-            }
-          } catch (err) {
-            console.error("⚠️ Embedding retrieval error:", err);
-          }
-
-          // 3️⃣ Prepare final input for hybrid model
-          const hybridInput = knowledgeContext
-            ? `${knowledgeContext}\n\nUser Question: ${cleanMessage}`
-            : cleanMessage;
-
-          // 4️⃣ Hybrid LLM (Gemma + Gemini)
-          const finalResponse = await generateHybridResponse(
-            hybridInput,
-            sessionId || "default"
-          );
-
-          return res.json({ answer: finalResponse });
-        } catch (err) {
-          console.error("❌ Chat route error:", err);
-          return res.status(500).json({
-            answer:
-              "An internal error occurred. Please try again shortly.",
-          });
+        if (!message || !message.trim()) {
+          return res.json({ answer: "Please provide a valid message." });
         }
-      });
 
-      // Keep your existing routes
-      await setupApp(app);
+        const cleanMessage = message.trim();
 
-      const PORT = process.env.PORT || 5000;
-      httpServer.listen(PORT, () =>
-        console.log(`🌐 Server running on port ${PORT}`)
-      );
+        // 1️⃣ Static intent first
+        const staticResponse = detectStaticIntent(cleanMessage);
+        if (staticResponse) return res.json({ answer: staticResponse });
+
+        // 2️⃣ Embedding retrieval
+        let knowledgeContext = "";
+        try {
+          const chunks = await fetchRelevantChunks(cleanMessage, 5);
+          if (chunks?.length) {
+            knowledgeContext = chunks.map(c => c.summary).join("\n\n");
+          }
+        } catch (err) {
+          console.error("⚠️ Embedding retrieval error:", err);
+        }
+
+        // 3️⃣ Hybrid LLM
+        const hybridInput = knowledgeContext
+          ? `${knowledgeContext}\n\nUser Question: ${cleanMessage}`
+          : cleanMessage;
+
+        const finalResponse = await generateHybridResponse(
+          hybridInput,
+          sessionId || "default"
+        );
+
+        return res.json({ answer: finalResponse });
+      } catch (err) {
+        console.error("❌ Chat route error:", err);
+        return res.status(500).json({ answer: "Internal server error." });
+      }
+    });
+
+    // Keep existing routes
+    await setupApp(app);
+
+    const PORT = process.env.PORT || 10000;
+    httpServer.listen(PORT, () => {
+      console.log(`🌐 Server running on port ${PORT}`);
     });
 
     console.log("✅ Server bootstrap complete");
