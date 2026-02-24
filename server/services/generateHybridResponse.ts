@@ -65,11 +65,9 @@ const aiIntents: any[] = [];
 
 function loadJSONRecursive(dir: string) {
   if (!fs.existsSync(dir)) return;
-
   for (const f of fs.readdirSync(dir)) {
     const fullPath = path.join(dir, f);
     const stat = fs.statSync(fullPath);
-
     if (stat.isDirectory()) {
       loadJSONRecursive(fullPath);
     } else if (f.endsWith(".json")) {
@@ -78,7 +76,9 @@ function loadJSONRecursive(dir: string) {
         if (Array.isArray(json.triggers) && Array.isArray(json.responses)) {
           aiIntents.push(json);
         }
-      } catch {}
+      } catch (err) {
+        console.warn(`Failed to load JSON: ${fullPath}`, err);
+      }
     }
   }
 }
@@ -94,62 +94,39 @@ function findMatchingIntent(userMessage: string) {
   for (const intent of aiIntents) {
     for (const trig of intent.triggers) {
       const trigNorm = normalize(trig);
-
       if (msg.includes(trigNorm)) {
-        matches.push({
-          score: 1,
-          response: intent.responses.join("\n\n")
-        });
+        matches.push({ score: 1, response: intent.responses.join("\n\n") });
         continue;
       }
-
       const msgWords = msg.split(" ");
       const trigWords = trigNorm.split(" ");
       const matchCount = trigWords.filter(word => msgWords.includes(word)).length;
       const score = matchCount / trigWords.length;
-
-      if (score >= 0.3) {
-        matches.push({
-          score,
-          response: intent.responses.join("\n\n")
-        });
-      }
+      if (score >= 0.3) matches.push({ score, response: intent.responses.join("\n\n") });
     }
   }
 
   if (matches.length === 0) return null;
 
-  // Sort by score descending and return top 3 responses combined
+  // Sort descending by score and combine top 3
   matches.sort((a, b) => b.score - a.score);
-  return matches.slice(0, 3).map(m => m.response).join("\n\n");
+  const topResponses = matches.slice(0, 3).map(m => m.response);
+  console.log("Top JSON matches:", topResponses);
+  return topResponses.join("\n\n");
 }
 
 /* ================= EMBEDDINGS ================= */
 async function getEmbeddingKnowledge(userMessage: string) {
   try {
-    // Prioritize top 15 embeddings with higher relevance threshold
-    const chunks = await getTopChunks(userMessage, 15, 0.15);
+    const chunks = await getTopChunks(userMessage, 15, 0.15); // prioritize relevance
     if (!chunks || chunks.length === 0) return "";
-
-    return chunks
-      .map(c => c.text)
-      .filter(Boolean)
-      .join("\n\n");
-
-  } catch {
+    const topChunks = chunks.map(c => c.text).filter(Boolean);
+    console.log("Top embedding chunks:", topChunks);
+    return topChunks.join("\n\n");
+  } catch (err) {
+    console.error("Error retrieving embeddings:", err);
     return "";
   }
-}
-
-/* ================= NON-ANSWER CHECK ================= */
-function isNonAnswer(text: string) {
-  if (!text) return true;
-  const lower = text.toLowerCase();
-  return (
-    lower.includes("as an ai") ||
-    lower.includes("i don't have") ||
-    lower.includes("i don’t currently have confirmed information")
-  );
 }
 
 /* ================= MAIN RESPONSE ================= */
@@ -195,30 +172,18 @@ export async function generateHybridResponse(
     const embeddingKnowledge = await getEmbeddingKnowledge(userMessage); // PRIORITY
     const jsonKnowledge = findMatchingIntent(userMessage); // SECONDARY
 
-    console.log("Embedding knowledge length:", embeddingKnowledge?.length || 0);
-    console.log("JSON knowledge length:", jsonKnowledge?.length || 0);
-
-    /* ================= BUILD UNIFIED CONTEXT ================= */
     let knowledgePool = "";
-    if (embeddingKnowledge) knowledgePool += `Knowledge Base:\n${embeddingKnowledge}\n\n`;
-    if (jsonKnowledge) knowledgePool += `Structured JSON:\n${jsonKnowledge}\n\n`;
-
+    if (embeddingKnowledge) knowledgePool += `PRIMARY DATA (Embeddings):\n${embeddingKnowledge}\n\n`;
+    if (jsonKnowledge) knowledgePool += `SECONDARY DATA (JSON Intents):\n${jsonKnowledge}\n\n`;
     const hasKnowledge = Boolean(knowledgePool);
 
     /* ================= MODEL PROMPT ================= */
     const prompt = `
-You are ${BOT_NAME}, the AI Strategist for Digital Transition Marketing (DTM).
+You are ${BOT_NAME}, AI Strategist for Digital Transition Marketing (DTM).
+You are fully trained on the company's internal knowledge base.
 
-You are fully trained on the company's internal knowledge base including:
-- 500+ embedded knowledge chunks
-- Structured service definitions
-- Company positioning and messaging
-
-Use the provided knowledge to answer accurately and confidently.
-Synthesize information when multiple sources are relevant.
-Do NOT mention missing data.
-Do NOT give generic chatbot answers.
-Do NOT ask unnecessary clarifications unless required.
+PRIMARY DATA (embeddings) must always be prioritized.
+SECONDARY DATA (structured JSON) can be used if it enhances the answer.
 
 Internal Knowledge:
 ${hasKnowledge ? knowledgePool : "No direct match found. Use strategic domain reasoning."}
@@ -226,32 +191,35 @@ ${hasKnowledge ? knowledgePool : "No direct match found. Use strategic domain re
 User Question:
 ${userMessage}
 
-Deliver a comprehensive, professional, and precise response.
+Provide a confident, professional, and complete response.
+Never give generic answers.
+Do NOT disclaim missing information if context is available.
 `;
 
     /* ================= GENERATE RESPONSE ================= */
     let response = cleanResponse(await generateGemma(prompt));
-    console.log("Gemma raw response:", response);
     let modelUsed = "Gemma";
+    console.log("Gemma raw response:", response);
 
-    // Fallback to Gemini if Gemma fails
     if ((!response || response.length < 25) && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(prompt));
         markGeminiUsed();
         modelUsed = "Gemini";
-      } catch {}
+        console.log("Gemini raw response:", response);
+      } catch (err) {
+        console.error("Gemini generation failed:", err);
+      }
     }
 
     response = enforceBotName(response);
 
-    /* ================= FINAL FALLBACK ================= */
-    if (!response || response.length < 25) {
+    /* ================= FINAL FALLBACK ONLY IF NO KNOWLEDGE ================= */
+    if ((!response || response.length < 25) && !hasKnowledge) {
       if (msg.includes("book") || msg.includes("schedule") || msg.includes("call")) {
         response = "Sure — you can book a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
       } else {
-        response =
-          "I can provide strategic guidance on AI marketing, automation, paid advertising, SEO, CGI property tours, and digital growth systems. Could you clarify what specific area you'd like to explore?";
+        response = "I can provide strategic guidance on AI marketing, automation, paid advertising, SEO, CGI property tours, and digital growth systems. Could you clarify which specific area you'd like to explore?";
       }
     }
 
@@ -259,9 +227,9 @@ Deliver a comprehensive, professional, and precise response.
 
     await memoryService.addMessage(userId, "assistant", response);
     return formatResponse(null, [{ content: response }], {});
-
   } catch (err) {
     console.error("Hybrid error:", err);
     return "We’re experiencing a temporary processing issue.";
   }
-}
+}	
+
