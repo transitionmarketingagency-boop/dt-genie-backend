@@ -44,14 +44,13 @@ const staticIntents = {
   niches: ["niches", "specialize", "industry"],
 };
 
-// Persona greeting variations
 const greetingVariations = [
   `I’m ${BOT_NAME}, your AI strategist at Digital Transition Marketing. How can I assist you today?`,
   `Hello! ${BOT_NAME} here, ready to guide your business growth with AI-powered strategies.`,
   `Hi! I’m ${BOT_NAME}, the AI behind Digital Transition Marketing's marketing excellence.`,
 ];
 
-/* ================= PERSONA & AI INTENTS ================= */
+/* ================= PERSONA ================= */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const personaPath = path.join(__dirname, "../personas/neon-vision.json");
@@ -66,7 +65,7 @@ if (fs.existsSync(personaPath)) {
   }
 }
 
-// Load all AI JSON intents
+/* ================= LOAD AI JSON INTENTS ================= */
 const aiLogicRoot = path.join(__dirname, "../ai_logic");
 const aiIntents: any[] = [];
 
@@ -112,7 +111,7 @@ function isNonAnswer(text: string) {
     "i don't have access",
     "i am just an ai",
   ];
-  return blockPhrases.some((p) => lower.includes(p));
+  return blockPhrases.some(p => lower.includes(p));
 }
 
 /* ================= EMBEDDING CACHE ================= */
@@ -151,13 +150,14 @@ async function getCachedEmbeddings(userMessage: string) {
   return chunks.map(c => c.text || "").join("\n\n");
 }
 
-/* ================= DYNAMIC SERVICE & PRICING ANSWERS ================= */
-async function dynamicServiceAnswer(userMessage: string, userId: string) {
+/* ================= DYNAMIC SERVICE & PRICING ================= */
+async function dynamicServiceAnswer(userMessage: string, userId: string): Promise<string> {
   const embeddingKnowledge = await getCachedEmbeddings(userMessage);
   const jsonKnowledge = findMatchingIntent(userMessage);
   const combined = [embeddingKnowledge, jsonKnowledge].filter(Boolean).join("\n\n");
   const prompt = `
-You are ${BOT_NAME}, the official AI of Digital Transition Marketing. Represent the company directly.
+You are ${BOT_NAME}, the official AI of Digital Transition Marketing.
+Represent the company directly.
 Use professional, strategic, confident tone from persona.
 USER QUERY: ${userMessage}
 COMPANY KNOWLEDGE: ${combined}
@@ -168,7 +168,7 @@ Provide a concise, bullet-pointed, expert-level response about our services. Inc
   return response;
 }
 
-async function dynamicPricingAnswer(userMessage: string, userId: string) {
+async function dynamicPricingAnswer(userMessage: string, userId: string): Promise<string> {
   const embeddingKnowledge = await getCachedEmbeddings(userMessage);
   const jsonKnowledge = findMatchingIntent(userMessage);
   const combined = [embeddingKnowledge, jsonKnowledge].filter(Boolean).join("\n\n");
@@ -190,7 +190,7 @@ export async function generateHybridResponse(userMessage: string, userId = "defa
     await memoryService.addMessage(userId, "user", userMessage);
     const msg = normalize(userMessage);
 
-    // ===== STATIC ROUTING WITH VARIATIONS =====
+    // ===== STATIC ROUTING =====
     if (staticIntents.greeting.includes(msg)) {
       const r = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
       await memoryService.addMessage(userId, "assistant", r);
@@ -203,10 +203,21 @@ export async function generateHybridResponse(userMessage: string, userId = "defa
     }
     if (staticIntents.service.some(t => msg.includes(t))) return await dynamicServiceAnswer(userMessage, userId);
     if (staticIntents.pricing.some(t => msg.includes(t))) return await dynamicPricingAnswer(userMessage, userId);
-    if (staticIntents.tagline.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Transitioning your business to the digital age.");
-    if (staticIntents.targetMarket.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Ideal clients: • Real Estate Developers & Agencies • Travel & Tourism Agencies • E-commerce Brands");
-    if (staticIntents.mission.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.");
-    if (staticIntents.niches.some(t => msg.includes(t))) return await memoryService.addMessage(userId, "assistant", "Specialties: • Real Estate — CGI ads & virtual property tours • Travel & Tourism — AI marketing & automation • E-commerce — scalable growth systems & paid acquisition");
+
+    // Handle static string responses safely
+    const staticMap: Record<string, string> = {
+      tagline: "Transitioning your business to the digital age.",
+      targetMarket: "Ideal clients: • Real Estate Developers & Agencies • Travel & Tourism Agencies • E-commerce Brands",
+      mission: "Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.",
+      niches: "Specialties: • Real Estate — CGI ads & virtual property tours • Travel & Tourism — AI marketing & automation • E-commerce — scalable growth systems & paid acquisition",
+    };
+    for (const key of ["tagline","targetMarket","mission","niches"]) {
+      if (staticIntents[key].some(t => msg.includes(t))) {
+        const response = staticMap[key];
+        await memoryService.addMessage(userId, "assistant", response);
+        return response;
+      }
+    }
 
     // ===== AI JSON + Embedding Retrieval =====
     const intentKnowledge = findMatchingIntent(userMessage);
@@ -222,11 +233,9 @@ RECENT CONTEXT: ${shortHistory}
 USER QUESTION: ${userMessage}
 Provide an expert-level, strategic, concise response based on official services and knowledge.`;
 
-    // ===== PRIMARY MODEL: Gemma =====
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
-    // ===== FALLBACK: Gemini =====
     if (!response || isNonAnswer(response)) {
       if (canUseGemini()) {
         try {
