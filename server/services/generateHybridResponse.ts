@@ -1,3 +1,4 @@
+// server/services/generateHybridResponse.ts
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -85,32 +86,49 @@ function loadJSONRecursive(dir: string) {
 loadJSONRecursive(aiLogicRoot);
 console.log(`✅ Loaded ${aiIntents.length} AI logic JSON intents`);
 
-/* ================= INTENT MATCHING ================= */
+/* ================= SEMANTIC JSON MATCH ================= */
 function findMatchingIntent(userMessage: string) {
   const msg = normalize(userMessage);
-  const msgWords = msg.split(" ");
+  const matches: { score: number; response: string }[] = [];
 
   for (const intent of aiIntents) {
     for (const trig of intent.triggers) {
       const trigNorm = normalize(trig);
+
+      if (msg.includes(trigNorm)) {
+        matches.push({
+          score: 1,
+          response: intent.responses.join("\n\n")
+        });
+        continue;
+      }
+
+      const msgWords = msg.split(" ");
       const trigWords = trigNorm.split(" ");
+      const matchCount = trigWords.filter(word => msgWords.includes(word)).length;
+      const score = matchCount / trigWords.length;
 
-      const matchCount = trigWords.filter(word =>
-        msgWords.includes(word)
-      ).length;
-
-      if (matchCount >= Math.ceil(trigWords.length * 0.6)) {
-        return intent.responses.join("\n\n");
+      if (score >= 0.3) {
+        matches.push({
+          score,
+          response: intent.responses.join("\n\n")
+        });
       }
     }
   }
-  return null;
+
+  if (matches.length === 0) return null;
+
+  // Sort by score descending and return top 3 responses combined
+  matches.sort((a, b) => b.score - a.score);
+  return matches.slice(0, 3).map(m => m.response).join("\n\n");
 }
 
 /* ================= EMBEDDINGS ================= */
 async function getEmbeddingKnowledge(userMessage: string) {
   try {
-    const chunks = await getTopChunks(userMessage, 10, 0.05);
+    // Prioritize top 15 embeddings with higher relevance threshold
+    const chunks = await getTopChunks(userMessage, 15, 0.15);
     if (!chunks || chunks.length === 0) return "";
 
     return chunks
@@ -173,58 +191,51 @@ export async function generateHybridResponse(
       }
     }
 
-    /* ===== KNOWLEDGE RETRIEVAL ===== */
-    const jsonKnowledge = findMatchingIntent(userMessage);
-    const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
+    /* ================= KNOWLEDGE RETRIEVAL ================= */
+    const embeddingKnowledge = await getEmbeddingKnowledge(userMessage); // PRIORITY
+    const jsonKnowledge = findMatchingIntent(userMessage); // SECONDARY
 
-    console.log("JSON knowledge length:", jsonKnowledge?.length || 0);
     console.log("Embedding knowledge length:", embeddingKnowledge?.length || 0);
+    console.log("JSON knowledge length:", jsonKnowledge?.length || 0);
 
-    /* ===== FORCE DIRECT JSON IF STRONG MATCH ===== */
-    if (jsonKnowledge && jsonKnowledge.length > 50) {
-      const direct = enforceBotName(jsonKnowledge);
-      await memoryService.addMessage(userId, "assistant", direct);
-      return formatResponse(null, [{ content: direct }], {});
-    }
+    /* ================= BUILD UNIFIED CONTEXT ================= */
+    let knowledgePool = "";
+    if (embeddingKnowledge) knowledgePool += `Knowledge Base:\n${embeddingKnowledge}\n\n`;
+    if (jsonKnowledge) knowledgePool += `Structured JSON:\n${jsonKnowledge}\n\n`;
 
-    /* ===== BUILD CONTEXT ===== */
-    const hasKnowledge = Boolean(jsonKnowledge || embeddingKnowledge);
-    let knowledgeContext = "";
+    const hasKnowledge = Boolean(knowledgePool);
 
-    if (jsonKnowledge) {
-      knowledgeContext += `${jsonKnowledge}\n\n`;
-    }
-
-    if (embeddingKnowledge) {
-      knowledgeContext += `${embeddingKnowledge}\n\n`;
-    }
-
-    /* ===== MODEL SYNTHESIS ===== */
+    /* ================= MODEL PROMPT ================= */
     const prompt = `
-You are ${BOT_NAME}, AI Strategist for Digital Transition Marketing (DTM).
+You are ${BOT_NAME}, the AI Strategist for Digital Transition Marketing (DTM).
 
-You are highly trained on the company’s internal knowledge base.
-Never say you lack information if context is provided.
+You are fully trained on the company's internal knowledge base including:
+- 500+ embedded knowledge chunks
+- Structured service definitions
+- Company positioning and messaging
 
-If knowledge is available, you MUST use it.
-If no knowledge is available, provide confident strategic guidance.
+Use the provided knowledge to answer accurately and confidently.
+Synthesize information when multiple sources are relevant.
+Do NOT mention missing data.
+Do NOT give generic chatbot answers.
+Do NOT ask unnecessary clarifications unless required.
 
-Knowledge:
-${hasKnowledge ? knowledgeContext : "No internal knowledge found."}
+Internal Knowledge:
+${hasKnowledge ? knowledgePool : "No direct match found. Use strategic domain reasoning."}
 
 User Question:
 ${userMessage}
 
-Provide a confident, professional, and complete response.
-Do not include disclaimers.
+Deliver a comprehensive, professional, and precise response.
 `;
 
+    /* ================= GENERATE RESPONSE ================= */
     let response = cleanResponse(await generateGemma(prompt));
     console.log("Gemma raw response:", response);
-
     let modelUsed = "Gemma";
 
-    if ((!response || response.length < 40) && canUseGemini()) {
+    // Fallback to Gemini if Gemma fails
+    if ((!response || response.length < 25) && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(prompt));
         markGeminiUsed();
@@ -234,22 +245,19 @@ Do not include disclaimers.
 
     response = enforceBotName(response);
 
-    if (!response || response.length < 40) {
+    /* ================= FINAL FALLBACK ================= */
+    if (!response || response.length < 25) {
       if (msg.includes("book") || msg.includes("schedule") || msg.includes("call")) {
-        response =
-          "Sure — you can book a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+        response = "Sure — you can book a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
       } else {
         response =
           "I can provide strategic guidance on AI marketing, automation, paid advertising, SEO, CGI property tours, and digital growth systems. Could you clarify what specific area you'd like to explore?";
       }
     }
 
-    console.log(
-      `[Hybrid] Model=${modelUsed} | JSON=${!!jsonKnowledge} | EMB=${!!embeddingKnowledge}`
-    );
+    console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
 
     await memoryService.addMessage(userId, "assistant", response);
-
     return formatResponse(null, [{ content: response }], {});
 
   } catch (err) {
