@@ -14,7 +14,6 @@ import { formatResponse } from "../utils/formatResponse.js";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENABLED = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 20);
 const GEMINI_DAILY_LIMIT = 20;
-
 let geminiUsage = { count: 0, lastReset: Date.now() };
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
@@ -41,13 +40,13 @@ const staticIntents = {
   tagline: ["tagline", "slogan"],
   targetMarket: ["target market", "ideal client", "who do you serve"],
   mission: ["mission"],
-  niches: ["niches", "specialize", "industry"],
+  niches: ["niches", "specialize", "industry"]
 };
 
 const greetingVariations = [
-  `I’m ${BOT_NAME}, your AI strategist at Digital Transition Marketing. How can I assist you today?`,
-  `Hello! ${BOT_NAME} here, ready to guide your business growth with AI-powered strategies.`,
-  `Hi! I’m ${BOT_NAME}, the AI behind Digital Transition Marketing's marketing excellence.`,
+  `Hello! I’m ${BOT_NAME}, your AI strategist at Digital Transition Marketing. How can I assist you today?`,
+  `Hi! ${BOT_NAME} here, ready to guide your business growth with AI-powered strategies.`,
+  `Greetings! I’m ${BOT_NAME}, your strategic AI partner for digital transformation.`
 ];
 
 /* ================= PERSONA ================= */
@@ -68,7 +67,6 @@ if (fs.existsSync(personaPath)) {
 /* ================= LOAD AI JSON INTENTS ================= */
 const aiLogicRoot = path.join(__dirname, "../ai_logic");
 const aiIntents: any[] = [];
-
 function loadJSONRecursive(dir: string) {
   if (!fs.existsSync(dir)) return;
   for (const f of fs.readdirSync(dir)) {
@@ -79,9 +77,7 @@ function loadJSONRecursive(dir: string) {
       try {
         const json = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
         if (json.triggers && json.responses) aiIntents.push(json);
-      } catch {
-        console.warn(`⚠️ Failed to load ${fullPath}`);
-      }
+      } catch { console.warn(`⚠️ Failed to load ${fullPath}`); }
     }
   }
 }
@@ -109,7 +105,7 @@ function isNonAnswer(text: string) {
     "as a large language model",
     "as an ai language model",
     "i don't have access",
-    "i am just an ai",
+    "i am just an ai"
   ];
   return blockPhrases.some(p => lower.includes(p));
 }
@@ -117,7 +113,6 @@ function isNonAnswer(text: string) {
 /* ================= EMBEDDING CACHE ================= */
 const EMB_CACHE_FILE = path.join(__dirname, ".embeddingCache.json");
 let embeddingCache: Map<string, string> = new Map();
-
 try {
   if (fs.existsSync(EMB_CACHE_FILE)) {
     const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
@@ -125,7 +120,6 @@ try {
     console.log(`✅ Loaded persistent embedding cache (${embeddingCache.size} entries)`);
   }
 } catch { console.warn("⚠️ Failed to load embedding cache, starting fresh."); }
-
 function saveEmbeddingCache() {
   try { fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(embeddingCache)), "utf-8"); }
   catch { console.warn("⚠️ Failed to save embedding cache."); }
@@ -135,7 +129,6 @@ async function getCachedEmbeddings(userMessage: string) {
   const chunks: any[] = [];
   try {
     const allChunks = await getTopChunks(userMessage, 20, 0.25);
-    console.log(`M-" Retrieved ${allChunks.length} chunks for message: "${userMessage}"`);
     let charCount = 0, MAX_CHARS = 12000;
     for (const c of allChunks) {
       let text = c.text || "";
@@ -155,14 +148,11 @@ async function dynamicServiceAnswer(userMessage: string, userId: string): Promis
   const embeddingKnowledge = await getCachedEmbeddings(userMessage);
   const jsonKnowledge = findMatchingIntent(userMessage);
   const combined = [embeddingKnowledge, jsonKnowledge].filter(Boolean).join("\n\n");
-  const prompt = `
-You are ${BOT_NAME}, the official AI of Digital Transition Marketing.
-Represent the company directly.
-Use professional, strategic, confident tone from persona.
-USER QUERY: ${userMessage}
-COMPANY KNOWLEDGE: ${combined}
-Provide a concise, bullet-pointed, expert-level response about our services. Include optional sub-services or details, but do NOT invent services.
-`;
+  const prompt = `You are ${BOT_NAME}, the official AI of Digital Transition Marketing.
+Use professional, strategic, confident tone: ${systemPersona.tone}.
+Provide concise, expert-level, bullet-pointed response about services.
+Do NOT invent services. Use company knowledge: ${combined}
+USER QUERY: ${userMessage}`;
   const response = cleanResponse(await generateGemma(prompt));
   await memoryService.addMessage(userId, "assistant", response);
   return response;
@@ -172,13 +162,10 @@ async function dynamicPricingAnswer(userMessage: string, userId: string): Promis
   const embeddingKnowledge = await getCachedEmbeddings(userMessage);
   const jsonKnowledge = findMatchingIntent(userMessage);
   const combined = [embeddingKnowledge, jsonKnowledge].filter(Boolean).join("\n\n");
-  const prompt = `
-You are ${BOT_NAME}, representing Digital Transition Marketing.
-Provide a clear, concise, context-aware pricing explanation for the services requested in USER QUERY.
-Avoid listing unrelated services. Base answer on official knowledge.
-USER QUERY: ${userMessage}
-COMPANY KNOWLEDGE: ${combined}
-`;
+  const prompt = `You are ${BOT_NAME}, official AI of Digital Transition Marketing.
+Use professional, strategic, confident tone: ${systemPersona.tone}.
+Provide concise, context-aware pricing based on company knowledge: ${combined}
+USER QUERY: ${userMessage}`;
   const response = cleanResponse(await generateGemma(prompt));
   await memoryService.addMessage(userId, "assistant", response);
   return response;
@@ -196,20 +183,21 @@ export async function generateHybridResponse(userMessage: string, userId = "defa
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
+
     if (staticIntents.identity.some(t => msg.includes(t))) {
-      const r = `I am ${BOT_NAME}, the strategic AI system representing Digital Transition Marketing. I guide businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`;
+      const r = `I am ${BOT_NAME}, your strategic AI system guiding businesses through AI-driven marketing, automation, performance advertising, and digital growth systems.`;
       await memoryService.addMessage(userId, "assistant", r);
       return r;
     }
+
     if (staticIntents.service.some(t => msg.includes(t))) return await dynamicServiceAnswer(userMessage, userId);
     if (staticIntents.pricing.some(t => msg.includes(t))) return await dynamicPricingAnswer(userMessage, userId);
 
-    // Handle static string responses safely
-    const staticMap: Record<string, string> = {
+    const staticMap: Record<string,string> = {
       tagline: "Transitioning your business to the digital age.",
       targetMarket: "Ideal clients: • Real Estate Developers & Agencies • Travel & Tourism Agencies • E-commerce Brands",
       mission: "Our mission is to empower businesses to dominate the digital future using AI-driven systems, automation, and performance strategy.",
-      niches: "Specialties: • Real Estate — CGI ads & virtual property tours • Travel & Tourism — AI marketing & automation • E-commerce — scalable growth systems & paid acquisition",
+      niches: "Specialties: • Real Estate — CGI ads & virtual property tours • Travel & Tourism — AI marketing & automation • E-commerce — scalable growth systems & paid acquisition"
     };
     for (const key of ["tagline","targetMarket","mission","niches"]) {
       if (staticIntents[key].some(t => msg.includes(t))) {
@@ -219,19 +207,20 @@ export async function generateHybridResponse(userMessage: string, userId = "defa
       }
     }
 
-    // ===== AI JSON + Embedding Retrieval =====
+    // ===== AI + EMBEDDINGS + HISTORY =====
     const intentKnowledge = findMatchingIntent(userMessage);
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
     const combinedKnowledge = [intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
-
     const history = await memoryService.getHistory(userId);
     const shortHistory = history.slice(-20).map(h => h.content).join("\n") || "None";
 
-    const prompt = `You are ${BOT_NAME}, official AI of Digital Transition Marketing. Represent the company directly. Never say you are an AI model. Use persona tone: ${systemPersona.tone}.
+    const prompt = `You are ${BOT_NAME}, official AI of Digital Transition Marketing.
+Use persona tone: ${systemPersona.tone}.
+Represent company knowledge accurately. Never mention AI model.
 COMPANY KNOWLEDGE: ${combinedKnowledge}
 RECENT CONTEXT: ${shortHistory}
 USER QUESTION: ${userMessage}
-Provide an expert-level, strategic, concise response based on official services and knowledge.`;
+Provide an expert-level, strategic, concise, and fully accurate response based on official knowledge.`;
 
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
