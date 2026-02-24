@@ -55,7 +55,10 @@ const __dirname = path.dirname(__filename);
 const personaPath = path.join(process.cwd(), "personas", "neon-vision.json");
 let systemPersona: any = { tone: "professional, strategic, confident" };
 if (fs.existsSync(personaPath)) {
-  try { systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8")); console.log("✅ Persona loaded"); }
+  try { 
+    systemPersona = JSON.parse(fs.readFileSync(personaPath, "utf-8")); 
+    console.log("✅ Persona loaded"); 
+  }
   catch { console.warn("⚠️ Failed to load persona, using default tone"); }
 }
 
@@ -203,15 +206,15 @@ export async function generateHybridResponse(userMessage: string, userId = "defa
       }
     }
 
-    // AI + EMBEDDINGS PRIMARY
-    const intentKnowledge = findMatchingIntent(userMessage);
+    // =================== FIXED HYBRID FLOW ===================
+    const jsonKnowledge = findMatchingIntent(userMessage) || "";
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
-    const combinedKnowledge = [intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
+    const combinedKnowledge = [jsonKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
     const history = await memoryService.getHistory(userId);
     const shortHistory = history.slice(-20).map(h => h.content).join("\n") || "None";
 
     const prompt = `You are expert AI for Digital Transition Marketing. Represent company knowledge and never mention AI model.
-COMPANY KNOWLEDGE: ${combinedKnowledge}
+COMPANY KNOWLEDGE: ${combinedKnowledge || "No direct knowledge available."}
 RECENT CONTEXT: ${shortHistory}
 USER QUESTION: ${userMessage}
 Respond strategically, concisely, and accurately based on official knowledge.`;
@@ -232,7 +235,7 @@ Respond strategically, concisely, and accurately based on official knowledge.`;
 
     response = enforceBotName(response);
 
-    // CALENDLY ONLY ON EXPLICIT REQUEST
+    // CALENDLY FALLBACK ONLY ON EXPLICIT REQUEST
     if (!response || isNonAnswer(response)) {
       if (msg.includes("book") || msg.includes("call") || msg.includes("schedule")) {
         response = "Sure — you can book a call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
