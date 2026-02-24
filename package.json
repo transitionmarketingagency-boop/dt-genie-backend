@@ -8,12 +8,14 @@
     "node": "20.18.x"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-personas",
+    "build": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-personas && npm run copy-ai-logic",
     "build:backend": "npm run build",
     "start": "node dist/server/index-prod.js",
     "test": "tsx server/test-end-to-end.ts",
+
     "copy-public": "cpx \"public/**/*\" dist/public",
-    "copy-personas": "cpx \"personas/**/*\" dist/personas"
+    "copy-personas": "cpx \"personas/**/*\" dist/personas",
+    "copy-ai-logic": "cpx \"server/ai_logic/**/*\" dist/server/ai_logic"
   },
   "dependencies": {
     "axios": "^1.6.0",
