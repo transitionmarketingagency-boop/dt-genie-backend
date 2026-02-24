@@ -1,4 +1,3 @@
-// server/services/generateHybridResponse.ts
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -178,40 +177,54 @@ export async function generateHybridResponse(
     const jsonKnowledge = findMatchingIntent(userMessage);
     const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
 
+    console.log("JSON knowledge length:", jsonKnowledge?.length || 0);
+    console.log("Embedding knowledge length:", embeddingKnowledge?.length || 0);
+
+    /* ===== FORCE DIRECT JSON IF STRONG MATCH ===== */
+    if (jsonKnowledge && jsonKnowledge.length > 50) {
+      const direct = enforceBotName(jsonKnowledge);
+      await memoryService.addMessage(userId, "assistant", direct);
+      return formatResponse(null, [{ content: direct }], {});
+    }
+
     /* ===== BUILD CONTEXT ===== */
+    const hasKnowledge = Boolean(jsonKnowledge || embeddingKnowledge);
     let knowledgeContext = "";
 
     if (jsonKnowledge) {
-      knowledgeContext += `Structured Knowledge:\n${jsonKnowledge}\n\n`;
+      knowledgeContext += `${jsonKnowledge}\n\n`;
     }
 
     if (embeddingKnowledge) {
-      knowledgeContext += `Knowledge Base:\n${embeddingKnowledge}\n\n`;
+      knowledgeContext += `${embeddingKnowledge}\n\n`;
     }
 
     /* ===== MODEL SYNTHESIS ===== */
     const prompt = `
 You are ${BOT_NAME}, AI Strategist for Digital Transition Marketing (DTM).
 
-Your role:
-- Answer clearly and professionally
-- If structured knowledge or knowledge base content exists, synthesize it properly
-- Do NOT say you lack information if knowledge is provided
-- If no knowledge exists, provide strategic but relevant guidance
+You are highly trained on the company’s internal knowledge base.
+Never say you lack information if context is provided.
 
-Conversation Context:
-${knowledgeContext || "No structured knowledge retrieved."}
+If knowledge is available, you MUST use it.
+If no knowledge is available, provide confident strategic guidance.
+
+Knowledge:
+${hasKnowledge ? knowledgeContext : "No internal knowledge found."}
 
 User Question:
 ${userMessage}
 
-Provide a complete and structured response.
+Provide a confident, professional, and complete response.
+Do not include disclaimers.
 `;
 
     let response = cleanResponse(await generateGemma(prompt));
+    console.log("Gemma raw response:", response);
+
     let modelUsed = "Gemma";
 
-    if ((!response || isNonAnswer(response)) && canUseGemini()) {
+    if ((!response || response.length < 40) && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(prompt));
         markGeminiUsed();
@@ -221,7 +234,7 @@ Provide a complete and structured response.
 
     response = enforceBotName(response);
 
-    if (!response || isNonAnswer(response)) {
+    if (!response || response.length < 40) {
       if (msg.includes("book") || msg.includes("schedule") || msg.includes("call")) {
         response =
           "Sure — you can book a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
