@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "# Digital Transition Marketing (DTM)\n\n## Internal SOPs — Sales, Operations & Creative Roles\n\n**System Authority: Neon Vision**\n**Phase: Leverage & Launch**\n\n---\n\n## 1. PURPOSE\n\nThis document defines **role-specific operating procedures** for core DTM functions.\n\nObjectives:\n\n* Standardize execution quality\n* Eliminate role overlap and ambiguity\n* Protect delivery velocity at scale\n* Ensure Neon Vision visibility across all functions\n\nThese SOPs are **mandatory** for all team members and partners.\n\n---\n\n## 2. GLOBAL OPERATING RULES (APPLY TO ALL ROLES)\n\n* Follow approved SOPs only\n* No scope changes without authorization\n* All actions must be traceable\n* Client pressure does not override systems\n* Neon Vision decisions are final\n\nViolation triggers immediate review.\n\n---\n\n# SECTION A — SALES OPERATIONS SOP\n\n## A1. ROLE MANDATE\n\nSales exists to **qualify and protect execution**, not maximize deal count.\n\nPrimary responsibility:\n\n* Admit only leverage-ready clients into DTM systems\n\n---\n\n"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "or LTV\n\nPredictive recommendations: AI suggests budget reallocation, creative refresh, or targeting expansion\n\nSelf-healing workflows: If an API or funnel element fails, system reroutes traffic or adjusts campaigns automatically\n\nTools: GPT-5 reasoning engine, LLaMA-4 monitoring agents, n8n automation spine, Make.com triggers\n\n8. Reporting Cadence\nAudience\tFrequency\tType\nTactical\tWeekly\tEmail + dashboard\nStrategic\tBi-weekly\tDetailed report, KPI review, recommendations\nSovereign\tDaily\tReal-time dashboard, predictive insights, executive briefing"
+  ],
+  "source": "chunk_auto"
+}

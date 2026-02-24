@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "tters (2026): It functions as an AI planning tool to sketch entire website architectures in minutes. Notes: Starter plan $26/month; exports directly to Figma and Webflow.\nTool: v0 Supports Services: Service 2 / WEBSITE & CRO Category: UI Component Generator Primary Use: Prototyping modern dashboards and web apps using Shadcn UI. Why It Matters (2026): Enables \"vibe coding,\" allowing marketers and developers to build complex UIs without manual coding. Notes: Created by Vercel; syncs with GitHub repositories.\nTool: Entail CRO Supports Services: Service 2 / WEBSITE & CRO Category: Content Conversion Optimizer Primary Use: Auto-generates contextually relevant CTAs and widgets for content pages. Why It Matters (2026): Specifically designed to maximize revenue and attribution from organic SEO traffic. Notes: Standard plan $29/month; requires a website that already has organic traffic.\nTool: Wisepops Supports Services: Service 2 / WEBSITE & CRO Category: Personalization & Engagement Primary U"
+  ],
+  "source": "chunk_auto"
+}

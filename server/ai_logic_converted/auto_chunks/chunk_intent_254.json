@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "uments due to its large context window and \"human-like\" writing style.\nWhy It Matters (2026):\n• It is widely considered the most reliable assistant for deep technical content and cohesive sales pages that require narrative flow over thousands of words.\nNotes:\n• Its \"Projects\" feature allows for the creation of custom-trained internal copywriter teams.\nTool: Writesonic\nSupports Services: Service 3 – AI Content Creation & Copywriting / Service 9 – AI SEO & Visibility Category: Automation / Search\nPrimary Use:\n• This full-stack platform handles content research, creation, and publication by integrating real-time data from Ahrefs and Google Search Console.\nWhy It Matters (2026):\n• It provides factual accuracy by referencing live web signals, solving the hallucination problems of traditional generative models.\nNotes:\n• Features \"Botsonic\" for custom AI agent creation and \"Photosonic\" for matching image generation.\nTool: Rytr\nSupports Services: Service 3 – AI Content Creation & Copywriting C"
+  ],
+  "source": "chunk_auto"
+}

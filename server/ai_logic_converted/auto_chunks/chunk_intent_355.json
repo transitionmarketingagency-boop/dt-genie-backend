@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    " Brain (DTM-only)\n│\n└── Client Brain (Isolated per client_id)\n     ├── Client Knowledge\n     ├── Client Tone\n     ├── Client KPIs\n     ├── Client History\n     └── Client Constraints\n\n15.4 Client Brain Creation Trigger\n\nA Client Brain is instantiated when ANY ONE of these occurs:\n\nPilot purchased\n\nRetainer signed\n\nLong-term contract approved\n\nNo brain for:\n\nCold leads\n\nDiscovery calls\n\nWebsite visitors\n\n15.5 Required Client Brain Files (MANDATORY)\n\nEach client brain must contain exactly these files:\n\nclient_profile.md\nclient_offer.md\nclient_kpis.md\nclient_assets.md\nclient_history.md\nclient_constraints.md\n\n\nNo file → no deployment.\n\n15.6 File Definitions (Paste-Ready)\nclient_profile.md\nClient Name:\nIndustry:\nMarket:\nBusiness Model:\nPrimary Objective:\nSecondary Objective:\nDecision Maker:\nSales Cycle Length:\nBudget Range:\nRisk Tolerance:\n\nclient_offer.md\nPrimary Offer:\nOffer Price:\nUnique Selling Point:\nTarget Persona:\nCore Objections:\nPrimary CTA:\n\nclient_kpis.md\nNorth Star Metric:\nPrimar"
+  ],
+  "source": "chunk_auto"
+}

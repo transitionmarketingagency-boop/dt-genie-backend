@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "Phase 16 – Go-To-Market Execution & Demand Capture\n\nObjective: Turn the finished system (services, pilots, pricing, governance, AI stack) into controlled, scalable demand without overselling or chaos.\n\n16.1 GTM Operating Principle (Read This First)\n\nDTM does not “launch everywhere”.\n\nDTM:\n\nOpens controlled demand valves\n\nValidates signal → expands\n\nCloses channels when quality drops\n\nThis phase is about execution discipline, not growth hype.\n\n16.2 Primary Demand Channels (What We ACTUALLY Use)\nChannel Priority Order (Do not invert)\n\nPilot-Led Inbound (Highest Intent)\n\nOutbound Precision (Founder / Decision Maker only)\n\nPartnerships & White-Label\n\nPaid Media (Used surgically, not broadly)\n\nAnything else is optional and experimental.\n\n16.3 Channel 1 – Pilot-Led Inbound Engine\n\nFile: gtm_pilot_inbound.md\n\nPurpose\n\nUse the CGI & Performance Pilot as the entry weapon for all niches.\n\nNo selling retainers upfront.\n\nExecution Stack\n\nLanding page: /pilot\n\nOne CTA only: Book Pilot Audit\n\nCalend"
+  ],
+  "source": "chunk_auto"
+}

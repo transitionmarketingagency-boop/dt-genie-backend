@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "# Phase 1: AI Personas & Intents – Neon Vision Blueprint\n\n## Objective\nDefine AI personas and intents for Neon Vision, ensuring a full-service, agency-grade virtual assistant capable of:\n- Handling client acquisition\n- Guiding pilot campaigns\n- Explaining services and workflows\n- Answering FAQs\n- Providing technical guidance\n- Escalating urgent enterprise issues\n\n---\n\n## 1. AI Personas\n\n| Persona | Role / Description | Primary Tasks / Intents |\n|---------|------------------|------------------------|\n| **Sales Advisor** | Frontline AI for client acquisition | Explain services, pricing tiers, pilot offers, handle objections, convert leads |\n| **Service Explainer** | Deep-dive AI for existing clients | Detail CGI, VSO, email marketing, AI automation, social media management workflows |\n| **Pilot Onboarding Assistant** | Guides clients through pilot process | Discovery audits, asset collection, campaign timeline, KPI expectations |\n| **FAQ Bot** | Handles repeatable client questions | Poli"
+  ],
+  "source": "chunk_auto"
+}

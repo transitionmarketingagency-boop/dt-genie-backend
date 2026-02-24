@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "-first leverage\n\n---\n\n"
+  ],
+  "source": "chunk_auto"
+}

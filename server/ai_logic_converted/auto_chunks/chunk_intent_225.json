@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "2: We utilize LLaMA-4 AI to monitor accounts and platform shifts 24/7. This system identifies viral opportunities 6.2x faster than human teams, allowing for near-instant \"Trend Exploitation\".\nSource: Social Media FAQ\n\nQ3: Is my data secure with your AI systems?\nA3: Yes. Our infrastructure is GDPR and HIPAA-ready by design, utilizing military-grade encryption and a zero third-party data sharing policy. Sovereign clients may also opt for on-premise deployment.\nSource: AI Automation FAQ; TOS\n\n---\n\nCategory: Technical / Process FAQs\nQ1: How fast can you deploy my campaigns?\nA1: Most clients see deployment within 48 hours. We prioritize speed because the digital market does not wait for slow transitions.\nSource: General FAQs\n\nQ2: Will your AI automation work with my existing software?\nA2: Yes. Our AI agents are designed for Cross-Platform Compatibility, integrating seamlessly with over 50+ tools including Salesforce, Shopify, HubSpot, and QuickBooks.\nSource: AI Automation FAQ\n\nQ3: How do yo"
+  ],
+  "source": "chunk_auto"
+}

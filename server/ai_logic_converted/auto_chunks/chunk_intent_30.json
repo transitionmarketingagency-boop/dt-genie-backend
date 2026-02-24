@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours"
+  ],
+  "responses": [
+    "# CGI Virtual Property Tours\n\n## Technical Infrastructure\nDTM’s CGI Virtual Property Tours leverage 12K NeRF (Neural Radiance Fields) rendering to produce photorealistic digital environments exceeding traditional photogrammetry. Property models are LIDAR-scanned, delivering measurement accuracy up to 0.1mm. Integrated AI ruler tools calculate precise dimensions for walls, ceilings, and floors, aiding renovation and spatial planning.\n\n## Functional Features\n- **Interactive Navigation**: Hotspots are synchronized with AI-generated voiceovers in 18 languages.  \n- **Dynamic Customization**: Real-time swaps of furniture, finishes, and lighting configurations through AI-powered staging modules.  \n- **Financial Integration**: Embedded mortgage calculators connected to lender APIs allow live payment estimates inside the virtual environment.  \n- **Multi-Platform Delivery**: Browser-based, plugin-free players maintain 60 FPS on web, mobile, and VR-ready platforms.\n\n## Technical Workflow and Sche"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "flow`: 4-step pilot process explained.\n- `pilot_asset_requirements`: Asset requirements for CGI production.\n- `deployment_timeline`: Campaign deployment speed and timelines.\n\n---\n\n## Next Steps\n1. Import these JSON files into Neon Vision.  \n2. Test each persona using example questions.  \n3. Fine-tune responses for tone, accuracy, and CTA performance.  \n4. After validation, move to **Phase 4: Intent Training & Synonyms Expansion**.\n"
+  ],
+  "source": "chunk_auto"
+}

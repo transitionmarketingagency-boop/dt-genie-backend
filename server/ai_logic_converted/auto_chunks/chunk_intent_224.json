@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "\nA2: Yes. We offer a Money-Back Creative Guarantee. If you are unsatisfied with your CGI ad after the designated revision rounds, we refund your creative fee in full.\nSource: Pilot Offer Page\n\nQ3: What are your support response times?\nA3:\n• Tactical: 48-hour response.\n• Strategic: 4-hour emergency SLA.\n• Sovereign: 1 to 2-hour priority support, including weekends.\nSource: Service Tier Pricing Sections\n\n---\n\nCategory: AI & Neon Vision Questions\nQ1: What is the AI Plagiarism Shield?\nA1: This proprietary tool detects when AI search engines (like ChatGPT) scrape your proprietary content. It automatically auto-rewrites your content with protected phrasing and forces attribution links back to your site to prevent traffic theft.\nSource: GEO & SEO FAQ\n\nQ2: How does your AI identify viral trends?\nA2: We utilize LLaMA-4 AI to monitor accounts and platform shifts 24/7. This system identifies viral opportunities 6.2x faster than human teams, allowing for near-instant \"Trend Exploitation\".\nSource: "
+  ],
+  "source": "chunk_auto"
+}

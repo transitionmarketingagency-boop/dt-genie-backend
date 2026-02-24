@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "r expresses dissatisfaction\tFAQ Bot + Sales Advisor\t\"We offer a Money-Back Creative Guarantee; let’s schedule a quick call to resolve this.\"\nUser asks for cross-service optimization\tTechnical Advisor → Sales Advisor\tSuggest complementary services (e.g., CGI + GEO + YouTube Ads).\nProactive Suggestion Rules\n\nSuggest upgrades when pilot completes a step.\n\nOffer upsells for multi-channel campaigns based on user engagement.\n\nTrigger reminders for unanswered questions stored in open_questions.\n\nInclude friendly nudges for audits, consultations, or new service launches.\n\nPersona Switching Logic\n{\n  \"persona_switching\": [\n    {\n      \"condition\": \"intent in ['pilot_pricing_tiers', 'agency_overview', 'service_social_domination']\",\n      \"persona\": \"Sales Advisor\"\n    },\n    {\n      \"condition\": \"intent in ['service_ai_automation', 'service_geo_seo', 'service_predictive_analytics', 'service_cgi_advertising']\",\n      \"persona\": \"Technical Advisor\"\n    },\n    {\n      \"condition\": \"intent in ['pilo"
+  ],
+  "source": "chunk_auto"
+}

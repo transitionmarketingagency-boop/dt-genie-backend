@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "ify missing confidence signal\n* Re-anchor on validated results\n* Offer clean exit\n\nChasing is prohibited.\n\n---\n\n## 11. FAILURE & NON-CONVERSION PROTOCOL\n\nIf pilot does not convert:\n\n* Conduct internal post-mortem\n* Identify qualification failure or system mismatch\n* Archive learnings\n\nNo re-pitching loops allowed.\n\n---\n\n## 12. SOVEREIGN FAST-TRACK\n\nSovereign-tier candidates may:\n\n* Skip pilots entirely, or\n* Convert mid-pilot if signals are decisive\n\nApproval authority:\n\n* Neon Vision\n* Leadership\n\n---\n\n## 13. INTERNAL RULES (NON-NEGOTIABLE)\n\n* Pilots do not exist without a retainer path\n* No custom conversion logic\n* No emotional selling\n* Neon Vision forecasts are respected\n\n---\n\n## 14. DOCUMENT STATUS\n\n* Status: LOCKED – V1\n* Owner: Digital Transition Marketing\n* System Authority: Neon Vision\n\n---\n\n*End of Document*\n"
+  ],
+  "source": "chunk_auto"
+}

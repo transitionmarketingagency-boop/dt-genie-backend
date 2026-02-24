@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "Service 1 – AI GEO, SEO\nTool: AIclicks.io Supports Services: [Service 1 / AI GEO, SEO] Category: AI Visibility & GEO Monitoring Primary Use: Tracks prompt-level visibility across ChatGPT, Perplexity, and Google AI Overviews to help brands win recommendations. Why It Matters (2026): Offers specific \"Citation Intelligence\" to pinpoint which external domains drive brand mentions in AI answers. Notes: $79/month; integrates with GA4, sitemaps, and IndexNow.\nTool: Profound Supports Services: [Service 1 / AI GEO, SEO] Category: Enterprise Visibility modeling Primary Use: Measures brand \"share of voice\" and sentiment across major AI platforms including Claude, Grok, and Gemini. Why It Matters (2026): Provides \"Agent Analytics\" to see how AI crawlers interpret and index site content for citations. Notes: Lite starts at $499/mo; high-end customization for regulated industries.\nTool: Search Atlas (OTTO SEO) Supports Services: [Service 1 / AI GEO, SEO] Category: AI SEO Automation Primary Use: An a"
+  ],
+  "source": "chunk_auto"
+}

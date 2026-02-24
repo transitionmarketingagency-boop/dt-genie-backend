@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "o.\nTool: AthenaHQ Supports Services: [Service 1 / AI GEO, SEO] Category: Real-time AI Visibility Monitoring Primary Use: Monitors brand presence across generative answer platforms and identifies misrepresentations in real-time. Why It Matters (2026): Utilizes a 3-million-response catalog to provide predictive insights into AI search results. Notes: Starts at $270/mo; includes GA4 integration.\nTool: LLMrefs Supports Services: [Service 1 / AI GEO, SEO] Category: AI Search Performance Tracking Primary Use: Tracks brand \"share of voice\" and the exact source URLs feeding information into an LLM's context window. Why It Matters (2026): Allows users to reverse-engineer AI responses to identify content gaps for specific keywords. Notes: Free trial available; features a Reddit Threadfinder for engagement.\n\n--------------------------------------------------------------------------------\nService 2 – Predictive Analytics and Forecasting\nTool: Drivetrain Supports Services: [Service 2 / Predictive A"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "# Neon Vision Chatbot Intents Documentation\n\n## General\n\n**Agency Overview**\n- **Examples:**\n  - Who is Digital Transition Marketing?\n  - Tell me about your agency.\n  - What is the mission of DTM?\n- **Response:** Digital Transition Marketing was founded on the belief that the future belongs to those who adapt. We bridge the gap between AI and human creativity to deliver measurable transformation, helping brands evolve smarter, faster, and with purpose.\n- **Persona:** FAQ Bot\n- **Source:** Inside The Forge; Home Page\n\n**Agency Differentiation**\n- **Examples:**\n  - What makes your agency different?\n  - Why should I choose DTM over others?\n- **Response:** We don’t just run campaigns—we engineer unfair advantages. Our philosophy is 'Brain > Billboards,' meaning we outthink rather than outspend the competition using patented AI, predictive analytics, and algorithmic warfare.\n- **Persona:** Sales Advisor\n- **Source:** Outthink FAQ; Why Us\n\n...\n\n## Pilot Offer\n\n**Pilot Overview**\n- **Examples"
+  ],
+  "source": "chunk_auto"
+}

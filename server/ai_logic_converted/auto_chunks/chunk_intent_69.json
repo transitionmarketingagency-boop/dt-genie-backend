@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "\n\n---\n\n## 3. MODEL AUTHORIZATION LAYER\n\n### Approved Model Classes\n\nPrimary Models:\n\n* GPT-5 — complex reasoning, strategy, synthesis\n* Gemini — multimodal processing, speed-critical inference\n\nSecondary / Fallback Models:\n\n* LLaMA-4 — cost optimization, redundancy\n\nExperimental models are sandbox-only.\n\n---\n\n## 4. MODEL SELECTION RULES\n\n* No automatic model switching\n* Model choice defined at workflow design\n* Any change requires Neon Vision approval\n\nModel changes are logged with:\n\n* Reason\n* Impact scope\n* Rollback plan\n\n---\n\n## 5. PROMPT GOVERNANCE\n\n### Prompt Classification\n\n* System Prompts (restricted)\n* Task Prompts (controlled)\n* User Inputs (sanitized)\n\nRules:\n\n* No client data embedded in reusable prompts\n* Prompts version-controlled\n* Prompt drift monitored\n\n---\n\n## 6. DATA HANDLING & PRIVACY\n\n### Client Data Rules\n\n* Zero training usage\n* No cross-client context leakage\n* No prompt memory persistence\n\n### Vector & Memory Isolation\n\n* Dedicated vector space per client\n* No "
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "ion analytics dashboards."
+  ],
+  "source": "chunk_auto"
+}

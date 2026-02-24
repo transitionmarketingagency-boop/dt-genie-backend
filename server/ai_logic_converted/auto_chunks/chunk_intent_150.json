@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation"
+  ],
+  "responses": [
+    "uided AI workflows for interactive emails (forms/surveys inside emails) and AI-assisted segmentation.\nSaaS and growth teams.\nFree plan (500 contacts).\nAPI access, custom event tracking.\nmailmodo.com\nZapier\nAI orchestration of marketing tools.\nConnects 8,000+ apps to automate lead ingestion, AI-driven data cleaning, and campaign summarization.\nMarketers managing complex tool stacks.\nFree plan available; Paid from $19.99/mo.\n8,000+ apps.\nzapier.com\nUnlayer\nAI-powered email design.\nTone-specific button/heading alternatives, grammar fixing, and AI image generation from prompts.\nDesigners and marketers.\nFree plan available (unlimited users).\n1,300+ templates.\nunlayer.com\nSendGrid\nTransactional email delivery at scale.\nDelivery monitoring, ISP-level insights, and AI-powered routing/reputation management.\nProduct and engineering teams.\nEssentials from $19.95/mo.\nAPI-first architecture.\nsendgrid.com\nMailivery\nAI-driven email warm-up.\nUses AI-generated emails to warm up inboxes and improve send"
+  ],
+  "source": "chunk_auto"
+}

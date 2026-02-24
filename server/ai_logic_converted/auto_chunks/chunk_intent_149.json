@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation"
+  ],
+  "responses": [
+    "Use Case\nKey Features\nTarget Users\nPricing\nIntegrations\nRelevant Links\nCopy.ai\nWriting email copies and skeletons.\nAutomated multi-campaign workflows, brand voice customization, and model-agnostic flexibility.\nEmail marketers and content teams.\nFree plan available; Straightforward paid plans.\nMultiple LLM models.\ncopy.ai\nLavender\nAI email coaching for sellers.\nEmail scoring against best practices, instant rewrite suggestions, and recipient context in-box.\nSDRs and AEs sending high daily volume.\nBasic: Free (5 emails); Starter: $29/mo.\nOutlook, Gmail.\nlavender.ai\nWarmer.ai\nLinkedIn-based email personalization.\nGenerates personalized intros based on LinkedIn profiles or website data.\nSales reps performing cold outreach.\n$59/mo.\nMailshake.\nwarmer.ai\nMailmodo\nInteractive AMP and HTML emails.\nGuided AI workflows for interactive emails (forms/surveys inside emails) and AI-assisted segmentation.\nSaaS and growth teams.\nFree plan (500 contacts).\nAPI access, custom event tracking.\nmailmodo.com\nZ"
+  ],
+  "source": "chunk_auto"
+}

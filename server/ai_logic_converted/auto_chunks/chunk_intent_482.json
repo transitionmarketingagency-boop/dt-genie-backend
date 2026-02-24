@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "Notes: Provides perpetual licensing, meaning rights do not expire if a subscription is canceled.\nTool: Scaler 2 Supports Services: Service 1 / music production Category: Production Assistant / MIDI Generator Primary Use: Detects musical keys and suggests complex chord progressions and melodies. Why It Matters (2026): Functions as a virtual music theory professor to help producers expand beyond repetitive patterns. Notes: Supports MIDI drag-and-drop directly into project timelines.\nTool: Synthesizer V Supports Services: Service 1 / music production Category: Vocal Synthesis Primary Use: Generates realistic singing performances from MIDI and lyrics with high human-like emotion. Why It Matters (2026): It is the industry gold standard for creating professional vocals without hiring a singer. Notes: Capable of capturing nuanced breath and timbre variations.\nTool: ACE Studio Supports Services: Service 1 / music production Category: Vocal Synthesis Primary Use: Provides a diverse library of A"
+  ],
+  "source": "chunk_auto"
+}

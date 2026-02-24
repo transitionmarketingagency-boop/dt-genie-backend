@@ -1,0 +1,14 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "email marketing",
+    "email automation",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "queries\tFollow up automatically with FAQs or next steps\npersona_context\tAI persona tone\tSales Advisor = persuasive, FAQ Bot = informative\nPersona Tone Mapping\nPersona\tTone / Style\tExample Response\nSales Advisor\tPersuasive, confident, benefits-focused\t\"The Strategic pilot is perfect for {user_company}, guaranteeing 3X ROI in 90 days.\"\nTechnical Advisor\tPrecise, data-driven, professional\t\"Our AI agents automate 50+ workflows, integrating seamlessly with Salesforce and Shopify.\"\nFAQ Bot\tClear, informative, neutral\t\"You can contact us at agencee@email.com\n or call +54 2541 22 55 66.\"\nPilot Onboarding Assistant\tFriendly, guiding, stepwise\t\"Step 2 of your pilot is CGI Production — we'll generate cinematic visuals digitally, no product needed.\"\nMulti-turn Memory Flow\n\nDetect intent → load persona → fetch relevant memory slots.\n\nFill response template with user-specific data.\n\nStore/update memory slots after every interaction.\n\nUse previous_intent and open_questions for follow-ups.\n\nExample Fl"
+  ],
+  "source": "chunk_auto"
+}

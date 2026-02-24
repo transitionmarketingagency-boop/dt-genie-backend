@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours"
+  ],
+  "responses": [
+    "an using a fixed library. Notes: Developed at Harvard Innovation Lab; starts at $12/month.\nTool: Autodesk Forma Supports Services: Service 1 / CGI 3d virtual property tours Category: AI Architecture Planning Primary Use: Performs site context modeling and environmental analysis for unbuilt construction projects. Why It Matters (2026): Automates complex simulations for wind, noise, and sun hours during the pre-design phase. Notes: Integrates directly with Revit through a file-less sync; costs $315/month.\nTool: ArchiCAD 28 (AI Visualizer) Supports Services: Service 1 / CGI 3d virtual property tours Category: BIM-Integrated AI Primary Use: Generates high-quality design variations and realistic visuals directly within architectural pallets. Why It Matters (2026): Allows architects to iterate claddings and facade inspirations instantly without extra installations. Notes: Built directly into palettes; best used for inspiration rather than technical construction drawings.\nTool: Hunyuan 3D Sup"
+  ],
+  "source": "chunk_auto"
+}

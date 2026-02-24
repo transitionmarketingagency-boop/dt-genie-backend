@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "2 / Predictive Analytics and Forecasting] Category: Spreadsheet-Native FP&A Primary Use: Layers AI forecasting on top of Excel and Google Sheets for multi-scenario planning. Why It Matters (2026): An \"AI Forecasting Agent\" creates baseline revenue and expense patterns directly within familiar tools. Notes: Specialized for strategic finance teams in SaaS and healthcare.\nTool: DataRobot Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: Automated Machine Learning (AutoML) Primary Use: Platform that simultaneously builds, tests, and optimizes multiple predictive models for enterprise deployment. Why It Matters (2026): Focuses on minimizing business risk by securing and governing AI assets at scale. Notes: Targeted at technical practitioners and organizational leaders.\nTool: Clari Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: End-to-End Revenue Intelligence Primary Use: Automates sales forecast rollups and uses AI to inspect de"
+  ],
+  "source": "chunk_auto"
+}

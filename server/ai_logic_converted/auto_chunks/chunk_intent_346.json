@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "• Prompt architecture\n• Orchestration rules\n• Performance heuristics\n\n### On Exit\n\n• Assets transferred within 7 days\n• No hostage tooling\n• Optional migration support\n\n---\n\n## 7. Failure & Fallback Logic\n\n### Tier 1 Failure (Tool Outage)\n\n• Automatic reroute via n8n\n\n### Tier 2 Failure (Model Drift)\n\n• Model rollback to pinned version\n\n### Tier 3 Failure (Platform Risk)\n\n• Campaign pause → asset swap → appeal orchestration\n\nNeon Vision maintains **kill-switch authority** at all times.\n\n---\n\n## 8. Evolution Policy (2026+ Safe)\n\n• Quarterly tool review\n• No silent model upgrades\n• Experimental → Optional → Core promotion only after 90 days of proof\n• Vendor replacement playbooks pre-written\n\n---\n\n## Strategic Outcome of Phase 14\n\n• Zero single-point failure\n• Platform resilience\n• Investor-grade AI governance\n• Long-term defensibility\n\n---\n\n## NEXT PHASE\n\n**Phase 15 – Offer Packaging, Go-To-Market Control & Launch Sequencing**\n\nThis will define:\n• What you sell first\n• To whom\n• In what"
+  ],
+  "source": "chunk_auto"
+}

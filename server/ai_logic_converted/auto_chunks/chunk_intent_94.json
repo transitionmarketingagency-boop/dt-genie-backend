@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "gement.\n\n--------------------------------------------------------------------------------\nService 2 – Predictive Analytics and Forecasting\nTool: Drivetrain Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: AI-Native Financial Planning Primary Use: Connected planning platform that automates financial model generation and variance analysis. Why It Matters (2026): Features an \"AI Analyst\" that provides conversational insights into how assumptions (like churn) impact future revenue. Notes: Mid-market/Enterprise pricing; includes 800+ native business system integrations.\nTool: Anaplan (PlanIQ) Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: Enterprise Connected Planning Primary Use: Large-scale scenario modeling and mathematical optimization for corporate performance management. Why It Matters (2026): The PlanIQ module uses machine learning to detect patterns in connected datasets for precision forecasting. Notes: Custom pricing;"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "cked answers to questions like \"Why did my ROAS drop yesterday?\".\nNotes:\n• Specifically optimized for e-commerce brands on Shopify.\nTool: Clari\nSupports Services: Service 14 – AI Predictive Analytics & ROI Modeling / Service 12 – AI Sales Enablement Category: Analytics / Automation\nPrimary Use:\n• Clari uses AI to evaluate pipeline health and predict the likelihood of each sales deal closing in a given quarter.\nWhy It Matters (2026):\n• It provides high-level rigor to forecasting by allowing sales leaders to run \"what-if\" scenarios and identify gaps in pipeline coverage early.\nNotes:\n• Essential for unpredictable markets where manual gut instinct fails.\nTool: Optimizely\nSupports Services: Service 14 – AI Predictive Analytics & ROI Modeling Category: Automation / Analytics\nPrimary Use:\n• This experimentation platform uses machine learning to identify and roll out the most promising versions of website features via automated A/B testing.\nWhy It Matters (2026):\n• It can automatically alloca"
+  ],
+  "source": "chunk_auto"
+}

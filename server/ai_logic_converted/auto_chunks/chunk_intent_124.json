@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "ine that allows teams to build complex, scalable workflows for blog posts and landing page refreshes. Why It Matters (2026): It uses \"power steps\" to handle large-scale SEO tasks like keyword research and metadata generation for hundreds of pages at once. Notes: Offers a drag-and-drop interface; supports latest models from OpenAI, Anthropic, and Google.\nTool: Writesonic Supports Services: Service 1 – content & copy Category: AI Writing & SEO Primary Use: Generates factually accurate articles using real-time web data and integrates with multi-platform publishing tools. Why It Matters (2026): Its \"AI Article Writer\" creates competitive long-form content while its Chatsonic feature monitors brand mentions and citation gaps. Notes: Used by over 10 million users; offers flexible pricing for agencies and enterprise.\nTool: Creatify Supports Services: Service 1 – content & copy Category: Video Ad Generation Primary Use: Converts product links (URLs) or short descriptions into high-quality vide"
+  ],
+  "source": "chunk_auto"
+}

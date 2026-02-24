@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "l Engineering & Audio Mixing\n- **Spatial Audio**: Object-based Dolby Atmos and immersive 3D audio optimization for headphones and mobile devices.  \n- **Music Production**: Human + AI-assisted mixing; natural-sounding vocal tuning using Antares and Melodyne.  \n- **Stereo Mastering**: Industry-standard loudness and clarity for streaming and broadcast.  \n\n## AI Integration & Retention Analytics\n- **AI Pre-Production**: LLaMA-4 and Gemini models predict viral hooks and script optimization before filming.  \n- **AI Voiceovers**: Human-like voices generated in 18 languages for localization.  \n- **Viewer Analytics**: Eye-tracking heatmaps and retention dashboards detect drop-off points and engagement patterns.  \n- **AI Tools (2026)**: Integration with the latest AI video generation platforms for automatic scene suggestions, visual effects, and scene-to-music alignment.  \n\n## Monitoring & Future Applications\n- Real-time dashboards monitor millisecond-level engagement data and retention maps.  \n"
+  ],
+  "source": "chunk_auto"
+}

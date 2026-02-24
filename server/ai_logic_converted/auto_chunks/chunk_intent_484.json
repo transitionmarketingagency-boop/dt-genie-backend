@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "t-specific textures.\nTool: LALAL.AI Supports Services: Service 1 / music production Category: Stem Separation Primary Use: Extracts up to eight distinct stems from a mixed track using a high-quality neural network. Why It Matters (2026): Offers the cleanest separations for vocals, drums, bass, and specific instruments like wind or strings. Notes: Includes an enterprise API and batch processing for high-volume workflows.\nTool: Moises Supports Services: Service 1 / music production Category: Stem Separation Primary Use: Separates audio stems and detects keys/chords for practice and remixing. Why It Matters (2026): The leading mobile-first AI tool for musicians to study professional mixes and isolate components anywhere. Notes: Includes a specialized practice mode for playing along with backing tracks.\nTool: Ultimate Vocal Remover (UVR) Supports Services: Service 1 / music production Category: Stem Separation Primary Use: An open-source desktop tool for splitting tracks into clean vocals "
+  ],
+  "source": "chunk_auto"
+}

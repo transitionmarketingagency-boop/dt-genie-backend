@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "ng tracks.\nTool: Ultimate Vocal Remover (UVR) Supports Services: Service 1 / music production Category: Stem Separation Primary Use: An open-source desktop tool for splitting tracks into clean vocals and instrumentals. Why It Matters (2026): Provides a powerful, zero-cost alternative for budget-conscious producers and developers. Notes: Features GPU acceleration for rapid processing.\nTool: iZotope Neutron 5 Supports Services: Service 1 / music production Category: Mixing Tool Primary Use: Employs a Track Assistant to analyze audio and suggest professional mixing chains. Why It Matters (2026): It is the industry standard for identifying masking issues and providing multi-track balance suggestions. Notes: Features a specialized \"Unmask\" function to create space between competing elements.\nTool: eMastered Supports Services: Service 1 / music production Category: Mastering Service Primary Use: Provides AI-powered mastering with the ability to match the sonic profile of a reference track. W"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "efund if you fail?\",\n      \"What is the 90-day performance clause?\",\n      \"How do you handle underperformance?\"\n    ],\n    \"response\": \"Our 90-day 'blood in the water' guarantee ensures we hit your KPIs or we work for free until we do. If key metrics aren't achieved, we re-engineer the entire approach at our own cost to deliver the results we promised. [4, 14]\",\n    \"category\": \"Policies & Guarantees\",\n    \"source\": \"Website Content - FAQs [4]; Straight Answers FAQ [14]\"\n  },\n  {\n    \"intent\": \"trending_faq_ai_creative\",\n    \"examples\": [\n      \"Can AI really create viral content?\",\n      \"How do you make content that trends?\",\n      \"Will AI help my brand go viral?\",\n      \"Can AI replace a creative team?\",\n      \"How fast can your AI create social posts?\",\n      \"Can AI generate high-converting video ads?\"\n    ],\n    \"response\": \"Yes! Our AI tracks viral trends across platforms in real-time, generates content in minutes, and optimizes for maximum engagement using predictive analytic"
+  ],
+  "source": "chunk_auto"
+}

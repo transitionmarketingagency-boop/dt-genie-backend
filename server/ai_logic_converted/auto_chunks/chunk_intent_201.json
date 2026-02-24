@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "ion\n\n* Active during engagement\n* Archived post-contract\n* Purged per agreement terms\n\n---\n\n## 6. CLIENT DATA ISOLATION RULES\n\n* No shared databases\n* No shared embeddings\n* No cross-client prompt memory\n* No internal reuse of client data\n\nViolation results in **immediate shutdown & investigation**.\n\n---\n\n## 7. HUMAN-IN-THE-LOOP REQUIREMENTS\n\nMandatory approval required for:\n\n* Content publishing\n* Budget changes\n* Automation activation\n* Model output used externally\n\nApproval authority defined during onboarding.\n\n---\n\n## 8. INCIDENT RESPONSE PROTOCOL\n\n### Trigger Events:\n\n* Unauthorized access\n* Data inconsistency\n* System anomaly\n\n### Response Flow:\n\n1. Immediate access freeze\n2. Neon Vision alert\n3. Root cause analysis\n4. Client notification if required\n5. Corrective action\n\n---\n\n## 9. CLIENT COMMUNICATION RULES\n\n* No technical jargon overload\n* Transparency without exposing internals\n* Performance reporting only after validation\n\nAll reports are Neon Vision-reviewed.\n\n---\n\n## 10. O"
+  ],
+  "source": "chunk_auto"
+}

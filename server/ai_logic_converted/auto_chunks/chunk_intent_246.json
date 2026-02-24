@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "proof-based upsell\nSovereign\t$5,500+/mo, enterprise, multiple locations, long-term\tFull-service custom retainer\tLong cycle, high ACV, requires dedicated AE & AI analyst\n3. Objection Handling Scripts\n\nKey Objections & AI-Assisted Responses:\n\n“I’m not sure about CGI / AI effectiveness.”\n\nResponse: Show pilot results from similar niche, highlight ROI and Money-Back Creative Guarantee.\n\n“Budget is too high.”\n\nResponse: Present tiered bundles, emphasize AI cost-savings (70–92% reduction on production costs), and predictive analytics for precise ROAS.\n\n“I need human oversight, not AI.”\n\nResponse: Human-in-the-loop model explained — Neon Vision works alongside your team, no full autonomy without approval.\n\n“We need faster results.”\n\nResponse: Tactical pilot offers 14-day validation, real-time KPI dashboards, and predictive growth roadmap.\n\n“We’ve tried other agencies, no results.”\n\nResponse: Show 14-service expansion logic, hidden sub-service layers, and performance-based pricing guarantees t"
+  ],
+  "source": "chunk_auto"
+}

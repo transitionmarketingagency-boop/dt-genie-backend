@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "l owner or champion\n* Desire for isolated tactics without systems\n* Refusal of data access or transparency\n\n---\n\n## 4. CLIENT QUALIFICATION FRAMEWORK (DTM-QF)\n\nEach prospect is evaluated across **5 qualification pillars**.\n\n### Pillar 1: Authority\n\n* Is the decision-maker present?\n* Can they approve retainers without committee friction?\n\n**Score:** 0–5\n\n### Pillar 2: Economics\n\n* Current revenue or capital availability\n* Ability to sustain 90+ day optimization windows\n\n**Score:** 0–5\n\n### Pillar 3: Pain Intensity\n\n* Revenue stagnation\n* Scaling bottlenecks\n* Inefficiency or CAC pressure\n\n**Score:** 0–5\n\n### Pillar 4: Systems Readiness\n\n* Existing tools & data hygiene\n* Team maturity\n* Automation openness\n\n**Score:** 0–5\n\n### Pillar 5: Expansion Potential\n\n* Multi-service applicability\n* Retainer longevity\n* Sovereign tier viability\n\n**Score:** 0–5\n\n### Qualification Thresholds:\n\n* **0–14:** Disqualify\n* **15–19:** Tactical Pilot Only\n* **20–22:** Strategic Fit\n* **23–25:** Sovereign Ca"
+  ],
+  "source": "chunk_auto"
+}

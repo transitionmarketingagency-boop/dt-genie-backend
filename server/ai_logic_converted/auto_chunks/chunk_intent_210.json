@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "youtube ads",
+    "youtube ads pricing"
+  ],
+  "responses": [
+    "nce guarantee?\",\n      \"How do you back your YouTube marketing results?\"\n    ],\n    \"response\": \"We contractually guarantee a 3X return on ad spend (ROAS) within 90 days. If we miss this target, we will work for free until it is achieved, refund 50% of our fees, and share our proprietary competitor ad data with you. [8]\",\n    \"category\": \"YouTube Ads\",\n    \"source\": \"Ad Hijack FAQ [8]\"\n  },\n  {\n    \"intent\": \"website_redesign_seo\",\n    \"examples\": [\n      \"Do you redesign existing websites without losing SEO?\",\n      \"Will a redesign hurt my Google rankings?\",\n      \"How do you protect SEO during a site refresh?\",\n      \"Can I update my site without losing traffic?\",\n      \"Do you handle SEO migration for new websites?\",\n      \"Will my keywords stay ranked after a redesign?\"\n    ],\n    \"response\": \"Guaranteed. Our redesigns include full SEO migration audits, 301 redirects, and content preservation to ensure zero traffic loss while providing you with a modern, higher-converting digital "
+  ],
+  "source": "chunk_auto"
+}

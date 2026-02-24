@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    " the competition using patented AI, predictive analytics, and algorithmic warfare.\n- **Persona:** Sales Advisor\n- **Source:** Outthink FAQ; Why Us\n\n...\n\n## Pilot Offer\n\n**Pilot Overview**\n- **Examples:**\n  - What is the CGI & Performance Ads Pilot?\n  - Tell me about your 21-day growth system\n- **Response:** The CGI & Performance Ads Pilot is a short, focused 14–21 day campaign. We create cinematic CGI visual assets for your brand and run a full traffic test to measure real-world demand and provide a predictable roadmap for scaling.\n- **Persona:** Sales Advisor\n- **Source:** Pilot Page FAQ\n\n**Pilot Workflow**\n- **Examples:**\n  - What are the steps of the pilot?\n  - How do we get started with the pilot?\n- **Response:** The pilot follows 4 steps: Discovery Audit, CGI Production, Ad Launch & Optimization, and Results & Scale.\n- **Persona:** Pilot Onboarding Assistant\n- **Source:** Pilot Workflow Section\n\n...\n"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "* Include executive summary for quick decision-making\n* Always highlight AI contributions and measurable results\n* Recommend actions without using technical jargon\n* Provide a section for client feedback and follow-up actions\n\n---\n\n## 6. CHECKLIST BEFORE REPORT DELIVERY\n\n* [ ] Verify data integrity from Neon Vision outputs\n* [ ] Ensure KPIs match client contract / SLA\n* [ ] Include predictive insights and suggested actions\n* [ ] Ensure visuals are correctly formatted and branded\n* [ ] Review narrative for clarity and tone\n* [ ] Schedule delivery and confirm receipt\n\n---\n\n## 7. REPORTING CADENCE RECOMMENDATIONS\n\n| Frequency | Purpose                                                            |\n| --------- | ------------------------------------------------------------------ |\n| Weekly    | Quick operational insights, immediate adjustments                  |\n| Bi-Weekly | Mid-level performance tracking, tactical decisions                 |\n| Monthly   | Comprehensive analysis, strategic r"
+  ],
+  "source": "chunk_auto"
+}

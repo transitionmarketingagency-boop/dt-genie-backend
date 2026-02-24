@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "Phase 7 – AI Decision Trees & Contextual Logic\nObjective\n\nDefine conversation branching paths for all intents and personas.\n\nAutomate persona escalation and context-aware suggestions.\n\nEnable dynamic upsells, reminders, and follow-ups based on user actions.\n\nEnsure multi-turn memory drives decision logic.\n\nDecision Tree Principles\n\nIntent-Based Routing:\n\nEach user intent routes to a primary persona.\n\nSecondary personas may be activated for clarification, technical support, or upsell.\n\nSentiment & Frustration Handling:\n\nNegative sentiment or repeated questions trigger escalation to human-like assistant or FAQ Bot.\n\nStep-Based Pilot Guidance:\n\nPilot queries follow a step progression (1–4).\n\nResponses guide users through workflow and suggest upgrades dynamically.\n\nProactive Suggestion Triggers:\n\nService completion triggers upsell prompts.\n\nIncomplete queries trigger contextual reminders.\n\nHigh engagement triggers cross-service recommendations.\n\nBranching Logic Overview\nUser Query\n│\n├─ Int"
+  ],
+  "source": "chunk_auto"
+}

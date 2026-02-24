@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "email marketing",
+    "email automation"
+  ],
+  "responses": [
+    " Sovereign tier)\n\nICP matching (Phase 3 mapping)\n\nPain point & service alignment\n\nRouting Layer\n\nTiered CRM queues (high-touch vs automated)\n\nService-specific routing (e.g., CGI tours → real estate sales team)\n\nSub-service activation flags for upsells\n\nFollow-Up & Nurture Layer\n\nAI-generated email sequences\n\nSMS / WhatsApp / Messenger follow-ups\n\nMulti-channel retargeting for warmed leads\n\n2. Lead Qualification & Scoring\n\nNeon Vision evaluates every lead against tiered ICP criteria:\n\nTier\tCriteria\nTactical\tSmall budget, single pain point, fast decision\nStrategic\tScaling business, multiple pain points, KPI-oriented\nSovereign\tEnterprise-level spend, complex systems, long-term vision\n\nScore Factors\n\nIndustry relevance\n\nLTV potential\n\nPlatform & service fit\n\nEngagement signals (chat, email opens, demo requests)\n\nAI calculates a Lead Quality Score (0–100) to automatically route leads to the proper team or self-service workflow.\n\n3. Sales Script & Objection Handling Framework\n\nNeon Vision pr"
+  ],
+  "source": "chunk_auto"
+}

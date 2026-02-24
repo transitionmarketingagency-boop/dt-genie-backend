@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "Category: AI Voice Generation Primary Use: Generates extremely realistic text-to-speech and high-fidelity voice clones for narrations and audiobooks. Why It Matters (2026): It preserves human emotion and timing, allowing creators to localize content across 29+ languages while maintaining the original speaker's voice. Notes: Free for up to 10k credits; paid plans from $5/mo; includes a \"Voice Changer\" feature.\nTool: NotebookLM Supports Services: Service 1 – content & copy Category: AI Research & Ideation Primary Use: A source-grounded research tool from Google that organizes uploaded PDFs, URLs, and videos into structured content. Why It Matters (2026): It generates viral-style \"audio overview\" podcasts and detailed reports based strictly on the user's provided data to minimize hallucinations. Notes: Completely free; connects directly to Google Drive.\nTool: HeyGen Supports Services: Service 1 – content & copy Category: AI Video Generation Primary Use: Scales video production by using hy"
+  ],
+  "source": "chunk_auto"
+}

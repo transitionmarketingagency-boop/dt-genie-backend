@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    " taken\n\n**C. Visibility & Dominance Dashboard**\n\n* GEO visibility (ChatGPT / Gemini presence)\n* Voice Search rankings\n* Zero-click capture rate\n* AI plagiarism alerts\n\n**D. Automation Efficiency Dashboard**\n\n* Tasks automated\n* Hours saved\n* Cost reduction\n* Error recovery events (self-healing)\n\n---\n\n## 2. Data Sources & Pipelines\n\n| Source           | Data Type            | Refresh Rate |\n| ---------------- | -------------------- | ------------ |\n| Ads APIs         | ROAS, CPA, Spend     | Real-time    |\n| CRM              | Leads, Sales, Status | 5 min        |\n| GEO Engine       | AI rankings          | Daily        |\n| VSO Engine       | Voice positions      | Daily        |\n| Social AI        | Engagement, bans     | Hourly       |\n| Automation Spine | Task metrics         | Real-time    |\n\nAll data is normalized into a **Unified Metrics Layer (UML)** consumed by dashboards.\n\n---\n\n## 3. Automated Reporting System\n\n### 3.1 Report Types\n\n**Weekly Tactical Report**\n\n* What happened t"
+  ],
+  "source": "chunk_auto"
+}

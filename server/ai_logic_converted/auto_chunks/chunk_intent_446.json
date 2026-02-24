@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "OI, prompting upsell conversations\n\n3.3 Objection Warfare & Trust Engineering\n\nObjection: “What if the campaign fails?”\nCounter: 90-Day KPI guarantee + pilot proof-of-concept\n\nObjection: “We don’t want hidden costs.”\nCounter: Transparent pricing with clearly listed upsells; performance-based fee only activates on target achievement\n\nObjection: “How do we know you’ll deliver?”\nCounter: AI-generated milestone dashboards + Neon Vision predictive alerts + post-delivery verification\n\n3.4 Automated Retention Tools (2026)\n\nNeural Churn Prediction: Detect accounts at risk of downgrades / exit → proactive engagement\n\nAutomated KPI Alerts: Clients notified when targets exceed or fall behind\n\nExecutive Dashboards: High-level reporting in real-time\n\nSubscription Self-Healing: Auto-renewal of AI modules without downtime or loss of function\n\n4. Expansion via Client Success Loops\n\nDeliver → Prove → Expand\n\nDeliver first service → show ROI → activate hidden sub-services → move client up the tier\n\nUpse"
+  ],
+  "source": "chunk_auto"
+}

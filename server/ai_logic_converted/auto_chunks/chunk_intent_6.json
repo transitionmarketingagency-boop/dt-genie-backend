@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "youtube ads",
+    "youtube ads pricing"
+  ],
+  "responses": [
+    "# AI-Powered YouTube Advertising\n\n## Overview\nNeon Vision utilizes autonomous systems to manage end-to-end YouTube ad campaigns, combining AI-driven video generation, predictive targeting, and real-time optimization. Campaigns leverage neural engagement models to maximize ROI and audience retention.\n\n## Automated Campaigns & Dynamic Creative\n- **AI Ad Creation**: Generates video scripts, thumbnails, CTAs, and captions based on 23 emotional triggers.  \n- **Dynamic Creative Optimization (DCO)**: Automatically rotates creative assets to prevent fatigue and maintain engagement.  \n- **Personalization**: Ad content adapts to viewer behavior, watch-time patterns, and demographic segments.\n\n## Predictive Targeting & Analytics\n- **Audience Modeling**: Custom 1.2B-parameter AI and lookalike models analyze 14,000+ signals, including search intent and watch patterns.  \n- **Multi-Platform Deployment**: Campaigns run across YouTube, Google Ads, Meta, TikTok, and programmatic networks.  \n- **Real-Tim"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,14 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "tent in ['service_ai_automation', 'service_geo_seo', 'service_predictive_analytics', 'service_cgi_advertising']\",\n      \"persona\": \"Technical Advisor\"\n    },\n    {\n      \"condition\": \"intent in ['pilot_workflow', 'pilot_asset_requirements']\",\n      \"persona\": \"Pilot Onboarding Assistant\"\n    },\n    {\n      \"condition\": \"intent in ['contact_and_support', 'performance_guarantee', 'guarantee_creative_revisions']\",\n      \"persona\": \"FAQ Bot\"\n    }\n  ]\n}\n\nEscalation Triggers\nScenario\tTrigger\tAction\nUser frustration detected\tSentiment analysis < 0.3\tEscalate to Sales Advisor + FAQ Bot response\nTechnical query unresolved\tprevious_intent = technical, repeated 2x\tEscalate to Technical Advisor\nPilot-related query confusion\tUser asks step clarification multiple times\tEscalate to Pilot Onboarding Assistant\nUpsell opportunity\tPilot completed step 2 or 3\tSuggest Strategic or Sovereign tier upsell\nCross-service opportunity\tUser using one service, query indicates another need\tTechnical Advisor propose"
+  ],
+  "source": "chunk_auto"
+}

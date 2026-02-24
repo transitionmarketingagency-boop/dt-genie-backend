@@ -1,0 +1,14 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "Funnel Routing, Qualification Logic & Sales Scripts\n\nObjective: Build a controlled client acquisition system that filters, qualifies, and converts leads using AI-driven routing, multi-tier ICP logic, and objection-handling scripts.\n\n1. Funnel Routing Architecture\n\nHigh-level Flow:\n\nLead Capture\n\nSources: Website forms, social media DMs, ad clicks, email campaigns.\n\nTools: HubSpot, Salesforce, Zapier/n8n for automation.\n\nAI: Neon Vision flags high-intent signals via behavioral scoring.\n\nQualification Layer\n\nTactical ICP: Single-service interest, small budget, 14–21 day pilot candidate.\n\nStrategic ICP: Multi-service interest, scaling, ready for retainers.\n\nSovereign ICP: Enterprise, high spend, requires custom systems + dedicated AI engineers.\n\nTools: AI scoring engine with LLaMA-4 predictive analytics.\n\nAuto-routing: CRM tags and triggers assign leads to correct tiered sales path.\n\nAutomated Pre-Qualification\n\nShort AI-powered form evaluates:\n\nIndustry & niche fit\n\nBudget & timeline\n\nDa"
+  ],
+  "source": "chunk_auto"
+}

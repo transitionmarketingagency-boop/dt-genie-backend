@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "\nTool Name\nPrimary Use Case\nKey Features\nTarget Users\nPricing\nIntegrations\nRelevant Links\nWritesonic\nAll-in-one AI SEO and visibility platform.\nGEO Tool for tracking LLM appearances, AI Article Writer, SEO AI Agent for research, and real-time technical audits.\nStartups, agencies, and content teams.\nFree plan available; Paid starts at $49/mo.\nAhrefs, Google Search Console, Keyword Planner.\nwritesonic.com\nOtterly.AI\nMonitoring brand mentions and citations across AI platforms.\nBrand Visibility Index, Link Citation Analysis, AI Keyword Research for prompts, and GEO Auditing.\nMarketing and SEO professionals.\nStarts at $29/mo; Free 14-day trial.\nSemrush App Center.\notterly.ai\nProfound\nEnterprise-grade AI search analytics and representation control.\nAnswer Engine Insights, AI Crawler Audits, Prompt Volumes data, and Shopping visibility tracking.\nEnterprise brands needing robust security and deep analytics.\nStarter: $99/mo; Custom enterprise pricing.\nBI integrations, Slack, SSO.\nprofound.com\nH"
+  ],
+  "source": "chunk_auto"
+}

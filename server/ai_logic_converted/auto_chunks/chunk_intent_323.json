@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "# Phase 03 – AI Personas & Intents\n\n## Personas Overview\nWe have defined 4 specialized AI personas for Neon Vision:\n\n1. **Sales Advisor** – Persuasive, ROI-focused, drives pilot signups and service purchases.  \n2. **Technical Advisor** – Authoritative, technical, explains AI, CGI, automation, GEO SEO, predictive analytics.  \n3. **FAQ Bot** – Neutral, concise, handles policies, guarantees, and support queries.  \n4. **Pilot Onboarding Assistant** – Guiding, step-by-step, explains pilot process and asset collection.\n\n---\n\n## Intents per Persona\n\n### **Sales Advisor**\n- `pilot_pricing_tiers`: Explains pilot packages and ROI.\n- `service_youtube_ads`: Explains YouTube ad performance & ROAS guarantee.\n- `service_social_domination`: Explains shadowban reversal and AI-generated content.\n- `agency_differentiation`: Explains unique agency advantages.\n\n### **Technical Advisor**\n- `service_virtual_tours`: Details 12K NeRF tours & off-plan CGI.\n- `service_ai_automation`: Explains AI automation, self"
+  ],
+  "source": "chunk_auto"
+}

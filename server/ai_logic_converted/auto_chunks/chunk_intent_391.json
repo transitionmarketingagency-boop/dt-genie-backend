@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    " → fetch relevant memory slots.\n\nFill response template with user-specific data.\n\nStore/update memory slots after every interaction.\n\nUse previous_intent and open_questions for follow-ups.\n\nExample Flow:\n\nUser: \"How much does the pilot cost?\"\n\nAI: Uses user_name & user_company → responds with pricing template.\n\nStores: previous_intent = pilot_pricing_tiers, open_questions = pilot_workflow.\n\nNext User Query: \"How do I get started?\" → AI knows they asked about pilot → uses Pilot Onboarding Assistant template."
+  ],
+  "source": "chunk_auto"
+}

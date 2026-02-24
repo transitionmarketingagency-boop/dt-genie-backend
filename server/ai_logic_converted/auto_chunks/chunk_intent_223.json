@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "ed. We can build your product, property, or destination from scratch in a virtual environment, requiring zero physical shoots or product delivery.\nSource: Pilot FAQ; CGI Ad FAQ\n\nQ3: What are the pricing tiers for the Pilot?\nA3:\n• Tactical: $899 (1 CGI teaser, 1 platform).\n• Strategic: $1,299 (2 CGI teasers, 2–3 platforms).\n• Sovereign: Custom (Unlimited variants, multi-platform split testing).\nSource: Pilot Offer Page\n\n---\n\nCategory: Policies, Terms & Guarantees\nQ1: What is the \"Blood in the Water\" guarantee?\nA1: It is our 90-day performance clause: Hit KPIs or we work for free. If we don’t meet the agreed-upon growth metrics within 90 days, we re-engineer your strategy at our own cost until the targets are met.\nSource: General FAQs; TOS\n\nQ2: Is there a guarantee for the CGI creative work?\nA2: Yes. We offer a Money-Back Creative Guarantee. If you are unsatisfied with your CGI ad after the designated revision rounds, we refund your creative fee in full.\nSource: Pilot Offer Page\n\nQ3: Wha"
+  ],
+  "source": "chunk_auto"
+}

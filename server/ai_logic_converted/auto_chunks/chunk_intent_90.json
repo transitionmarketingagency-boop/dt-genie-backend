@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "ith the probability of being cited by AI models. Notes: Paid add-on starting at ~$199/mo per index.\nTool: Surfer SEO Supports Services: [Service 1 / AI GEO, SEO] Category: AI Content Optimization Primary Use: Analyzes top SERPs to provide real-time suggestions on content structure and \"GEO Scores\" for better AI extractability. Why It Matters (2026): Its \"Auto-Optimizer\" makes real-time adjustments to schema and headers as AI algorithms change. Notes: Starts at $89/mo; integrates with Google Docs and WordPress.\nTool: Peec AI Supports Services: [Service 1 / AI GEO, SEO] Category: Real-time Visibility Tracker Primary Use: Delivers instant alerts for brand visibility shifts across multiple countries and LLM platforms. Why It Matters (2026): Features a \"benchmarking dashboard\" to identify exactly why competitors are favored in specific prompts. Notes: Starts at €89/mo for 25 prompts.\nTool: Rankscale.ai Supports Services: [Service 1 / AI GEO, SEO] Category: Granular GEO Tracking Primary Use:"
+  ],
+  "source": "chunk_auto"
+}

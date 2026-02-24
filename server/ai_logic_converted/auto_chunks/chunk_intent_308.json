@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "S OPERATIONS SOP\n\n## A1. ROLE MANDATE\n\nSales exists to **qualify and protect execution**, not maximize deal count.\n\nPrimary responsibility:\n\n* Admit only leverage-ready clients into DTM systems\n\n---\n\n## A2. ALLOWED ACTIVITIES\n\n* Lead qualification\n* Discovery calls\n* Pilot recommendation\n* Retainer conversion\n\nSales **does not**:\n\n* Design solutions\n* Promise outcomes\n* Modify delivery scope\n\n---\n\n## A3. SALES EXECUTION FLOW\n\n1. Lead intake\n2. Neon Vision enrichment\n3. Qualification scoring\n4. Discovery call\n5. Pilot / Retainer decision\n\nUnqualified leads are exited cleanly.\n\n---\n\n## A4. HANDOFF RULES\n\n* Only qualified clients handed to Ops\n* Complete intake documentation required\n* No verbal-only context\n\nIncomplete handoff = rejection.\n\n---\n\n# SECTION B — OPERATIONS SOP\n\n## B1. ROLE MANDATE\n\nOperations converts qualified clients into **stable, secure execution environments**.\n\nPrimary responsibility:\n\n* Enable delivery without friction or risk\n\n---\n\n## B2. ALLOWED ACTIVITIES\n\n* Clien"
+  ],
+  "source": "chunk_auto"
+}

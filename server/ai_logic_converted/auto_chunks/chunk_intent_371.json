@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "tive\n• Rules-based or pattern-driven\n• Requires speed or 24/7 monitoring\n• Failure cost is low to medium\n\n**DELEGATE if:**\n• Task requires creative judgment\n• Client trust or persuasion is involved\n• High financial or reputational risk\n• Strategic ambiguity exists\n\n**HYBRID if:**\n• AI executes → human approves\n• AI monitors → human intervenes\n\n---\n\n## 17.3 What Neon Vision Handles (AI-Owned Ops)\n\nNeon Vision is the **primary operator**, not an assistant.\n\n### Fully AI-Owned\n\n• Lead intake & qualification scoring\n• Pilot onboarding workflows\n• Asset versioning & creative rotation\n• Ad fatigue detection\n• SEO / GEO monitoring\n• Social moderation & risk alerts\n• Reporting & dashboards\n• API health & self-healing workflows\n• Internal documentation drafts\n\n### AI + Human-in-the-Loop\n\n• Content publishing approval\n• Budget reallocations\n• Compliance flags\n• Client escalation triage\n• Creative concept selection\n\n---\n\n## 17.4 Human Roles (Minimal & High-Leverage)\n\nDTM is designed to run profit"
+  ],
+  "source": "chunk_auto"
+}

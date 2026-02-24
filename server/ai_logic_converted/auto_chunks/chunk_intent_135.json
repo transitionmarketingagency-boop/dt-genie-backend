@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "available for unlimited use."
+  ],
+  "source": "chunk_auto"
+}

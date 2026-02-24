@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "fication\n* Access scope validation\n* Data boundary assignment\n* Vector space isolation\n\nAny anomaly triggers manual review.\n\n---\n\n### Stage 4: System Mapping\n\n**Owner:** AI Systems Architect\n\nOutputs:\n\n* Service-to-system map\n* Automation eligibility\n* Data flow diagram\n\nThis becomes the **client system blueprint**.\n\n---\n\n### Stage 5: Execution Clearance\n\n**Owner:** Neon Vision\n\nClearance granted only if:\n\n* All access verified\n* Security checks passed\n* Human-in-the-loop points defined\n\nExecution begins immediately after clearance.\n\n---\n\n## 5. DATA SECURITY STANDARDS\n\n### Access Control\n\n* Unique credentials per client\n* MFA enforced where available\n* Quarterly access review\n\n### Data Storage\n\n* Encrypted at rest\n* Encrypted in transit\n* Client-specific storage partitions\n\n### Data Retention\n\n* Active during engagement\n* Archived post-contract\n* Purged per agreement terms\n\n---\n\n## 6. CLIENT DATA ISOLATION RULES\n\n* No shared databases\n* No shared embeddings\n* No cross-client prompt mem"
+  ],
+  "source": "chunk_auto"
+}

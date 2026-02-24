@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "om **how tools are orchestrated**.\n\n### 2.1 Protected Intellectual Property\n\n**IP Categories**\n• Service orchestration logic (how services interlock)\n• Automation Spine architecture\n• Predictive execution frameworks\n• Performance-based pricing math\n• Pilot-to-retainer escalation models\n• Internal scoring systems (risk, intent, expansion)\n\n**Action**\nAll IP is documented internally as **process IP**, not exposed deliverables.\n\nClients receive:\n• Outputs\n• Dashboards\n• Results\n\nThey do **not** receive:\n• Workflow maps\n• Agent logic\n• Prompt chains\n• Internal automation recipes\n\n---\n\n## 3. AI Moat vs Copycat Agencies\n\n### 3.1 Why Tools Alone Are Not a Moat\n\nAny agency can access:\n• GPT‑5\n• Gemini\n• LLaMA‑4\n• Runway\n• Leonardo\n\nWhat they **cannot replicate**:\n• Your orchestration logic\n• Your decision thresholds\n• Your escalation rules\n• Your failure-response systems\n\n### 3.2 Defensive Design Principles\n\n• Multi-model redundancy (no single-model dependency)\n• Workflow fragmentation (no sin"
+  ],
+  "source": "chunk_auto"
+}

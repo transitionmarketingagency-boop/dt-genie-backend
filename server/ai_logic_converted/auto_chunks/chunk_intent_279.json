@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "earbit processes data from 250+ sources to add 100+ B2B attributes automatically to lead records and identify anonymous website visitors.\nWhy It Matters (2026):\n• It shortens sales cycles by detecting high-intent buying signals from IP data and refreshing records every 30 days to ensure data accuracy.\nNotes:\n• Database includes 50 million company and 389 million contact records.\nTool: ATIO\nSupports Services: Service 11 – AI Data Enrichment & CRM Intelligence / Service 12 – AI Sales Enablement Category: Automation / Analytics\nPrimary Use:\n• ATIO is an AI-native CRM that deploys research agents to tackle complex prospecting and automated lead routing tasks.\nWhy It Matters (2026):\n• It populates itself automatically by syncing email and calendar data, allowing teams to move at high speed without manual entry bottlenecks.\nNotes:\n• Fast setup; includes built-in call intelligence.\nService 12 – AI Sales Enablement & Lead Qualification\nTool: Clay\nSupports Services: Service 12 – AI Sales Enable"
+  ],
+  "source": "chunk_auto"
+}

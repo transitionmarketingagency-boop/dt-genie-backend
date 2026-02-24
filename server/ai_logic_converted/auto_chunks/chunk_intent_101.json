@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "Service 1 – AUTOMATION & ai agents\nTool: Zapier\nSupports Services: Service 1 / AUTOMATION & ai agents\nCategory: No-code app connectors\nPrimary Use: Connects 8,000+ apps to automate event-driven workflows without code.\nWhy It Matters (2026): Includes \"Zapier Central\" for self-directed AI agents and a natural language Copilot for building.\nNotes: Free tier; Professional from $19.99/mo; cost scales with task volume.\nTool: n8n\nSupports Services: Service 1 / AUTOMATION & ai agents\nCategory: Developer-grade automation\nPrimary Use: Node-based workflow customization with native JavaScript/Python step support.\nWhy It Matters (2026): Offers ultimate flexibility for technical teams and a free self-hosted option to keep data private.\nNotes: Free self-hosted; Cloud from $20/mo; 4,000+ expert templates available.\nTool: Vellum AI\nSupports Services: Service 1 / AUTOMATION & ai agents\nCategory: Agentic workflow platform\nPrimary Use: Standardizes and validates production-grade AI workflows with built-in"
+  ],
+  "source": "chunk_auto"
+}

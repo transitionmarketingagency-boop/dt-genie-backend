@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "rimary Use:\n• This tool provides AI-powered virtual assistants that conduct natural, two-way conversations to engage and nurture leads autonomously.\nWhy It Matters (2026):\n• One assistant can handle thousands of contacts simultaneously, ensuring no inbound inquiry is missed and only sales-ready leads are handed to humans.\nNotes:\n• Multilingual support; integrates with major CRM systems.\nTool: Gong\nSupports Services: Service 12 – AI Sales Enablement & Lead Qualification Category: Audio / Analytics\nPrimary Use:\n• Gong records, transcribes, and analyzes sales calls to identify deal risks, common objections, and coaching opportunities for reps.\nWhy It Matters (2026):\n• It pinpoint exactly what top-performing salespeople do differently, using call data to improve forecast accuracy and revenue intelligence.\nNotes:\n• Alerts managers when critical deal features haven't been mentioned on a call.\nTool: Outreach (Kaia)\nSupports Services: Service 12 – AI Sales Enablement & Lead Qualification Categ"
+  ],
+  "source": "chunk_auto"
+}

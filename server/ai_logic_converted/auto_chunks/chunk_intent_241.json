@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "ns, demo requests)\n\nAI calculates a Lead Quality Score (0–100) to automatically route leads to the proper team or self-service workflow.\n\n3. Sales Script & Objection Handling Framework\n\nNeon Vision provides adaptive, multi-tiered scripts for all services.\n\nCore Structure\n\nOpening\n\nEstablish credibility (results, data points, KPIs)\n\nConfirm client pain points\n\nProblem Amplification\n\nHighlight cost of inaction\n\nShow predicted losses without solution\n\nService Alignment\n\nMatch service + sub-service to exact pain point\n\nTiered recommendation (Tactical → Strategic → Sovereign)\n\nRisk Reversal\n\nHighlight 90-day KPI guarantee\n\nProof via pilot or performance data\n\nUpsell / Expansion Hooks\n\nHidden sub-service activation (Phase 3)\n\nMulti-service upgrade logic\n\nClosing\n\nClear next steps\n\nTiered pricing transparency\n\nAutomated follow-up triggers\n\n3.1 Objection Handling Cheat Sheet\nObjection\tCounter\n“Your service is expensive.”\tROI demonstration via predictive analytics; phased pilot to mitigate risk"
+  ],
+  "source": "chunk_auto"
+}

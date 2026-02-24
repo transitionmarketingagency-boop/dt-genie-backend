@@ -1,0 +1,14 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "uilds trust and reduces entry risk.\n\nRecommendations:\n\nTactical Tier ($899): Perfect for testing SMBs. Keep as-is.\n\nStrategic Tier ($1,299): Appropriate for scaling clients. Optional upsell of predictive analytics post-pilot.\n\nSovereign Tier (Custom): Maintain flexible enterprise pricing, but clearly outline expected deliverables and ROI metrics per vertical.\n\nConsider micro-bundles for e-commerce (1 ad variant + 1 platform) to capture lower-budget leads.\n\nAdd visual ROI preview dashboard (mock KPI dashboard) to show leads and engagement potential pre-signup.\n\n3. Bundling Logic Across Services\n\nPilot acts as entry into all 14 services. Once a pilot proves performance, the client can be upsold into:\n\nCGI Advertising Retainer\n\nAI-Powered Websites & Conversion Architecture\n\nPredictive Analytics + Automation Suite\n\nSocial Media Domination Package\n\nAI Content Engine & Multi-format Repurposing\n\nBundles can be tiered by revenue impact, e.g.:\n\nStarter Bundle: Pilot + Tactical Website + AI Ads\n"
+  ],
+  "source": "chunk_auto"
+}

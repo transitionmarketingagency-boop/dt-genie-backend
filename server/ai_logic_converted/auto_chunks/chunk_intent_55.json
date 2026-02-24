@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "utomatic scene suggestions, visual effects, and scene-to-music alignment.  \n\n## Monitoring & Future Applications\n- Real-time dashboards monitor millisecond-level engagement data and retention maps.  \n- **Futuristic Enhancements**: AI-assisted conversion editing where neural predictors guide cuts, transitions, and pacing to maximize watch time.  \n- Predictive adaptive editing dynamically adjusts sequences based on live performance signals from audience analytics.  \n"
+  ],
+  "source": "chunk_auto"
+}

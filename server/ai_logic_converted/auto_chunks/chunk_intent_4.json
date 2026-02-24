@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "# AI-Powered Website Design\n\n## System Overview\nNeon Vision implements autonomous systems to architect mobile-first, SEO-optimized digital platforms. Pixel-perfect initial drafts are generated within 48 hours using AI-assisted coding and design frameworks.\n\n## Optimization & Integration\n- **SEO & GEO Integration**: Incorporates FAQ/HowTo schema, Core Web Vitals, and GEO for indexing in ChatGPT, Gemini, and DeepSeek.  \n- **UI/UX & Layout**: Predictive UX scoring and AI-driven landing page testing with heatmap analysis.  \n- **Compatibility**: All builds meet mobile-first standards, scoring 95+ on Google’s Mobile-Friendly Test.\n\n## Predictive Analytics & Advanced Architecture\n- **User Engagement Forecasting**: Predictive AI estimates campaign outcomes with 90% accuracy.  \n- **Self-Healing Systems**: Detects and fixes workflow or API errors autonomously.  \n- **Autonomous Code Generation**: Tools like Cursor AI implement features 4.2x faster by interpreting intent.  \n- **Content Structuring"
+  ],
+  "source": "chunk_auto"
+}

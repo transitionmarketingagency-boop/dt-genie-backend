@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    ": ROAS, LTV, CAC, CPL, churn\n\nEngagement Metrics: CTR, scroll depth, time-on-page, retention\n\nOperational Metrics: SLA adherence, workflow efficiency, agent uptime\n\nPredictive Metrics: Forecasted revenue, lead velocity, creative fatigue risk\n\nService-Specific KPIs\nService\tKPIs\tTools (2026)\nAI-Powered Email Marketing\tOpen rates, click-through, conversions\tKlaviyo, HubSpot, AI Subject Line Optimizer\nCGI Virtual Tours\tLeads generated, engagement duration, inquiry conversions\tRunway Gen-3, Leonardo AI, Hotjar, Google Analytics\nCGI Advertising\tROAS, creative fatigue, audience segmentation efficiency\tPika Labs, ElevenLabs, Meta Ads Manager, Google Ads, GPT-5 for script analysis\nAI Automation & Agents\tWorkflow uptime, task completion rate, SLA adherence\tn8n, Make.com, LLaMA-4 dashboards, Agent Scout\nVideo & Audio Production\tRetention rate, engagement, distribution reach\tDolby.io analytics, YouTube Studio, TikTok Analytics, ElevenLabs emotion scoring\nAI-Powered Website & CRO\tConversion rate, p"
+  ],
+  "source": "chunk_auto"
+}

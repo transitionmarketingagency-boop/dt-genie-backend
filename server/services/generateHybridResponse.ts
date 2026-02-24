@@ -31,16 +31,18 @@ function markGeminiUsed() { geminiUsage.count++; }
 function normalize(text: string) {
   return text.toLowerCase().trim().replace(/[^\w\s]/gi, "");
 }
+
 const staticIntents = {
   greeting: ["hi", "hello", "hey", "who are you"],
   identity: ["who are you", "about yourself", "tell me about yourself"],
-  service: ["service", "what services", "list services"],
-  pricing: ["pricing", "price", "cost", "how much"],
+  service: ["service", "services", "what services", "list services", "cgi ads", "youtube ads"],
+  pricing: ["pricing", "price", "cost", "how much", "package", "tiers"],
   tagline: ["tagline", "slogan"],
   targetMarket: ["target market", "ideal client", "who do you serve"],
   mission: ["mission"],
   niches: ["niches", "specialize", "industry"]
 };
+
 const greetingVariations = [
   `Hello! How can I assist you today?`,
   `Hi there! Ready to guide your business growth with AI-powered strategies.`,
@@ -57,43 +59,30 @@ if (fs.existsSync(personaPath)) {
   catch { console.warn("⚠️ Failed to load persona, using default tone"); }
 }
 
-/* ================= LOAD AI JSON INTENTS ================= */
+/* ================= AI LOGIC INTENTS ================= */
 const aiLogicRoot = path.join(process.cwd(), "server", "ai_logic_converted");
 const aiIntents: any[] = [];
-
-/**
- * Recursively load all JSON intent files from ai_logic folder
- * Supports nested subfolders
- */
 function loadJSONRecursive(dir: string) {
   if (!fs.existsSync(dir)) {
     console.warn(`⚠️ AI logic folder not found: ${dir}`);
     return;
   }
-
   for (const f of fs.readdirSync(dir)) {
     const fullPath = path.join(dir, f);
     const stat = fs.statSync(fullPath);
-
-    if (stat.isDirectory()) {
-      loadJSONRecursive(fullPath); // recurse into subfolder
-    } else if (f.endsWith(".json")) {
+    if (stat.isDirectory()) loadJSONRecursive(fullPath);
+    else if (f.endsWith(".json")) {
       try {
         const json = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
-        if (json && Array.isArray(json.triggers) && Array.isArray(json.responses)) {
-          aiIntents.push(json);
-        } else {
-          console.warn(`⚠️ Skipped invalid intent JSON (missing triggers/responses): ${fullPath}`);
-        }
-      } catch (err) {
-        console.warn(`⚠️ Failed to parse JSON file: ${fullPath}`, err);
-      }
+        if (json && Array.isArray(json.triggers) && Array.isArray(json.responses)) aiIntents.push(json);
+        else console.warn(`⚠️ Skipped invalid intent JSON (missing triggers/responses): ${fullPath}`);
+      } catch (err) { console.warn(`⚠️ Failed to parse JSON file: ${fullPath}`, err); }
     }
   }
 }
-
 loadJSONRecursive(aiLogicRoot);
 console.log(`✅ Loaded ${aiIntents.length} AI logic JSON intents from ${aiLogicRoot}`);
+
 /* ================= FIND MATCHING INTENT ================= */
 function findMatchingIntent(userMessage: string) {
   const msg = normalize(userMessage);
@@ -129,6 +118,7 @@ try {
     console.log(`✅ Loaded persistent embedding cache (${embeddingCache.size} entries)`);
   }
 } catch { console.warn("⚠️ Failed to load embedding cache, starting fresh."); }
+
 function saveEmbeddingCache() {
   try { fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(embeddingCache)), "utf-8"); }
   catch { console.warn("⚠️ Failed to save embedding cache."); }
@@ -160,10 +150,12 @@ async function dynamicServiceAnswer(userMessage: string, userId: string): Promis
   const prompt = `You are ${BOT_NAME}, expert AI for Digital Transition Marketing.
 Provide concise, expert-level, bullet-pointed response on services. Use company knowledge: ${combined}
 User Query: ${userMessage}`;
-  const response = cleanResponse(await generateGemma(prompt));
+  let response = cleanResponse(await generateGemma(prompt));
+  if (!response || isNonAnswer(response)) response = "I don’t currently have confirmed information on that.";
   await memoryService.addMessage(userId, "assistant", response);
   return response;
 }
+
 async function dynamicPricingAnswer(userMessage: string, userId: string): Promise<string> {
   const embeddingKnowledge = await getCachedEmbeddings(userMessage);
   const jsonKnowledge = findMatchingIntent(userMessage);
@@ -171,7 +163,8 @@ async function dynamicPricingAnswer(userMessage: string, userId: string): Promis
   const prompt = `You are ${BOT_NAME}, expert AI for Digital Transition Marketing.
 Provide concise, context-aware pricing based on company knowledge: ${combined}
 User Query: ${userMessage}`;
-  const response = cleanResponse(await generateGemma(prompt));
+  let response = cleanResponse(await generateGemma(prompt));
+  if (!response || isNonAnswer(response)) response = "I don’t currently have confirmed pricing information.";
   await memoryService.addMessage(userId, "assistant", response);
   return response;
 }
@@ -210,7 +203,7 @@ export async function generateHybridResponse(userMessage: string, userId = "defa
       }
     }
 
-    // AI + EMBEDDINGS
+    // AI + EMBEDDINGS PRIMARY
     const intentKnowledge = findMatchingIntent(userMessage);
     const embeddingKnowledge = await getCachedEmbeddings(userMessage);
     const combinedKnowledge = [intentKnowledge, embeddingKnowledge].filter(Boolean).join("\n\n");
@@ -238,6 +231,16 @@ Respond strategically, concisely, and accurately based on official knowledge.`;
     }
 
     response = enforceBotName(response);
+
+    // CALENDLY ONLY ON EXPLICIT REQUEST
+    if (!response || isNonAnswer(response)) {
+      if (msg.includes("book") || msg.includes("call") || msg.includes("schedule")) {
+        response = "Sure — you can book a call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+      } else {
+        response = "I don’t currently have confirmed information on that.";
+      }
+    }
+
     console.log(`[Hybrid] Model=${modelUsed}, UserMessage="${userMessage}"`);
     await memoryService.addMessage(userId, "assistant", response);
 

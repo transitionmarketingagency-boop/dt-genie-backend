@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "rotation\n\n### Tech Stack\n\n• Runway Gen‑3\n• Leonardo AI\n• Pika Labs\n• ElevenLabs narration\n\n### Entry Pricing\n\n• Tactical: $1,800 / campaign\n• Strategic: $2,500 / campaign\n• Sovereign: Custom\n\n### Upsells\n\n• Performance marketing bundle\n• AR shopping integrations\n• Influencer CGI avatars\n\n---\n\n## 8. AI Business Automation & Autonomous Agents\n\n### Core Promise\n\nReplace fragmented SaaS stacks with **self‑healing AI workflows**.\n\n### Ideal Clients\n\n• Scaling agencies\n• E‑commerce brands\n• Finance, legal & SaaS firms\n\n### What Neon Vision Delivers\n\n• AI agents managing 50+ workflows\n• Self‑healing APIs (Stripe, Shopify, CRM)\n• Autonomous compliance (GDPR / HIPAA)\n• Predictive process optimization\n• Real‑time KPI dashboards\n\n### Tech Stack\n\n• n8n + Make.com\n• LLaMA‑4 + GPT‑5 agents\n• Agent Scout\n• Snowflake / Power BI\n\n### Entry Pricing\n\n• Tactical: $2,199 / month\n• Strategic: $3,299 / month\n• Sovereign: Custom (on‑prem / enterprise)\n\n### Upsells\n\n• Predictive analytics module\n• AI sales & s"
+  ],
+  "source": "chunk_auto"
+}

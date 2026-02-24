@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "# Music Production\n\n## Overview\nMusic Production at Digital Transition Marketing encompasses technical workflows that combine advanced hardware, digital audio workstations (DAWs), and AI‑assisted tools to create, mix, and master professional‑grade audio content. These systems support a range of outputs including original compositions, soundtracks, jingles, audio branding elements, voiceovers, and immersive audio assets for multimedia applications.\n\n## Production Timelines & Workflows\n- **Standard Production**: Full music production cycles operate within defined delivery schedules, including structured phases for composition, arrangement, mixing, and mastering.  \n- **Rush & High‑Priority Cycles**: Accelerated delivery options are available for time‑sensitive assets.  \n- Production resources include professional DAWs such as **Pro Tools**, **Ableton Live**, **Logic Pro**, and **Fender Studio Pro** for end‑to‑end audio recording, editing, and mixing workflows. :contentReference[oaicite:0]"
+  ],
+  "source": "chunk_auto"
+}

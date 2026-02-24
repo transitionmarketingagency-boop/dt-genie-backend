@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "# Video & Audio Production\n\n## Overview\nVideo and Audio Production at Neon Vision is a technical framework for creating broadcast-ready assets using advanced AI and human engineering workflows. The process combines structured production timelines, spatial audio engineering, and AI-assisted pre-production to ensure high-quality, data-driven results across multiple formats and platforms.\n\n## Production Timelines & Workflows\n- **Standard Cycle**: 7-day delivery for full production.  \n- **Rush Cycle**: 5-day delivery for high-priority projects.  \n- **Music-Specific**: 3-day mixing, 2-day mastering; 72-hour turnaround for premium tiers.  \n- **Technical Platforms**: Hybrid workflow integrating SSL consoles, UAD plugins, and digital platforms like Pro Tools HD, iZotope, and Manley.  \n\n## Technical Engineering & Audio Mixing\n- **Spatial Audio**: Object-based Dolby Atmos and immersive 3D audio optimization for headphones and mobile devices.  \n- **Music Production**: Human + AI-assisted mixing; "
+  ],
+  "source": "chunk_auto"
+}

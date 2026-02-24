@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "ot match that velocity or scale, leading to far more efficient spend and total market dominance. [12]\",\n    \"category\": \"Performance Marketing\",\n    \"source\": \"AI Performance Marketing FAQ [12]\"\n  },\n  {\n    \"intent\": \"ai_automation_security\",\n    \"examples\": [\n      \"How secure is your AI automation?\",\n      \"Is my data safe with AI agents?\",\n      \"Are your automation systems compliant?\",\n      \"Do you protect my company's data privacy?\",\n      \"What security measures do you use for AI?\",\n      \"Is your AI GDPR or HIPAA ready?\"\n    ],\n    \"response\": \"Our systems are built with military-grade encryption and are GDPR/HIPAA-ready by design. We have a zero third-party data sharing policy and offer optional on-premise deployment for enterprise clients requiring maximum data sovereignty. [13, 14]\",\n    \"category\": \"AI Business Automation\",\n    \"source\": \"AI Business Automation FAQs [13]; Straight Answers FAQ [14]\"\n  },\n  {\n    \"intent\": \"social_shadowban_reversal\",\n    \"examples\": [\n     "
+  ],
+  "source": "chunk_auto"
+}

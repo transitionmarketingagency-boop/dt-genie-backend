@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "h-converting pages built with Core Web Vitals 95+ and predictive UX scoring.\n\nAI/CGI Creatives: 30-second scroll-stopping teasers (dynamic variants optional).\n\nAutomated Nurture Systems: Email, SMS, and retargeting flows fully automated via n8n + Make.com.\n\nSmart Targeting: AI analyzes buyer intent, market trends, and local voice search traffic (VSO/GEO).\n\nKPI Tracking & Optimization: Weekly adjustments to audiences, creative rotation, and bid strategies to maximize ROAS.\n\nMulti-Channel Setup: Paid traffic infrastructure across Meta, Google, TikTok, and programmatic DSPs.\n\nGrowth Roadmap: Strategic plan to move from pilot validation → retainer expansion → full automation and predictive analytics.\n\nPilot Workflow – 4 Steps\n\nDiscovery Audit: 20-minute consultation defining KPIs, goals, brand guidelines.\n\nCGI Production: 30-second cinematic teaser, optional creative variants.\n\nAd Launch & Optimization: 14-day campaign with AI-driven targeting and performance adjustments.\n\nResults & Scale:"
+  ],
+  "source": "chunk_auto"
+}

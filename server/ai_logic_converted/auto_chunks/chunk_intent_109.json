@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "-------------------------------------------\nService 2 – VIDEO & AUDIO production & automation\nTool: Sora 2\nSupports Services: Service 2 / VIDEO & AUDIO production & automation\nCategory: High-end Text-to-Video\nPrimary Use: Generates 4K cinematic video clips with complex camera movements from text prompts.\nWhy It Matters (2026): Features integrated audio, dialogue support, and high realism for social media and filmmaking.\nNotes: Top-tier plans around $200/mo; features a storyboard keyframe tool.\nTool: Google Veo 3 / 3.1\nSupports Services: Service 2 / VIDEO & AUDIO production & automation\nCategory: Pro-grade AI Cinematography\nPrimary Use: Produces high-fidelity commercial videos with natural motion and synchronized audio/SFX.\nWhy It Matters (2026): The best model for generating video with contextually accurate audio and filmmaking controls.\nNotes: Google AI Pro starts at $19.99/mo; 1080p resolution available.\nTool: Kling AI (v2.5/2.6)\nSupports Services: Service 2 / VIDEO & AUDIO productio"
+  ],
+  "source": "chunk_auto"
+}

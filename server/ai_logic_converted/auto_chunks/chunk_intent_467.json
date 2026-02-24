@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours"
+  ],
+  "responses": [
+    "tes based on live engagement and auction volatility.\n\nPredictive Audience Targeting: 14,000+ signals, including search intent, dark pool data, and behavioral patterns.\n\nDynamic Creative Optimization (DCO): Generates 1,000+ variations automatically from scripts or 3D models.\n\nFraud Protection: Server-side tracking and AI detection prevent non-human traffic, saving up to 30% of ad spend.\n\nWorkflow Pipeline:\n\nTarget Acquisition → Strategic Deployment → Autonomous Engagement → Adaptive Optimization\n\nTools (2026): GPT-5 for scripts, LLaMA-5 for viral hooks, Runway Gen-3 for video ad creation, Adobe Firefly 3 for visual assets.\n\nCGI Virtual Tours & Advertising\n\nOverview:\nProvides photorealistic digital assets using 12K NeRF rendering and LIDAR-scanned models (accuracy 0.1mm). Separate pipelines for property tours and product advertising.\n\nTechnical Features:\n\nVoxel-Accurate Lighting: Eliminates flat CGI artifacts using ray-traced reflections and sunlight simulations.\n\nDynamic Staging & Custo"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "ted workflows ensure partner teams can execute without Neon Vision direct intervention.\n\nPartner Onboarding\n\nTiered access to AI systems (Tactical → Strategic → Sovereign)\n\nTraining on platform compliance, SOPs, and client management\n\nAccess to hidden sub-services for upsells\n\nRevenue Logic\n\nRevenue share or subscription-based model for partner clients\n\nPartners can unlock hidden sub-services to increase margins without renegotiation\n\nPredictive reporting ensures partner profitability is tracked and optimized\n\n3. Partner AI Integration\n\nAutonomous Copilots: Each partner gets AI assistants tuned for client acquisition, onboarding, and retention.\n\nBrand-Locked Models: Neon Vision maintains oversight; partner models can’t drift or violate compliance.\n\nPerformance Monitoring: KPIs tracked across partner networks; anomalies flagged and corrected automatically.\n\n4. Expansion & Scaling Logic\n\nMicro-Partners: Single-service specialists, small campaigns (Tactical level).\n\nStrategic Partners: Mu"
+  ],
+  "source": "chunk_auto"
+}

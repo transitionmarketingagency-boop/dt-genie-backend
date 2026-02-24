@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "ehavioral trend analysis.\n• Madgicx: Autonomous Meta ad bidding and creative fatigue prediction.\n• Clari: Sales pipeline health and revenue risk scoring.\n\n--------------------------------------------------------------------------------\nC. tool_risk_matrix.md\nTool\nService\nDependency Risk\nLock-in Risk\nReplaceability\nZapier (Central)\nS10\nHigh (Ecosystem)\nHigh\nModerate\nSalesforce Einstein\nS14\nHigh (Ecosystem)\nHigh\nHard\nHubSpot\nS2\nHigh (Ecosystem)\nHigh\nHard\nJasper\nS3\nLow\nMedium\nModerate\nSynthesia\nS4\nMedium\nMedium\nModerate\nClay\nS12\nHigh (Data)\nHigh\nHard\nGong\nS12\nHigh (Data)\nHigh\nModerate\nMidjourney\nS5\nHigh (Discord/API)\nLow\nEasy\nPerplexity Ent.\nS7\nLow\nLow\nEasy\nn8n\nS10\nLow (Self-hosted)\nHigh\nModerate\nSprout Social\nS6\nHigh (API)\nMedium\nEasy\nClearbit\nS11\nHigh (Data)\nMedium\nModerate\nSurfer SEO\nS9\nLow\nLow\nEasy\nMadgicx\nS14\nHigh (Meta/API)\nMedium\nModerate\nMatterport\nS4\nHigh (Hardware)\nHigh\nHard\n\n--------------------------------------------------------------------------------\nD. phase14_input_summar"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "ients.\n\n2. AI Usage & Ethics Governance\n\nNeon Vision operates under Human-in-the-Loop sovereignty:\n\nRules\n\nNo autonomous publishing without approval (unless contracted)\n\nNo identity impersonation\n\nNo political or prohibited content\n\nBrand voice locked via embeddings\n\nModel version pinning (no silent changes)\n\nModels Used (2026)\n\nGPT‑5 (reasoning & predictive execution)\n\nLLaMA‑4 (automation, monitoring, multi-agent coordination)\n\nGemini (search & multimodal content alignment)\n\nProprietary fine-tunes (brand-specific, secured)\n\n3. Platform Compliance & Risk Mitigation\n\nReal-time platform safety layers for social, search, and programmatic systems:\n\nActive Safeguards\n\nShadowban detection & mitigation\n\nMetadata & content scrubbers\n\nRate-limit & behavior simulation\n\nDevice fingerprint normalization\n\nCompliance audits every 7 days\n\nIncident Response\n\nAuto-pause flagged campaigns or posts\n\nAI diagnosis & suggested corrections\n\nContent correction or replacement\n\nAppeal orchestration\n\nPost-incide"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "# Phase 04 – Intent Training & Synonyms Expansion\n\n## Objective\nTrain Neon Vision to recognize multiple phrasings for each intent using expanded examples and synonyms. This ensures AI responds accurately regardless of user wording.\n\n---\n\n## Strategy\n1. Expand each intent with 5–10 new example questions.\n2. Add 3–5 synonyms per intent to capture variations in phrasing.\n3. Group intents by persona for context-specific understanding:\n   - Sales Advisor\n   - Technical Advisor\n   - FAQ Bot\n   - Pilot Onboarding Assistant\n4. Load JSON files into Neon Vision and verify intent recognition with test queries.\n5. Iterate: Add new examples based on real chat logs to improve accuracy.\n\n---\n\n## Next Steps\n1. Import these JSON files into Neon Vision for training.\n2. Run test queries and validate intent recognition.\n3. Adjust synonyms and examples if misclassifications occur.\n4. Once stable, move to **Phase 5: Response Personalization & Context Memory**, integrating dynamic context for multi-turn conv"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "iew\n\n---\n\n## 17.8 Internal Tool Stack (Ops Only)\n\n• Notion / Linear – SOPs & task control\n• n8n / Make – automation spine\n• Snowflake / BigQuery – data layer\n• Power BI – exec dashboards\n• Cursor AI – rapid system changes\n• Neon Vision – orchestration brain\n\n---\n\n## 17.9 Scaling Without Hiring (Key Mechanisms)\n\n• Pilot-first revenue validation\n• Capacity throttling (lead caps)\n• Tiered SLAs\n• Automation expansion before headcount\n• Performance-based retainers\n\nThis ensures **margins increase as revenue grows**.\n\n---\n\n## 17.10 Exit-Ready Operations\n\nDTM is built to be:\n• Acquirable\n• Licensable\n• White-label ready\n\nBecause:\n• Processes are documented\n• AI owns execution\n• Humans own judgment\n\n---\n\n## Phase 17 Outcome\n\n• No operational chaos\n• Minimal hiring pressure\n• Founder protected\n• AI-first leverage\n\n---\n\n"
+  ],
+  "source": "chunk_auto"
+}

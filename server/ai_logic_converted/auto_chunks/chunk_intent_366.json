@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "llo / Clay / Instantly\n\nAI enrichment (firmographics + intent)\n\nHuman-approved copy only\n\nVolume Rules\n\nMax 50–100 sends/day/account\n\nPause if reply quality drops\n\nKill campaigns after 7 days if weak signal\n\nOutbound exists to fill pilot slots, nothing else.\n\n16.5 Channel 3 – Partnerships & White-Label\n\nFile: gtm_partnerships.md\n\nIdeal Partners\n\nAgencies (ads, web, branding)\n\nProperty consultants\n\nSaaS integrators\n\nMedia buyers\n\nWhat We Offer\n\nWhite-label CGI\n\nWhite-label automation\n\nRevenue share pilots\n\nBackend fulfillment\n\nRules\n\nPartner never touches core IP\n\nDTM owns systems\n\nPartner owns relationship\n\nMinimum volume required\n\nThis is leverage, not dependency.\n\n16.6 Channel 4 – Paid Media (Controlled Use)\n\nFile: gtm_paid_controlled.md\n\nPaid media is not for scaling DTM aggressively.\n\nIt is used to:\n\nValidate new niches\n\nStress-test pilots\n\nCapture high-intent keywords\n\nPlatforms\n\nGoogle Search (high intent only)\n\nMeta (retargeting only)\n\nYouTube (case-driven)\n\nRules\n\nSmall budgets"
+  ],
+  "source": "chunk_auto"
+}

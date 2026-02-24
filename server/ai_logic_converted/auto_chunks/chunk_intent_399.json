@@ -1,0 +1,14 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "Phase 8 – Memory & Contextual Data Persistence\nObjective\n\nRetain multi-turn memory of user interactions.\n\nTrack pilot progress, service history, and open questions.\n\nEnable personalized suggestions, proactive upsells, and context-aware responses.\n\nEnsure long-term engagement with consistent brand voice.\n\nMemory Architecture\n1. User Profile Memory\n\nStores basic info for personalization:\n\n{\n  \"user_id\": \"unique_user_id\",\n  \"name\": \"John Doe\",\n  \"company\": \"Acme Inc.\",\n  \"industry\": \"Real Estate\",\n  \"preferred_services\": [\"CGI Ads\", \"AI Automation\"],\n  \"timezone\": \"UTC+0\"\n}\n\n2. Conversation History Memory\n\nKeeps multi-turn chat context:\n\n{\n  \"session_id\": \"neon_session_001\",\n  \"last_active\": \"2026-01-21T10:15:00Z\",\n  \"messages\": [\n    {\"role\": \"user\", \"message\": \"Tell me about your pilot program\"},\n    {\"role\": \"ai\", \"message\": \"The CGI & Performance Ads Pilot is a 14–21 day campaign...\"},\n    {\"role\": \"user\", \"message\": \"What are the pricing tiers?\"}\n  ],\n  \"current_intent\": \"pilot_overv"
+  ],
+  "source": "chunk_auto"
+}

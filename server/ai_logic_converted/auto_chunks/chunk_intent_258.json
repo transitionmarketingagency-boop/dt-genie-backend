@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "Media / Service 5 – AI Image & Graphic Design Category: Video / CGI / Automation\nPrimary Use:\n• This advanced creative platform generates high-fidelity cinematic video and animations from simple text or image prompts.\nWhy It Matters (2026):\n• It enables rapid prototyping of social reels and high-end cinematic b-roll for marketing campaigns without the expense of a full production crew.\nNotes:\n• Features the \"Motion Brush\" for precise animation control and integrates with Adobe pipelines.\nTool: Sora (OpenAI)\nSupports Services: Service 4 – AI Video Marketing & Synthetic Media Category: Video / CGI\nPrimary Use:\n• Sora generates photorealistic high-definition videos up to 60 seconds long based on complex text descriptions.\nWhy It Matters (2026):\n• It masters complex physics and continuity, allowing for the creation of high-fidelity advertisements and simulations without sets or actors.\nNotes:\n• Access is currently limited to creative professionals via API.\nTool: Podcastle\nSupports Services"
+  ],
+  "source": "chunk_auto"
+}

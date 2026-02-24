@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "Notes: Offers a budget-friendly subscription model at $3.25 per month.\nTool: Sound Switch Supports Services: Service 2 / djying Category: Automation Primary Use: Automatically syncs DMX lighting to music in real-time by listening to DJ software. Why It Matters (2026): Automates the role of a lighting engineer, allowing solo DJs to have a dynamic light show. Notes: Integrates with most major DJ software platforms.\nTool: ChatGPT / Atlas Supports Services: Service 2 / djying Category: Workflow Automation Primary Use: Automates DJ business tasks, outreach, and music discovery through the Atlas browser. Why It Matters (2026): Agent mode can take over mouse actions to batch-download tracks from record pools while the user sleeps. Notes: Can analyze lyrics to check if requested versions are clean before playing live.\nTool: Mixo Supports Services: Service 2 / djying Category: Library Management Primary Use: Seamlessly transfers music libraries between Serato, Rekordbox, and Virtual DJ. Why It "
+  ],
+  "source": "chunk_auto"
+}

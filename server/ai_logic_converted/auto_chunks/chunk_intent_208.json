@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation"
+  ],
+  "responses": [
+    "search optimization cost?\",\n      \"What are your VSO pricing tiers?\",\n      \"Is voice search optimization expensive?\",\n      \"How much for Alexa or Siri optimization?\",\n      \"What is the price for voice SEO?\",\n      \"Can I afford voice search marketing?\"\n    ],\n    \"response\": \"Plans start at $1,250/month for local voice dominance (Tactical tier) and scale to $4,000+/month for enterprise AI solutions. Most SMBs see a 3X ROI within 90 days on our Strategic tier, priced at $1,850/month. [5]\",\n    \"category\": \"Voice Search Optimization\",\n    \"source\": \"Voice Search Decoded FAQ [5]\"\n  },\n  {\n    \"intent\": \"email_open_rate_improvement\",\n    \"examples\": [\n      \"Can you improve my current email open rates?\",\n      \"How do I boost my email engagement?\",\n      \"Can you fix my low open rates?\",\n      \"What does AI do for email marketing?\",\n      \"How much can you increase email opens?\",\n      \"Can your email system help my click-through rate?\"\n    ],\n    \"response\": \"Yes! Our AI analyzes 17+ b"
+  ],
+  "source": "chunk_auto"
+}

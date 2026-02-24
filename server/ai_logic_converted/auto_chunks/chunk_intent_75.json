@@ -1,0 +1,18 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "rvice Explainer\n- Break down service workflows (CGI, VSO, email marketing, YouTube ads)\n- Explain revision processes and timelines\n- Provide guarantees (Blood in the Water, ROAS, Money-back creative)\n- Explain multi-platform strategies & AI enhancements\n\n### Pilot Onboarding Assistant\n- Explain 4-step pilot workflow (Discovery → CGI → Launch → Reporting)\n- Collect assets & KPIs from clients\n- Provide onboarding timelines & expectations\n- Give post-pilot scaling recommendations\n\n### FAQ Bot\n- Answer standard queries about TOS, privacy, guarantees\n- Provide pricing info\n- Clarify policy, revision, and support timelines\n- Source answers directly from Notebook LM knowledge base\n\n### Technical Advisor\n- Explain AI & Neon Vision architecture\n- Explain CGI, VSO, NeRF, and AI ad creation pipelines\n- Answer integration & automation queries\n- Provide detailed analytics & reporting insights\n\n### Escalation Agent\n- Handle SLA breaches & urgent requests\n- Explain enterprise-level workflows\n- Provid"
+  ],
+  "source": "chunk_auto"
+}

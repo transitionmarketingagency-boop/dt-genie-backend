@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "s and automatically reroute traffic or patch broken endpoints (e.g., switching between Stripe, PayPal, or internal payment gateways).\n- **Task Automation Scope**: Key automated functions include:\n  - Document and invoice processing  \n  - Ticket routing and SLA management  \n  - Lead scoring and CRM updates  \n  - Real-time social media moderation  \n  - Automated email campaign orchestration  \n  - Video, audio, and content generation pipelines  \n  - Predictive business analytics and reporting  \n  - Multi-channel performance monitoring  \n  - Custom conversational agents for customer support, HR, and sales  \n\n- **Integrations**: Supports 50+ third-party tools (Salesforce, Shopify, QuickBooks, HubSpot) without replacing existing systems. APIs and SQL connectors allow full workflow orchestration.\n\n## Compliance & Monitoring\n- **Predictive Compliance**: Systems adhere to GDPR, HIPAA, and CCPA standards, with automated agents monitoring regulatory changes and updating internal policies across a"
+  ],
+  "source": "chunk_auto"
+}

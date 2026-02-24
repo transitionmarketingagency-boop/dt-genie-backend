@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours"
+  ],
+  "responses": [
+    "# Digital Transition Marketing (DTM)\n\n## Reporting Templates & Performance Explanation Docs\n\n**System Authority: Neon Vision**\n**Phase: Leverage & Launch**\n\n---\n\n## DOCUMENT PURPOSE\n\nProvide **client-facing, production-ready templates** for reporting campaign performance, explaining results, and demonstrating ROI. These are aligned with DTM’s AI-driven methodology and CGI-powered presentation style.\n\nAll templates are modular and adaptable across all 14 core services.\n\n---\n\n## 1. PERFORMANCE DASHBOARD TEMPLATE\n\n**Sections:**\n\n1. Campaign Overview\n\n   * Service / Channel\n   * Objective\n   * Duration\n\n2. Key Metrics (Dynamic KPIs)\n\n   * Traffic / Impressions / Reach\n   * Conversion Rate\n   * Cost per Acquisition / Click\n   * Engagement Rate\n   * ROI / ROAS\n\n3. AI-Powered Insights\n\n   * Observed trends\n   * Predictive adjustments recommended by Neon Vision\n\n4. Visuals\n\n   * Line charts for trends\n   * Bar charts for channel comparison\n   * Heatmaps / engagement maps\n\n5. Executive Summary\n"
+  ],
+  "source": "chunk_auto"
+}

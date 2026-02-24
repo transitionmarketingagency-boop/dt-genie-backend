@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "next tier\n     ├─ Service Completed → Suggest complementary service\n     └─ Open Questions → Prompt reminders"
+  ],
+  "source": "chunk_auto"
+}

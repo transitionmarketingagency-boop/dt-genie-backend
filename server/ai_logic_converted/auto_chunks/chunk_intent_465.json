@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "Voice Search Optimization (VSO) & Generative Engine Optimization (GEO)\n\nOverview:\nThis group focuses on capturing traffic from voice-first devices and AI search engines like ChatGPT and Gemini. Core methodologies include Generative Engine Optimization (GEO) and Answer Engine Optimization (AEO) to ensure machine-readability and snippet dominance.\n\nTechnical Features:\n\nConversational NLP Mapping: Identifies 200+ long-tail conversational phrases not captured by traditional SEO.\n\nNeural FAQ Structuring: Implements FAQ/HowTo schema to boost eligibility for voice answers by 40% and structure 29-word “Position Zero” snippets.\n\nPlagiarism Shield: Auto-detects AI model content cloning and triggers rewrites with GEO-protected phrasing to maintain attribution.\n\nTechnical Benchmarks: Sub-1.5s page load times with edge-computed server-side rendering (SSR) and zero-latency architecture.\n\nWorkflow Pipeline:\n\nAI Search Footprinting: Crawlability and coverage audits across ChatGPT, Gemini, DeepSeek.\n\nN"
+  ],
+  "source": "chunk_auto"
+}

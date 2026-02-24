@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "Service 1 – music production\nTool: Suno AI Supports Services: Service 1 / music production Category: All-in-One Text-to-Audio Generator Primary Use: Generates full songs including lyrics, vocals, and instruments from text prompts. Why It Matters (2026): It is the market leader for viral, radio-ready vocal tracks and high-quality song synthesis. Notes: Pro features include stem export and commercial rights.\nTool: Udio Supports Services: Service 1 / music production Category: All-in-One Text-to-Audio Generator Primary Use: Creates high-fidelity songs with complex structures and unique genre-blending capabilities. Why It Matters (2026): Recognized for superior audio fidelity (up to 320kbps) and strong performance in electronic genres. Notes: Offers a manual mode for precise control over lyric timing and clarity.\nTool: AIVA Supports Services: Service 1 / music production Category: All-in-One Text-to-Audio Generator Primary Use: Composes orchestral and cinematic scores for film, games, and "
+  ],
+  "source": "chunk_auto"
+}

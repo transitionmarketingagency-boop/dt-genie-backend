@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "API access shifts.\nData Moat Construction Data moats are built within the Service 11 (CRM Intelligence) and Service 13 (DAM) layers. Tools like Clearbit (enrichment) and Canto (smart asset organization) centralize proprietary brand and customer data. Jasper IQ and Poppy AI allow for the creation of a \"Brand Brain\" that learns from past creative work.\nPlatform Risk Identification High platform risk exists for tools reliant on specific social or search ecosystems, notably Madgicx (Meta), PMax (Google), and Midjourney (Discord/API). Service 1 (GEO) tools like Profound face volatility as LLM providers frequently update crawler protocols and citation formats.\nTool intelligence extraction complete. Ready for Phase 14."
+  ],
+  "source": "chunk_auto"
+}

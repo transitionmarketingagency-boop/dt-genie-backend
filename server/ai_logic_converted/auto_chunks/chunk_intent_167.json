@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours"
+  ],
+  "responses": [
+    "affic. Notes: Standard plan $29/month; requires a website that already has organic traffic.\nTool: Wisepops Supports Services: Service 2 / WEBSITE & CRO Category: Personalization & Engagement Primary Use: Increases conversions through onsite notification feeds and AI product recommendations. Why It Matters (2026): Predicts cart abandonment before it happens using AI triggers to maximize recovery. Notes: Pricing starts at $49/month; integrates with Shopify, Klaviyo, and GA4.\nTool: ImagineArt Supports Services: Service 3 / CGI Ads Category: Bulk CGI Ad Maker Primary Use: Generates hyper-realistic product imagery and animated clips for marketing. Why It Matters (2026): Allows users to train custom AI models for product consistency across image and video campaigns. Notes: Ad campaigns can be produced for as low as $5 total cost.\nTool: Arcads Supports Services: Service 3 / CGI Ads Category: AI Actor Platform Primary Use: Produces high-realism ads featuring AI talking actors that sound human."
+  ],
+  "source": "chunk_auto"
+}

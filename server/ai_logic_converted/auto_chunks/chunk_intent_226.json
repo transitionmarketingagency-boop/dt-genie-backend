@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "Our AI agents are designed for Cross-Platform Compatibility, integrating seamlessly with over 50+ tools including Salesforce, Shopify, HubSpot, and QuickBooks.\nSource: AI Automation FAQ\n\nQ3: How do you track and report my ROI?\nA3: We provide Real-Time War Room Dashboards that show every dollar’s journey. You receive live performance data and weekly executive briefs containing actionable \"sabotage strategies\" to maintain your lead.\nSource: General FAQs; Email Marketing Services\n\n---\n\nCategory: General & Process\nQ1: Can you fix our underperforming ads or campaigns?\nA1: Yes. We reverse-engineer failures into wins. Statistical data shows that 87% of rescued campaigns see a 2X ROI within 60 days.\n\nQ2: Do you offer short-term projects or retainers?\nA2: We offer flexibility: choose 3-month sprints for quick wins or 12-month domination plans for long-term market leadership.\n\nQ3: Who manages our account?\nA3: You are supported by a hybrid team: AI handles the technical execution, human engineers"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "me sources from the live web.\nWhy It Matters (2026):\n• It eliminates traditional search time-sinks by synthesizing information and providing verifiable links, making it the standard for competitive intelligence and due diligence.\nNotes:\n• The \"Enterprise\" tier allows research behind a secure firewall using internal company files.\nTool: GWI Spark\nSupports Services: Service 7 – AI Search & Market Research Category: Search / Analytics\nPrimary Use:\n• It gathers statistically representative audience insights by tapping directly into live survey panels across 50+ countries.\nWhy It Matters (2026):\n• In a world moving toward privacy-first, consent-based data, Spark provides real human feedback in seconds rather than waiting weeks for manual reports.\nNotes:\n• Built by the Global Web Index; focuses on zero-party data.\nTool: SparkToro\nSupports Services: Service 7 – AI Search & Market Research Category: Search / Analytics\nPrimary Use:\n• SparkToro reveals where specific target audiences spend their"
+  ],
+  "source": "chunk_auto"
+}

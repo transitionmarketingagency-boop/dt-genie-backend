@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "sponse\": \"Guaranteed. Our redesigns include full SEO migration audits, 301 redirects, and content preservation to ensure zero traffic loss while providing you with a modern, higher-converting digital growth engine. [9]\",\n    \"category\": \"AI-Powered Website Design\",\n    \"source\": \"Website Design FAQs [9]\"\n  },\n  {\n    \"intent\": \"virtual_tour_vs_matterport\",\n    \"examples\": [\n      \"Why shouldn't I just use Matterport for virtual tours?\",\n      \"How are DTM tours better than Matterport?\",\n      \"What is the difference between your tours and standard photogrammetry?\",\n      \"Why choose your virtual tours over competitors?\",\n      \"Are your property tours higher quality than Matterport?\",\n      \"What makes your virtual engineering unique?\"\n    ],\n    \"response\": \"We dominate standard providers in five key areas: 12K HDR resolution (vs. their 8K), interactive AI Q&A vs. static boxes, 24-hour edit SLAs vs. 5 days, unlimited pricing models, and a dedicated UK-based production team. [10, 11]\","
+  ],
+  "source": "chunk_auto"
+}

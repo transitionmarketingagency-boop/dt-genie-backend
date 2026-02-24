@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "conversions and bookings."
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "Internal AI Governance, Partner Framework & White-Label Expansion\n\nBrand: Digital Transition Marketing\nAI Bot: Neon Vision\nPurpose: Define AI governance, internal safety policies, and partner/white-label frameworks for scaling while maintaining control and compliance.\n\n1. Internal AI Governance & Safety\n\nNeon Vision enforces a human-in-the-loop AI governance model across all services:\n\nRules & Policies\n\nHuman Oversight: No AI publishes externally without human approval unless explicitly contracted.\n\nModel Version Pinning: GPT-5, LLaMA-4, Gemini, and proprietary fine-tunes are pinned per client to avoid drift.\n\nData Privacy: AI never uses cross-client data without explicit consent.\n\nEthics Compliance: No political, fake engagement, or restricted content.\n\nAudit Trails: All AI decisions logged for review and compliance verification.\n\nMonitoring & Control\n\nReal-Time AI Watchdog: LLaMA-4 monitors autonomous processes, flags anomalies, and prevents policy violations.\n\nSelf-Healing Automatio"
+  ],
+  "source": "chunk_auto"
+}

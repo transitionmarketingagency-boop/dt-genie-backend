@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "s\n* Budget reallocations\n* Content publishing\n\nRisk Level: High\nApproval: Neon Vision + Human-in-the-Loop\n\n---\n\n## 5. AGENT DESIGN STANDARDS\n\nAll agents must:\n\n* Have a single defined objective\n* Operate within scoped permissions\n* Log all actions\n* Support rollback\n\nMandatory components:\n\n* Input validation\n* Confidence threshold\n* Fail-safe trigger\n\n---\n\n## 6. MODEL USAGE POLICY\n\nApproved models:\n\n* GPT-5 (primary reasoning)\n* Gemini (multimodal & fast inference)\n* LLaMA-4 (fallback / cost optimization)\n\nRules:\n\n* No client data used for model training\n* Model switching logged\n* No autonomous model selection\n\n---\n\n## 7. HUMAN-IN-THE-LOOP RULES\n\nHuman approval required when:\n\n* Financial impact > predefined threshold\n* Client-facing output published\n* Data schema changes occur\n\nOverride authority:\n\n* AI Systems Architect\n* Neon Vision\n\n---\n\n## 8. DATA ACCESS & ISOLATION\n\n* One client = one data boundary\n* Separate credentials per client\n* No shared vector spaces\n* Encrypted storage ma"
+  ],
+  "source": "chunk_auto"
+}

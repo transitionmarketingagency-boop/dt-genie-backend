@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation"
+  ],
+  "responses": [
+    "tions to detect hidden market shifts. Custom dashboards visualize metrics such as CAC, LTV, conversion correlation heatmaps, and predictive risk signals for rapid decision-making.\n\n## Anomalies, Alerts, and Deployment\nAutomated alerts notify stakeholders via SMS, webhooks, or email when predefined thresholds (e.g., earnings surprises, short squeezes, or abnormal traffic spikes) are breached. Standard deployment timelines for full analytics infrastructure are 14 days, with high-priority data onboarding achievable within 72 hours.\n\n## Technical Toolset (2025–2026)\n- **LLaMA-4 and GPT-5**: Autonomous workflow reconnaissance and predictive execution.  \n- **n8n & Agent Scout**: Neural process mapping to detect and resolve operational inefficiencies.  \n- **Self-Healing Workflows**: Automatic detection and repair of API or integration failures.  \n- **Databricks and Apache Spark 4**: Real-time large-scale data processing and predictive modeling.  \n- **Hugging Face Transformers & LangChain 3.0*"
+  ],
+  "source": "chunk_auto"
+}

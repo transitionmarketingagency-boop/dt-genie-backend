@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "ntent\": \"geo_vs_seo\",\n    \"examples\": [\n      \"How is GEO different from traditional SEO?\",\n      \"What is Generative Engine Optimization?\",\n      \"Why do I need GEO if I already have SEO?\",\n      \"Do I need to optimize for ChatGPT and Gemini?\",\n      \"Difference between AI search optimization and Google SEO\",\n      \"What is AI search warfare?\"\n    ],\n    \"response\": \"Traditional SEO optimizes for Google's algorithm. GEO rewires your content for AI engines like ChatGPT and Gemini using patented NLP alignment to force-index your pages and dominate 'zero-click' answers. [16]\",\n    \"category\": \"GEO & AI SEO\",\n    \"source\": \"AI Optimized GEO & SEO FAQ [16]\"\n  },\n  {\n    \"intent\": \"pilot_offer_overview\",\n    \"examples\": [\n      \"What is a CGI & Performance Ads Pilot?\",\n      \"How does the 21-day pilot work?\",\n      \"What is included in the AI growth pilot?\",\n      \"Tell me about the traffic test and cinematic ad.\",\n      \"How do I start a pilot campaign?\",\n      \"What is the purpose of the "
+  ],
+  "source": "chunk_auto"
+}

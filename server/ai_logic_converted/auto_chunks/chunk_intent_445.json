@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "\n\nAlerts & dashboards delivered on SLA\n\nOptional bonus: ROI forecast vs actual tracked\n\n3. Client Retention & LTV Optimization\n3.1 Tiered Retention Programs\nTier\tRetention Tools\tFeatures\nTactical\tMonthly check-ins\tKPI review, optional micro-upsells\nStrategic\tWeekly analytics + performance audits\tPredictive insights, hidden sub-service activation\nSovereign\t24/7 AI + human monitoring\tFull dashboard, executive briefs, cross-service integration\n3.2 Retainer & Upsell Strategy\n\nHidden Sub-Services Activation: Automatically unlocks additional features after performance milestones (Phase 3 sub-services)\n\nExpansion Hooks: E.g., Tactical → Strategic via pilot success; Strategic → Sovereign via KPI overachievement\n\nPredictive Revenue Mapping: AI identifies where additional investment yields highest ROI, prompting upsell conversations\n\n3.3 Objection Warfare & Trust Engineering\n\nObjection: “What if the campaign fails?”\nCounter: 90-Day KPI guarantee + pilot proof-of-concept\n\nObjection: “We don’t wan"
+  ],
+  "source": "chunk_auto"
+}

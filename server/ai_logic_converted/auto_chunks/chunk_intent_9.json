@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "# AI Business Automation & Agents\n\n## Overview\nAI Business Automation leverages unified AI cores to manage and execute over 50 automated tasks across departments including finance, HR, operations, sales, and customer support. The platform acts as a centralized \"Automation Spine,\" consolidating fragmented software environments into a single self-learning backbone. It is designed to continuously adapt using real-time data and predictive intelligence.\n\n## Technical Architecture\n- **Model Deployment**: Pre-trained LLaMA-3 models are deployed per industry (finance, healthcare, e-commerce, real estate), with optional integration of GPT-4/5 and Gemini models for advanced reasoning and scenario prediction.\n- **Self-Healing Workflows**: Autonomous workflows detect errors in APIs or service pipelines and automatically reroute traffic or patch broken endpoints (e.g., switching between Stripe, PayPal, or internal payment gateways).\n- **Task Automation Scope**: Key automated functions include:\n  - "
+  ],
+  "source": "chunk_auto"
+}

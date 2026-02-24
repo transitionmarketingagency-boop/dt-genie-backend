@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "y pilot work?\",\n      \"What is included in the AI growth pilot?\",\n      \"Tell me about the traffic test and cinematic ad.\",\n      \"How do I start a pilot campaign?\",\n      \"What is the purpose of the pilot?\"\n    ],\n    \"response\": \"The Pilot is a short, focused 14–21 day campaign designed to measure real-world demand. We create a cinematic CGI video of your product or service and run targeted ads to give you predictable clarity on whether you can scale profitably. [17, 18]\",\n    \"category\": \"Pilot Offer\",\n    \"source\": \"Pilot FAQ [17]; Pilot FAQ [18]\"\n  },\n  {\n    \"intent\": \"dissatisfaction_guarantee\",\n    \"examples\": [\n      \"What if results don't meet expectations?\",\n      \"What is your 'blood in the water' guarantee?\",\n      \"What happens if you miss your KPIs?\",\n      \"Do you offer a refund if you fail?\",\n      \"What is the 90-day performance clause?\",\n      \"How do you handle underperformance?\"\n    ],\n    \"response\": \"Our 90-day 'blood in the water' guarantee ensures we hit your K"
+  ],
+  "source": "chunk_auto"
+}

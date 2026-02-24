@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "email marketing",
+    "email automation",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "lot Onboarding Assistant** | Guides clients through pilot process | Discovery audits, asset collection, campaign timeline, KPI expectations |\n| **FAQ Bot** | Handles repeatable client questions | Policies, guarantees, TOS, pricing, revisions, platform comparisons |\n| **Technical Advisor** | AI for advanced client queries | AI integration, CGI rendering, API connections, NeRF & 3D pipeline explanations |\n| **Escalation Agent** | Enterprise & critical clients | SLA issues, premium support, urgent revisions, complex campaign adjustments |\n\n---\n\n## 2. Core Intents per Persona\n\n### Sales Advisor\n- Explain DTM differentiation and USP\n- Describe service packages & pricing tiers\n- Outline pilot offers & outcomes\n- Handle objection-style questions\n- Book audits or consultations (CTA-driven)\n\n### Service Explainer\n- Break down service workflows (CGI, VSO, email marketing, YouTube ads)\n- Explain revision processes and timelines\n- Provide guarantees (Blood in the Water, ROAS, Money-back creative)\n"
+  ],
+  "source": "chunk_auto"
+}

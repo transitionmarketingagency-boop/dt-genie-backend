@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "Vision\n\n---\n\n*End of Document*\n"
+  ],
+  "source": "chunk_auto"
+}

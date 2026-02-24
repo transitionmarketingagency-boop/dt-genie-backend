@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "timeline\",\n    \"examples\": [\n      \"How quickly can you improve our marketing performance?\",\n      \"How long until I see results?\",\n      \"When will my ads start working better?\",\n      \"What is the timeline for campaign improvement?\",\n      \"How fast do your AI systems show results?\",\n      \"When can I expect a ROI increase?\"\n    ],\n    \"response\": \"Our AI-driven systems typically show measurable improvements within 30-45 days. In fact, 87% of our clients see 40%+ better results within this timeframe. We prioritize speed because markets won’t wait, offering 48-hour deployment for most clients. [1, 4]\",\n    \"category\": \"General / About Us\",\n    \"source\": \"Website Content - FAQs [1]; Website Content - FAQs [4]\"\n  },\n  {\n    \"intent\": \"vso_cost\",\n    \"examples\": [\n      \"How much does voice search optimization cost?\",\n      \"What are your VSO pricing tiers?\",\n      \"Is voice search optimization expensive?\",\n      \"How much for Alexa or Siri optimization?\",\n      \"What is the price for vo"
+  ],
+  "source": "chunk_auto"
+}

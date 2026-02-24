@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "3, Antares, iZotope, Pro Tools HD, Leonardo AI."
+  ],
+  "source": "chunk_auto"
+}

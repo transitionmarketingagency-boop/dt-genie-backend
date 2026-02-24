@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "continue the arrangement in their own DAW.\nTool: Clear (Supertone) Supports Services: Service 1 / music production Category: Post-Production Primary Use: Removes room tone, ambience, and reverb from recorded vocals or dialogue. Why It Matters (2026): Uses only three simple controls to instantly fix problem recordings without introducing heavy artifacts. Notes: Essential for content creators and producers recording in untreated environments.\nTool: ElevenLabs Music Supports Services: Service 1 / music production Category: Vocal & Track Generation Primary Use: Generates full songs up to four minutes with ultra-realistic vocal synthesis. Why It Matters (2026): Offers a more ethical approach by aiming to compensate artists used in training data. Notes: Features professional studio editing tools for audiobooks and podcasts.\nTool: Producer.ai Supports Services: Service 1 / music production Category: Production Assistant Primary Use: An agentic model that crafts lyrics and builds backing track"
+  ],
+  "source": "chunk_auto"
+}

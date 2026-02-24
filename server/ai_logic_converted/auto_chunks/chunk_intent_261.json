@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "f content for multiple social platforms.\nWhy It Matters (2026):\n• It democratizes professional design for non-designers, allowing small teams to produce consistent, publication-ready graphics in seconds.\nNotes:\n• \"Magic Resize\" creates properly formatted versions of a single design for Instagram, LinkedIn, and TikTok automatically.\nTool: Midjourney\nSupports Services: Service 5 – AI Image & Graphic Design Category: CGI / Search\nPrimary Use:\n• Midjourney is the industry-standard tool for generating high-fidelity, photorealistic, and artistically sophisticated images from text prompts.\nWhy It Matters (2026):\n• It provides unparalleled control over style and composition, making it the top choice for creating unique brand visuals and high-end ad concepts.\nNotes:\n• Primarily accessible through Discord; no longer offers a free plan.\nTool: Nana Banana (Gemini 2.5 Flash Image)\nSupports Services: Service 5 – AI Image & Graphic Design Category: Automation / Search\nPrimary Use:\n• This Google-power"
+  ],
+  "source": "chunk_auto"
+}

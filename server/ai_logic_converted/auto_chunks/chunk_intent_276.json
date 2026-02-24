@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    " in workflows.\nTool: Gumloop\nSupports Services: Service 10 – AI Marketing Automation & Orchestration Category: Automation / Search\nPrimary Use:\n• This no-code platform allows marketers to build complex AI-powered workflows by connecting premium LLMs directly to internal company tools.\nWhy It Matters (2026):\n• It enables continuous AI agents to run web scraping and competitor analysis tasks 24/7 without requiring individual API keys or technical dev work.\nNotes:\n• Most underrated automation tool; provides built-in access to GPT-4, Claude, and Grok.\nTool: n8n\nSupports Services: Service 10 – AI Marketing Automation & Orchestration Category: Automation / Search\nPrimary Use:\n• n8n is a low-code platform for building custom AI agents that chain together LLMs with operational tools like Slack and HubSpot.\nWhy It Matters (2026):\n• Its self-hosted capability makes it the leading choice for GDPR-compliant and secure enterprise-grade automation in the European market.\nNotes:\n• Fair-code model; fr"
+  ],
+  "source": "chunk_auto"
+}

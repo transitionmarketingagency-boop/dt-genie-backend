@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours"
+  ],
+  "responses": [
+    " in five key areas: 12K HDR resolution (vs. their 8K), interactive AI Q&A vs. static boxes, 24-hour edit SLAs vs. 5 days, unlimited pricing models, and a dedicated UK-based production team. [10, 11]\",\n    \"category\": \"CGI Virtual Home Tours\",\n    \"source\": \"Virtual Tour FAQ [10, 11]\"\n  },\n  {\n    \"intent\": \"ai_ppc_vs_manual\",\n    \"examples\": [\n      \"How does AI outperform manual PPC?\",\n      \"Why is AI better than a human ads manager?\",\n      \"What is the advantage of AI-powered ad warfare?\",\n      \"Can't a person do what your AI does for ads?\",\n      \"Why switch from a manual PPC team to AI?\",\n      \"How much faster is AI at ad optimization?\"\n    ],\n    \"response\": \"AI reacts in milliseconds, adjusting bids, creatives, and targeting based on live data 24/7. Manual human teams simply cannot match that velocity or scale, leading to far more efficient spend and total market dominance. [12]\",\n    \"category\": \"Performance Marketing\",\n    \"source\": \"AI Performance Marketing FAQ [12]\"\n  },\n"
+  ],
+  "source": "chunk_auto"
+}

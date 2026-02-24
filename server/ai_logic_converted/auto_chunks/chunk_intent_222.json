@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "active AI hotspots that answer buyer questions in real-time, and a 24-hour revision SLA.\nSource: Virtual Tour FAQ\n\nQ6: Do you offer music production without using AI?\nA6: Yes. We provide \"No AI Crutches\" production. Our human-engineered tracks use analog warmth and hybrid mixing to sculpt professional, radio-ready audio that AI cannot replicate.\nSource: Music Production FAQ\n\n---\n\nCategory: Pilot Offer & Packages\nQ1: What exactly is the CGI & Performance Ads Pilot?\nA1: It is a high-impact 14–21 day \"Battle-Ready\" campaign. We create cinematic CGI assets for your brand and run targeted traffic tests to measure real-world demand and CPA before you scale.\nSource: Pilot Offer Page; Pilot FAQ\n\nQ2: Do I need to provide my own video or photos for the pilot?\nA2: No. Our CGI is fully digitally created. We can build your product, property, or destination from scratch in a virtual environment, requiring zero physical shoots or product delivery.\nSource: Pilot FAQ; CGI Ad FAQ\n\nQ3: What are the prici"
+  ],
+  "source": "chunk_auto"
+}

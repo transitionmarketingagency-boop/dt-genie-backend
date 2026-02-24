@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "ting\n• Model arbitration (who answers, who executes)\n• Data ingestion & normalization\n• Performance monitoring & escalation\n• Safety, compliance, and kill-switch logic\n\nNeon Vision **never generates raw output directly** unless fallback mode is triggered.\n\n---\n\n## 2. AI Model Role Assignment (Locked)\n\n### Reasoning & Planning Layer\n\n• **GPT-5** – Strategy, synthesis, pricing logic, forecasting\n• **Claude** – Long-form reasoning, policies, documentation\n\n### Execution & Automation Layer\n\n• **LLaMA-4** – Monitoring, automation logic, background agents\n• **Gemini** – Multimodal analysis, search & indexing alignment\n\n### Creative Intelligence Layer\n\n• **Jasper IQ** – Brand voice locking & campaign memory\n• **Runway Gen-4** – Video generation & scene logic\n• **Higgsfield** – Cinematic lighting, physically accurate CGI environments\n\n### Voice & Audio Layer\n\n• **ElevenLabs** – Narration, authority modulation\n• **Dolby Atmos Toolchain** – Spatial audio production\n\n**Rule:** No single model con"
+  ],
+  "source": "chunk_auto"
+}

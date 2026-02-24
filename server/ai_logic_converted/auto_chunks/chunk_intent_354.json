@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "PHASE 15 — CLIENT-SPECIFIC AI INSTANCES\n“Per-Client Brain” Architecture for Neon Vision\n15.1 Purpose of Phase 15\n\nThis phase enables isolated, intelligent AI brains per client — without spinning up new apps, models, or infrastructure.\n\nEach client gets:\n\nTheir own memory\n\nTheir own tone\n\nTheir own KPIs\n\nTheir own historical context\n\nZero cross-client leakage\n\nResult:\n\nYou scale clients without scaling cognitive load.\n\n15.2 What a “Client Brain” Is (Clear Definition)\n\nA Client Brain is:\n\nA scoped retrieval layer\n\nBound to one client_id\n\nGoverned by strict permissions\n\nRunning on the same Neon Vision core\n\nIt is NOT:\n\nA new chatbot\n\nA new model\n\nA new UI\n\nA fork of Neon Vision\n\n15.3 Client Brain Stack (Logical Layers)\nNeon Vision Core (Fixed)\n│\n├── Global Brand Brain (DTM)\n│\n├── Internal Ops Brain (DTM-only)\n│\n└── Client Brain (Isolated per client_id)\n     ├── Client Knowledge\n     ├── Client Tone\n     ├── Client KPIs\n     ├── Client History\n     └── Client Constraints\n\n15.4 Client Brain"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "decision thresholds\n• Your escalation rules\n• Your failure-response systems\n\n### 3.2 Defensive Design Principles\n\n• Multi-model redundancy (no single-model dependency)\n• Workflow fragmentation (no single exportable flow)\n• Intent-based triggers (not static automations)\n• Performance gates before scale\n\nResult: even if copied, the system **fails outside DTM**.\n\n---\n\n## 4. Data & Model Ownership Strategy\n\n### 4.1 Data Ownership Rules\n\n• Clients own their raw data\n• DTM owns:\n◦ Aggregated insights\n◦ Performance benchmarks\n◦ Non-identifiable behavioral patterns\n\nNo client data is used to train cross-client models.\n\n### 4.2 Model Strategy (2026)\n\n• GPT‑5: reasoning & planning\n• LLaMA‑4: monitoring & automation\n• Gemini: search & multimodal\n• Fine-tuned internal agents: **DTM-only**\n\nModel version pinning prevents silent regressions.\n\n---\n\n## 5. Platform & Legal Defensibility\n\n### 5.1 Platform Survivability\n\n• Shadowban detection layers\n• Compliance-first publishing\n• Rate & behavior normali"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,16 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    " / Social Platforms\tSchedule posts, reverse shadowbans, track engagement, push alerts on viral trends\nGEO & AI SEO\tAPI / Content DB\tUpdate AI-friendly content, detect plagiarism, generate SERP/zero-click insights\nAI Business Automation\tInternal Agents\tTrigger workflows across Sales, HR, Finance; self-healing error correction, automated reports\n2. Action Triggers & Automation Rules\nPilot Automation\n\nTrigger: Discovery audit completion → Automatically schedule CGI production.\n\nTrigger: CGI production completed → Auto-launch ads on designated platforms.\n\nTrigger: Ad campaign ends → Auto-generate performance report, suggest scaling strategy.\n\nVSO Automation\n\nTrigger: Keyword rank drop → Auto-trigger content optimization.\n\nTrigger: New \"near me\" queries detected → Suggest content or ad updates.\n\nTrigger: Monthly VSO report → Send automated performance dashboard to client.\n\nYouTube Ads Automation\n\nTrigger: ROAS < 3X → Pause underperforming ads, alert account manager, launch competitor ad clo"
+  ],
+  "source": "chunk_auto"
+}

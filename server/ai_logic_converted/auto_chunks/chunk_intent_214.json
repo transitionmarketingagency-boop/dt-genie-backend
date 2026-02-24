@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    " 14]\",\n    \"category\": \"AI Business Automation\",\n    \"source\": \"AI Business Automation FAQs [13]; Straight Answers FAQ [14]\"\n  },\n  {\n    \"intent\": \"social_shadowban_reversal\",\n    \"examples\": [\n      \"Can you really reverse shadowbans?\",\n      \"How do you fix a banned TikTok account?\",\n      \"Can you get my Instagram unbanned?\",\n      \"Fix social media account restrictions\",\n      \"How do you unban social profiles?\",\n      \"Shadowban recovery services\"\n    ],\n    \"response\": \"We have a 94% success rate unbanning TikTok and Instagram accounts within 72 hours. We use proprietary methods to spoof device fingerprints and automatically scrub flagged content to restore your reach. [15]\",\n    \"category\": \"Social Media Management\",\n    \"source\": \"Algorithm-Hacking Social FAQ [15]\"\n  },\n  {\n    \"intent\": \"geo_vs_seo\",\n    \"examples\": [\n      \"How is GEO different from traditional SEO?\",\n      \"What is Generative Engine Optimization?\",\n      \"Why do I need GEO if I already have SEO?\",\n      \"Do"
+  ],
+  "source": "chunk_auto"
+}

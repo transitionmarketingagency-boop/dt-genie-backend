@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "s operator, not vendor\n\n### Objection: “Budget concerns”\n\n**Response Logic:**\n\n* Tie investment to inefficiency cost\n* Offer pilot validation if qualified\n\nNeon Vision flags objection frequency patterns.\n\n---\n\n## 8. PILOT → RETAINER CONVERSION LOGIC\n\nPilot success is measured by:\n\n* Signal lift (CTR, engagement, leads)\n* Process efficiency gains\n* Decision confidence\n\n### Conversion Rules:\n\n* Pilot success = Retainer offer within 72 hours\n* No discounts post-pilot\n* Expansion paths pre-mapped\n\nFailure to convert triggers **post-mortem analysis**, not re-pitching.\n\n---\n\n## 9. SOVEREIGN CLIENT PITCH FLOW\n\nSovereign clients bypass pilots if:\n\n* Qualification score ≥ 23\n* Clear multi-service activation\n* Long-term scale intent\n\n### Sovereign Pitch Focus:\n\n* Predictive analytics\n* AI governance\n* Automation depth\n* Executive-level reporting\n\n---\n\n## 10. INTERNAL SALES RULES (NON-NEGOTIABLE)\n\n* Never oversell\n* Never customize before qualification\n* Never chase unqualified revenue\n* Protect "
+  ],
+  "source": "chunk_auto"
+}

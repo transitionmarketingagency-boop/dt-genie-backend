@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours"
+  ],
+  "responses": [
+    "ity cinematic product shots. Why It Matters (2026): Uses a chat-to-prompt refiner to rewrite simple ideas into high-end cinematography briefs. Notes: Integrates models like Kling 2.1 for video animation.\nTool: Creatify Supports Services: Service 3 / CGI Ads Category: Short-Form Video Generator Primary Use: Generates marketing videos for social media based on a product link. Why It Matters (2026): \"Batch Mode\" generates multiple video variations and formats (9:16, 1:1, etc.) simultaneously. Notes: Paid plans start at $27/month; includes realistic AI avatars.\nTool: Higsfield.ai Supports Services: Service 3 / CGI Ads Category: AI Hub for Video Creators Primary Use: Accesses multiple top-tier models (Sora 2, Kling, WAN) for high-end ad production. Why It Matters (2026): Allows creators to generate emotionally intense scenes often rejected by other censored tools. Notes: Pro subscription is $32/month; offers unlimited usage during promo periods."
+  ],
+  "source": "chunk_auto"
+}

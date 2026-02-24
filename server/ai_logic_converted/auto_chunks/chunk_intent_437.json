@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "\n• Snowflake / Power BI\n\n### Entry Pricing\n\n• Tactical: $2,199 / month\n• Strategic: $3,299 / month\n• Sovereign: Custom (on‑prem / enterprise)\n\n### Upsells\n\n• Predictive analytics module\n• AI sales & support agents\n• Custom internal GPTs\n\n---\n\n## NEXT PROMPT FOR NOTEBOOKLM\n\n\"Extract objections, ideal buyer profiles, and sales‑blocking questions for Services 5–8. Return in structured bullets so Neon Vision can generate closing scripts and objection‑handling logic.\"\n\n---\n\nStatus: **Phase 2 – Step 1B Complete**\n"
+  ],
+  "source": "chunk_auto"
+}

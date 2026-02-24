@@ -1,0 +1,14 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "Phase 5 – Response Personalization & Context Memory\nObjective\n\nTailor AI responses based on persona, previous queries, and intent context.\n\nEnable multi-turn conversations with memory of past interactions.\n\nApply persona-driven responses (Sales Advisor, Technical Advisor, FAQ Bot, Pilot Onboarding Assistant).\n\nMemory Slots & Context Variables\nMemory Slot\tDescription\tExample Usage\nuser_name\tStores user’s name\t\"Hi {user_name}, welcome back!\"\nuser_company\tCompany name\t\"For {user_company}, we recommend the Strategic pilot.\"\nprevious_intent\tLast detected intent\tAdjust follow-up questions or refine advice\npreferred_service\tUser’s chosen service\tPersonalize pitch for YouTube, VSO, CGI, etc.\npilot_status\tTracks pilot progress\t\"Your CGI video is in production (Step 2/4).\"\nopen_questions\tUnresolved queries\tFollow up automatically with FAQs or next steps\npersona_context\tAI persona tone\tSales Advisor = persuasive, FAQ Bot = informative\nPersona Tone Mapping\nPersona\tTone / Style\tExample Response\nSal"
+  ],
+  "source": "chunk_auto"
+}

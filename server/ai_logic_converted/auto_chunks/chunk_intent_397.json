@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "s:\n\nService completion triggers upsell prompts.\n\nIncomplete queries trigger contextual reminders.\n\nHigh engagement triggers cross-service recommendations.\n\nBranching Logic Overview\nUser Query\n│\n├─ Intent Recognized?\n│   ├─ Yes → Route to Primary Persona\n│   │        ├─ If pilot step → Pilot Onboarding Assistant\n│   │        ├─ If pricing → Sales Advisor\n│   │        ├─ If technical/automation → Technical Advisor\n│   │        └─ Else → FAQ Bot\n│   │\n│   └─ No → FAQ Bot (clarifying questions)\n│\n├─ Sentiment Analysis\n│   ├─ Positive → Continue normal flow\n│   └─ Negative → Escalate to Sales Advisor + FAQ Bot\n│\n├─ Repetition Detection\n│   ├─ Repeated 2+ times → Escalate Technical or Pilot persona\n│   └─ Else → Normal flow\n│\n└─ Trigger Proactive Suggestions\n     ├─ Pilot Step Complete → Upsell next tier\n     ├─ Service Completed → Suggest complementary service\n     └─ Open Questions → Prompt reminders"
+  ],
+  "source": "chunk_auto"
+}

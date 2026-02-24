@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "ve analytics identify when a post is losing momentum, allowing adaptive re‑distribution or content iteration.\n\n## AI Models & Tools (2026)\nDTM workflows integrate generative models (e.g., ChatGPT family, Gemini) for ideation, copywriting, and contextual optimization. Content workflows also include **AI video and visual design tools** that:\n- Convert long videos into platform‑ready clips (e.g., quso.ai workflows). :contentReference[oaicite:4]{index=4}  \n- Suggest post layouts, graphics, and designs (e.g., Canva AI features). :contentReference[oaicite:5]{index=5}  \n- Provide automated scheduling and multi‑channel content distribution (e.g., Hootsuite AI). :contentReference[oaicite:6]{index=6}\n\n## Future Enhancements (Realistic for 2026)\n- **Predictive Content Personalization**: AI tailors captions, headlines, and visuals to segments based on engagement and behavioral data. :contentReference[oaicite:7]{index=7}  \n- **Agentic Workflow Automation**: Autonomous AI agents generate ideas, sche"
+  ],
+  "source": "chunk_auto"
+}

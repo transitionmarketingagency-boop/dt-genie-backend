@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "[\n  {\n    \"intent\": \"dtm_differentiation\",\n    \"examples\": [\n      \"What makes Digital Transition Marketing different?\",\n      \"Why choose DTM over other agencies?\",\n      \"What is unique about your agency?\",\n      \"How are you different from a standard marketing firm?\",\n      \"Why is your approach better?\",\n      \"What makes your agency stand out?\"\n    ],\n    \"response\": \"We don’t just run campaigns—we engineer unfair advantages. DTM fuses patented AI, predictive analytics, and algorithmic warfare that competitors simply cannot replicate. We are operators who prioritize 'Brain > Billboards,' outthinking the market to ensure you outlast it. [1-3]\",\n    \"category\": \"General / About Us\",\n    \"source\": \"Website Content - FAQs [1]; Straight Answers FAQ [3]\"\n  },\n  {\n    \"intent\": \"performance_timeline\",\n    \"examples\": [\n      \"How quickly can you improve our marketing performance?\",\n      \"How long until I see results?\",\n      \"When will my ads start working better?\",\n      \"What is the t"
+  ],
+  "source": "chunk_auto"
+}

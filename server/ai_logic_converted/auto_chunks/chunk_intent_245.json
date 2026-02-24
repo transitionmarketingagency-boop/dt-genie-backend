@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "e analytics.\n\nAuto-routing: CRM tags and triggers assign leads to correct tiered sales path.\n\nAutomated Pre-Qualification\n\nShort AI-powered form evaluates:\n\nIndustry & niche fit\n\nBudget & timeline\n\nData readiness for AI systems\n\nCompliance / legal restrictions\n\nScoring outputs: Green = proceed, Yellow = nurture, Red = disqualify.\n\nSales Hand-off\n\nQualified leads routed to human AE + Neon Vision AI assistant.\n\nScripts, objection handling, and personalized pitch decks are auto-prepared.\n\n2. Lead Qualification Logic (2026)\nTier\tCriteria\tActions\tOutcome\nTactical\t$500–2,000/mo, pilot-ready, SMB, one service\tOffer CGI & Performance Pilot\tHigh conversion probability, short sales cycle\nStrategic\t$2,500–5,500/mo, scaling business, multiple services\tBundle + retainer pitch\tMedium cycle, performance proof-based upsell\nSovereign\t$5,500+/mo, enterprise, multiple locations, long-term\tFull-service custom retainer\tLong cycle, high ACV, requires dedicated AE & AI analyst\n3. Objection Handling Scripts\n\n"
+  ],
+  "source": "chunk_auto"
+}

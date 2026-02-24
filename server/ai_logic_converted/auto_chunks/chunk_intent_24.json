@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "ws for each recipient to increase engagement. Platforms like **Seventh Sense** specialize in behavioral send‑time optimization by analyzing individual engagement patterns. :contentReference[oaicite:1]{index=1}\n\n## Tool Ecosystem (2026)\n- **Klaviyo AI**: Generates email copy, predicts smart send times, and uses customer data for dynamic personalization. :contentReference[oaicite:2]{index=2}  \n- **ActiveCampaign Intelligence**: Predictive sending, AI content suggestions, audience scoring, and cross‑channel automation. :contentReference[oaicite:3]{index=3}  \n- **Brevo (Aura)**: AI assistant for subject lines, segmentation optimization, and predictive content workflows. :contentReference[oaicite:4]{index=4}  \n- **Mailchimp & HubSpot**: Provide integrated AI features for content drafting, send‑time suggestions, and analytics across email and CRM. :contentReference[oaicite:5]{index=5}\n\n## Technical Integrations\nThese systems commonly integrate with CRMs and e‑commerce platforms such as:\n- **"
+  ],
+  "source": "chunk_auto"
+}

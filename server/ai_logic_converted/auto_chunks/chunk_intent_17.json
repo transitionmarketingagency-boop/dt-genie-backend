@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "# AI Performance Marketing & PPC\n\n## Overview\nAI Performance Marketing and PPC systems automate advertising operations using machine learning, providing efficient audience targeting, ad buying, and campaign optimization. These systems execute real-time programmatic bidding, adjusting bids as frequently as every six minutes based on live engagement signals. They operate across multiple platforms, including Google, Meta, LinkedIn, TikTok, and programmatic DSPs, within a unified ecosystem.\n\n## Core Features\n- **Predictive Audience Targeting**: Machine learning models analyze 50+ data points to identify purchase intent and reduce wasted ad spend.  \n- **Dynamic Creative Optimization (DCO)**: Tests 1,000+ creative variants automatically, incorporating fatigue detection to rotate ads at optimal intervals.  \n- **Full-Funnel Tracking & Attribution**: Server-side analytics provide cross-channel ROI modeling and comprehensive performance insights.  \n- **Fraud & Bot Protection**: AI monitors traff"
+  ],
+  "source": "chunk_auto"
+}

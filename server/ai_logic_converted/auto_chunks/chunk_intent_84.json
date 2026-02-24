@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    "tive intelligence.\nService 11: AI Data Enrichment & CRM Intelligence\n• Clearbit: B2B attribute enrichment and intent detection from IP data.\nService 12: AI Sales Enablement & Lead Qualification\n• Clay: Hyper-personalized lead research and data orchestration.\n• Gong: Revenue intelligence and deal risk analysis via call transcription.\n• GoHighLevel: All-in-one sales funnel and automated responder orchestration.\n• Apollo.io: Prospecting database and cold sequence writing assistance.\nService 13: AI Reporting, Business Intelligence & DAM\n• Whatagraph: Unified multi-channel reporting with conversational AI interface.\n• Canto: AI-powered digital asset management with smart tagging.\nService 14: AI Predictive Analytics, ROI Modeling & Forecasting\n• Salesforce Einstein: Predictive lead scoring and behavioral trend analysis.\n• Madgicx: Autonomous Meta ad bidding and creative fatigue prediction.\n• Clari: Sales pipeline health and revenue risk scoring.\n\n---------------------------------------------"
+  ],
+  "source": "chunk_auto"
+}

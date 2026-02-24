@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    " for AI‑assisted mixing and mastering. :contentReference[oaicite:4]{index=4}  \n- **DAW Integration**: Systems integrate with digital audio workstations to automate tasks such as vocal tuning, dynamic balancing, real‑time effects processing, and multi‑track arrangement.\n\n## Monitoring & Analytics\n- **Real‑Time Dashboards**: Track production metrics including mix balance, loudness standards, signal‑to‑noise ratios, and delivery milestones.  \n- **AI Performance Predictors**: Predictive algorithms model listener engagement, frequency balance outcomes, and platform delivery optimization for different streaming contexts.  \n- **Stem & Structural Analysis**: AI tools assess stems and suggest structural improvements based on genre‑specific data patterns.\n\n## Advanced & Future Applications (2026)\n- **Hybrid Human+AI Workflows**: AI assists with idea generation, arrangement suggestions, and structural refinement while preserving creative control.  \n- **Neural Music Assistants**: Models like multi"
+  ],
+  "source": "chunk_auto"
+}

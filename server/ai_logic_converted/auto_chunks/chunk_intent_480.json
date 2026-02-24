@@ -1,0 +1,9 @@
+{
+  "triggers": [
+    "general service"
+  ],
+  "responses": [
+    ".\nTool: Boomy Supports Services: Service 1 / music production Category: All-in-One Text-to-Audio Generator Primary Use: Enables instant song creation and direct distribution to major streaming platforms. Why It Matters (2026): Provides a low-barrier entry for beginners to monetize AI-generated music through revenue sharing. Notes: Features a one-click generation system with community-based feedback.\nTool: Orb Producer Suite Supports Services: Service 1 / music production Category: Production Assistant / MIDI Generator Primary Use: Generates infinite MIDI patterns for chords, melodies, basslines, and arpeggios inside a DAW. Why It Matters (2026): Acts as a high-level creative spark for producers who want to use their own synth sounds. Notes: Uses state-of-the-art technology to ensure musical patterns are sound and humanized.\nTool: Soundful Supports Services: Service 1 / music production Category: Production Assistant / MIDI Generator Primary Use: Produces studio-quality loops and tracks"
+  ],
+  "source": "chunk_auto"
+}

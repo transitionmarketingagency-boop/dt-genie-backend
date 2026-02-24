@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "email marketing",
+    "email automation",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "* Integrate into standardized report template\n\n**Step 4: Review & QA**\n\n* Internal review for accuracy, brand alignment, and compliance\n* Ensure clarity and readability\n\n**Step 5: Delivery**\n\n* Schedule delivery per client cadence (weekly, bi-weekly, monthly)\n* Distribute via client portal, email, or secure PDF\n* Archive for internal tracking\n\n---\n\n## 4. AUTOMATION & INTEGRATION\n\n* **Neon Vision**: Automated KPI aggregation, predictive analytics, anomaly detection\n* **Power BI / Snowflake**: Visual dashboards and cross-channel analytics\n* **n8n / Make**: Scheduled data pulls, report generation, and client distribution\n* **Quality checks**: Automated alerts for missing or anomalous data\n\n---\n\n## 5. CLIENT COMMUNICATION GUIDELINES\n\n* Reports must be **clear, concise, and visually engaging**\n* Include executive summary for quick decision-making\n* Always highlight AI contributions and measurable results\n* Recommend actions without using technical jargon\n* Provide a section for client feedb"
+  ],
+  "source": "chunk_auto"
+}

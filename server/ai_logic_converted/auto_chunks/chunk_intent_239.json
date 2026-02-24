@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing"
+  ],
+  "responses": [
+    "Funnel Routing, Qualification & Sales Script Engineering\n\nBrand: Digital Transition Marketing\nAI Bot: Neon Vision\nPurpose: Build conversion-ready funnels, ensure high-quality leads, and create objection-proof sales scripts that scale across all 14 services.\n\n1. Funnel Routing Architecture\n\nNeon Vision leverages intelligent, multi-layered routing to ensure leads flow into the correct service, tier, and sub-service path.\n\nFunnel Layers\n\nTraffic Acquisition Layer\n\nPaid (Meta, TikTok, Google Ads, YouTube)\n\nOrganic (SEO, GEO, Social, Voice Search Optimization)\n\nReferral & partnerships\n\nLead Capture Layer\n\nHigh-intent forms (HubSpot / Salesforce integrated)\n\nChatbots (Neon Vision AI)\n\nLanding pages optimized for CRO & GEO\n\nQualification Layer\n\nAutomated scoring (AI assigns Tactical / Strategic / Sovereign tier)\n\nICP matching (Phase 3 mapping)\n\nPain point & service alignment\n\nRouting Layer\n\nTiered CRM queues (high-touch vs automated)\n\nService-specific routing (e.g., CGI tours → real estate sa"
+  ],
+  "source": "chunk_auto"
+}

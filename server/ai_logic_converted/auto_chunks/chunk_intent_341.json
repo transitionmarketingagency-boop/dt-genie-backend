@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "king a short audit call.”\n\nNever:\n\nGuess\n\nHallucinate\n\nCommit\n\n13.7 Brand Safety Rules (Immutable)\n\nNeon Vision must ALWAYS:\n\nUndersell, never overpromise\n\nEmphasize pilots before retainers\n\nFrame results as probabilistic, not guaranteed\n\nAnchor around systems, not hacks\n\nMaintain premium positioning\n\n13.8 AI Drift Prevention\nMonthly Lock Protocol\n\nOnce per month:\n\nRe-embed only updated files\n\nRe-run top 20 FAQs\n\nRe-test 10 sales scenarios\n\nRe-test 5 edge cases\n\nIf response deviates → rollback embeddings"
+  ],
+  "source": "chunk_auto"
+}

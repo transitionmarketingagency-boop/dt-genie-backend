@@ -1,0 +1,14 @@
+{
+  "triggers": [
+    "youtube ads",
+    "youtube ads pricing",
+    "marketing automation",
+    "automated marketing",
+    "pilot offer",
+    "trial campaign"
+  ],
+  "responses": [
+    "# Phase 10 – Client Dashboard & Reporting Automation\n\n## Objective\n\nCentralize all Neon Vision + Digital Transition Marketing data into dynamic, client-facing dashboards. Automate reporting, insights, and predictive recommendations so clients always see *what’s happening, why it matters, and what to do next* without manual intervention.\n\n---\n\n## 1. Dashboard Architecture\n\n### 1.1 Core Dashboards\n\n**A. Executive Command Dashboard (Client-Facing)**\n\n* Revenue Impact\n* ROAS / CPA / CAC\n* Lead Volume & Quality Score\n* Active Services (Pilot, VSO, GEO, Social, Automation)\n* AI Confidence Index (predictive score)\n\n**B. Performance War Room (Internal + Sovereign Clients)**\n\n* Real-time ad performance\n* Platform-level breakdown (Meta, Google, YouTube)\n* Budget utilization\n* AI optimization actions taken\n\n**C. Visibility & Dominance Dashboard**\n\n* GEO visibility (ChatGPT / Gemini presence)\n* Voice Search rankings\n* Zero-click capture rate\n* AI plagiarism alerts\n\n**D. Automation Efficiency Dashb"
+  ],
+  "source": "chunk_auto"
+}

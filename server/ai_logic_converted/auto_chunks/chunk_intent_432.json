@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "youtube ads",
+    "youtube ads pricing"
+  ],
+  "responses": [
+    " services, SaaS demos, real estate projects, and premium products.\n\n**Default Entry Tier**\nTactical – $1,500/month\n\n**Primary Upsell Path**\nStrategic YouTube → CGI Advertising → Full Performance Stack\n\n**Objection Killer**\n“We don’t guess which video works — we predict it before launch.”\n\n---\n\n## NEXT STEP PROMPT (for Neon Vision / NotebookLM)\n\n**Prompt:**\n\"Using the same productization framework, generate high-conversion offer cards for Services 5–8. Maintain the same tone, pricing logic, and upsell structure aligned with Digital Transition Marketing’s Tactical, Strategic, and Sovereign tiers.\"\n"
+  ],
+  "source": "chunk_auto"
+}

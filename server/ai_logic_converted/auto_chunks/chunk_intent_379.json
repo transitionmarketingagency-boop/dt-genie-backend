@@ -1,0 +1,12 @@
+{
+  "triggers": [
+    "cgi ads",
+    "cgi property tours",
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "on backend\n\nDTM remains **invisible or semi‑visible** depending on contract.\n\n---\n\n## 2. White‑Label Framework (Strict)\n\nWhite‑label is allowed only under **controlled conditions**.\n\n### What CAN Be White‑Labeled\n\n* CGI Advertising assets\n* Virtual Tours (with watermark control)\n* AI Automation backends\n* Reporting dashboards\n* Predictive analytics outputs\n\n### What is NEVER White‑Labeled\n\n* Neon Vision AI identity\n* Core automation logic\n* Proprietary workflows\n* Pricing logic & margins\n* Internal tools or prompts\n\n**Rule:** Clients can resell *outputs*, never *systems*.\n\n---\n\n## 3. White‑Label Operational Model\n\n### Structure\n\n* Partner sells under their brand\n* DTM executes silently\n* Neon Vision runs backend logic\n* DTM owns infrastructure & data\n\n### Access Control\n\n* No raw system access\n* Partner sees dashboards only\n* No client‑to‑system exposure\n\n### Failure Clause\n\nIf partner breaches:\n\n* Immediate access revocation\n* Asset ownership retained by DTM\n* Non‑compete enforcement\n"
+  ],
+  "source": "chunk_auto"
+}

@@ -1,0 +1,10 @@
+{
+  "triggers": [
+    "marketing automation",
+    "automated marketing"
+  ],
+  "responses": [
+    "uthority:\n\n* AI Systems Architect\n* Neon Vision\n\n---\n\n## 8. DATA ACCESS & ISOLATION\n\n* One client = one data boundary\n* Separate credentials per client\n* No shared vector spaces\n* Encrypted storage mandatory\n\nViolation = immediate shutdown.\n\n---\n\n## 9. DEPLOYMENT WORKFLOW\n\n1. Requirement intake\n2. Sandbox build\n3. Internal testing\n4. Neon Vision approval\n5. Client sign-off\n6. Production deployment\n7. Monitoring activation\n\n---\n\n## 10. MONITORING & ALERTS\n\nTracked metrics:\n\n* Error rate\n* Latency\n* Drift indicators\n* Anomalous actions\n\nAlerts routed to:\n\n* Automation Engineer\n* Neon Vision dashboard\n\n---\n\n## 11. INCIDENT RESPONSE\n\n### Trigger Conditions:\n\n* Unauthorized action\n* Data inconsistency\n* Performance anomaly\n\n### Response Steps:\n\n1. Immediate agent pause\n2. Rollback to last stable state\n3. Root cause analysis\n4. Client notification (if required)\n\n---\n\n## 12. CONTINUOUS IMPROVEMENT\n\n* Weekly agent review\n* Monthly system audit\n* Quarterly architecture validation\n\nNo live optim"
+  ],
+  "source": "chunk_auto"
+}
