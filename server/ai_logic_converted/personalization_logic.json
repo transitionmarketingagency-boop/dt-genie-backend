@@ -1,0 +1,8 @@
+{
+  "triggers": [
+    "*"
+  ],
+  "responses": [
+    "[{\"intent\":\"pilot_pricing_tiers\",\"persona\":\"Sales Advisor\",\"response_template\":\"Hello {user_name}, we offer three pilot tiers for {user_company}: Tactical ($899) for a fast test on 1 platform, Strategic ($1,299) for multi-channel impact, and Sovereign (Custom) for full-service validation. Which tier are you interested in?\",\"memory_slots\":[\"user_name\",\"user_company\",\"previous_intent\",\"open_questions\"]},{\"intent\":\"service_ai_automation\",\"persona\":\"Technical Advisor\",\"response_template\":\"Our AI agents can automate {user_preferred_tasks} for {user_company}, reducing costs by 40% with self-healing workflows. Integration is seamless with Salesforce, Shopify, and other platforms.\",\"memory_slots\":[\"user_company\",\"user_preferred_tasks\",\"previous_intent\"]},{\"intent\":\"contact_and_support\",\"persona\":\"FAQ Bot\",\"response_template\":\"You can reach us at agencee@email.com or +54 2541 22 55 66. For {user_company}, we recommend booking a 20-min audit to get tailored advice.\",\"memory_slots\":[\"user_company\",\"previous_intent\"]},{\"intent\":\"pilot_workflow\",\"persona\":\"Pilot Onboarding Assistant\",\"response_template\":\"Hi {user_name}, your pilot follows 4 steps: 1. Discovery Audit, 2. CGI Production, 3. Ad Launch & Optimization, 4. Results & Scale. You're currently at Step {pilot_status}.\",\"memory_slots\":[\"user_name\",\"pilot_status\",\"previous_intent\"]}]"
+  ]
+}
