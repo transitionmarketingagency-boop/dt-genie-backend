@@ -86,7 +86,7 @@ function loadJSONRecursive(dir: string) {
 loadJSONRecursive(aiLogicRoot);
 console.log(`✅ Loaded ${aiIntents.length} AI logic JSON intents`);
 
-/* ================= IMPROVED INTENT MATCHING ================= */
+/* ================= INTENT MATCHING ================= */
 function findMatchingIntent(userMessage: string) {
   const msg = normalize(userMessage);
   const msgWords = msg.split(" ");
@@ -100,7 +100,6 @@ function findMatchingIntent(userMessage: string) {
         msgWords.includes(word)
       ).length;
 
-      // Fuzzy match: 60% keyword overlap required
       if (matchCount >= Math.ceil(trigWords.length * 0.6)) {
         return intent.responses.join("\n\n");
       }
@@ -112,9 +111,7 @@ function findMatchingIntent(userMessage: string) {
 /* ================= EMBEDDINGS ================= */
 async function getEmbeddingKnowledge(userMessage: string) {
   try {
-    // LOWERED similarity threshold to improve recall
     const chunks = await getTopChunks(userMessage, 10, 0.05);
-
     if (!chunks || chunks.length === 0) return "";
 
     return chunks
@@ -181,48 +178,62 @@ export async function generateHybridResponse(
     const jsonKnowledge = findMatchingIntent(userMessage);
     const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
 
-    // 🔥 CRITICAL FIX: If JSON or Embedding has answer, use it directly
+    /* ===== BUILD CONTEXT ===== */
+    let knowledgeContext = "";
+
     if (jsonKnowledge) {
-      await memoryService.addMessage(userId, "assistant", jsonKnowledge);
-      return formatResponse(null, [{ content: jsonKnowledge }], {});
+      knowledgeContext += `Structured Knowledge:\n${jsonKnowledge}\n\n`;
     }
 
     if (embeddingKnowledge) {
-      await memoryService.addMessage(userId, "assistant", embeddingKnowledge);
-      return formatResponse(null, [{ content: embeddingKnowledge }], {});
+      knowledgeContext += `Knowledge Base:\n${embeddingKnowledge}\n\n`;
     }
 
-    /* ===== MODEL FALLBACK ===== */
+    /* ===== MODEL SYNTHESIS ===== */
     const prompt = `
-You are ${BOT_NAME}, expert AI for Digital Transition Marketing.
-Respond strategically and professionally.
-User question: ${userMessage}
+You are ${BOT_NAME}, AI Strategist for Digital Transition Marketing (DTM).
+
+Your role:
+- Answer clearly and professionally
+- If structured knowledge or knowledge base content exists, synthesize it properly
+- Do NOT say you lack information if knowledge is provided
+- If no knowledge exists, provide strategic but relevant guidance
+
+Conversation Context:
+${knowledgeContext || "No structured knowledge retrieved."}
+
+User Question:
+${userMessage}
+
+Provide a complete and structured response.
 `;
 
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
 
-    if (!response || isNonAnswer(response)) {
-      if (canUseGemini()) {
-        try {
-          response = cleanResponse(await generateGemini(prompt));
-          markGeminiUsed();
-          modelUsed = "Gemini";
-        } catch {}
-      }
+    if ((!response || isNonAnswer(response)) && canUseGemini()) {
+      try {
+        response = cleanResponse(await generateGemini(prompt));
+        markGeminiUsed();
+        modelUsed = "Gemini";
+      } catch {}
     }
 
     response = enforceBotName(response);
 
     if (!response || isNonAnswer(response)) {
       if (msg.includes("book") || msg.includes("schedule") || msg.includes("call")) {
-        response = "Sure — you can book a call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+        response =
+          "Sure — you can book a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
       } else {
-        response = "I don’t currently have confirmed information on that.";
+        response =
+          "I can provide strategic guidance on AI marketing, automation, paid advertising, SEO, CGI property tours, and digital growth systems. Could you clarify what specific area you'd like to explore?";
       }
     }
 
-    console.log(`[Hybrid] Model=${modelUsed} | JSON=${!!jsonKnowledge} | EMB=${!!embeddingKnowledge}`);
+    console.log(
+      `[Hybrid] Model=${modelUsed} | JSON=${!!jsonKnowledge} | EMB=${!!embeddingKnowledge}`
+    );
 
     await memoryService.addMessage(userId, "assistant", response);
 
