@@ -6,22 +6,26 @@ import { getEmbedding } from "./services/embeddingClient.js";
 const chunksPath = path.join(process.cwd(), "server", "vector_store", "chunks.json");
 const DEBUG = process.env.DEBUG_CHUNKS === "true";
 
-// Persistent embedding cache to avoid repeated getEmbedding calls
+// Persistent embedding cache
 const EMB_CACHE_FILE = path.join(process.cwd(), "server", "vector_store", ".queryEmbCache.json");
 let queryEmbeddingCache: Map<string, number[]> = new Map();
+
 try {
   if (fs.existsSync(EMB_CACHE_FILE)) {
     const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
-    queryEmbeddingCache = new Map(Object.entries(JSON.parse(raw)));
+    const parsed = JSON.parse(raw);
+    // Ensure numbers
+    queryEmbeddingCache = new Map(Object.entries(parsed).map(([k, v]) => [k, (v as number[]).map(Number)]));
   }
-} catch {
-  console.warn("⚠️ Failed to load query embedding cache, starting fresh.");
+} catch (err) {
+  console.warn("[QueryChunks] ⚠️ Failed to load query embedding cache, starting fresh.", err);
 }
+
 function saveQueryCache() {
   try {
     fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(queryEmbeddingCache)), "utf-8");
-  } catch {
-    console.warn("⚠️ Failed to save query embedding cache.");
+  } catch (err) {
+    console.warn("[QueryChunks] ⚠️ Failed to save query embedding cache.", err);
   }
 }
 
@@ -48,7 +52,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
  */
 function loadChunks(): { text: string; source: string | null; embedding: number[] }[] {
   if (!fs.existsSync(chunksPath)) {
-    console.error("⚠️ chunks.json not found:", chunksPath);
+    console.error("[QueryChunks] ⚠️ chunks.json not found:", chunksPath);
     return [];
   }
 
@@ -60,11 +64,11 @@ function loadChunks(): { text: string; source: string | null; embedding: number[
       .filter(c => c?.text && Array.isArray(c.embedding))
       .map(c => ({
         text: c.text,
-        source: c.source || null,
-        embedding: c.embedding
+        source: typeof c.source === "string" ? c.source : null,
+        embedding: c.embedding.map(Number)
       }));
   } catch (err) {
-    console.error("⚠️ Failed to parse chunks.json:", err);
+    console.error("[QueryChunks] ⚠️ Failed to parse chunks.json:", err);
     return [];
   }
 }
@@ -76,7 +80,7 @@ export async function getTopChunks(
   queryText: string,
   limit = 8,
   minSimilarity = 0.25
-) {
+): Promise<{ text: string; source: string | null; score: number }[]> {
   if (!queryText || !queryText.trim()) return [];
 
   const chunks = loadChunks();
@@ -88,7 +92,7 @@ export async function getTopChunks(
   } else {
     queryEmbedding = await getEmbedding(queryText);
     if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
-      console.error("⚠️ Invalid query embedding");
+      console.error("[QueryChunks] ⚠️ Invalid query embedding");
       return [];
     }
     queryEmbeddingCache.set(queryText, queryEmbedding);
@@ -105,13 +109,12 @@ export async function getTopChunks(
     .sort((a, b) => b.score - a.score);
 
   if (DEBUG) {
-    console.log(`🔹 ${scored.length} chunks scored for query: "${queryText}"`);
+    console.log(`[QueryChunks] ${scored.length} chunks scored for query: "${queryText}"`);
     scored.slice(0, 5).forEach((c, i) =>
       console.log(`${i + 1}. Score=${c.score.toFixed(3)} | ${c.text.slice(0, 80)}...`)
     );
   }
 
-  // Return filtered
   const filtered = scored.filter(c => c.score >= minSimilarity);
   return filtered.length > 0 ? filtered.slice(0, limit) : scored.slice(0, Math.min(limit, scored.length));
 }

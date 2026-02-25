@@ -111,7 +111,6 @@ function findMatchingIntent(userMessage: string) {
   // Sort descending by score and combine top 3
   matches.sort((a, b) => b.score - a.score);
   const topResponses = matches.slice(0, 3).map(m => m.response);
-  console.log("Top JSON matches:", topResponses);
   return topResponses.join("\n\n");
 }
 
@@ -121,7 +120,6 @@ async function getEmbeddingKnowledge(userMessage: string) {
     const chunks = await getTopChunks(userMessage, 15, 0.15); // prioritize relevance
     if (!chunks || chunks.length === 0) return "";
     const topChunks = chunks.map(c => c.text).filter(Boolean);
-    console.log("Top embedding chunks:", topChunks);
     return topChunks.join("\n\n");
   } catch (err) {
     console.error("Error retrieving embeddings:", err);
@@ -199,14 +197,12 @@ Do NOT disclaim missing information if context is available.
     /* ================= GENERATE RESPONSE ================= */
     let response = cleanResponse(await generateGemma(prompt));
     let modelUsed = "Gemma";
-    console.log("Gemma raw response:", response);
 
     if ((!response || response.length < 25) && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(prompt));
         markGeminiUsed();
         modelUsed = "Gemini";
-        console.log("Gemini raw response:", response);
       } catch (err) {
         console.error("Gemini generation failed:", err);
       }
@@ -231,5 +227,4 @@ Do NOT disclaim missing information if context is available.
     console.error("Hybrid error:", err);
     return "We’re experiencing a temporary processing issue.";
   }
-}	
-
+}
