@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# Generative Engine Optimization (GEO) & AI SEO\n\n## Overview\nGenerative Engine Optimization (GEO) and AI SEO are technical frameworks designed to structure digital content for indexing and retrieval within generative AI models, including ChatGPT, Gemini, and DeepSeek. Unlike traditional SEO, GEO targets AI model algorithms, leveraging NLP alignment to ensure content is recognized, parsed, and accurately retrieved by these engines.\n\n## Core Features\n- **Index Audits & Diagnostics**: Performs crawlability checks and resolves technical issues to enable AI indexing. Standard remediation timelines are approximately 14 days.  \n- **Answer Engine Optimization (AEO)**: Structures content into concise Q&A pairs and snippet-ready formats designed to occupy AI-driven answer boxes.  \n- **Plagiarism Detection & Content Protection**: Utilizes an AI-driven “Plagiarism Shield” to detect unauthorized scraping of proprietary content, automatically rewriting material to enforce attribution.  \n- **Voice Se"
-  ],
-  "source": "chunk_auto"
-}

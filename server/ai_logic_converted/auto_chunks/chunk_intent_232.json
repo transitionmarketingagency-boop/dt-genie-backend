@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "istants like Alexa or Siri?\nA3: Yes. Our Voice GEO module structures Q&A pairs specifically for voice assistants, which convert at a rate 3.2X higher than text searches.\n\n---\n\nCategory: Website Design & Maintenance\nQ1: Can you redesign our website without us losing our SEO rankings?\nA1: Guaranteed. Our process includes SEO migration audits, 301 redirects, and content preservation to ensure zero traffic loss during the transition.\n\nQ2: What is included in your £99/month maintenance plan?\nA2: This covers security updates, speed optimizations, 24/7 malware scans, and backups—services for which most agencies charge over £200.\n\n---\n\nCategory: Music & Audio Production\nQ1: Can I work with the same producer across multiple tracks?\nA1: Absolutely. Our higher tiers include a dedicated producer to maintain a cohesive sound across an entire EP or album.\n\nQ2: Do you offer ghost production?\nA2: Yes. We provide 100% original tracks where you own the full copyright. All tiers include signed NDAs to en"
-  ],
-  "source": "chunk_auto"
-}

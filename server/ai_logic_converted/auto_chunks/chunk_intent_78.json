@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "udio & Synthetic Media\n• Synthesia: CORE\n• HeyGen: CORE\n• ElevenLabs: CORE\n• Sora 2: EXPERIMENTAL\n• Google Veo 3.1: EXPERIMENTAL\n• Kling AI: OPTIONAL\n• Runway (Gen-4): CORE\n• Opus Clip: CORE\n• Descript: CORE\n• Matterport: CORE\n• LALAL.AI: OPTIONAL\n• Suno: OPTIONAL\n• Virtual DJ 2026: OPTIONAL\nService 5: AI Image & Graphic Design\n• Midjourney: CORE\n• Canva (Magic Studio): CORE\n• PhotoRoom: OPTIONAL\n• Looka: OPTIONAL\n• Hunyuan 3D: EXPERIMENTAL\n• Meshy AI: EXPERIMENTAL\nService 6: AI Social Media & Reputation Management\n• Sprout Social: CORE\n• Brand24: CORE\n• Flick: OPTIONAL\n• SocialBee: OPTIONAL\n• Metricool: OPTIONAL\n• TubeBuddy: OPTIONAL\n• Spotter Studio: EXPERIMENTAL\nService 7: AI Search, Market Research & Competitive Intelligence\n• Perplexity Enterprise: CORE\n• GWI Spark: CORE\n• SparkToro: OPTIONAL\n• AnswerThePublic: OPTIONAL\n• NotebookLM: OPTIONAL\n• Loopletics: EXPERIMENTAL\nService 8: AI Chatbots & Conversational Engagement\n• Drift: CORE\n• ManyChat: CORE\n• Tidio (Lyro AI): OPTIONAL\n• B"
-  ],
-  "source": "chunk_auto"
-}

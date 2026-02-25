@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# AI Predictive Analytics\n\n## Market Forecasting and Sentiment Analysis\nDTM’s AI Predictive Analytics framework delivers short-term (72-hour) market foresight with approximately 93% precision for actionable signals. Patented sentiment algorithms quantify tonal shifts across corporate filings (SEC 10K), earnings calls, and social media platforms such as Reddit, Twitter, and LinkedIn. Behavioral models analyze over 50 key data points to forecast purchase intent, sector rotations, and customer engagement trends ahead of standard market consensus.\n\n## Data Integration and Monitoring\nThe system integrates live via API with Snowflake, Tableau, Power BI, and Salesforce to consolidate operational and financial data. It monitors dark pool liquidity, institutional trading movements, and \"whale\" positions to detect hidden market shifts. Custom dashboards visualize metrics such as CAC, LTV, conversion correlation heatmaps, and predictive risk signals for rapid decision-making.\n\n## Anomalies, Alert"
-  ],
-  "source": "chunk_auto"
-}

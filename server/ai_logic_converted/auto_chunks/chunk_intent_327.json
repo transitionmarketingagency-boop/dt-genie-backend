@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "ecognition.\n3. Adjust synonyms and examples if misclassifications occur.\n4. Once stable, move to **Phase 5: Response Personalization & Context Memory**, integrating dynamic context for multi-turn conversations.\n"
-  ],
-  "source": "chunk_auto"
-}

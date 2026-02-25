@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "egal & policy coverage done\n\nIf any box is unchecked → do not scale."
-  ],
-  "source": "chunk_auto"
-}

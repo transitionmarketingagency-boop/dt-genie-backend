@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# Voice Search Optimization (VSO)\n\n## Overview\nVoice Search Optimization (VSO) is the technical process of adapting digital content for conversational queries processed by voice-activated assistants, including Siri, Alexa, and Google Assistant. The primary objective is to structure content for retrieval as \"Position Zero\" featured snippets in search engines.\n\n## Core Methods\n- **Conversational Keyword Mapping**: Mapping over 200 long-tail phrases that reflect natural speech patterns (e.g., \"who, what, where, and why\") rather than traditional typed keywords.\n- **FAQ & HowTo Schema Implementation**: Applying structured data to digital assets to increase content eligibility for voice-based answers.\n- **Answer Engine Optimization (AEO)**: Engineering content into concise 29-word responses specifically designed for featured snippet inclusion.\n- **Local Optimization**: Integrating real-time business data, citations, and Google Business Profile (GMB) details to address hyperlocal \"near me\" qu"
-  ],
-  "source": "chunk_auto"
-}

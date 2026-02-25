@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "Service 1 – content & copy\nTool: AdCreative.ai Supports Services: Service 1 – content & copy Category: Ad Creative Generation Primary Use: Uses AI to generate high-performing ad creatives, headlines, and social media posts tailored for conversion. Why It Matters (2026): It allows brands to rapidly scale multi-platform ad campaigns using a proprietary model that learns brand fonts and colors. Notes: Pricing from $29/mo; integrates with Google and Facebook for ad credits and analytics.\nTool: Claude (Anthropic) Supports Services: Service 1 – content & copy Category: AI Assistant / LLM Primary Use: Excels at generating natural, nuanced long-form content, complex reasoning, and coding analysis. Why It Matters (2026): It is preferred for brand-sensitive content and technical writing due to its high writing quality and lower hallucination rates. Notes: Free tier available; Pro plan at $20/mo; features \"Projects\" for custom instructions and style training.\nTool: Jasper Supports Services: Servi"
-  ],
-  "source": "chunk_auto"
-}

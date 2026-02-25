@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "s Cycle Length:\nBudget Range:\nRisk Tolerance:\n\nclient_offer.md\nPrimary Offer:\nOffer Price:\nUnique Selling Point:\nTarget Persona:\nCore Objections:\nPrimary CTA:\n\nclient_kpis.md\nNorth Star Metric:\nPrimary KPIs:\n- KPI 1\n- KPI 2\n- KPI 3\n\nAcceptable CPA:\nBreak-even Point:\nScale Threshold:\n\nclient_assets.md\nProvided Assets:\n- Logos\n- Brand Guidelines\n- URLs\n- Ad Accounts\n- Analytics Access\n\nMissing Assets:\n- …\n\nclient_history.md\nCampaign Timeline:\nKey Decisions:\nTested Angles:\nWinning Creatives:\nFailed Hypotheses:\n\nclient_constraints.md\nCompliance Requirements:\nPlatform Restrictions:\nMessaging No-Gos:\nGeographic Limits:\nOperational Limits:\n\n15.7 Client Brain Retrieval Rules\n\nWhen a client is active:\n\nQuery Client Brain first\n\nThen Global Brand Brain\n\nNever access other client brains\n\nInternal Ops Brain only if internal_intent=true\n\nHard Rule\n\nClient data is NEVER used as examples for another client.\n\n15.8 Client-Facing Behavior Changes\n\nWith a Client Brain active, Neon Vision:\n\nSpeaks in clie"
-  ],
-  "source": "chunk_auto"
-}

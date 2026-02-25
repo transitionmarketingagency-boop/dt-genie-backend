@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "and HubSpot.\nTool: SAP Analytics Cloud Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: Integrated Planning & Analytics Primary Use: Combines BI, predictive planning, and resource optimization into a single cloud environment. Why It Matters (2026): Embeds \"Smart Insights\" to explain the \"why\" behind data variances and trends using machine learning. Notes: Native integration with SAP S/4HANA and BDC.\nTool: Stock GPT Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: Deep Learning Market Forecasting Primary Use: Generative AI model trained on decades of returns to model long-term temporal market dependencies. Why It Matters (2026): Captures nonlinear market behavior better than conventional strategies for excess returns. Notes: Targeted at algorithmic traders and quantitative investors.\nTool: Proshort Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: AI-Powered Sales Enablement Primary Use: Uses con"
-  ],
-  "source": "chunk_auto"
-}

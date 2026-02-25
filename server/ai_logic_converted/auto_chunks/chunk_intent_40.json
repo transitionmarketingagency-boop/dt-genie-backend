@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    " include professional DAWs such as **Pro Tools**, **Ableton Live**, **Logic Pro**, and **Fender Studio Pro** for end‑to‑end audio recording, editing, and mixing workflows. :contentReference[oaicite:0]{index=0}\n\n## Technical Engineering & AI Integration\n- **AI‑Assisted Composition**: Generative tools like **Suno AI**, **Boomy**, and **Soundraw** provide AI‑based music and melody generation from text prompts or structured inputs. :contentReference[oaicite:1]{index=1}  \n- **AI Plugins & Tools**:  \n  - **Orb Producer Suite** and **Magenta Studio** for chord, melody, and beat generation. :contentReference[oaicite:2]{index=2}  \n  - **AI Sample Finder** tools for intelligent sample discovery and stem manipulation. :contentReference[oaicite:3]{index=3}  \n  - **LANDR Pro X** and **iZotope Neutron** for AI‑assisted mixing and mastering. :contentReference[oaicite:4]{index=4}  \n- **DAW Integration**: Systems integrate with digital audio workstations to automate tasks such as vocal tuning, dynamic "
-  ],
-  "source": "chunk_auto"
-}

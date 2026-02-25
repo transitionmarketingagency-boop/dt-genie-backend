@@ -59,32 +59,8 @@ const greetingVariations = [
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ================= AI LOGIC ================= */
-const aiLogicRoot = path.join(process.cwd(), "server", "ai_logic_converted");
-const aiIntents: any[] = [];
-
-function loadJSONRecursive(dir: string) {
-  if (!fs.existsSync(dir)) return;
-  for (const f of fs.readdirSync(dir)) {
-    const fullPath = path.join(dir, f);
-    const stat = fs.statSync(fullPath);
-    if (stat.isDirectory()) {
-      loadJSONRecursive(fullPath);
-    } else if (f.endsWith(".json")) {
-      try {
-        const json = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
-        if (Array.isArray(json.triggers) && Array.isArray(json.responses)) {
-          aiIntents.push(json);
-        }
-      } catch (err) {
-        console.warn(`Failed to load JSON: ${fullPath}`, err);
-      }
-    }
-  }
-}
-
-loadJSONRecursive(aiLogicRoot);
-console.log(`✅ Loaded ${aiIntents.length} AI logic JSON intents`);
+/* ================= AI LOGIC LOADER ================= */
+import { aiIntents } from "./json_loader.js"; // ✅ Helper JSON intents
 
 /* ================= SEMANTIC JSON MATCH ================= */
 function findMatchingIntent(userMessage: string) {
@@ -101,14 +77,13 @@ function findMatchingIntent(userMessage: string) {
       const msgWords = msg.split(" ");
       const trigWords = trigNorm.split(" ");
       const matchCount = trigWords.filter(word => msgWords.includes(word)).length;
-      const score = matchCount / trigWords.length;
+      const score = trigWords.length > 0 ? matchCount / trigWords.length : 0;
       if (score >= 0.3) matches.push({ score, response: intent.responses.join("\n\n") });
     }
   }
 
   if (matches.length === 0) return null;
 
-  // Sort descending by score and combine top 3
   matches.sort((a, b) => b.score - a.score);
   const topResponses = matches.slice(0, 3).map(m => m.response);
   return topResponses.join("\n\n");
@@ -117,7 +92,7 @@ function findMatchingIntent(userMessage: string) {
 /* ================= EMBEDDINGS ================= */
 async function getEmbeddingKnowledge(userMessage: string) {
   try {
-    const chunks = await getTopChunks(userMessage, 15, 0.15); // prioritize relevance
+    const chunks = await getTopChunks(userMessage, 15, 0.15);
     if (!chunks || chunks.length === 0) return "";
     const topChunks = chunks.map(c => c.text).filter(Boolean);
     return topChunks.join("\n\n");
@@ -167,8 +142,8 @@ export async function generateHybridResponse(
     }
 
     /* ================= KNOWLEDGE RETRIEVAL ================= */
-    const embeddingKnowledge = await getEmbeddingKnowledge(userMessage); // PRIORITY
-    const jsonKnowledge = findMatchingIntent(userMessage); // SECONDARY
+    const embeddingKnowledge = await getEmbeddingKnowledge(userMessage); // ✅ PRIMARY: embeddings
+    const jsonKnowledge = findMatchingIntent(userMessage);             // Helper JSON intents
 
     let knowledgePool = "";
     if (embeddingKnowledge) knowledgePool += `PRIMARY DATA (Embeddings):\n${embeddingKnowledge}\n\n`;
@@ -180,8 +155,8 @@ export async function generateHybridResponse(
 You are ${BOT_NAME}, AI Strategist for Digital Transition Marketing (DTM).
 You are fully trained on the company's internal knowledge base.
 
-PRIMARY DATA (embeddings) must always be prioritized.
-SECONDARY DATA (structured JSON) can be used if it enhances the answer.
+PRIMARY DATA (Embeddings) must always be prioritized.
+SECONDARY DATA (JSON intents) can be used as supplemental context.
 
 Internal Knowledge:
 ${hasKnowledge ? knowledgePool : "No direct match found. Use strategic domain reasoning."}
@@ -195,27 +170,32 @@ Do NOT disclaim missing information if context is available.
 `;
 
     /* ================= GENERATE RESPONSE ================= */
-    let response = cleanResponse(await generateGemma(prompt));
-    let modelUsed = "Gemma";
+    let response = "";
+    let modelUsed = "";
 
-    if ((!response || response.length < 25) && canUseGemini()) {
-      try {
-        response = cleanResponse(await generateGemini(prompt));
-        markGeminiUsed();
-        modelUsed = "Gemini";
-      } catch (err) {
-        console.error("Gemini generation failed:", err);
+    if (embeddingKnowledge || jsonKnowledge) {
+      response = cleanResponse(await generateGemma(prompt));
+      modelUsed = "Gemma";
+
+      if ((!response || response.length < 25) && canUseGemini()) {
+        try {
+          response = cleanResponse(await generateGemini(prompt));
+          markGeminiUsed();
+          modelUsed = "Gemini";
+        } catch (err) {
+          console.error("Gemini generation failed:", err);
+        }
       }
     }
 
     response = enforceBotName(response);
 
-    /* ================= FINAL FALLBACK ONLY IF NO KNOWLEDGE ================= */
+    /* ================= FINAL FALLBACK ================= */
     if ((!response || response.length < 25) && !hasKnowledge) {
       if (msg.includes("book") || msg.includes("schedule") || msg.includes("call")) {
         response = "Sure — you can book a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
       } else {
-        response = "I can provide strategic guidance on AI marketing, automation, paid advertising, SEO, CGI property tours, and digital growth systems. Could you clarify which specific area you'd like to explore?";
+        response = "I can provide strategic guidance on AI marketing, automation, paid advertising, SEO, CGI property tours, and digital growth systems. Could you clarify which specific area you'd like?";
       }
     }
 
@@ -223,6 +203,7 @@ Do NOT disclaim missing information if context is available.
 
     await memoryService.addMessage(userId, "assistant", response);
     return formatResponse(null, [{ content: response }], {});
+
   } catch (err) {
     console.error("Hybrid error:", err);
     return "We’re experiencing a temporary processing issue.";

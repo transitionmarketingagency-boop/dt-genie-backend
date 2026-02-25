@@ -1,17 +1,19 @@
+// server/services/gemmaClient.ts
 import fetch from "node-fetch";
 
 /**
  * Gemma Client (Ollama HTTP-based)
- * Stable + Windows-safe
- * Uses 127.0.0.1 instead of localhost
+ * Node.js-safe
+ * Uses 127.0.0.1
  */
 
-const GEMMA_URL =
-  process.env.GEMMA_URL || "http://127.0.0.1:11434/api/generate";
-
+const GEMMA_URL = process.env.GEMMA_URL || "http://127.0.0.1:11434/api/generate";
 const GEMMA_MODEL = process.env.GEMMA_MODEL || "gemma3:1b";
+const GEMMA_TIMEOUT = 30000; // 30s
 
-const GEMMA_TIMEOUT = 30000; // 30 seconds
+interface GemmaResponse {
+  response?: string;
+}
 
 export async function generateGemma(prompt: string): Promise<string> {
   const controller = new AbortController();
@@ -24,7 +26,7 @@ export async function generateGemma(prompt: string): Promise<string> {
       body: JSON.stringify({
         model: GEMMA_MODEL,
         prompt,
-        stream: false,
+        stream: false, // Disable streaming for Node.js compatibility
         options: {
           temperature: 0.4,
           num_predict: 512,
@@ -40,25 +42,31 @@ export async function generateGemma(prompt: string): Promise<string> {
       return "";
     }
 
-    const data: any = await res.json();
+    // Type-safe parsing
+    const data = (await res.json()) as Partial<GemmaResponse>;
 
-    if (!data || !data.response) {
+    if (!data?.response) {
       console.warn("⚠️ Gemma returned empty response");
       return "";
     }
 
     return data.response.trim();
-  } catch (err: any) {
+  } catch (err: unknown) {
     clearTimeout(timeout);
 
-    if (err.name === "AbortError") {
-      console.warn("⚠️ Gemma timeout (30s)");
+    if (err instanceof Error) {
+      if (err.name === "AbortError") {
+        console.warn("⚠️ Gemma timeout (30s)");
+      } else {
+        console.warn("⚠️ Gemma failed:", err.message);
+      }
     } else {
-      console.warn("⚠️ Gemma failed:", err.message || err);
+      console.warn("⚠️ Gemma failed:", String(err));
     }
 
     return "";
   }
 }
 
+// Exporting for use in hybrid response
 export const gemmaClient = generateGemma;

@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "gagement data.\n\n## 24/7 Moderation & Community Response\n- Continuous monitoring of comments, direct messages, and reactions is conducted via AI agents.  \n- LLaMA-4 powered moderation systems identify and flag potentially harmful or non-compliant interactions.  \n- Automated engagement tools respond with pre-approved templates or escalate high-priority issues to human operators.\n\n## Algorithm Monitoring & Performance Metrics\n- Live algorithm heatmaps track post performance and viewer retention at millisecond-level granularity.  \n- Unified dashboards aggregate reach, engagement, conversion, and ROI metrics, replacing traditional vanity metrics.  \n- Weekly algorithm audits ensure alignment with platform updates and policy changes.\n\n## Shadowban Detection & Mitigation\n- LLaMA-4 models continuously detect account or content risks, including potential shadowbans.  \n- Mitigation protocols include ethical interventions such as flagged metadata cleanup, content revision, and safe account footpri"
-  ],
-  "source": "chunk_auto"
-}

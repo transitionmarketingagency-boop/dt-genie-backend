@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "tope Ozone 12 Supports Services: Service 1 / music production Category: Mastering Service Primary Use: An AI-assisted mastering suite offering bass control, stem EQ, and a high-performance maximizer. Why It Matters (2026): The IRC5 maximizer algorithm allows for clean, loud masters that meet platform standards without squashing dynamics. Notes: The \"Stem EQ\" feature allows processing of specific layers within a bounced track.\nTool: OpenBeat AI Supports Services: Service 1 / music production Category: Idea Generation Primary Use: Builds full musical arrangements around human input like a recorded hum or rough melody. Why It Matters (2026): Keeps the original creative idea recognizable while framing it in professional instrumentation and rhythms. Notes: Supports stem extraction so users can continue the arrangement in their own DAW.\nTool: Clear (Supertone) Supports Services: Service 1 / music production Category: Post-Production Primary Use: Removes room tone, ambience, and reverb from r"
-  ],
-  "source": "chunk_auto"
-}

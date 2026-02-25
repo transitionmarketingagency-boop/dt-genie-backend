@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "ary Use: Generates predictive models and time-series visualizations through plain-English natural language queries. Why It Matters (2026): Democratizes forecasting for non-technical users by identifying outliers and distributions instantly. Notes: Connects to Snowflake, Postgres, and Google Ads; offers a free trial.\nTool: Pecan AI Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: Automated Machine Learning Primary Use: Predictive model building specifically for customer churn, revenue, and demand forecasting. Why It Matters (2026): Uses \"Predictive Gen AI\" to guide business users through model training without needing data scientists. Notes: 14-day free trial; integrates with BigQuery, Snowflake, and Salesforce.\nTool: Cube Software Supports Services: [Service 2 / Predictive Analytics and Forecasting] Category: Spreadsheet-Native FP&A Primary Use: Layers AI forecasting on top of Excel and Google Sheets for multi-scenario planning. Why It Matters (2026): An "
-  ],
-  "source": "chunk_auto"
-}

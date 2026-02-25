@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "ved trends\n   * Predictive adjustments recommended by Neon Vision\n\n4. Visuals\n\n   * Line charts for trends\n   * Bar charts for channel comparison\n   * Heatmaps / engagement maps\n\n5. Executive Summary\n\n   * 3–5 bullet summary of performance\n   * Highlights wins & areas for improvement\n\n**Format Notes:**\n\n* Clean, corporate layout\n* Uses DTM brand colors\n* Visuals automatically populated by Neon Vision outputs\n\n---\n\n## 2. ROI & Impact Report TEMPLATE\n\n**Sections:**\n\n1. Campaign Highlights\n\n   * Objectives achieved vs planned\n   * Notable milestones\n\n2. Financial Performance\n\n   * Revenue generated\n   * Cost per Lead / Sale\n   * ROI / ROAS calculation\n\n3. AI System Contribution\n\n   * Automated actions completed\n   * Predicted vs actual outcomes\n\n4. Predictive Forecast\n\n   * Expected 30/60/90-day outcomes\n   * Suggested next actions\n\n5. Client Takeaways\n\n   * 3–5 actionable insights\n\n**Format Notes:**\n\n* Designed for board / executive review\n* Charts & graphs auto-generated from Neon Visio"
-  ],
-  "source": "chunk_auto"
-}

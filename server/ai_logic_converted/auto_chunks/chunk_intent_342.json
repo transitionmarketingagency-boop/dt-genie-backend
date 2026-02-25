@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# Phase 14 – AI Stack Governance & Execution Doctrine\n\nBrand: **Digital Transition Marketing**\nAI Orchestration System: **Neon Vision**\nStatus: **Control Architecture / Final Lock Layer**\nTime Horizon: **2026+**\n\n---\n\n## Purpose of Phase 14\n\nPhase 14 defines **how the entire AI stack is governed, locked, replaced, escalated, and evolved** without breaking services, SLAs, or revenue.\n\nThis phase ensures:\n• No single tool failure can collapse operations\n• No vendor lock-in can hold the agency hostage\n• No AI model drift silently degrades performance\n• Neon Vision operates as a **control plane**, not a chatbot\n\n---\n\n## 1. Neon Vision Control Plane (Authoritative Layer)\n\nNeon Vision is **not a model** — it is an orchestration authority.\n\n### Neon Vision Responsibilities\n\n• Tool selection & routing\n• Model arbitration (who answers, who executes)\n• Data ingestion & normalization\n• Performance monitoring & escalation\n• Safety, compliance, and kill-switch logic\n\nNeon Vision **never generates r"
-  ],
-  "source": "chunk_auto"
-}

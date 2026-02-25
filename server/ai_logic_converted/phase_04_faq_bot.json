@@ -1,8 +1,0 @@
-{
-  "triggers": [
-    "*"
-  ],
-  "responses": [
-    "[{\"intent\":\"performance_guarantee\",\"examples\":[\"What is your 90-day guarantee?\",\"What happens if results don't meet expectations?\",\"Tell me about the blood in the water guarantee.\",\"Do you offer refunds if we aren't happy?\",\"How do you ensure you hit KPIs?\",\"KPI guarantee\",\"Results assurance\",\"90-day performance promise\",\"Performance refund policy\",\"Client satisfaction guarantee\"],\"synonyms\":[\"results guarantee\",\"money-back promise\",\"performance SLA\",\"client satisfaction pledge\",\"KPI fulfillment\"],\"persona\":\"FAQ Bot\",\"category\":\"Policies\"},{\"intent\":\"guarantee_creative_revisions\",\"examples\":[\"What if I don't like the CGI designs?\",\"Do you offer unlimited revisions?\",\"What is the creative refund policy?\",\"How many revisions do I get per tier?\",\"How fast are revisions delivered?\",\"Creative revision policy\",\"Money-back for designs\",\"CGI redesign SLA\",\"Revision limits per tier\",\"Creative satisfaction guarantee\"],\"synonyms\":[\"design revision policy\",\"CGI ad edits\",\"creative feedback SLA\",\"unlimited edits\",\"creative refund terms\"],\"persona\":\"FAQ Bot\",\"category\":\"Policies\"},{\"intent\":\"contact_and_support\",\"examples\":[\"How do I book an audit?\",\"How can I contact your team?\",\"What is your support SLA?\",\"Where is your office located?\",\"What is your email and phone number?\",\"Customer support contact\",\"Book a consultation\",\"Get help from DTM\",\"Audit request\",\"Support channels\"],\"synonyms\":[\"contact info\",\"customer support\",\"help desk\",\"office location\",\"email & phone\"],\"persona\":\"FAQ Bot\",\"category\":\"General\"}]"
-  ]
-}

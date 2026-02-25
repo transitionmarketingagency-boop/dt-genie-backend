@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# AI Content Creation & Social Media Management\n\n## Overview\nAI Content Creation and Social Media Management encompass systems that generate, repurpose, distribute, and monitor digital content using artificial intelligence, analytics, and automated workflows. These services support content strategies that maintain consistent audience engagement across blogs, social platforms, and multimedia channels.\n\n## Content Generation & Repurposing\nAI engines produce long‑form content such as blogs, case studies, and whitepapers using advanced natural language models. Repurposing workflows transform these base assets into multiple formats — for example, TikTok/Reels clips, podcast outlines, carousel posts, short videos, and platform‑specific captions — using tools that detect high‑engagement segments and automatically create optimized variants. :contentReference[oaicite:1]{index=1}\n\n## Social Media Operations\n- **Automated Posting & Scheduling**: AI schedules posts across platforms (e.g., Instagra"
-  ],
-  "source": "chunk_auto"
-}

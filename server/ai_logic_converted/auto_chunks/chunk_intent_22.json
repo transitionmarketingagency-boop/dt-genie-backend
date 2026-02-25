@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "ection and repair of API or integration failures.  \n- **Databricks and Apache Spark 4**: Real-time large-scale data processing and predictive modeling.  \n- **Hugging Face Transformers & LangChain 3.0**: Integration for custom NLP-based forecasting models.  \n- **AI Observability Tools (Arize AI, Fiddler AI)**: Continuous monitoring of model drift, bias, and prediction accuracy.\n"
-  ],
-  "source": "chunk_auto"
-}

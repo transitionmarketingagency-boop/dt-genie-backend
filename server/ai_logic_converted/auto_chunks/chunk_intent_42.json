@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "**Hybrid Human+AI Workflows**: AI assists with idea generation, arrangement suggestions, and structural refinement while preserving creative control.  \n- **Neural Music Assistants**: Models like multimodal AI agents coordinate composition, mixing, and production suggestions in near real time.  \n- **Immersive Audio & Spatial Mixes**: Support for immersive formats (e.g., Dolby Atmos and 3D audio) with AI‑driven spatial balancing.  \n- **Automated Attribution & Metadata Embedding**: Emerging frameworks embed attribution and rights metadata directly into audio blocks to support transparent usage and licensing.\n"
-  ],
-  "source": "chunk_auto"
-}

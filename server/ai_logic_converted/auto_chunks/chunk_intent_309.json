@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "ATE\n\nOperations converts qualified clients into **stable, secure execution environments**.\n\nPrimary responsibility:\n\n* Enable delivery without friction or risk\n\n---\n\n## B2. ALLOWED ACTIVITIES\n\n* Client onboarding\n* Access validation\n* Workflow setup\n* Timeline enforcement\n\nOperations **does not**:\n\n* Change strategy\n* Approve scope expansions\n* Bypass onboarding steps\n\n---\n\n## B3. OPERATIONS EXECUTION FLOW\n\n1. Receive qualified handoff\n2. Execute onboarding SOP\n3. Validate access & security\n4. Activate systems\n5. Notify Creative & AI teams\n\n---\n\n## B4. ESCALATION RULES\n\nEscalate to Neon Vision when:\n\n* Access is incomplete\n* Client deviates from agreement\n* Security anomalies detected\n\nNo silent workarounds allowed.\n\n---\n\n# SECTION C — CREATIVE OPERATIONS SOP\n\n## C1. ROLE MANDATE\n\nCreative exists to produce **system-aligned, performance-ready assets**, not subjective art.\n\nPrimary responsibility:\n\n* Deliver assets that integrate into AI-driven systems\n\n---\n\n## C2. ALLOWED ACTIVITIES\n\n*"
-  ],
-  "source": "chunk_auto"
-}

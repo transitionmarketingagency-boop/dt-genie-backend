@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    " experimentation platform uses machine learning to identify and roll out the most promising versions of website features via automated A/B testing.\nWhy It Matters (2026):\n• It can automatically allocate traffic to \"winning\" variations while experiments are still running, maximizing ROI without waiting for completion.\nNotes:\n• Features \"flagging\" capabilities to roll out new features gradually to reduce risk."
-  ],
-  "source": "chunk_auto"
-}

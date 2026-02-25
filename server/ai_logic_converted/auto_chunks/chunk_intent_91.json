@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "ly why competitors are favored in specific prompts. Notes: Starts at €89/mo for 25 prompts.\nTool: Rankscale.ai Supports Services: [Service 1 / AI GEO, SEO] Category: Granular GEO Tracking Primary Use: Tracks brand visibility for specific search terms, regions, and engine modes (e.g., Perplexity with web search). Why It Matters (2026): Provides a drill-down approach to track hyper-personalized AI results at hourly or daily intervals. Notes: Pay-as-you-go model starting at $20.\nTool: Indexly Supports Services: [Service 1 / AI GEO, SEO] Category: Indexation AI Primary Use: Automates the submission of URLs to search engines and tracks site discoverability by LLMs like ChatGPT. Why It Matters (2026): Uses predictive scoring to forecast which pages are most likely to be indexed by AI bots. Notes: Starts at $14/mo; includes a Bing integration for faster AI engine crawling.\nTool: Prerender.io Supports Services: [Service 1 / AI GEO, SEO] Category: Technical GEO Optimization Primary Use: Generat"
-  ],
-  "source": "chunk_auto"
-}

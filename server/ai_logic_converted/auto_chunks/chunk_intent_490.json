@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    " for wave file exports.\n\n--------------------------------------------------------------------------------\nService 2 – djying\nTool: Virtual DJ 2026 Supports Services: Service 2 / djying Category: Performance Software Primary Use: Enables live DJ mixing with real-time stem separation and AI-generated lyrics displayed on waveforms. Why It Matters (2026): Includes an AI sensor that can automatically mute censored words in the audio in real-time. Notes: Features an AI prompt folder for natural language track suggestions and transitions.\nTool: djay Pro AI (Algoriddim) Supports Services: Service 2 / djying Category: Performance Software Primary Use: Integrated with \"Neural Mix\" for live stem separation and smart beatgrids that adapt on the fly. Why It Matters (2026): Pioneer in VR DJing, supporting Apple Vision Pro and Meta Quest for immersive performances. Notes: Deeply integrated with streaming services like Apple Music, TIDAL, and SoundCloud.\nTool: DJ.Studio Supports Services: Service 2 / "
-  ],
-  "source": "chunk_auto"
-}

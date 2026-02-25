@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "only that file\n\nNever touch other clients\n\nThis prevents:\n\nDrift\n\nCost spikes\n\nAccidental overwrites\n\n15.11 Safety & Legal Isolation\n\nClient brains are cryptographically isolated by ID\n\nNo cross-vector similarity searches\n\nNo shared embeddings\n\nNo internal prompts exposed\n\nThis makes Neon Vision:\n\nGDPR-safe\n\nEnterprise-safe\n\nLitigation-safe\n\n15.12 Example: Live Client Query\n\nClient asks\n\n“Why did last week’s ads underperform?”\n\nNeon Vision Response Uses\n\nTheir KPI thresholds\n\nTheir last tested angles\n\nTheir budget sensitivity\n\nTheir past failures\n\nNot generic marketing advice."
-  ],
-  "source": "chunk_auto"
-}

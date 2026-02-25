@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "on\n\n---\n\n## 9. MONITORING & AUDITABILITY\n\nTracked continuously:\n\n* Model usage\n* Prompt execution\n* Output anomalies\n* Drift indicators\n\nAudits:\n\n* Weekly spot checks\n* Monthly full audits\n* Quarterly governance review\n\n---\n\n## 10. INCIDENT RESPONSE (AI-SPECIFIC)\n\n### Trigger Events\n\n* Hallucination with business impact\n* Unauthorized data exposure\n* Unexpected autonomous action\n\n### Response Flow\n\n1. Immediate model halt\n2. Isolation of affected workflows\n3. Root cause analysis\n4. Client notification if required\n5. Remediation & retraining (if applicable)\n\n---\n\n## 11. MODEL UPDATE PROTOCOL\n\n* Updates evaluated in sandbox\n* Performance benchmarks required\n* Security review mandatory\n\nNo live update without Neon Vision sign-off.\n\n---\n\n## 12. CLIENT TRANSPARENCY POLICY\n\nClients are informed:\n\n* AI is used in execution\n* Human oversight is enforced\n* Data is isolated and protected\n\nInternal architecture details remain confidential.\n\n---\n\n## 13. INTERNAL ENFORCEMENT RULES\n\n* No bypassing g"
-  ],
-  "source": "chunk_auto"
-}

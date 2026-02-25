@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# Digital Transition Marketing (DTM)\n\n## Client-Facing Service One-Pagers (All Core Services)\n\n**System Context: Neon Vision**\n**Phase: Leverage & Launch**\n\n---\n\n## DOCUMENT PURPOSE\n\nThis document contains **client-facing, positioning-first one-pagers** for all 14 locked DTM services.\n\nRules applied:\n\n* No hype language\n* No tool dumping\n* Outcome- and system-oriented\n* Suitable for website, decks, proposals, and Notebook LM\n\nEach service is presented as a **growth system**, not a tactic.\n\n---\n\n# 1. VOICE SEARCH OPTIMIZATION (VSO)\n\n**What It Solves**\nYour brand is invisible in voice-driven and conversational search results.\n\n**DTM Outcome**\nWe structure your digital presence to be surfaced by voice assistants, AI answers, and spoken queries.\n\n**What We Deploy**\n\n* Voice-intent keyword mapping\n* Structured data & entity optimization\n* Conversational content systems\n\n**Best Fit For**\nLocal, service-based, and multi-location brands preparing for AI-first discovery.\n\n---\n\n# 2. AI SEARCH DO"
-  ],
-  "source": "chunk_auto"
-}

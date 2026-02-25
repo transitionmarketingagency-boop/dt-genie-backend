@@ -8,17 +8,21 @@
     "node": "20.18.x"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && npm run copy-public && npm run copy-personas && npm run copy-ai-logic",
+    "build": "tsc && npm run copy-public && npm run copy-personas && npm run copy-ai-logic",
     "build:backend": "npm run build",
     "start": "node dist/server/index-prod.js",
-    "test": "tsx server/test-end-to-end.ts",
-
+    "test-embedding": "tsx server/services/testEmbedding.ts",
+    "test-hybrid": "tsx server/testHybridSystem.ts",
+    "test-full": "tsx server/utils/full_system_test.ts",
+    "test-all": "npm run test-embedding && npm run test-hybrid && npm run test-full",
     "copy-public": "cpx \"public/**/*\" dist/public",
     "copy-personas": "cpx \"personas/**/*\" dist/personas",
     "copy-ai-logic": "cpx \"server/ai_logic/**/*\" dist/server/ai_logic"
   },
   "dependencies": {
     "axios": "^1.6.0",
+    "better-sqlite3": "^12.6.2",
+    "chalk": "^5.6.2",
     "cheerio": "^1.0.2-rc.12",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",

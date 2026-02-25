@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    ",\n  \"service_history\": {},\n  \"open_questions\": {}\n}\n\n\nEach key references detailed JSON schemas above.\n\nSupports dynamic context-aware branching from Phase 7.\n\nEnsures Neon Vision remembers everything, enabling intelligent AI decision-making and proactive engagement."
-  ],
-  "source": "chunk_auto"
-}

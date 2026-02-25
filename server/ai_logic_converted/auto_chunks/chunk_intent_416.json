@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "on\n\nCompliance audits every 7 days\n\nIncident Response\n\nAuto-pause flagged campaigns or posts\n\nAI diagnosis & suggested corrections\n\nContent correction or replacement\n\nAppeal orchestration\n\nPost-incident platform hardening\n\n4. Data Security & Privacy Policy\n\nStandards\n\nGDPR / CCPA / HIPAA-ready\n\nMilitary-grade encryption (data at rest & in transit)\n\nRole-based access controls\n\nNo resale or cross-client training\n\nClient Ownership\n\nFull ownership of all assets & data\n\nExclusive model training unless waived\n\nGuaranteed deletion of data on contract exit\n\n5. Performance Guarantees & Liability Boundaries\n\nCovered\n\nAgreed-upon KPIs (CPL, ROAS, conversions)\n\nDelivery timelines\n\nSystem uptime SLAs\n\nNot Covered\n\nPlatform outages\n\nClient operational failures\n\nExternal market crashes\n\nForce majeure\n\nPrinciple: Guarantees are math-based, not emotional; no overpromising.\n\n6. Change Management & Algorithm Volatility\n\nWeekly Maintenance\n\nAlgorithm audits & updates\n\nCreative decay scans\n\nFunnel stress t"
-  ],
-  "source": "chunk_auto"
-}

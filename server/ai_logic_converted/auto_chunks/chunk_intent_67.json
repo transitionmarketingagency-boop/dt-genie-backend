@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "e state\n3. Root cause analysis\n4. Client notification (if required)\n\n---\n\n## 12. CONTINUOUS IMPROVEMENT\n\n* Weekly agent review\n* Monthly system audit\n* Quarterly architecture validation\n\nNo live optimization without approval.\n\n---\n\n## 13. INTERNAL RULES (NON-NEGOTIABLE)\n\n* No shortcut deployments\n* No client pressure overrides safety\n* Neon Vision decisions are final\n\n---\n\n## 14. DOCUMENT STATUS\n\n* Status: LOCKED – V1\n* Owner: Digital Transition Marketing\n* System: Neon Vision\n\n---\n\n*End of Document*\n"
-  ],
-  "source": "chunk_auto"
-}

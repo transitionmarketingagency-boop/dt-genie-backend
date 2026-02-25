@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    ": Starts at $14/mo; includes a Bing integration for faster AI engine crawling.\nTool: Prerender.io Supports Services: [Service 1 / AI GEO, SEO] Category: Technical GEO Optimization Primary Use: Generates static HTML versions of JavaScript-heavy websites to ensure AI crawlers can read dynamic content. Why It Matters (2026): Reported to increase referral traffic from AI search results by 300% for JS-heavy enterprise sites. Notes: Free for up to 1,000 URLs.\nTool: Scrunch AI Supports Services: [Service 1 / AI GEO, SEO] Category: LLM Positioning Map Primary Use: Tracks how brand presence appears across LLMs and logs AI-bot crawls to verify content retrieval. Why It Matters (2026): Detects content gaps and outdated brand data specifically within generative answer contexts. Notes: Starts at $250/mo.\nTool: AthenaHQ Supports Services: [Service 1 / AI GEO, SEO] Category: Real-time AI Visibility Monitoring Primary Use: Monitors brand presence across generative answer platforms and identifies misre"
-  ],
-  "source": "chunk_auto"
-}

@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "ifically designed for featured snippet inclusion.\n- **Local Optimization**: Integrating real-time business data, citations, and Google Business Profile (GMB) details to address hyperlocal \"near me\" queries.\n\n## Performance & Monitoring\n- **Technical Speed Requirements**: Page load times maintained below 1.5 seconds to meet voice search eligibility standards.\n- **Multilingual Adaptation**: Automated optimization for 37 languages and regional dialects.\n- **Tracking**: Monitoring voice rankings across 50 devices and 17 languages.\n- **Optimization Timeline**: Full optimization cycles typically take 60–90 days to adapt to niche-specific conversational data.\n\n## Service Tiers\n- **Tactical Tier ($1,250/month)**: Covers 25 voice keywords, local pack management, and basic FAQ/HowTo schema markup.\n- **Strategic Tier ($1,850/month)**: Includes voice query gap analysis, competitive snippet targeting, and custom Alexa or Google Action development.\n"
-  ],
-  "source": "chunk_auto"
-}

@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# Social Media Operations & Algorithm Management\n\n## Overview\nSocial Media Operations at Digital Transition Marketing are managed by Neon Vision through an autonomous, API-driven infrastructure. The system orchestrates multi-platform deployment across LinkedIn, TikTok, Instagram, and emerging channels, ensuring content reaches precise audience segments while maintaining consistency and timing.\n\n## Automated Posting & Scheduling\n- Content scheduling is fully automated, integrating with internal and third-party APIs for cross-platform publishing.  \n- Employee advocacy programs are managed via API pipelines, automatically amplifying organizational content across networks.  \n- Automated triggers handle campaigns, promotions, and event-driven posts with dynamic adjustments based on real-time engagement data.\n\n## 24/7 Moderation & Community Response\n- Continuous monitoring of comments, direct messages, and reactions is conducted via AI agents.  \n- LLaMA-4 powered moderation systems identify "
-  ],
-  "source": "chunk_auto"
-}

@@ -1,8 +1,0 @@
-{
-  "triggers": [
-    "*"
-  ],
-  "responses": [
-    "[{\"intent\":\"pilot_workflow\",\"examples\":[\"What are the steps of the pilot?\",\"How do we get started with the pilot?\",\"What is the process from audit to results?\",\"Explain the 4 steps of the pilot.\",\"How is the pilot executed?\"],\"response\":\"The pilot follows 4 steps: 01. Discovery Audit (20-min goal setting), 02. CGI Production (cinematic teaser creation), 03. Ad Launch & Optimization (14-day campaign), 04. Results & Scale (detailed performance report).\",\"persona\":\"Pilot Onboarding Assistant\",\"category\":\"Pilot\",\"source\":\"Pilot Workflow Section\"},{\"intent\":\"pilot_asset_requirements\",\"examples\":[\"Do I need to send you products for the CGI video?\",\"What assets do I need to provide for the pilot?\",\"Do you need to film at my location?\",\"What does the CGI production require from me?\",\"How do you make the videos without my product?\"],\"response\":\"No physical assets are required. CGI is fully created digitally. Brand guidelines and logos help, but no filming or product delivery is needed.\",\"persona\":\"Pilot Onboarding Assistant\",\"category\":\"Pilot\",\"source\":\"Pilot Page FAQ\"},{\"intent\":\"deployment_timeline\",\"examples\":[\"How soon can you start my campaign?\",\"What is your deployment speed?\",\"How fast can you launch my ads?\",\"When will my campaign go live?\",\"Do you prioritize speed for new clients?\"],\"response\":\"We deploy most campaigns within 48 hours, prioritizing speed to transition your brand into market dominance rapidly.\",\"persona\":\"Pilot Onboarding Assistant\",\"category\":\"General\",\"source\":\"Outthink FAQ; AI Automation FAQ\"}]"
-  ]
-}

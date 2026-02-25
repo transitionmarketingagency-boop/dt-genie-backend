@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "otes: Capable of capturing nuanced breath and timbre variations.\nTool: ACE Studio Supports Services: Service 1 / music production Category: Vocal Synthesis Primary Use: Provides a diverse library of AI singers for multi-lingual song demoing. Why It Matters (2026): Delivers professional-sounding vocals across various languages for rapid prototyping. Notes: Users can feed the system MIDI to generate specific vocal lines.\nTool: Kits.ai Supports Services: Service 1 / music production Category: Vocal Synthesis Primary Use: A platform for using and creating custom AI voice models for commercial music production. Why It Matters (2026): Offers a library of royalty-free voices that ensures artists are compensated for their data. Notes: Ideal for producers needing high-quality \"vocal chops\" or artist-specific textures.\nTool: LALAL.AI Supports Services: Service 1 / music production Category: Stem Separation Primary Use: Extracts up to eight distinct stems from a mixed track using a high-quality n"
-  ],
-  "source": "chunk_auto"
-}

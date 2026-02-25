@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    " for audiobooks and podcasts.\nTool: Producer.ai Supports Services: Service 1 / music production Category: Production Assistant Primary Use: An agentic model that crafts lyrics and builds backing tracks for vocalists or instrumentalists. Why It Matters (2026): Collaborates with the user by asking clarifying questions to refine the track's \"grit\" or \"silkiness\". Notes: Features a \"Raw\" 2.0 instrument model for high creative ceilings.\nTool: EaseUS AI Music Supports Services: Service 1 / music production Category: All-in-One Utility Primary Use: A browser-based suite providing vocal removal, stem splitting, and AI mastering in one location. Why It Matters (2026): Functions as an affordable \"one-stop shop\" for beginners who lack expensive DAW software. Notes: Offers a high-quality \"Pro\" version for wave file exports.\n\n--------------------------------------------------------------------------------\nService 2 – djying\nTool: Virtual DJ 2026 Supports Services: Service 2 / djying Category: Perfo"
-  ],
-  "source": "chunk_auto"
-}

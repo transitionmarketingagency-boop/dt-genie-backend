@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    " timing and clarity.\nTool: AIVA Supports Services: Service 1 / music production Category: All-in-One Text-to-Audio Generator Primary Use: Composes orchestral and cinematic scores for film, games, and advertisements. Why It Matters (2026): Provides professional-grade MIDI and orchestral score exports for further editing in DAWs. Notes: Pro plan transfers full copyright ownership to the user.\nTool: Soundraw Supports Services: Service 1 / music production Category: All-in-One Text-to-Audio Generator Primary Use: Generates customizable, royalty-free background music for video creators. Why It Matters (2026): Allows users to manually mute specific instruments and adjust song structure to match video pacing. Notes: Trained on a proprietary library of human-played music to ensure copyright safety.\nTool: Boomy Supports Services: Service 1 / music production Category: All-in-One Text-to-Audio Generator Primary Use: Enables instant song creation and direct distribution to major streaming platfor"
-  ],
-  "source": "chunk_auto"
-}

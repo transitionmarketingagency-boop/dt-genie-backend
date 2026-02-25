@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "igh writing quality and lower hallucination rates. Notes: Free tier available; Pro plan at $20/mo; features \"Projects\" for custom instructions and style training.\nTool: Jasper Supports Services: Service 1 – content & copy Category: Marketing Content Platform Primary Use: An end-to-end platform for planning, creating, and scaling on-brand marketing content across channels. Why It Matters (2026): It unifies brand voice via \"Jasper IQ,\" automating the entire content lifecycle from brief to distribution. Notes: Enterprise-focused with custom pricing; integrates with existing CMS and marketing stacks.\nTool: Synthesia Supports Services: Service 1 – content & copy Category: AI Video Generation Primary Use: Creates professional videos featuring realistic AI avatars from text input without cameras or studios. Why It Matters (2026): It streamlines corporate training and global marketing by supporting over 140 languages and expressive avatars. Notes: Free plan (36 mins/year); Starter plan from 18"
-  ],
-  "source": "chunk_auto"
-}

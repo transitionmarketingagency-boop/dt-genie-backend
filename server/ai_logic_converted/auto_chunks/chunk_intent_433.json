@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    "# Phase 2 – Productized Offer Stack (Services 5–8)\n\nBrand: **Digital Transition Marketing**\nAI System / Bot: **Neon Vision**\nPurpose: Sales-ready, funnel-optimized service definitions\n\n---\n\n## 5. AI‑Powered Website Design & Conversion Architecture\n\n### Core Promise\n\nTurn websites into **autonomous conversion engines** that load under 1.5s, rank in AI search engines, and self‑optimize based on user behavior.\n\n### Ideal Clients\n\n• SaaS & service businesses\n• Real estate developers & brokers\n• E‑commerce brands launching or scaling\n\n### What Neon Vision Delivers\n\n• 48‑hour AI‑generated first draft (pixel‑perfect)\n• Mobile‑first, Core Web Vitals 95+\n• SEO + GEO + AEO baked into page structure\n• Predictive UX scoring before launch\n• Self‑healing code architecture\n• AI heatmap‑driven layout optimization\n\n### Tech Stack (2026)\n\n• Next.js + Edge SSR\n• Cursor AI autonomous coding agents\n• Hotjar + neural heatmaps\n• ChatGPT / Gemini index alignment\n\n### Entry Pricing\n\n• Tactical: $1,500 / build\n"
-  ],
-  "source": "chunk_auto"
-}

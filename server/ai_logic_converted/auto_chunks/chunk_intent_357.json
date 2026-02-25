@@ -1,9 +1,0 @@
-{
-  "triggers": [
-    "general service"
-  ],
-  "responses": [
-    " Brain only if internal_intent=true\n\nHard Rule\n\nClient data is NEVER used as examples for another client.\n\n15.8 Client-Facing Behavior Changes\n\nWith a Client Brain active, Neon Vision:\n\nSpeaks in client tone\n\nReferences their KPIs\n\nUses their history\n\nAvoids generic advice\n\nAnswers with contextual precision\n\nWithout a Client Brain:\n\nNeon Vision stays high-level and non-committal.\n\n15.9 Client Brain Lifecycle\nCreation\n\nOnboarding complete\n\nFiles validated\n\nBrain activated\n\nActive\n\nContinuous memory updates\n\nKPI tracking\n\nDecision logging\n\nDormant\n\nNo activity for 60 days\n\nRead-only mode\n\nArchived\n\nContract ended\n\nBrain frozen\n\nNo retrieval\n\nNo deletion (audit safety)\n\n15.10 Updating Client Brains (IMPORTANT)\nDo NOT re-embed everything.\n\nCorrect flow:\n\nUpdate only the changed file\n\nRe-embed only that file\n\nNever touch other clients\n\nThis prevents:\n\nDrift\n\nCost spikes\n\nAccidental overwrites\n\n15.11 Safety & Legal Isolation\n\nClient brains are cryptographically isolated by ID\n\nNo cross-vecto"
-  ],
-  "source": "chunk_auto"
-}

@@ -10,17 +10,18 @@ const DEBUG = process.env.DEBUG_CHUNKS === "true";
 const EMB_CACHE_FILE = path.join(process.cwd(), "server", "vector_store", ".queryEmbCache.json");
 let queryEmbeddingCache: Map<string, number[]> = new Map();
 
+// Load query embedding cache if exists
 try {
   if (fs.existsSync(EMB_CACHE_FILE)) {
     const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
     const parsed = JSON.parse(raw);
-    // Ensure numbers
     queryEmbeddingCache = new Map(Object.entries(parsed).map(([k, v]) => [k, (v as number[]).map(Number)]));
   }
 } catch (err) {
   console.warn("[QueryChunks] ⚠️ Failed to load query embedding cache, starting fresh.", err);
 }
 
+// Save cache helper
 function saveQueryCache() {
   try {
     fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(queryEmbeddingCache)), "utf-8");
@@ -29,9 +30,7 @@ function saveQueryCache() {
   }
 }
 
-/**
- * Compute cosine similarity safely
- */
+// Cosine similarity
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length === 0 || vecB.length === 0) return 0;
   const minLen = Math.min(vecA.length, vecB.length);
@@ -47,15 +46,12 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-/**
- * Load all chunks safely
- */
+// Load pre-embedded chunks
 function loadChunks(): { text: string; source: string | null; embedding: number[] }[] {
   if (!fs.existsSync(chunksPath)) {
     console.error("[QueryChunks] ⚠️ chunks.json not found:", chunksPath);
     return [];
   }
-
   try {
     const raw = fs.readFileSync(chunksPath, "utf-8");
     const chunks = JSON.parse(raw);
@@ -73,9 +69,7 @@ function loadChunks(): { text: string; source: string | null; embedding: number[
   }
 }
 
-/**
- * Retrieve top relevant chunks for a query
- */
+// Retrieve top relevant chunks
 export async function getTopChunks(
   queryText: string,
   limit = 8,
@@ -99,13 +93,8 @@ export async function getTopChunks(
     saveQueryCache();
   }
 
-  // Score and sort
   const scored = chunks
-    .map(c => ({
-      text: c.text,
-      source: c.source,
-      score: cosineSimilarity(queryEmbedding, c.embedding)
-    }))
+    .map(c => ({ text: c.text, source: c.source, score: cosineSimilarity(queryEmbedding, c.embedding) }))
     .sort((a, b) => b.score - a.score);
 
   if (DEBUG) {
