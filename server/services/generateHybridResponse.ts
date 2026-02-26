@@ -81,8 +81,7 @@ function findMatchingIntent(userMessage: string) {
 /* ================= EMBEDDINGS ================= */
 async function getEmbeddingKnowledge(userMessage: string) {
   try {
-    // LOWERED similarity threshold from 0.15 → 0.05
-    const chunks = await getTopChunks(userMessage, 10, 0.05);
+    const chunks = await getTopChunks(userMessage, 10, 0.05); // existing threshold retained here
 
     if (!chunks || chunks.length === 0) return "";
 
@@ -123,39 +122,70 @@ export async function generateHybridResponse(
       return r;
     }
 
+    /* ===== FORCE SERVICE LISTING FIX ===== */
+    if (msg.includes("list") && msg.includes("service")) {
+      const forcedKnowledge = await getEmbeddingKnowledge(
+        "List all company services with details and pricing"
+      );
+      if (forcedKnowledge) {
+        await memoryService.addMessage(userId, "assistant", forcedKnowledge);
+        return formatResponse(null, [{ content: forcedKnowledge }], {});
+      }
+    }
+
     /* ================= KNOWLEDGE ================= */
     const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
     const jsonKnowledge = findMatchingIntent(userMessage);
 
+    /* ===== FIX 1 — FORCE EMBEDDINGS ALWAYS ===== */
     let knowledgePool = "";
-    if (embeddingKnowledge) {
-      knowledgePool += `PRIMARY KNOWLEDGE:\n${embeddingKnowledge}\n\n`;
+
+    // ALWAYS prioritize embeddings
+    if (embeddingKnowledge && embeddingKnowledge.length > 50) {
+      knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge}\n\n`;
     }
+
+    // JSON enrichment only
     if (jsonKnowledge) {
-      knowledgePool += `SUPPORTING INTENT DATA:\n${jsonKnowledge}\n\n`;
+      knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge}\n\n`;
     }
 
-    const hasKnowledge = Boolean(knowledgePool.trim().length > 0);
+    // Neutral fallback (no defensive language)
+    if (!knowledgePool) {
+      knowledgePool = "Use company domain expertise to answer confidently.";
+    }
 
-    /* ================= PROMPT ================= */
+    /* ================= FIXED PROMPT ================= */
     const prompt = `
-You are ${BOT_NAME}, senior AI strategist for Digital Transition Marketing.
+You are ${BOT_NAME}, AI strategist for Digital Transition Marketing (DTM).
 
-Use ONLY the provided internal knowledge to answer.
-Be specific. Be confident. Be detailed.
-Do NOT give generic answers.
+You MUST answer using the company knowledge base below.
+If service pricing, packages, tiers, deliverables, or technical details exist in the knowledge, you must state them clearly.
 
-Internal Knowledge:
-${hasKnowledge ? knowledgePool : "No direct knowledge match found. Use strategic marketing expertise."}
+Do NOT:
+- Say "no direct knowledge match found"
+- Say "we don't have a standalone service"
+- Speak like a generic consultant
+- Over-explain your role
+
+Be direct.
+Be confident.
+List details clearly.
+Use bullet points when helpful.
+Provide pricing if available.
+
+COMPANY KNOWLEDGE:
+${knowledgePool}
 
 User Question:
 ${userMessage}
+
+Answer:
 `;
 
     let response = "";
     let modelUsed = "";
 
-    // Always attempt generation (even without embeddings)
     response = cleanResponse(await generateGemma(prompt));
     modelUsed = "Gemma";
 
@@ -169,11 +199,15 @@ ${userMessage}
       }
     }
 
-    response = enforceBotName(response);
+    /* ===== FIX 4 — RELAX BOT NAME ENFORCEMENT ===== */
+    if (msg.includes("who are you") || msg.includes("your name")) {
+      response = enforceBotName(response);
+    }
 
-    /* ===== INTELLIGENT FALLBACK (only if model failed completely) ===== */
+    /* ===== SAFE FALLBACK ===== */
     if (!response || response.length < 25) {
-      response = "I can help with AI automation, performance marketing, CGI property tours, SEO systems, and digital growth strategy. Could you specify which area you’d like to explore?";
+      response =
+        "I can help with AI automation, performance marketing, CGI property tours, SEO systems, and digital growth strategy. Could you specify which area you’d like to explore?";
     }
 
     console.log(

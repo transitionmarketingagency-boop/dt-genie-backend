@@ -64,7 +64,7 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let normB = 0;
 
   for (let i = 0; i < vecA.length; i++) {
-    dot += vecA[i] * vecB[i];
+    dot += vecA[i] * vecA[i];
     normA += vecA[i] * vecA[i];
     normB += vecB[i] * vecB[i];
   }
@@ -113,7 +113,7 @@ function loadChunks(): {
 export async function getTopChunks(
   queryText: string,
   limit = 8,
-  minSimilarity = 0.2
+  minSimilarity = 0.18 // 🔥 UPDATED FROM 0.2 → 0.18 (balanced precision)
 ): Promise<{ text: string; source: string | null; score: number }[]> {
 
   if (!queryText || !queryText.trim()) return [];
