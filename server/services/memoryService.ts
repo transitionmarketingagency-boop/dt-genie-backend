@@ -11,44 +11,31 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/* ---------------- Ensure memory folder exists ---------------- */
+// ---------------- Memory DB path ----------------
 const memoryDir = path.join(__dirname, "../memory");
 if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
-
 const dbPath = path.join(memoryDir, "chat_memory.db");
 
-/* ---------------- Open sqlite database ---------------- */
-const dbPromise = sqlite.open({
-  filename: dbPath,
-  driver: sqlite3.Database
-});
+// ---------------- Open SQLite ----------------
+const dbPromise = sqlite.open({ filename: dbPath, driver: sqlite3.Database });
 
-/* ---------------- Initialize table safely ---------------- */
-(async () => {
-  try {
-    const db = await dbPromise;
+// ---------------- Initialization ----------------
+export async function initializeMemory(): Promise<void> {
+  const db = await dbPromise;
+  await db.run(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id TEXT PRIMARY KEY,
+      sessionId TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      timestamp TEXT NOT NULL
+    )
+  `);
+  await db.run(`CREATE INDEX IF NOT EXISTS idx_sessionId ON chat_messages (sessionId)`);
+  console.log("✅ Memory DB initialized at:", dbPath);
+}
 
-    await db.run(`
-      CREATE TABLE IF NOT EXISTS chat_messages (
-        id TEXT PRIMARY KEY,
-        sessionId TEXT NOT NULL,
-        role TEXT NOT NULL,
-        content TEXT NOT NULL,
-        timestamp TEXT NOT NULL
-      )
-    `);
-
-    await db.run(`
-      CREATE INDEX IF NOT EXISTS idx_sessionId
-      ON chat_messages (sessionId)
-    `);
-
-    console.log("✅ Memory DB ready");
-  } catch (err) {
-    console.error("❌ Memory DB initialization failed:", err);
-  }
-})();
-
+// ---------------- Memory Service ----------------
 export class MemoryService {
   async addMessage(
     sessionId: string,
@@ -56,14 +43,16 @@ export class MemoryService {
     content: string
   ): Promise<ChatMessage> {
     const db = await dbPromise;
-
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId,
       role,
       content: content ?? "",
-      timestamp: new Date()
+      timestamp: new Date(),
     };
+
+    const timestampISO =
+      msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
 
     await db.run(
       `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
@@ -72,7 +61,7 @@ export class MemoryService {
       msg.sessionId,
       msg.role,
       msg.content,
-      (new Date(msg.timestamp)).toISOString()
+      timestampISO
     );
 
     return msg;
@@ -80,27 +69,45 @@ export class MemoryService {
 
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
     const db = await dbPromise;
-
     const rows = await db.all(
-      `
-      SELECT * FROM chat_messages
-      WHERE sessionId = ?
-      ORDER BY timestamp DESC
-      LIMIT 20
-      `,
+      `SELECT * FROM chat_messages WHERE sessionId = ? ORDER BY timestamp ASC`,
       sessionId
     );
+    return rows.map((r: any) => ({
+      id: r.id,
+      sessionId: r.sessionId,
+      role: r.role,
+      content: r.content,
+      timestamp: new Date(r.timestamp),
+    }));
+  }
 
-    return rows
-      .reverse()
-      .map((r: any) => ({
-        id: r.id,
-        sessionId: r.sessionId,
-        role: r.role,
-        content: r.content,
-        timestamp: new Date(r.timestamp)
-      }));
+  async saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void> {
+    const db = await dbPromise;
+    await db.exec("BEGIN TRANSACTION");
+    try {
+      await db.run(`DELETE FROM chat_messages WHERE sessionId = ?`, sessionId);
+
+      const insertStmt = await db.prepare(`
+        INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+      `);
+
+      for (const msg of messages) {
+        const timestampISO =
+          msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
+
+        await insertStmt.run(msg.id, msg.sessionId, msg.role, msg.content, timestampISO);
+      }
+
+      await insertStmt.finalize();
+      await db.exec("COMMIT");
+    } catch (err) {
+      await db.exec("ROLLBACK");
+      throw err;
+    }
   }
 }
 
+// ---------------- Export singleton ----------------
 export const memoryService = new MemoryService();

@@ -1,46 +1,26 @@
 // server/populate-test-data.ts
 
-import { storage, InsertChatMessage } from "./storage.js";
 import { memoryService } from "./services/memoryService.js";
 import { ConversationMemory, ChatMessage } from "../shared/types.js";
 
 export default async function populateTestData() {
   const sessionId = "default-session";
 
-  const existingHistory = await storage.getChatHistory(sessionId);
+  // Check if any existing messages
+  const existingHistory: ChatMessage[] = await memoryService.getHistory(sessionId);
 
   if (!existingHistory.length) {
-    const testMessages: InsertChatMessage[] = [
-      {
-        sessionId,
-        role: "user",
-        content: "Hi, I want to start email campaigns for XCGI clients.",
-      },
-      {
-        sessionId,
-        role: "assistant",
-        content: "Great! Let’s draft a campaign targeting luxury real estate developers.",
-      },
-      {
-        sessionId,
-        role: "user",
-        content: "Also, can we create a test memory for this chat?",
-      },
-      {
-        sessionId,
-        role: "assistant",
-        content: "Absolutely — I can populate memory with your preferences and current projects.",
-      },
+    const testMessages: ChatMessage[] = [
+      { id: crypto.randomUUID(), sessionId, role: "user", content: "Hi, I want to start email campaigns for XCGI clients.", timestamp: new Date() },
+      { id: crypto.randomUUID(), sessionId, role: "assistant", content: "Great! Let’s draft a campaign targeting luxury real estate developers.", timestamp: new Date() },
+      { id: crypto.randomUUID(), sessionId, role: "user", content: "Also, can we create a test memory for this chat?", timestamp: new Date() },
+      { id: crypto.randomUUID(), sessionId, role: "assistant", content: "Absolutely — I can populate memory with your preferences and current projects.", timestamp: new Date() },
     ];
 
-    const fullMessages: ChatMessage[] = [];
-
     for (const msg of testMessages) {
-      const saved = await storage.addChatMessage(msg);
-      fullMessages.push(saved);
+      await memoryService.addMessage(msg.sessionId, msg.role, msg.content);
     }
 
-    await storage.saveChatHistory(sessionId, fullMessages);
     console.log("✅ Test chat history inserted!");
   } else {
     console.log("ℹ️ Chat history already exists. Skipping insertion.");

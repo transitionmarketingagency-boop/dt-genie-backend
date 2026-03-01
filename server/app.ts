@@ -1,12 +1,13 @@
+// server/app.ts
 import 'dotenv/config';
 import fs from "fs";
 import path from "path";
-import express, { type Application } from "express";
+import express, { type Application, type Request, type Response } from "express";
 import cors from "cors";
 import { createServer, type Server } from "node:http";
 
 // Local modules
-import { storage } from "./storage.js";
+import { memoryService, initializeMemory } from "./services/memoryService.js";
 import { populateChunks } from "./populate-chunks.js";
 import { generateHybridResponse } from "./services/hybridClient.js";
 import { CALENDLY_LINK } from "./config/constants.js";
@@ -32,6 +33,9 @@ export const setupApp = async (app: Application) => {
     console.log("✅ Public folder served:", publicPath);
   }
 
+  // Initialize memory DB
+  await initializeMemory();
+
   // Populate chunks on startup
   if (process.env.POPULATE_CHUNKS === "true") {
     await populateChunks();
@@ -48,20 +52,18 @@ export const setupApp = async (app: Application) => {
   });
 
   // ---------------- CHAT HANDLER ----------------
-  const chatHandler = async (req: any, res: any) => {
+  const chatHandler = async (req: Request, res: Response) => {
     try {
-      let { message, sessionId } = req.body;
+      let { message, sessionId } = req.body as { message?: string; sessionId?: string };
 
       // Ensure strings
       if (!message || typeof message !== "string") message = "";
       if (!sessionId || typeof sessionId !== "string") sessionId = "default";
 
-      if (!message.trim()) return res.status(400).json({ ok: false, error: "Missing message or sessionId" });
-
-      console.log(" M-, Chat request:", message);
+      console.log("💬 Chat request:", message);
 
       // Save user message
-      await storage.addChatMessage({ sessionId, role: "user", content: message });
+      await memoryService.addMessage(sessionId, "user", message);
 
       // Generate hybrid response
       let reply: string;
@@ -78,10 +80,10 @@ export const setupApp = async (app: Application) => {
       }
 
       // Save assistant message
-      await storage.addChatMessage({ sessionId, role: "assistant", content: reply });
+      await memoryService.addMessage(sessionId, "assistant", reply);
 
       // Return full chat history
-      const history = await storage.getChatHistory(sessionId);
+      const history = await memoryService.getHistory(sessionId);
 
       console.log("✅ Chat response sent");
       res.json({ ok: true, reply, history });
@@ -112,12 +114,13 @@ export default async function runApp(
 }
 
 // ---------------- Direct run ----------------
-if (process.argv[1].includes("app.ts")) {
+if (process.argv[1].endsWith("app.ts")) {
   const PORT = Number(process.env.PORT) || 5000;
   const app = express();
   const server = createServer(app);
-
   setupApp(app).then(() => {
-    server.listen(PORT, () => console.log(` ~@ Server running on http://localhost:${PORT}`));
-  });
+    server.listen(PORT, () =>
+      console.log(` ~@ Server running on http://localhost:${PORT}`)
+    );
+ });
 }

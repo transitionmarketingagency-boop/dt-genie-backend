@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 // Cross-platform Python detection
 let PYTHON_PATH: string = process.env.PYTHON || (os.platform() === "win32" ? "python" : "python3");
 
-// Python script for embedding
+// Path to embedding Python script
 const SCRIPT_PATH = path.resolve(__dirname, "../utils/embed_text.py");
 
 export async function getEmbedding(text: string): Promise<number[]> {

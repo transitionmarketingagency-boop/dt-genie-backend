@@ -1,13 +1,14 @@
+// server/index-prod.ts
 import 'dotenv/config';
 import fs from "fs";
 import path from "path";
 import cors from "cors";
-import express, { type Application } from "express";
+import express, { type Application, type Request, type Response } from "express";
 import { createServer, type Server } from "node:http";
 
 import runApp, { setupApp } from "./app.js";
-import { generateHybridResponse } from "./services/generateHybridResponse.js"; // ✅ FIXED
-import { storage } from "./storage.js";
+import { generateHybridResponse } from "./services/generateHybridResponse.js";
+import { memoryService, initializeMemory } from "./services/memoryService.js"; // ✅ merged memoryService
 
 // ---------------- ENV CHECK ----------------
 if (!process.env.GEMINI_API_KEY) {
@@ -39,6 +40,10 @@ if (!fs.existsSync(dbDir)) {
   console.log("✅ Vector DB folder exists:", dbDir);
 }
 
+// ---------------- MEMORY DB INIT ----------------
+await initializeMemory(); // ✅ ensures chat_memory.db is ready before any requests
+console.log("✅ Memory DB initialized");
+
 // ---------------- START SERVER ----------------
 (async () => {
   try {
@@ -55,20 +60,39 @@ if (!fs.existsSync(dbDir)) {
         console.log("✅ Public folder served:", publicPath);
       }
 
-      // ---------- FORCE CORRECT CHAT ROUTE ----------
-      app.post("/chat", async (req, res) => {
+      // ---------------- CHAT ROUTE ----------------
+      app.post("/chat", async (req: Request, res: Response) => {
         try {
-          const { message, userId } = req.body;
+          let { message, sessionId } = req.body as { message?: string; sessionId?: string };
 
-          if (!message) {
+          if (!message || typeof message !== "string") {
             return res.status(400).json({ error: "Message is required" });
           }
+          if (!sessionId || typeof sessionId !== "string") {
+            sessionId = "default-session";
+          }
 
-          const reply = await generateHybridResponse(
-            message,
-            userId || "default-session"
-          );
+          // Save user message
+          await memoryService.addMessage(sessionId, "user", message);
 
+          // Generate hybrid response
+          let reply: string;
+          try {
+            reply = await generateHybridResponse(message, sessionId);
+          } catch (err) {
+            console.warn("⚠️ Hybrid response failed:", err);
+            reply = "";
+          }
+
+          // Fallback if empty
+          if (!reply || reply.trim().length === 0) {
+            reply = "Sure — you can book a call with our team here: [Your Calendly Link]";
+          }
+
+          // Save assistant message
+          await memoryService.addMessage(sessionId, "assistant", reply);
+
+          // Return chat reply only
           res.json({ reply });
 
         } catch (err) {
@@ -82,9 +106,9 @@ if (!fs.existsSync(dbDir)) {
       // Optional: keep other routes if needed
       await setupApp(app);
 
-      const PORT = process.env.PORT || 5000;
+      const PORT = Number(process.env.PORT) || 5000;
       httpServer.listen(PORT, () =>
-        console.log(`🚀 Server running on port ${PORT}`)
+        console.log(` ~@ Server running on port ${PORT}`)
       );
     });
 

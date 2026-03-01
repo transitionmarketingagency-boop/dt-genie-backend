@@ -1,6 +1,6 @@
 // server/services/generateHybridResponse.ts
 import { getTopChunks } from "../queryChunks.js";
-import { generateGemma } from "./gemmaClient.js";
+import { generateOpenRouter } from "./openRouterClient.js"; // Qwen client
 import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
@@ -40,52 +40,45 @@ const staticIntents = {
   greeting: ["hi", "hello", "hey"],
   identity: ["who are you", "about yourself", "tell me about yourself"],
   pricing: ["pricing", "price", "cost", "how much", "package"],
-  book: ["book", "schedule", "call"]
+  book: ["book", "schedule", "call"],
 };
 
 const greetingVariations = [
   `Hello! How can I assist you today?`,
   `Hi there! Ready to guide your business growth with AI-powered strategies.`,
-  `Greetings! Let's explore how to accelerate your business digitally.`
+  `Greetings! Let's explore how to accelerate your business digitally.`,
 ];
 
 /* ================= SMART JSON MATCH ================= */
 function findMatchingIntent(userMessage: string) {
   const msg = normalize(userMessage);
+  const msgWords = msg.split(/\s+/);
   let bestMatch: { score: number; response: string } | null = null;
 
   for (const intent of aiIntents) {
-    const triggerScore = intent.triggers.reduce((score: number, trig: string) => {
-      const trigNorm = normalize(trig);
-      if (msg.includes(trigNorm)) return score + 1;
-
-      const msgWords = msg.split(" ");
-      const trigWords = trigNorm.split(" ");
-      const overlap = trigWords.filter(w => msgWords.includes(w)).length;
-      return score + (overlap / trigWords.length);
-    }, 0);
-
-    if (triggerScore > 0.3) {
-      if (!bestMatch || triggerScore > bestMatch.score) {
-        bestMatch = {
-          score: triggerScore,
-          response: intent.responses.join("\n\n")
-        };
-      }
+    if (!intent.triggers || !intent.responses) continue;
+    let triggerScore = 0;
+    for (const trig of intent.triggers) {
+      const trigWords = normalize(trig).split(/\s+/);
+      const overlap = trigWords.filter((w) => msgWords.includes(w)).length;
+      triggerScore += trigWords.length ? overlap / trigWords.length : 0;
+    }
+    if (triggerScore > 0.3 && (!bestMatch || triggerScore > bestMatch.score)) {
+      bestMatch = {
+        score: triggerScore,
+        response: intent.responses.join("\n\n"),
+      };
     }
   }
-
   return bestMatch?.response || null;
 }
 
 /* ================= EMBEDDINGS ================= */
 async function getEmbeddingKnowledge(userMessage: string) {
   try {
-    const chunks = await getTopChunks(userMessage, 10, 0.05); // existing threshold retained here
-
+    const chunks = await getTopChunks(userMessage, 10, 0.05);
     if (!chunks || chunks.length === 0) return "";
-
-    return chunks.map(c => c.text).filter(Boolean).join("\n\n");
+    return chunks.map((c) => c.text).filter(Boolean).join("\n\n");
   } catch (err) {
     console.error("Embedding retrieval error:", err);
     return "";
@@ -105,20 +98,23 @@ export async function generateHybridResponse(
     if (staticIntents.greeting.includes(msg)) {
       const r = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
       await memoryService.addMessage(userId, "assistant", r);
+      console.log(`[Hybrid] Greeting served`);
       return r;
     }
 
     /* ===== IDENTITY ===== */
-    if (staticIntents.identity.some(t => msg.includes(t))) {
-      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, and scalable digital growth.`;
+    if (staticIntents.identity.some((t) => msg.includes(t))) {
+      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, and scalable business growth.`;
       await memoryService.addMessage(userId, "assistant", r);
+      console.log(`[Hybrid] Identity response served`);
       return r;
     }
 
     /* ===== BOOKING ===== */
-    if (staticIntents.book.some(t => msg.includes(t))) {
+    if (staticIntents.book.some((t) => msg.includes(t))) {
       const r = "You can schedule a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
       await memoryService.addMessage(userId, "assistant", r);
+      console.log(`[Hybrid] Booking link served`);
       return r;
     }
 
@@ -129,6 +125,7 @@ export async function generateHybridResponse(
       );
       if (forcedKnowledge) {
         await memoryService.addMessage(userId, "assistant", forcedKnowledge);
+        console.log(`[Hybrid] Forced service listing served`);
         return formatResponse(null, [{ content: forcedKnowledge }], {});
       }
     }
@@ -137,25 +134,17 @@ export async function generateHybridResponse(
     const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
     const jsonKnowledge = findMatchingIntent(userMessage);
 
-    /* ===== FIX 1 — FORCE EMBEDDINGS ALWAYS ===== */
     let knowledgePool = "";
-
-    // ALWAYS prioritize embeddings
     if (embeddingKnowledge && embeddingKnowledge.length > 50) {
       knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge}\n\n`;
     }
-
-    // JSON enrichment only
     if (jsonKnowledge) {
       knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge}\n\n`;
     }
-
-    // Neutral fallback (no defensive language)
     if (!knowledgePool) {
       knowledgePool = "Use company domain expertise to answer confidently.";
     }
 
-    /* ================= FIXED PROMPT ================= */
     const prompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing (DTM).
 
@@ -186,9 +175,11 @@ Answer:
     let response = "";
     let modelUsed = "";
 
-    response = cleanResponse(await generateGemma(prompt));
-    modelUsed = "Gemma";
+    // ✅ Primary Qwen-3.5-35B-a3b
+    response = cleanResponse(await generateOpenRouter(prompt));
+    modelUsed = "Qwen-3.5-35B-a3b";
 
+    // ✅ Fallback to Gemini
     if ((!response || response.length < 40) && canUseGemini()) {
       try {
         response = cleanResponse(await generateGemini(prompt));
@@ -199,24 +190,21 @@ Answer:
       }
     }
 
-    /* ===== FIX 4 — RELAX BOT NAME ENFORCEMENT ===== */
+    // ===== Bot name enforcement
     if (msg.includes("who are you") || msg.includes("your name")) {
       response = enforceBotName(response);
     }
 
-    /* ===== SAFE FALLBACK ===== */
+    // ===== Safe fallback
     if (!response || response.length < 25) {
       response =
         "I can help with AI automation, performance marketing, CGI property tours, SEO systems, and digital growth strategy. Could you specify which area you’d like to explore?";
     }
 
-    console.log(
-      `[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`
-    );
+    console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
 
     await memoryService.addMessage(userId, "assistant", response);
     return formatResponse(null, [{ content: response }], {});
-
   } catch (err) {
     console.error("Hybrid error:", err);
     return "We’re experiencing a temporary processing issue.";
