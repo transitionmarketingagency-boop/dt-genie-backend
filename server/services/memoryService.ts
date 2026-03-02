@@ -1,5 +1,4 @@
 // server/services/memoryService.ts
-
 import * as sqlite from "sqlite";
 import sqlite3 from "sqlite3";
 import { ChatMessage } from "../../shared/types.js";
@@ -51,8 +50,8 @@ export class MemoryService {
       timestamp: new Date(),
     };
 
-    const timestampISO =
-      msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
+    // Ensure timestamp is a Date for ISO conversion
+    const ts = msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
 
     await db.run(
       `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
@@ -61,8 +60,12 @@ export class MemoryService {
       msg.sessionId,
       msg.role,
       msg.content,
-      timestampISO
+      ts
     );
+
+    if (process.env.DEBUG_MEMORY === "true") {
+      console.log(`[Memory] Added message (${role}) for session ${sessionId}`);
+    }
 
     return msg;
   }
@@ -94,14 +97,19 @@ export class MemoryService {
       `);
 
       for (const msg of messages) {
-        const timestampISO =
-          msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
-
-        await insertStmt.run(msg.id, msg.sessionId, msg.role, msg.content, timestampISO);
+        const ts =
+          msg.timestamp instanceof Date
+            ? msg.timestamp.toISOString()
+            : new Date(msg.timestamp).toISOString();
+        await insertStmt.run(msg.id, msg.sessionId, msg.role, msg.content, ts);
       }
 
       await insertStmt.finalize();
       await db.exec("COMMIT");
+
+      if (process.env.DEBUG_MEMORY === "true") {
+        console.log(`[Memory] Saved ${messages.length} messages for session ${sessionId}`);
+      }
     } catch (err) {
       await db.exec("ROLLBACK");
       throw err;

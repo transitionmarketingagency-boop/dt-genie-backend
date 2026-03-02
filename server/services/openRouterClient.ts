@@ -4,14 +4,14 @@ import { cleanResponse } from "../utils/cleanResponse.js";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL_NAME = "qwen/qwen3.5-35b-a3b"; // Updated to latest Qwen 3.5 model
+const MODEL_NAME = "qwen/qwen3.5-35b-a3b"; // Latest Qwen 3.5 model
 const TIMEOUT_MS = 30000; // 30 seconds
 
 if (!OPENROUTER_API_KEY) {
   console.warn("⚠️ OPENROUTER_API_KEY is missing. OpenRouter requests will fail.");
 }
 
-// Define the OpenRouter response type
+// ---------------- OpenRouter response types ----------------
 interface OpenRouterChoice {
   message: { role: string; content: string };
 }
@@ -36,27 +36,31 @@ export async function generateOpenRouter(prompt: string): Promise<string> {
     const body = {
       model: MODEL_NAME,
       messages: [
-        { role: "system", content: "You are a helpful AI assistant specialized in marketing, automation, and digital growth strategies." },
-        { role: "user", content: prompt }
+        {
+          role: "system",
+          content: "You are a helpful AI assistant specialized in marketing, automation, and digital growth strategies.",
+        },
+        { role: "user", content: prompt },
       ],
-      max_tokens: 1024, // increased for detailed responses
-      temperature: 0.4
+      max_tokens: 1024,
+      temperature: 0.4,
     };
 
     const res = await fetch(OPENROUTER_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
       },
       body: JSON.stringify(body),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeout);
 
     if (!res.ok) {
-      console.warn(`⚠️ OpenRouter HTTP Error: ${res.status}`);
+      const errText = await res.text();
+      console.warn(`⚠️ OpenRouter HTTP Error ${res.status}: ${errText}`);
       return "";
     }
 

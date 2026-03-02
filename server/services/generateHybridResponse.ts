@@ -1,6 +1,6 @@
 // server/services/generateHybridResponse.ts
 import { getTopChunks } from "../queryChunks.js";
-import { generateOpenRouter } from "./openRouterClient.js"; // Qwen client
+import { generateOpenRouter } from "./openRouterClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
@@ -49,20 +49,23 @@ const greetingVariations = [
   `Greetings! Let's explore how to accelerate your business digitally.`,
 ];
 
-/* ================= SMART JSON MATCH ================= */
+/* ================= SMART JSON INTENTS ================= */
 function findMatchingIntent(userMessage: string) {
   const msg = normalize(userMessage);
   const msgWords = msg.split(/\s+/);
+
   let bestMatch: { score: number; response: string } | null = null;
 
   for (const intent of aiIntents) {
     if (!intent.triggers || !intent.responses) continue;
+
     let triggerScore = 0;
     for (const trig of intent.triggers) {
       const trigWords = normalize(trig).split(/\s+/);
       const overlap = trigWords.filter((w) => msgWords.includes(w)).length;
       triggerScore += trigWords.length ? overlap / trigWords.length : 0;
     }
+
     if (triggerScore > 0.3 && (!bestMatch || triggerScore > bestMatch.score)) {
       bestMatch = {
         score: triggerScore,
@@ -70,13 +73,15 @@ function findMatchingIntent(userMessage: string) {
       };
     }
   }
+
   return bestMatch?.response || null;
 }
 
-/* ================= EMBEDDINGS ================= */
+/* ================= EMBEDDING KNOWLEDGE ================= */
 async function getEmbeddingKnowledge(userMessage: string) {
   try {
-    const chunks = await getTopChunks(userMessage, 10, 0.05);
+    // Use all pre-embedded chunks, top 12 relevant
+    const chunks = await getTopChunks(userMessage, 12, 0.1);
     if (!chunks || chunks.length === 0) return "";
     return chunks.map((c) => c.text).filter(Boolean).join("\n\n");
   } catch (err) {
@@ -85,7 +90,7 @@ async function getEmbeddingKnowledge(userMessage: string) {
   }
 }
 
-/* ================= MAIN ================= */
+/* ================= MAIN HYBRID RESPONSE ================= */
 export async function generateHybridResponse(
   userMessage: string,
   userId = "default-session"
@@ -94,76 +99,66 @@ export async function generateHybridResponse(
     await memoryService.addMessage(userId, "user", userMessage);
     const msg = normalize(userMessage);
 
-    /* ===== GREETING ===== */
-    if (staticIntents.greeting.includes(msg)) {
+    /* ===== STATIC GREETING ===== */
+    if (staticIntents.greeting.some((t) => msg.includes(normalize(t)))) {
       const r = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
       await memoryService.addMessage(userId, "assistant", r);
-      console.log(`[Hybrid] Greeting served`);
       return r;
     }
 
-    /* ===== IDENTITY ===== */
-    if (staticIntents.identity.some((t) => msg.includes(t))) {
-      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, and scalable business growth.`;
+    /* ===== STATIC IDENTITY ===== */
+    if (staticIntents.identity.some((t) => msg.includes(normalize(t)))) {
+      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, SEO, and scalable digital growth strategies.`;
       await memoryService.addMessage(userId, "assistant", r);
-      console.log(`[Hybrid] Identity response served`);
       return r;
     }
 
-    /* ===== BOOKING ===== */
-    if (staticIntents.book.some((t) => msg.includes(t))) {
-      const r = "You can schedule a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
+    /* ===== STATIC BOOKING ===== */
+    if (staticIntents.book.some((t) => msg.includes(normalize(t)))) {
+      const r =
+        "You can schedule a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
       await memoryService.addMessage(userId, "assistant", r);
-      console.log(`[Hybrid] Booking link served`);
       return r;
     }
 
-    /* ===== FORCE SERVICE LISTING FIX ===== */
-    if (msg.includes("list") && msg.includes("service")) {
+    /* ===== EMBEDDING + INTENT KNOWLEDGE POOL ===== */
+    const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
+    const jsonKnowledge = findMatchingIntent(userMessage);
+
+    /* ===== FORCE SERVICE LISTING ===== */
+    if (/list.*service/i.test(userMessage)) {
       const forcedKnowledge = await getEmbeddingKnowledge(
-        "List all company services with details and pricing"
+        "List all company services with full details and pricing"
       );
-      if (forcedKnowledge) {
+      if (forcedKnowledge && forcedKnowledge.length > 50) {
         await memoryService.addMessage(userId, "assistant", forcedKnowledge);
-        console.log(`[Hybrid] Forced service listing served`);
         return formatResponse(null, [{ content: forcedKnowledge }], {});
       }
     }
 
-    /* ================= KNOWLEDGE ================= */
-    const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
-    const jsonKnowledge = findMatchingIntent(userMessage);
-
     let knowledgePool = "";
-    if (embeddingKnowledge && embeddingKnowledge.length > 50) {
-      knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge}\n\n`;
-    }
-    if (jsonKnowledge) {
-      knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge}\n\n`;
-    }
-    if (!knowledgePool) {
-      knowledgePool = "Use company domain expertise to answer confidently.";
-    }
+    if (embeddingKnowledge && embeddingKnowledge.length > 50) knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge}\n\n`;
+    if (jsonKnowledge) knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge}\n\n`;
+    if (!knowledgePool) knowledgePool = "Use company domain expertise to answer confidently and professionally.";
 
     const prompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing (DTM).
 
-You MUST answer using the company knowledge base below.
-If service pricing, packages, tiers, deliverables, or technical details exist in the knowledge, you must state them clearly.
+You MUST answer using the company knowledge below.
+If pricing, packages, tiers, deliverables, or technical details exist, state them clearly.
 
 Do NOT:
 - Say "no direct knowledge match found"
-- Say "we don't have a standalone service"
+- Say "we don't have that service"
 - Speak like a generic consultant
 - Over-explain your role
 
 Be direct.
 Be confident.
+Use structured formatting.
 List details clearly.
-Use bullet points when helpful.
 Provide pricing if available.
 
-COMPANY KNOWLEDGE:
 ${knowledgePool}
 
 User Question:
@@ -173,37 +168,46 @@ Answer:
 `;
 
     let response = "";
-    let modelUsed = "";
+    let modelUsed = "None";
 
-    // ✅ Primary Qwen-3.5-35B-a3b
-    response = cleanResponse(await generateOpenRouter(prompt));
-    modelUsed = "Qwen-3.5-35B-a3b";
+    /* ================= PRIMARY: QWEN ================= */
+    try {
+      response = cleanResponse(await generateOpenRouter(prompt));
+      if (response && response.length > 30) modelUsed = "Qwen";
+    } catch (err) {
+      console.error("Qwen error:", err);
+      response = "";
+    }
 
-    // ✅ Fallback to Gemini
-    if ((!response || response.length < 40) && canUseGemini()) {
+    /* ================= FALLBACK: GEMINI ================= */
+    if ((!response || response.length < 30) && canUseGemini()) {
       try {
-        response = cleanResponse(await generateGemini(prompt));
-        markGeminiUsed();
-        modelUsed = "Gemini";
+        const geminiResp = cleanResponse(await generateGemini(prompt));
+        if (geminiResp && geminiResp.length > 30) {
+          response = geminiResp;
+          modelUsed = "Gemini";
+          markGeminiUsed();
+        }
       } catch (err) {
         console.error("Gemini failed:", err);
       }
     }
 
-    // ===== Bot name enforcement
+    /* ================= ENFORCE BOT NAME ================= */
     if (msg.includes("who are you") || msg.includes("your name")) {
       response = enforceBotName(response);
     }
 
-    // ===== Safe fallback
-    if (!response || response.length < 25) {
+    /* ================= SAFE FALLBACK ================= */
+    if (!response || response.length < 20) {
       response =
-        "I can help with AI automation, performance marketing, CGI property tours, SEO systems, and digital growth strategy. Could you specify which area you’d like to explore?";
+        "I can help with AI automation, performance marketing, CGI property tours, SEO systems, and digital growth strategy. Could you specify which area you'd like to explore?";
     }
+
+    await memoryService.addMessage(userId, "assistant", response);
 
     console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
 
-    await memoryService.addMessage(userId, "assistant", response);
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
     console.error("Hybrid error:", err);

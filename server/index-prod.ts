@@ -8,7 +8,8 @@ import { createServer, type Server } from "node:http";
 
 import runApp, { setupApp } from "./app.js";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
-import { memoryService, initializeMemory } from "./services/memoryService.js"; // ✅ merged memoryService
+import { memoryService, initializeMemory } from "./services/memoryService.js";
+import { initializeAIIntents } from "./services/json_loader.js"; // ✅ new import
 
 // ---------------- ENV CHECK ----------------
 if (!process.env.GEMINI_API_KEY) {
@@ -41,8 +42,11 @@ if (!fs.existsSync(dbDir)) {
 }
 
 // ---------------- MEMORY DB INIT ----------------
-await initializeMemory(); // ✅ ensures chat_memory.db is ready before any requests
+await initializeMemory();
 console.log("✅ Memory DB initialized");
+
+// ---------------- AI INTENTS INIT ----------------
+initializeAIIntents(); // ✅ ensures aiIntents is loaded before any requests
 
 // ---------------- START SERVER ----------------
 (async () => {
@@ -55,7 +59,7 @@ console.log("✅ Memory DB initialized");
 
       // Serve static public folder
       const publicPath = path.resolve(process.cwd(), "public");
-      if (fs.existsSync(publicPath)) {
+      if (fs.existsSync(publicPath)) {                   
         app.use(express.static(publicPath));
         console.log("✅ Public folder served:", publicPath);
       }
@@ -112,7 +116,7 @@ console.log("✅ Memory DB initialized");
       );
     });
 
-    console.log("✅ Server bootstrap complete");
+   console.log("✅ Server bootstrap complete");
 
   } catch (err) {
     console.error("❌ Server bootstrap failed:", err);

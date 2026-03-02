@@ -1,9 +1,8 @@
 // server/services/geminiClient.ts
-
-import * as dotenv from "dotenv";
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
 import fetch from "node-fetch";
+import * as dotenv from "dotenv";
 
 /* ---------------- ESM-safe __dirname ---------------- */
 const __filename = fileURLToPath(import.meta.url);
@@ -15,10 +14,11 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 /* ---------------- Gemini config ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
+const TIMEOUT_MS = 30000; // 30s timeout
 
 /* ---------------- Import identity helpers ---------------- */
 const identityUrl = pathToFileURL(join(__dirname, "../system/identity.js")).href;
-const { enforceBotName } = await import(identityUrl);
+const { enforceBotName, BOT_NAME } = await import(identityUrl);
 
 /**
  * Generate response from Gemini API
@@ -29,9 +29,9 @@ export async function generateGemini(prompt: string): Promise<string> {
 
   const finalPrompt =
     prompt.length < 100
-      ? `Answer briefly and professionally as Neon Vision:\n${prompt}`
+      ? `Answer briefly and professionally as ${BOT_NAME}:\n${prompt}`
       : `
-You are Neon Vision, AI strategist at Digital Transition Marketing.
+You are ${BOT_NAME}, AI strategist at Digital Transition Marketing.
 
 Answer professionally and confidently.
 
@@ -42,13 +42,19 @@ Answer:
 `.trim();
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
     const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: finalPrompt }] }]
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
 
     if (!res.ok) {
       const errText = await res.text();

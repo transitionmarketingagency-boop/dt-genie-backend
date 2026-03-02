@@ -1,4 +1,5 @@
 // server/services/json_loader.ts
+
 import fs from "fs";
 import path from "path";
 
@@ -7,55 +8,83 @@ export interface AIIntent {
   responses: string[];
 }
 
-// Master array of all loaded intents
+// Master array
 export const aiIntents: AIIntent[] = [];
 
 /**
+ * Validate intent structure strictly
+ */
+function isValidIntent(obj: any): obj is AIIntent {
+  return (
+    obj &&
+    Array.isArray(obj.triggers) &&
+    Array.isArray(obj.responses) &&
+    obj.triggers.every((t: any) => typeof t === "string" && t.trim().length > 0) &&
+    obj.responses.every((r: any) => typeof r === "string" && r.trim().length > 0)
+  );
+}
+
+/**
  * Recursively load AI intents from JSON files
- * Supports both structured (triggers/responses) and raw JSON
  */
 export function loadAIIntents(dir: string) {
-  if (!fs.existsSync(dir)) return;
+  if (!fs.existsSync(dir)) {
+    console.warn("⚠️ AI logic directory not found:", dir);
+    return;
+  }
 
   const files = fs.readdirSync(dir);
-  for (const f of files) {
-    const fullPath = path.join(dir, f);
+
+  for (const file of files) {
+    const fullPath = path.join(dir, file);
     const stat = fs.statSync(fullPath);
 
     if (stat.isDirectory()) {
-      loadAIIntents(fullPath); // ✅ recurse into subfolders
-    } else if (f.endsWith(".json")) {
-      try {
-        const json = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
+      loadAIIntents(fullPath);
+      continue;
+    }
 
-        // Check if JSON has triggers/responses
-        if (Array.isArray(json.triggers) && Array.isArray(json.responses)) {
-          aiIntents.push(json);
-        } else if (Array.isArray(json)) {
-          // If JSON is an array of objects, merge all items
-          for (const item of json) {
-            if (item.triggers && item.responses) {
-              aiIntents.push(item);
-            } else {
-              // fallback: keep raw JSON string as response
-              aiIntents.push({ triggers: [], responses: [JSON.stringify(item)] });
-            }
-          }
-        } else {
-          // Fallback: push raw JSON as a single response
-          aiIntents.push({ triggers: [], responses: [JSON.stringify(json)] });
-        }
-      } catch (err) {
-        console.warn(`⚠️ Failed to load JSON: ${fullPath}`, err);
+    if (!file.endsWith(".json")) continue;
+
+    try {
+      const raw = fs.readFileSync(fullPath, "utf-8");
+      const parsed = JSON.parse(raw);
+
+      // Case 1: Single structured object
+      if (isValidIntent(parsed)) {
+        aiIntents.push(parsed);
+        continue;
       }
+
+      // Case 2: Array of structured objects
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          if (isValidIntent(item)) {
+            aiIntents.push(item);
+          }
+        }
+        continue;
+      }
+
+      // Otherwise ignore silently (NO fallback injection)
+      console.warn(`⚠️ Ignored invalid intent file: ${fullPath}`);
+    } catch (err) {
+      console.warn(`⚠️ Failed to load JSON: ${fullPath}`, err);
     }
   }
 }
 
-// ✅ Correct root folder for AI logic
-const aiLogicDir = path.join(process.cwd(), "server", "ai_logic");
-console.log(" ~B Loading AI intents from:", aiLogicDir);
+/**
+ * Initialize intents manually (call from server start)
+ */
+export function initializeAIIntents() {
+  aiIntents.length = 0; // prevent duplication
 
-loadAIIntents(aiLogicDir);
+  const aiLogicDir = path.join(process.cwd(), "server", "ai_logic");
 
-console.log(`✅ Total AI intents loaded from JSON files: ${aiIntents.length}`);
+  console.log("🧠 Loading AI intents from:", aiLogicDir);
+
+  loadAIIntents(aiLogicDir);
+
+  console.log(`✅ Total valid AI intents loaded: ${aiIntents.length}`);
+}
