@@ -1,16 +1,21 @@
 // server/queryChunks.ts
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { getEmbedding } from "./services/embeddingClient.js";
 
 /* ================= PATH RESOLUTION ================= */
-const distPath = path.resolve("dist/server/vector_store/chunks.json");
-const devPath = path.resolve("server/vector_store/chunks.json");
+// Resolve __dirname equivalent for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const distPath = path.join(__dirname, "vector_store", "chunks.json");
+const devPath = path.join(__dirname, "../vector_store/chunks.json");
 export const chunksPath = fs.existsSync(distPath) ? distPath : devPath;
 
-console.log("📦 Loading chunks.json from:", chunksPath);
+console.log("📂 Loading chunks.json from:", chunksPath);
 
-const EMB_CACHE_FILE = path.resolve(path.dirname(chunksPath), ".queryEmbCache.json");
+const EMB_CACHE_FILE = path.join(path.dirname(chunksPath), ".queryEmbCache.json");
 const DEBUG = process.env.DEBUG_CHUNKS === "true";
 
 /* ================= LOAD CHUNKS ONCE ================= */
@@ -38,7 +43,7 @@ function loadChunksOnce() {
         embedding: c.embedding.map(Number),
       }));
 
-    console.log(`[QueryChunks] Loaded ${cachedChunks.length} chunks into memory`);
+    console.log(`[QueryChunks] ✅ Loaded ${cachedChunks.length} chunks into memory`);
     return cachedChunks;
   } catch (err) {
     console.error("[QueryChunks] ⚠️ Failed to parse chunks.json:", err);
@@ -62,11 +67,13 @@ try {
       Object.entries(parsed).map(([k, v]) => [k, (v as number[]).map(Number)])
     );
     if (DEBUG) {
-      console.log(`[QueryChunks] Loaded ${queryEmbeddingCache.size} cached query embeddings`);
+      console.log(`[QueryChunks] ✅ Loaded ${queryEmbeddingCache.size} cached query embeddings`);
     }
+  } else {
+    console.warn("[QueryChunks] ⚠️ No embedding cache found, starting fresh");
   }
-} catch {
-  console.warn("[QueryChunks] ⚠️ Failed to load embedding cache. Starting fresh.");
+} catch (err) {
+  console.warn("[QueryChunks] ⚠️ Failed to load embedding cache. Starting fresh.", err);
 }
 
 function saveQueryCache() {
@@ -80,7 +87,9 @@ function saveQueryCache() {
 /* ================= COSINE SIMILARITY ================= */
 export function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length !== vecB.length) return 0;
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0,
+    normA = 0,
+    normB = 0;
   for (let i = 0; i < vecA.length; i++) {
     dot += vecA[i] * vecB[i];
     normA += vecA[i] ** 2;
@@ -99,9 +108,12 @@ export async function getTopChunks(
 
   const normalizedQuery = normalizeQuery(queryText);
   const chunks = loadChunksOnce();
-  if (chunks.length === 0) return [];
+  if (chunks.length === 0) {
+    console.warn("[QueryChunks] ⚠️ No chunks available for retrieval");
+    return [];
+  }
 
-  let queryEmbedding: number[];
+  let queryEmbedding: number[] = [];
 
   if (queryEmbeddingCache.has(normalizedQuery)) {
     queryEmbedding = queryEmbeddingCache.get(normalizedQuery)!;
@@ -113,7 +125,7 @@ export async function getTopChunks(
         return [];
       }
       queryEmbeddingCache.set(normalizedQuery, queryEmbedding);
-      saveQueryCache();
+      saveQueryCache(); // persist cache immediately
     } catch (err) {
       console.error("[QueryChunks] ⚠️ Embedding generation error:", err);
       return [];

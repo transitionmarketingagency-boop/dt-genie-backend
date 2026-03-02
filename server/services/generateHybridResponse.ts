@@ -6,13 +6,15 @@ import { memoryService } from "./memoryService.js";
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { formatResponse } from "../utils/formatResponse.js";
-import { aiIntents } from "./json_loader.js";
+import { aiIntents, initializeAIIntents } from "./json_loader.js";
+
+/* ================= INITIALIZE AI INTENTS ================= */
+initializeAIIntents(); // ensures aiIntents[] is populated
 
 /* ================= GEMINI CONFIG ================= */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENABLED = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 20);
 const GEMINI_DAILY_LIMIT = 20;
-
 let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
@@ -50,14 +52,13 @@ const greetingVariations = [
 ];
 
 /* ================= SMART JSON INTENTS ================= */
-function findMatchingIntent(userMessage: string) {
+function findMatchingIntent(userMessage: string): string | null {
   const msg = normalize(userMessage);
   const msgWords = msg.split(/\s+/);
-
   let bestMatch: { score: number; response: string } | null = null;
 
   for (const intent of aiIntents) {
-    if (!intent.triggers || !intent.responses) continue;
+    if (!intent?.triggers?.length || !intent?.responses?.length) continue;
 
     let triggerScore = 0;
     for (const trig of intent.triggers) {
@@ -69,21 +70,21 @@ function findMatchingIntent(userMessage: string) {
     if (triggerScore > 0.3 && (!bestMatch || triggerScore > bestMatch.score)) {
       bestMatch = {
         score: triggerScore,
-        response: intent.responses.join("\n\n"),
+        response: intent.responses.filter(Boolean).join("\n\n"),
       };
     }
   }
 
-  return bestMatch?.response || null;
+  return bestMatch?.response ?? null;
 }
 
 /* ================= EMBEDDING KNOWLEDGE ================= */
-async function getEmbeddingKnowledge(userMessage: string) {
+async function getEmbeddingKnowledge(userMessage: string): Promise<string> {
   try {
-    // Use all pre-embedded chunks, top 12 relevant
     const chunks = await getTopChunks(userMessage, 12, 0.1);
-    if (!chunks || chunks.length === 0) return "";
-    return chunks.map((c) => c.text).filter(Boolean).join("\n\n");
+    if (!chunks?.length) return "";
+    const texts = Array.from(new Set(chunks.map((c) => c.text).filter(Boolean)));
+    return texts.join("\n\n");
   } catch (err) {
     console.error("Embedding retrieval error:", err);
     return "";
@@ -123,25 +124,29 @@ export async function generateHybridResponse(
 
     /* ===== EMBEDDING + INTENT KNOWLEDGE POOL ===== */
     const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
-    const jsonKnowledge = findMatchingIntent(userMessage);
+    const jsonKnowledgeRaw = findMatchingIntent(userMessage);
+    const jsonKnowledge = typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
 
     /* ===== FORCE SERVICE LISTING ===== */
     if (/list.*service/i.test(userMessage)) {
       const forcedKnowledge = await getEmbeddingKnowledge(
         "List all company services with full details and pricing"
       );
-      if (forcedKnowledge && forcedKnowledge.length > 50) {
+      if (forcedKnowledge?.length > 50) {
         await memoryService.addMessage(userId, "assistant", forcedKnowledge);
         return formatResponse(null, [{ content: forcedKnowledge }], {});
       }
     }
 
     let knowledgePool = "";
-    if (embeddingKnowledge && embeddingKnowledge.length > 50) knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge}\n\n`;
-    if (jsonKnowledge) knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge}\n\n`;
-    if (!knowledgePool) knowledgePool = "Use company domain expertise to answer confidently and professionally.";
+    if (embeddingKnowledge?.trim().length > 20) {
+      knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge.trim()}\n\n`;
+    }
+    if (jsonKnowledge?.trim().length > 20) {
+      knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge.trim()}\n\n`;
+    }
 
-    const prompt = `
+    const promptBase = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing (DTM).
 
 You MUST answer using the company knowledge below.
@@ -169,21 +174,22 @@ Answer:
 
     let response = "";
     let modelUsed = "None";
+    const MIN_RESPONSE_LENGTH = 50;
 
-    /* ================= PRIMARY: QWEN ================= */
+    /* ================= QWEN RESPONSE ================= */
     try {
-      response = cleanResponse(await generateOpenRouter(prompt));
-      if (response && response.length > 30) modelUsed = "Qwen";
+      response = cleanResponse(await generateOpenRouter(promptBase));
+      if (response?.length > MIN_RESPONSE_LENGTH) modelUsed = "Qwen";
     } catch (err) {
       console.error("Qwen error:", err);
       response = "";
     }
 
     /* ================= FALLBACK: GEMINI ================= */
-    if ((!response || response.length < 30) && canUseGemini()) {
+    if ((!response || response.length < MIN_RESPONSE_LENGTH) && canUseGemini()) {
       try {
-        const geminiResp = cleanResponse(await generateGemini(prompt));
-        if (geminiResp && geminiResp.length > 30) {
+        const geminiResp = cleanResponse(await generateGemini(promptBase));
+        if (geminiResp?.length > MIN_RESPONSE_LENGTH) {
           response = geminiResp;
           modelUsed = "Gemini";
           markGeminiUsed();
@@ -194,18 +200,15 @@ Answer:
     }
 
     /* ================= ENFORCE BOT NAME ================= */
-    if (msg.includes("who are you") || msg.includes("your name")) {
-      response = enforceBotName(response);
-    }
+    response = enforceBotName(response);
 
     /* ================= SAFE FALLBACK ================= */
-    if (!response || response.length < 20) {
+    if (!response || response.length < MIN_RESPONSE_LENGTH) {
       response =
-        "I can help with AI automation, performance marketing, CGI property tours, SEO systems, and digital growth strategy. Could you specify which area you'd like to explore?";
+        "I can help with AI automation, marketing growth, CGI property tours, SEO systems, and digital strategy. Could you specify which area you'd like to explore?";
     }
 
     await memoryService.addMessage(userId, "assistant", response);
-
     console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
 
     return formatResponse(null, [{ content: response }], {});

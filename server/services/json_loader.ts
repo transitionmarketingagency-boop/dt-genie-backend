@@ -1,5 +1,4 @@
 // server/services/json_loader.ts
-
 import fs from "fs";
 import path from "path";
 
@@ -50,15 +49,19 @@ export function loadAIIntents(dir: string) {
       const raw = fs.readFileSync(fullPath, "utf-8");
       const parsed = JSON.parse(raw);
 
-      // Case 1: Single structured object
-      if (isValidIntent(parsed)) {
-        aiIntents.push(parsed);
-        continue;
-      }
-
-      // Case 2: Array of structured objects
+      // If parsed is an array of intents
       if (Array.isArray(parsed)) {
         for (const item of parsed) {
+          // NEW: support your current format (examples + response)
+          if (item?.examples && typeof item.response === "string") {
+            aiIntents.push({
+              triggers: item.examples,
+              responses: [item.response],
+            });
+            continue;
+          }
+
+          // Support standard {triggers, responses} format too
           if (isValidIntent(item)) {
             aiIntents.push(item);
           }
@@ -66,7 +69,21 @@ export function loadAIIntents(dir: string) {
         continue;
       }
 
-      // Otherwise ignore silently (NO fallback injection)
+      // If parsed is a single object in your format
+      if (parsed?.examples && typeof parsed.response === "string") {
+        aiIntents.push({
+          triggers: parsed.examples,
+          responses: [parsed.response],
+        });
+        continue;
+      }
+
+      // If parsed is a single object in standard format
+      if (isValidIntent(parsed)) {
+        aiIntents.push(parsed);
+        continue;
+      }
+
       console.warn(`⚠️ Ignored invalid intent file: ${fullPath}`);
     } catch (err) {
       console.warn(`⚠️ Failed to load JSON: ${fullPath}`, err);
@@ -80,9 +97,11 @@ export function loadAIIntents(dir: string) {
 export function initializeAIIntents() {
   aiIntents.length = 0; // prevent duplication
 
-  const aiLogicDir = path.join(process.cwd(), "server", "ai_logic");
+  // Use dist folder if running built server
+  const baseDir = process.cwd();
+  const aiLogicDir = path.join(baseDir, "dist", "server", "ai_logic");
 
-  console.log("🧠 Loading AI intents from:", aiLogicDir);
+  console.log("📥 Loading AI intents from:", aiLogicDir);
 
   loadAIIntents(aiLogicDir);
 
