@@ -9,7 +9,7 @@ import { formatResponse } from "../utils/formatResponse.js";
 import { aiIntents, initializeAIIntents } from "./json_loader.js";
 
 /* ================= INITIALIZE AI INTENTS ================= */
-initializeAIIntents(); // ensures aiIntents[] is populated
+initializeAIIntents();
 
 /* ================= GEMINI CONFIG ================= */
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -56,7 +56,6 @@ function findMatchingIntent(userMessage: string): string | null {
   const msg = normalize(userMessage);
   const msgWords = msg.split(/\s+/);
   let bestMatch: { score: number; response: string } | null = null;
-
   for (const intent of aiIntents) {
     if (!intent?.triggers?.length || !intent?.responses?.length) continue;
 
@@ -92,25 +91,34 @@ async function getEmbeddingKnowledge(userMessage: string): Promise<string> {
 }
 
 /* ================= MAIN HYBRID RESPONSE ================= */
-export async function generateHybridResponse(
-  userMessage: string,
-  userId = "default-session"
-): Promise<string> {
+interface HybridRequest {
+  message: string;
+  sessionId: string;
+  history?: any[];
+  contextChunks?: { text: string; source?: string | null; score?: number }[];
+}
+
+export async function generateHybridResponse({
+  message,
+  sessionId,
+  history = [],
+  contextChunks = [],
+}: HybridRequest): Promise<string> {
   try {
-    await memoryService.addMessage(userId, "user", userMessage);
-    const msg = normalize(userMessage);
+    await memoryService.addMessage(sessionId, "user", message);
+    const msg = normalize(message);
 
     /* ===== STATIC GREETING ===== */
     if (staticIntents.greeting.some((t) => msg.includes(normalize(t)))) {
       const r = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
-      await memoryService.addMessage(userId, "assistant", r);
+      await memoryService.addMessage(sessionId, "assistant", r);
       return r;
     }
 
     /* ===== STATIC IDENTITY ===== */
     if (staticIntents.identity.some((t) => msg.includes(normalize(t)))) {
-      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, SEO, and scalable digital growth strategies.`;
-      await memoryService.addMessage(userId, "assistant", r);
+      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, SEO, and business growth strategy.`;
+      await memoryService.addMessage(sessionId, "assistant", r);
       return r;
     }
 
@@ -118,22 +126,22 @@ export async function generateHybridResponse(
     if (staticIntents.book.some((t) => msg.includes(normalize(t)))) {
       const r =
         "You can schedule a strategy call here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
-      await memoryService.addMessage(userId, "assistant", r);
+      await memoryService.addMessage(sessionId, "assistant", r);
       return r;
     }
 
     /* ===== EMBEDDING + INTENT KNOWLEDGE POOL ===== */
-    const embeddingKnowledge = await getEmbeddingKnowledge(userMessage);
-    const jsonKnowledgeRaw = findMatchingIntent(userMessage);
+    const embeddingKnowledge = await getEmbeddingKnowledge(message);
+    const jsonKnowledgeRaw = findMatchingIntent(message);
     const jsonKnowledge = typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
 
     /* ===== FORCE SERVICE LISTING ===== */
-    if (/list.*service/i.test(userMessage)) {
+    if (/list.*service/i.test(message)) {
       const forcedKnowledge = await getEmbeddingKnowledge(
         "List all company services with full details and pricing"
       );
       if (forcedKnowledge?.length > 50) {
-        await memoryService.addMessage(userId, "assistant", forcedKnowledge);
+        await memoryService.addMessage(sessionId, "assistant", forcedKnowledge);
         return formatResponse(null, [{ content: forcedKnowledge }], {});
       }
     }
@@ -146,8 +154,7 @@ export async function generateHybridResponse(
       knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge.trim()}\n\n`;
     }
 
-    const promptBase = `
-You are ${BOT_NAME}, AI strategist for Digital Transition Marketing (DTM).
+    const promptBase = `You are ${BOT_NAME}, AI strategist for Digital Transition Marketing (DTM).
 
 You MUST answer using the company knowledge below.
 If pricing, packages, tiers, deliverables, or technical details exist, state them clearly.
@@ -167,7 +174,7 @@ Provide pricing if available.
 ${knowledgePool}
 
 User Question:
-${userMessage}
+${message}
 
 Answer:
 `;
@@ -208,7 +215,7 @@ Answer:
         "I can help with AI automation, marketing growth, CGI property tours, SEO systems, and digital strategy. Could you specify which area you'd like to explore?";
     }
 
-    await memoryService.addMessage(userId, "assistant", response);
+    await memoryService.addMessage(sessionId, "assistant", response);
     console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
 
     return formatResponse(null, [{ content: response }], {});

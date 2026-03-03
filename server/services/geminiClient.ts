@@ -49,9 +49,9 @@ Answer:
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: finalPrompt }] }]
+        contents: [{ parts: [{ text: finalPrompt }] }],
       }),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeout);

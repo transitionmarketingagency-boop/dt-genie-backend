@@ -9,7 +9,7 @@ import { createServer, type Server } from "node:http";
 // Local modules
 import { memoryService, initializeMemory } from "./services/memoryService.js";
 import { populateChunks } from "./populate-chunks.js";
-import { generateHybridResponse } from "./services/hybridClient.js";
+import { generateHybridResponse } from "./services/generateHybridResponse.js";
 import { CALENDLY_LINK } from "./config/constants.js";
 
 // ---------------- GOOGLE SERVICE ACCOUNT ----------------
@@ -60,15 +60,13 @@ export const setupApp = async (app: Application) => {
       if (!message || typeof message !== "string") message = "";
       if (!sessionId || typeof sessionId !== "string") sessionId = "default";
 
-      console.log("💬 Chat request:", message);
-
       // Save user message
       await memoryService.addMessage(sessionId, "user", message);
 
-      // Generate hybrid response
+      // Generate hybrid response using updated object argument
       let reply: string;
       try {
-        reply = await generateHybridResponse(message, sessionId);
+        reply = await generateHybridResponse({ message, sessionId });
       } catch (err) {
         console.warn("⚠️ Hybrid response failed:", err);
         reply = "";
@@ -93,7 +91,6 @@ export const setupApp = async (app: Application) => {
     }
   };
 
-  app.post("/chat", chatHandler);
   app.post("/api/chat", chatHandler);
 };
 

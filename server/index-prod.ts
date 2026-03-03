@@ -59,9 +59,8 @@ initializeAIIntents(); // ✅ ensures aiIntents is loaded before any requests
 
       // Serve static public folder
       const publicPath = path.resolve(process.cwd(), "public");
-      if (fs.existsSync(publicPath)) {                   
+      if (fs.existsSync(publicPath)) {
         app.use(express.static(publicPath));
-        console.log("✅ Public folder served:", publicPath);
       }
 
       // ---------------- CHAT ROUTE ----------------
@@ -79,10 +78,13 @@ initializeAIIntents(); // ✅ ensures aiIntents is loaded before any requests
           // Save user message
           await memoryService.addMessage(sessionId, "user", message);
 
-          // Generate hybrid response
+          // Generate hybrid response ✅ updated to single object argument
           let reply: string;
           try {
-            reply = await generateHybridResponse(message, sessionId);
+            reply = await generateHybridResponse({
+              message,
+              sessionId,
+            });
           } catch (err) {
             console.warn("⚠️ Hybrid response failed:", err);
             reply = "";

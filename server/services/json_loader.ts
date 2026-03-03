@@ -24,70 +24,59 @@ function isValidIntent(obj: any): obj is AIIntent {
 }
 
 /**
- * Recursively load AI intents from JSON files
+ * Recursively scan directory and collect all JSON files
  */
-export function loadAIIntents(dir: string) {
-  if (!fs.existsSync(dir)) {
-    console.warn("⚠️ AI logic directory not found:", dir);
-    return;
+function getAllJsonFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  let files: string[] = [];
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files = files.concat(getAllJsonFiles(fullPath));
+    } else if (entry.isFile() && entry.name.endsWith(".json")) {
+      files.push(fullPath);
+    }
   }
+  return files;
+}
 
-  const files = fs.readdirSync(dir);
+/**
+ * Load AI intents from a single JSON file
+ */
+function loadIntentsFromFile(filePath: string) {
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const parsed = JSON.parse(raw);
 
-  for (const file of files) {
-    const fullPath = path.join(dir, file);
-    const stat = fs.statSync(fullPath);
-
-    if (stat.isDirectory()) {
-      loadAIIntents(fullPath);
-      continue;
-    }
-
-    if (!file.endsWith(".json")) continue;
-
-    try {
-      const raw = fs.readFileSync(fullPath, "utf-8");
-      const parsed = JSON.parse(raw);
-
-      // If parsed is an array of intents
-      if (Array.isArray(parsed)) {
-        for (const item of parsed) {
-          // NEW: support your current format (examples + response)
-          if (item?.examples && typeof item.response === "string") {
-            aiIntents.push({
-              triggers: item.examples,
-              responses: [item.response],
-            });
-            continue;
-          }
-
-          // Support standard {triggers, responses} format too
-          if (isValidIntent(item)) {
-            aiIntents.push(item);
-          }
+    if (Array.isArray(parsed)) {
+      parsed.forEach((item: any) => {
+        if (item?.examples && typeof item.response === "string") {
+          aiIntents.push({ triggers: item.examples, responses: [item.response] });
+        } else if (isValidIntent(item)) {
+          aiIntents.push(item);
         }
-        continue;
-      }
-
-      // If parsed is a single object in your format
-      if (parsed?.examples && typeof parsed.response === "string") {
-        aiIntents.push({
-          triggers: parsed.examples,
-          responses: [parsed.response],
-        });
-        continue;
-      }
-
-      // If parsed is a single object in standard format
-      if (isValidIntent(parsed)) {
-        aiIntents.push(parsed);
-        continue;
-      }
-
-      console.warn(`⚠️ Ignored invalid intent file: ${fullPath}`);
-    } catch (err) {
-      console.warn(`⚠️ Failed to load JSON: ${fullPath}`, err);
+      });
+    } else if (parsed?.examples && typeof parsed.response === "string") {
+      aiIntents.push({ triggers: parsed.examples, responses: [parsed.response] });
+    } else if (isValidIntent(parsed)) {
+      aiIntents.push(parsed);
+    } else {
+      console.warn(`⚠️ Ignored invalid AI intent file: ${filePath}`);
     }
+  } catch (err) {
+    console.warn(`⚠️ Failed to parse AI intent JSON: ${filePath}`, err);
+  }
+}
+
+/**
+ * Load all AI intents from a base directory recursively
+ */
+export function loadAIIntents(baseDir: string) {
+  const allFiles = getAllJsonFiles(baseDir);
+  console.log(`[Loader] Found ${allFiles.length} JSON files in AI logic dir.`);
+
+  for (const file of allFiles) {
+    loadIntentsFromFile(file);
   }
 }
 
@@ -97,12 +86,11 @@ export function loadAIIntents(dir: string) {
 export function initializeAIIntents() {
   aiIntents.length = 0; // prevent duplication
 
-  // Use dist folder if running built server
+  // Resolve dist folder automatically
   const baseDir = process.cwd();
   const aiLogicDir = path.join(baseDir, "dist", "server", "ai_logic");
 
-  console.log("📥 Loading AI intents from:", aiLogicDir);
-
+  console.log(`[Loader] Loading AI intents from: ${aiLogicDir}`);
   loadAIIntents(aiLogicDir);
 
   console.log(`✅ Total valid AI intents loaded: ${aiIntents.length}`);

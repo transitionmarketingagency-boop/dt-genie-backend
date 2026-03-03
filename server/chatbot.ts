@@ -33,13 +33,13 @@ async function ask() {
     }
 
     try {
-      // 🔹 ALL logic lives in generateHybridResponse
-      const response = await generateHybridResponse(
-        input,
-        "default-session"
-      );
+      // ✅ Updated: pass single object to generateHybridResponse
+      const response = await generateHybridResponse({
+        message: input,
+        sessionId: "default-session",
+      });
 
-      console.log("\n🤖 AI Response:", response, "\n");
+      console.log("\n ~V AI Response:", response, "\n");
     } catch (err) {
       console.error("⚠️ Error:", err);
       console.log("Sorry — something went wrong.\n");

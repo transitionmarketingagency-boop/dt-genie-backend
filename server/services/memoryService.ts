@@ -50,12 +50,11 @@ export class MemoryService {
       timestamp: new Date(),
     };
 
-    // Ensure timestamp is a Date for ISO conversion
     const ts = msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
 
+    // Correct parameter order
     await db.run(
-      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp) VALUES (?, ?, ?, ?, ?)`,
       msg.id,
       msg.sessionId,
       msg.role,
@@ -97,10 +96,7 @@ export class MemoryService {
       `);
 
       for (const msg of messages) {
-        const ts =
-          msg.timestamp instanceof Date
-            ? msg.timestamp.toISOString()
-            : new Date(msg.timestamp).toISOString();
+        const ts = msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
         await insertStmt.run(msg.id, msg.sessionId, msg.role, msg.content, ts);
       }
 

@@ -5,7 +5,6 @@ import { fileURLToPath } from "url";
 import { getEmbedding } from "./services/embeddingClient.js";
 
 /* ================= PATH RESOLUTION ================= */
-// Resolve __dirname equivalent for ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -13,15 +12,22 @@ const distPath = path.join(__dirname, "vector_store", "chunks.json");
 const devPath = path.join(__dirname, "../vector_store/chunks.json");
 export const chunksPath = fs.existsSync(distPath) ? distPath : devPath;
 
-console.log("📂 Loading chunks.json from:", chunksPath);
+console.log(" ~B Loading chunks.json from:", chunksPath);
 
 const EMB_CACHE_FILE = path.join(path.dirname(chunksPath), ".queryEmbCache.json");
 const DEBUG = process.env.DEBUG_CHUNKS === "true";
 
-/* ================= LOAD CHUNKS ONCE ================= */
-let cachedChunks: { text: string; source: string | null; embedding: number[] }[] = [];
+/* ================= CHUNK TYPE ================= */
+type Chunk = {
+  text: string;
+  source: string | null;
+  embedding: number[];
+};
 
-function loadChunksOnce() {
+/* ================= LOAD CHUNKS ONCE ================= */
+let cachedChunks: Chunk[] = [];
+
+function loadChunksOnce(): Chunk[] {
   if (cachedChunks.length > 0) return cachedChunks;
 
   if (!fs.existsSync(chunksPath)) {
@@ -51,14 +57,13 @@ function loadChunksOnce() {
   }
 }
 
-/* ================= QUERY CACHE ================= */
+/* ================= QUERY EMBEDDING CACHE ================= */
 let queryEmbeddingCache: Map<string, number[]> = new Map();
 
 function normalizeQuery(text: string) {
   return text.toLowerCase().trim().replace(/\s+/g, " ");
 }
 
-// Load cached embeddings
 try {
   if (fs.existsSync(EMB_CACHE_FILE)) {
     const raw = fs.readFileSync(EMB_CACHE_FILE, "utf-8");
@@ -66,36 +71,70 @@ try {
     queryEmbeddingCache = new Map(
       Object.entries(parsed).map(([k, v]) => [k, (v as number[]).map(Number)])
     );
-    if (DEBUG) {
-      console.log(`[QueryChunks] ✅ Loaded ${queryEmbeddingCache.size} cached query embeddings`);
-    }
-  } else {
-    console.warn("[QueryChunks] ⚠️ No embedding cache found, starting fresh");
+    if (DEBUG) console.log("[QueryChunks] ✅ Loaded embedding cache.");
   }
 } catch (err) {
-  console.warn("[QueryChunks] ⚠️ Failed to load embedding cache. Starting fresh.", err);
+  console.warn("[QueryChunks] ⚠️ Failed to load embedding cache.", err);
 }
 
 function saveQueryCache() {
   try {
-    fs.writeFileSync(EMB_CACHE_FILE, JSON.stringify(Object.fromEntries(queryEmbeddingCache)), "utf-8");
-  } catch {
-    console.warn("[QueryChunks] ⚠️ Failed to save embedding cache.");
+    fs.writeFileSync(
+      EMB_CACHE_FILE,
+      JSON.stringify(Object.fromEntries(queryEmbeddingCache)),
+      "utf-8"
+    );
+    if (DEBUG) console.log("[QueryChunks] ✅ Saved embedding cache.");
+  } catch (err) {
+    console.warn("[QueryChunks] ⚠️ Failed to save embedding cache.", err);
   }
 }
 
 /* ================= COSINE SIMILARITY ================= */
 export function cosineSimilarity(vecA: number[], vecB: number[]): number {
-  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length !== vecB.length) return 0;
+  if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length !== vecB.length)
+    return 0;
+
   let dot = 0,
     normA = 0,
     normB = 0;
+
   for (let i = 0; i < vecA.length; i++) {
     dot += vecA[i] * vecB[i];
     normA += vecA[i] ** 2;
     normB += vecB[i] ** 2;
   }
+
   return normA && normB ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
+}
+
+/* ================= SEMANTIC DEDUPLICATION ================= */
+function semanticDeduplicate(
+  candidates: (Chunk & { score: number })[],
+  limit: number,
+  similarityThreshold = 0.92
+) {
+  const selected: (Chunk & { score: number })[] = [];
+
+  for (const candidate of candidates) {
+    let isDuplicate = false;
+
+    for (const existing of selected) {
+      const sim = cosineSimilarity(candidate.embedding, existing.embedding);
+      if (sim >= similarityThreshold) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      selected.push(candidate);
+    }
+
+    if (selected.length >= limit) break;
+  }
+
+  return selected;
 }
 
 /* ================= TOP CHUNKS RETRIEVAL ================= */
@@ -108,45 +147,50 @@ export async function getTopChunks(
 
   const normalizedQuery = normalizeQuery(queryText);
   const chunks = loadChunksOnce();
-  if (chunks.length === 0) {
-    console.warn("[QueryChunks] ⚠️ No chunks available for retrieval");
-    return [];
-  }
+  if (chunks.length === 0) return [];
 
-  let queryEmbedding: number[] = [];
+  let queryEmbedding: number[];
 
   if (queryEmbeddingCache.has(normalizedQuery)) {
     queryEmbedding = queryEmbeddingCache.get(normalizedQuery)!;
   } else {
     try {
       queryEmbedding = await getEmbedding(queryText);
-      if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
-        console.warn("[QueryChunks] ⚠️ Failed to generate embedding for query");
-        return [];
-      }
+      if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) return [];
       queryEmbeddingCache.set(normalizedQuery, queryEmbedding);
-      saveQueryCache(); // persist cache immediately
+      saveQueryCache();
     } catch (err) {
-      console.error("[QueryChunks] ⚠️ Embedding generation error:", err);
+      console.error("[QueryChunks] ⚠️ getEmbedding failed:", err);
       return [];
     }
   }
 
   const scored = chunks.map((c) => ({
-    text: c.text,
-    source: c.source,
+    ...c,
     score: cosineSimilarity(queryEmbedding, c.embedding),
   }));
 
   scored.sort((a, b) => b.score - a.score);
 
+  const filtered = scored.filter((c) => c.score >= minSimilarity);
+
+  const candidatePool =
+    filtered.length > 0
+      ? filtered.slice(0, limit * 5)
+      : scored.slice(0, limit * 5);
+
+  const deduplicated = semanticDeduplicate(candidatePool, limit);
+
   if (DEBUG) {
-    console.log(`\n[QueryChunks DEBUG] Query: "${queryText}"`);
-    scored.slice(0, 5).forEach((c, i) => {
-      console.log(`${i + 1}. Score=${c.score.toFixed(4)} | ${c.text.slice(0, 80)}...`);
+    console.log(`\n[QueryChunks DEBUG] Final semantic results:`);
+    deduplicated.forEach((c, i) => {
+      console.log(`${i + 1}. Score=${c.score.toFixed(4)} | Source=${c.source}`);
     });
   }
 
-  const filtered = scored.filter((c) => c.score >= minSimilarity);
-  return filtered.length ? filtered.slice(0, limit) : scored.slice(0, Math.min(limit, scored.length));
+  return deduplicated.map(({ text, source, score }) => ({
+    text,
+    source,
+    score,
+  }));
 }
