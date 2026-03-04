@@ -10,6 +10,9 @@ interface OpenRouterResponse {
   }[];
 }
 
+/**
+ * Generates a response using OpenRouter Qwen3.5-35B-A3B model
+ */
 export async function generateOpenRouter(
   prompt: string
 ): Promise<string> {
@@ -21,7 +24,7 @@ export async function generateOpenRouter(
   console.log("✅ OPENROUTER_API_KEY detected");
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+  const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -33,7 +36,7 @@ export async function generateOpenRouter(
         "X-Title": "DT Genie Backend",
       },
       body: JSON.stringify({
-        model: "qwen/qwen-72b-chat",
+        model: "qwen/Qwen3.5-35B-A3B", // ✅ Correct model
         messages: [
           {
             role: "user",
@@ -68,9 +71,9 @@ export async function generateOpenRouter(
     clearTimeout(timeout);
 
     if (err.name === "AbortError") {
-      console.error("❌ OpenRouter request timed out (25s)");
+      console.error("❌ OpenRouter request timed out (60s)");
     } else {
-      console.error("❌ OpenRouter request failed:", err.message);
+      console.error("❌ OpenRouter request failed:", err);
     }
 
     return "";
