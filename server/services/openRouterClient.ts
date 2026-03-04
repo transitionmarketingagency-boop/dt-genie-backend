@@ -1,3 +1,4 @@
+// server/services/openRouterClient.ts
 import fetch from "node-fetch";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -12,9 +13,11 @@ interface OpenRouterResponse {
 
 /**
  * Generates a response using OpenRouter Qwen3.5-35B-A3B model
+ * with retry logic to handle live Render environment issues
  */
 export async function generateOpenRouter(
-  prompt: string
+  prompt: string,
+  maxRetries = 2
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.error("❌ OPENROUTER_API_KEY is NOT defined");
@@ -23,59 +26,72 @@ export async function generateOpenRouter(
 
   console.log("✅ OPENROUTER_API_KEY detected");
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+  let attempt = 0;
+  let lastError: any = null;
 
-  try {
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "HTTP-Referer": "https://dt-genie-backend.onrender.com",
-        "X-Title": "DT Genie Backend",
-      },
-      body: JSON.stringify({
-        model: "qwen/Qwen3.5-35B-A3B", // ✅ Correct model
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
-        temperature: 0.5,
-        max_tokens: 800,
-      }),
-      signal: controller.signal,
-    });
+  while (attempt <= maxRetries) {
+    attempt++;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
 
-    clearTimeout(timeout);
+    try {
+      console.log(`🔹 OpenRouter attempt ${attempt}...`);
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "HTTP-Referer": "https://dt-genie-backend.onrender.com",
+          "X-Title": "DT Genie Backend",
+        },
+        body: JSON.stringify({
+          model: "qwen/Qwen3.5-35B-A3B",
+          messages: [
+            {
+              role: "user",
+              content: prompt,
+            },
+          ],
+          temperature: 0.5,
+          max_tokens: 800,
+        }),
+        signal: controller.signal,
+      });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`❌ OpenRouter HTTP ${res.status}:`, errText);
-      return "";
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`OpenRouter HTTP ${res.status}: ${errText}`);
+      }
+
+      const data = (await res.json()) as OpenRouterResponse;
+      const content = data?.choices?.[0]?.message?.content;
+
+      if (!content) {
+        throw new Error("OpenRouter returned empty content");
+      }
+
+      console.log("✅ Qwen response received");
+      return content.trim();
+    } catch (err: any) {
+      clearTimeout(timeout);
+      lastError = err;
+
+      if (err.name === "AbortError") {
+        console.warn(`⚠️ OpenRouter request timed out (60s) on attempt ${attempt}`);
+      } else {
+        console.warn(`⚠️ OpenRouter request failed on attempt ${attempt}:`, err.message || err);
+      }
+
+      if (attempt <= maxRetries) {
+        const backoff = 2000 * attempt; // 2s, 4s, etc.
+        console.log(`🔄 Retrying after ${backoff}ms...`);
+        await new Promise((res) => setTimeout(res, backoff));
+      }
     }
-
-    const data = (await res.json()) as OpenRouterResponse;
-    const content = data?.choices?.[0]?.message?.content;
-
-    if (!content) {
-      console.error("❌ OpenRouter returned empty content");
-      return "";
-    }
-
-    console.log("✅ Qwen response received");
-    return content.trim();
-  } catch (err: any) {
-    clearTimeout(timeout);
-
-    if (err.name === "AbortError") {
-      console.error("❌ OpenRouter request timed out (60s)");
-    } else {
-      console.error("❌ OpenRouter request failed:", err);
-    }
-
-    return "";
   }
+
+  console.error("❌ All OpenRouter attempts failed:", lastError);
+  return "";
 }
