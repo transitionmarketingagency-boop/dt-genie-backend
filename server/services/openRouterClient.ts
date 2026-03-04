@@ -1,58 +1,43 @@
-// server/services/openRouterClient.ts
 import fetch from "node-fetch";
-import { cleanResponse } from "../utils/cleanResponse.js";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL_NAME = "qwen/qwen3.5-35b-a3b"; // Latest Qwen 3.5 model
-const TIMEOUT_MS = 30000; // 30 seconds
-
-if (!OPENROUTER_API_KEY) {
-  console.warn("⚠️ OPENROUTER_API_KEY is missing. OpenRouter requests will fail.");
-}
-
-// ---------------- OpenRouter response types ----------------
-interface OpenRouterChoice {
-  message: { role: string; content: string };
-}
 
 interface OpenRouterResponse {
-  id: string;
-  object: string;
-  created: number;
-  model: string;
-  choices: OpenRouterChoice[];
+  choices?: {
+    message?: {
+      content?: string;
+    };
+  }[];
 }
 
-/**
- * generateOpenRouter
- * Sends a prompt to Qwen 3.5-35B-a3b via OpenRouter API and returns the cleaned text response
- */
-export async function generateOpenRouter(prompt: string): Promise<string> {
+export async function callQwen(
+  messages: { role: string; content: string }[]
+): Promise<string> {
+  if (!OPENROUTER_API_KEY) {
+    console.error("❌ OPENROUTER_API_KEY is NOT defined");
+    return "";
+  }
+
+  console.log("✅ OPENROUTER_API_KEY detected");
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-    const body = {
-      model: MODEL_NAME,
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful AI assistant specialized in marketing, automation, and digital growth strategies.",
-        },
-        { role: "user", content: prompt },
-      ],
-      max_tokens: 1024,
-      temperature: 0.4,
-    };
-
-    const res = await fetch(OPENROUTER_URL, {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "HTTP-Referer": "https://dt-genie-backend.onrender.com",
+        "X-Title": "DT Genie Backend",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: "qwen/qwen-72b-chat",
+        messages,
+        temperature: 0.5,
+        max_tokens: 800,
+      }),
       signal: controller.signal,
     });
 
@@ -60,28 +45,30 @@ export async function generateOpenRouter(prompt: string): Promise<string> {
 
     if (!res.ok) {
       const errText = await res.text();
-      console.warn(`⚠️ OpenRouter HTTP Error ${res.status}: ${errText}`);
+      console.error(`❌ OpenRouter HTTP ${res.status}:`, errText);
       return "";
     }
 
     const data = (await res.json()) as OpenRouterResponse;
 
-    if (data?.choices?.[0]?.message?.content) {
-      return cleanResponse(data.choices[0].message.content);
+    const content = data?.choices?.[0]?.message?.content;
+
+    if (!content) {
+      console.error("❌ OpenRouter returned empty content");
+      return "";
     }
 
-    console.warn("⚠️ OpenRouter returned empty response");
-    return "";
-  } catch (err: unknown) {
-    if (err instanceof Error) {
-      if (err.name === "AbortError") {
-        console.warn("⚠️ OpenRouter request timed out (30s)");
-      } else {
-        console.warn("⚠️ OpenRouter request failed:", err.message);
-      }
+    console.log("✅ Qwen response received");
+    return content.trim();
+  } catch (err: any) {
+    clearTimeout(timeout);
+
+    if (err.name === "AbortError") {
+      console.error("❌ OpenRouter request timed out (25s)");
     } else {
-      console.warn("⚠️ OpenRouter request failed:", String(err));
+      console.error("❌ OpenRouter request failed:", err.message);
     }
+
     return "";
   }
 }

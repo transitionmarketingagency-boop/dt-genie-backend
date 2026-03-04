@@ -56,10 +56,12 @@ function findMatchingIntent(userMessage: string): string | null {
   const msg = normalize(userMessage);
   const msgWords = msg.split(/\s+/);
   let bestMatch: { score: number; response: string } | null = null;
+
   for (const intent of aiIntents) {
     if (!intent?.triggers?.length || !intent?.responses?.length) continue;
 
     let triggerScore = 0;
+
     for (const trig of intent.triggers) {
       const trigWords = normalize(trig).split(/\s+/);
       const overlap = trigWords.filter((w) => msgWords.includes(w)).length;
@@ -117,7 +119,7 @@ export async function generateHybridResponse({
 
     /* ===== STATIC IDENTITY ===== */
     if (staticIntents.identity.some((t) => msg.includes(normalize(t)))) {
-      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, SEO, and business growth strategy.`;
+      const r = `I am ${BOT_NAME}, AI Strategist for Digital Transition Marketing. I specialize in AI-driven marketing systems, automation, performance advertising, CGI property marketing, SEO systems, and business growth strategies.`;
       await memoryService.addMessage(sessionId, "assistant", r);
       return r;
     }
@@ -135,21 +137,12 @@ export async function generateHybridResponse({
     const jsonKnowledgeRaw = findMatchingIntent(message);
     const jsonKnowledge = typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
 
-    /* ===== FORCE SERVICE LISTING ===== */
-    if (/list.*service/i.test(message)) {
-      const forcedKnowledge = await getEmbeddingKnowledge(
-        "List all company services with full details and pricing"
-      );
-      if (forcedKnowledge?.length > 50) {
-        await memoryService.addMessage(sessionId, "assistant", forcedKnowledge);
-        return formatResponse(null, [{ content: forcedKnowledge }], {});
-      }
-    }
-
     let knowledgePool = "";
+
     if (embeddingKnowledge?.trim().length > 20) {
       knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge.trim()}\n\n`;
     }
+
     if (jsonKnowledge?.trim().length > 20) {
       knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge.trim()}\n\n`;
     }
@@ -164,6 +157,8 @@ Do NOT:
 - Say "we don't have that service"
 - Speak like a generic consultant
 - Over-explain your role
+- Reveal internal reasoning
+- Output analysis steps
 
 Be direct.
 Be confident.
@@ -185,24 +180,33 @@ Answer:
 
     /* ================= QWEN RESPONSE ================= */
     try {
-      response = cleanResponse(await generateOpenRouter(promptBase));
-      if (response?.length > MIN_RESPONSE_LENGTH) modelUsed = "Qwen";
+      const qwenResponse = await generateOpenRouter(promptBase);
+
+      if (!qwenResponse || qwenResponse.length < MIN_RESPONSE_LENGTH) {
+        console.warn("⚠️ Qwen failed or returned short response. Fallback to Gemini triggered.");
+      } else {
+        response = cleanResponse(qwenResponse);
+        modelUsed = "Qwen";
+        console.log("✅ Qwen response accepted");
+      }
     } catch (err) {
-      console.error("Qwen error:", err);
-      response = "";
+      console.error("❌ Qwen error:", err);
     }
 
     /* ================= FALLBACK: GEMINI ================= */
     if ((!response || response.length < MIN_RESPONSE_LENGTH) && canUseGemini()) {
       try {
-        const geminiResp = cleanResponse(await generateGemini(promptBase));
-        if (geminiResp?.length > MIN_RESPONSE_LENGTH) {
-          response = geminiResp;
+        console.log("🔄 Attempting Gemini fallback...");
+        const geminiResp = await generateGemini(promptBase);
+
+        if (geminiResp && geminiResp.length > MIN_RESPONSE_LENGTH) {
+          response = cleanResponse(geminiResp);
           modelUsed = "Gemini";
           markGeminiUsed();
+          console.log("✅ Gemini fallback successful");
         }
       } catch (err) {
-        console.error("Gemini failed:", err);
+        console.error("❌ Gemini failed:", err);
       }
     }
 
@@ -213,10 +217,14 @@ Answer:
     if (!response || response.length < MIN_RESPONSE_LENGTH) {
       response =
         "I can help with AI automation, marketing growth, CGI property tours, SEO systems, and digital strategy. Could you specify which area you'd like to explore?";
+      modelUsed = "SafeFallback";
     }
 
     await memoryService.addMessage(sessionId, "assistant", response);
-    console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
+
+    console.log(
+      `[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`
+    );
 
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
