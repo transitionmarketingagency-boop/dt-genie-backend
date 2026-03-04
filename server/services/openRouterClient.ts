@@ -10,8 +10,8 @@ interface OpenRouterResponse {
   }[];
 }
 
-export async function callQwen(
-  messages: { role: string; content: string }[]
+export async function generateOpenRouter(
+  prompt: string
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.error("❌ OPENROUTER_API_KEY is NOT defined");
@@ -34,7 +34,12 @@ export async function callQwen(
       },
       body: JSON.stringify({
         model: "qwen/qwen-72b-chat",
-        messages,
+        messages: [
+          {
+            role: "user",
+            content: prompt,
+          },
+        ],
         temperature: 0.5,
         max_tokens: 800,
       }),
@@ -50,7 +55,6 @@ export async function callQwen(
     }
 
     const data = (await res.json()) as OpenRouterResponse;
-
     const content = data?.choices?.[0]?.message?.content;
 
     if (!content) {
