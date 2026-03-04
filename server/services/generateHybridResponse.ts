@@ -81,9 +81,11 @@ function findMatchingIntent(userMessage: string): string | null {
 /* ================= EMBEDDING KNOWLEDGE ================= */
 async function getEmbeddingKnowledge(userMessage: string): Promise<string> {
   try {
-    const chunks = await getTopChunks(userMessage, 12, 0.1);
+    const chunks = await getTopChunks(userMessage, 5, 0.1); // reduced from 12 → 5 for token safety
     if (!chunks?.length) return "";
-    const texts = Array.from(new Set(chunks.map((c) => c.text).filter(Boolean)));
+    const texts = Array.from(
+      new Set(chunks.map((c) => (c.text ? c.text.slice(0, 300) : "")))
+    ).filter(Boolean); // truncate each chunk to 300 chars
     return texts.join("\n\n");
   } catch (err) {
     console.error("Embedding retrieval error:", err);
@@ -111,7 +113,8 @@ export async function generateHybridResponse({
 
     /* ===== STATIC GREETING ===== */
     if (staticIntents.greeting.some((t) => msg.includes(normalize(t)))) {
-      const r = greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
+      const r =
+        greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
       await memoryService.addMessage(sessionId, "assistant", r);
       return r;
     }
@@ -134,7 +137,8 @@ export async function generateHybridResponse({
     /* ===== EMBEDDING + INTENT KNOWLEDGE POOL ===== */
     const embeddingKnowledge = await getEmbeddingKnowledge(message);
     const jsonKnowledgeRaw = findMatchingIntent(message);
-    const jsonKnowledge = typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
+    const jsonKnowledge =
+      typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
 
     let knowledgePool = "";
     if (embeddingKnowledge?.trim().length > 20) {
@@ -175,19 +179,25 @@ Answer:
     let modelUsed = "None";
 
     /* ================= QWEN RESPONSE (PRIMARY) ================= */
-    try {
-      console.log("🔹 Attempting Qwen primary model...");
-      const qwenResp = await generateOpenRouter(promptBase);
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error("❌ OPENROUTER_API_KEY is not set. Qwen disabled.");
+    } else {
+      try {
+        console.log("🔹 Attempting Qwen primary model...");
+        const qwenResp = await generateOpenRouter(promptBase);
 
-      if (qwenResp && qwenResp.length >= MIN_RESPONSE_LENGTH) {
-        response = cleanResponse(qwenResp);
-        modelUsed = "Qwen";
-        console.log("✅ Qwen response accepted");
-      } else {
-        console.warn("⚠️ Qwen returned short or empty response. Fallback may trigger.");
+        if (qwenResp && qwenResp.length >= MIN_RESPONSE_LENGTH) {
+          response = cleanResponse(qwenResp);
+          modelUsed = "Qwen";
+          console.log("✅ Qwen response accepted");
+        } else {
+          console.warn(
+            "⚠️ Qwen returned short or empty response. Fallback may trigger."
+          );
+        }
+      } catch (err) {
+        console.error("❌ Qwen error:", err);
       }
-    } catch (err) {
-      console.error("❌ Qwen error:", err);
     }
 
     /* ================= FALLBACK: GEMINI ================= */
@@ -220,7 +230,9 @@ Answer:
     }
 
     await memoryService.addMessage(sessionId, "assistant", response);
-    console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
+    console.log(
+      `[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`
+    );
 
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {

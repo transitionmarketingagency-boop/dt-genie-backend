@@ -12,8 +12,7 @@ interface OpenRouterResponse {
 }
 
 /**
- * Generates a response using OpenRouter Qwen3.5-35B-A3B model
- * with retry logic to handle live Render environment issues
+ * Generate response using OpenRouter Qwen model with retries and backoff
  */
 export async function generateOpenRouter(
   prompt: string,
@@ -24,15 +23,20 @@ export async function generateOpenRouter(
     return "";
   }
 
-  console.log("✅ OPENROUTER_API_KEY detected");
+  // === Truncate prompt to avoid token overflow ===
+  const MAX_PROMPT_LENGTH = 4000;
+  if (prompt.length > MAX_PROMPT_LENGTH) {
+    prompt = prompt.slice(0, MAX_PROMPT_LENGTH) + "\n[TRUNCATED]";
+  }
 
   let attempt = 0;
   let lastError: any = null;
 
   while (attempt <= maxRetries) {
     attempt++;
+
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 60000); // 60s timeout
+    const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
 
     try {
       console.log(`🔹 OpenRouter attempt ${attempt}...`);
@@ -46,14 +50,9 @@ export async function generateOpenRouter(
         },
         body: JSON.stringify({
           model: "qwen/Qwen3.5-35B-A3B",
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          temperature: 0.5,
-          max_tokens: 800,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,
+          max_tokens: 600,
         }),
         signal: controller.signal,
       });
@@ -68,30 +67,24 @@ export async function generateOpenRouter(
       const data = (await res.json()) as OpenRouterResponse;
       const content = data?.choices?.[0]?.message?.content;
 
-      if (!content) {
-        throw new Error("OpenRouter returned empty content");
-      }
+      if (!content) throw new Error("OpenRouter returned empty content");
 
-      console.log("✅ Qwen response received");
+      console.log("✅ OpenRouter success");
       return content.trim();
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
+      console.warn(`⚠️ OpenRouter attempt ${attempt} failed:`, err.message);
 
-      if (err.name === "AbortError") {
-        console.warn(`⚠️ OpenRouter request timed out (60s) on attempt ${attempt}`);
-      } else {
-        console.warn(`⚠️ OpenRouter request failed on attempt ${attempt}:`, err.message || err);
-      }
-
+      // Exponential backoff before retry
       if (attempt <= maxRetries) {
-        const backoff = 2000 * attempt; // 2s, 4s, etc.
-        console.log(`🔄 Retrying after ${backoff}ms...`);
-        await new Promise((res) => setTimeout(res, backoff));
+        const delay = 2000 * attempt; // 2s, 4s, etc.
+        console.log(`⏳ Retrying in ${delay / 1000}s...`);
+        await new Promise((res) => setTimeout(res, delay));
       }
     }
   }
 
   console.error("❌ All OpenRouter attempts failed:", lastError);
-  return "";
+  return ""; // Let Gemini fallback handle
 }
