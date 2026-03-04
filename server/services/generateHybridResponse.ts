@@ -61,7 +61,6 @@ function findMatchingIntent(userMessage: string): string | null {
     if (!intent?.triggers?.length || !intent?.responses?.length) continue;
 
     let triggerScore = 0;
-
     for (const trig of intent.triggers) {
       const trigWords = normalize(trig).split(/\s+/);
       const overlap = trigWords.filter((w) => msgWords.includes(w)).length;
@@ -138,11 +137,9 @@ export async function generateHybridResponse({
     const jsonKnowledge = typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
 
     let knowledgePool = "";
-
     if (embeddingKnowledge?.trim().length > 20) {
       knowledgePool += `COMPANY KNOWLEDGE BASE:\n${embeddingKnowledge.trim()}\n\n`;
     }
-
     if (jsonKnowledge?.trim().length > 20) {
       knowledgePool += `SUPPLEMENTAL INTENT DATA:\n${jsonKnowledge.trim()}\n\n`;
     }
@@ -156,7 +153,6 @@ Do NOT:
 - Say "no direct knowledge match found"
 - Say "we don't have that service"
 - Speak like a generic consultant
-- Over-explain your role
 - Reveal internal reasoning
 - Output analysis steps
 
@@ -174,20 +170,21 @@ ${message}
 Answer:
 `;
 
+    const MIN_RESPONSE_LENGTH = 50;
     let response = "";
     let modelUsed = "None";
-    const MIN_RESPONSE_LENGTH = 50;
 
-    /* ================= QWEN RESPONSE ================= */
+    /* ================= QWEN RESPONSE (PRIMARY) ================= */
     try {
-      const qwenResponse = await generateOpenRouter(promptBase);
+      console.log("🔹 Attempting Qwen primary model...");
+      const qwenResp = await generateOpenRouter(promptBase);
 
-      if (!qwenResponse || qwenResponse.length < MIN_RESPONSE_LENGTH) {
-        console.warn("⚠️ Qwen failed or returned short response. Fallback to Gemini triggered.");
-      } else {
-        response = cleanResponse(qwenResponse);
+      if (qwenResp && qwenResp.length >= MIN_RESPONSE_LENGTH) {
+        response = cleanResponse(qwenResp);
         modelUsed = "Qwen";
         console.log("✅ Qwen response accepted");
+      } else {
+        console.warn("⚠️ Qwen returned short or empty response. Fallback may trigger.");
       }
     } catch (err) {
       console.error("❌ Qwen error:", err);
@@ -199,11 +196,13 @@ Answer:
         console.log("🔄 Attempting Gemini fallback...");
         const geminiResp = await generateGemini(promptBase);
 
-        if (geminiResp && geminiResp.length > MIN_RESPONSE_LENGTH) {
+        if (geminiResp && geminiResp.length >= MIN_RESPONSE_LENGTH) {
           response = cleanResponse(geminiResp);
           modelUsed = "Gemini";
           markGeminiUsed();
           console.log("✅ Gemini fallback successful");
+        } else {
+          console.warn("⚠️ Gemini returned short or empty response.");
         }
       } catch (err) {
         console.error("❌ Gemini failed:", err);
@@ -221,10 +220,7 @@ Answer:
     }
 
     await memoryService.addMessage(sessionId, "assistant", response);
-
-    console.log(
-      `[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`
-    );
+    console.log(`[Hybrid] Model=${modelUsed} | EMB=${!!embeddingKnowledge} | JSON=${!!jsonKnowledge}`);
 
     return formatResponse(null, [{ content: response }], {});
   } catch (err) {
