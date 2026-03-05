@@ -1,6 +1,5 @@
 import { getTopChunks } from "./queryChunks.js"; // ✅ ESM-safe
-import { getEmbedding } from "./services/embeddingClient.js"; // ✅ Correct ESM path
-
+import { getEmbedding } from "./services/openRouterEmbeddingsClient.js";
 export type NormalizedChunk = {
   source: string;
   summary: string;

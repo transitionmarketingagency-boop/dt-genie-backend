@@ -16,7 +16,7 @@
     "copy-personas": "cpx \"personas/**/*\" dist/personas",
     "copy-ai-logic": "cpx \"server/ai_logic/**/*.json\" dist/server/ai_logic --preserve",
     "copy-chunks": "cpx \"server/vector_store/chunks.json\" dist/server/vector_store/",
-    "copy-utils": "cpx \"server/utils/**/*.py\" dist/server/utils/"
+    "copy-utils": "cpx \"server/utils/**/*.ts\" dist/server/utils/"
   },
   "dependencies": {
     "axios": "^1.6.0",

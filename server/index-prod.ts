@@ -9,7 +9,7 @@ import { createServer, type Server } from "node:http";
 import runApp, { setupApp } from "./app.js";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
 import { memoryService, initializeMemory } from "./services/memoryService.js";
-import { initializeAIIntents } from "./services/json_loader.js"; // ✅ new import
+import { initializeAIIntents } from "./services/json_loader.js";
 
 // ---------------- ENV CHECK ----------------
 if (!process.env.GEMINI_API_KEY) {
@@ -17,6 +17,10 @@ if (!process.env.GEMINI_API_KEY) {
   process.exit(1);
 }
 console.log("✅ GEMINI_API_KEY loaded");
+
+if (!process.env.OPENROUTER_API_KEY) {
+  console.warn("⚠️ OPENROUTER_API_KEY is missing. Cloud embeddings may fail.");
+}
 
 // ---------------- GOOGLE SERVICE ACCOUNT ----------------
 if (process.env.SERVICE_ACCOUNT_BASE64) {
@@ -46,7 +50,8 @@ await initializeMemory();
 console.log("✅ Memory DB initialized");
 
 // ---------------- AI INTENTS INIT ----------------
-initializeAIIntents(); // ✅ ensures aiIntents is loaded before any requests
+initializeAIIntents();
+console.log("✅ AI intents initialized");
 
 // ---------------- START SERVER ----------------
 (async () => {
@@ -65,26 +70,21 @@ initializeAIIntents(); // ✅ ensures aiIntents is loaded before any requests
 
       // ---------------- CHAT ROUTE ----------------
       app.post("/chat", async (req: Request, res: Response) => {
+        let reply = "";
         try {
           let { message, sessionId } = req.body as { message?: string; sessionId?: string };
 
           if (!message || typeof message !== "string") {
             return res.status(400).json({ error: "Message is required" });
           }
-          if (!sessionId || typeof sessionId !== "string") {
-            sessionId = "default-session";
-          }
+          if (!sessionId || typeof sessionId !== "string") sessionId = "default-session";
 
           // Save user message
           await memoryService.addMessage(sessionId, "user", message);
 
-          // Generate hybrid response ✅ updated to single object argument
-          let reply: string;
+          // Generate hybrid response
           try {
-            reply = await generateHybridResponse({
-              message,
-              sessionId,
-            });
+            reply = await generateHybridResponse({ message, sessionId });
           } catch (err) {
             console.warn("⚠️ Hybrid response failed:", err);
             reply = "";
@@ -98,27 +98,26 @@ initializeAIIntents(); // ✅ ensures aiIntents is loaded before any requests
           // Save assistant message
           await memoryService.addMessage(sessionId, "assistant", reply);
 
-          // Return chat reply only
-          res.json({ reply });
+          // Return chat reply
+          return res.json({ reply });
 
         } catch (err) {
           console.error("❌ Chat route error:", err);
-          res.status(500).json({ error: "Internal server error" });
+          return res.status(500).json({ error: "Internal server error" });
         }
       });
 
       console.log("✅ Hybrid chat route initialized");
 
-      // Optional: keep other routes if needed
+      // Optional additional routes
       await setupApp(app);
 
+      // Start server
       const PORT = Number(process.env.PORT) || 5000;
-      httpServer.listen(PORT, () =>
-        console.log(` ~@ Server running on port ${PORT}`)
-      );
+      httpServer.listen(PORT, () => console.log(` ~@ Server running on port ${PORT}`));
     });
 
-   console.log("✅ Server bootstrap complete");
+    console.log("✅ Server bootstrap complete");
 
   } catch (err) {
     console.error("❌ Server bootstrap failed:", err);

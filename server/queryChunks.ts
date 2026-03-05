@@ -2,7 +2,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { getEmbedding } from "./services/embeddingClient.js";
+import { getEmbedding } from "./services/openRouterEmbeddingsClient.js"
 
 /* ================= PATH RESOLUTION ================= */
 const __filename = fileURLToPath(import.meta.url);

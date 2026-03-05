@@ -81,7 +81,7 @@ function findMatchingIntent(userMessage: string): string | null {
 /* ================= EMBEDDING KNOWLEDGE ================= */
 async function getEmbeddingKnowledge(userMessage: string): Promise<string> {
   try {
-    const chunks = await getTopChunks(userMessage, 5, 0.1); // reduced from 12 → 5 for token safety
+    const chunks = await getTopChunks(userMessage, 5, 0.1); // limit 5 chunks
     if (!chunks?.length) return "";
     const texts = Array.from(
       new Set(chunks.map((c) => (c.text ? c.text.slice(0, 300) : "")))
@@ -137,8 +137,7 @@ export async function generateHybridResponse({
     /* ===== EMBEDDING + INTENT KNOWLEDGE POOL ===== */
     const embeddingKnowledge = await getEmbeddingKnowledge(message);
     const jsonKnowledgeRaw = findMatchingIntent(message);
-    const jsonKnowledge =
-      typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
+    const jsonKnowledge = typeof jsonKnowledgeRaw === "string" ? jsonKnowledgeRaw : "";
 
     let knowledgePool = "";
     if (embeddingKnowledge?.trim().length > 20) {
@@ -167,7 +166,6 @@ List details clearly.
 Provide pricing if available.
 
 ${knowledgePool}
-
 User Question:
 ${message}
 
@@ -183,7 +181,7 @@ Answer:
       console.error("❌ OPENROUTER_API_KEY is not set. Qwen disabled.");
     } else {
       try {
-        console.log("🔹 Attempting Qwen primary model...");
+        console.log(" M-9 Attempting Qwen primary model...");
         const qwenResp = await generateOpenRouter(promptBase);
 
         if (qwenResp && qwenResp.length >= MIN_RESPONSE_LENGTH) {
@@ -203,7 +201,7 @@ Answer:
     /* ================= FALLBACK: GEMINI ================= */
     if ((!response || response.length < MIN_RESPONSE_LENGTH) && canUseGemini()) {
       try {
-        console.log("🔄 Attempting Gemini fallback...");
+        console.log(" ~D Attempting Gemini fallback...");
         const geminiResp = await generateGemini(promptBase);
 
         if (geminiResp && geminiResp.length >= MIN_RESPONSE_LENGTH) {

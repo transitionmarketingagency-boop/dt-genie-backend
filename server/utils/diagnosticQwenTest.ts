@@ -1,24 +1,26 @@
+// server/utils/diagnosticQwenTest.ts
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
-import fetch from "node-fetch";
 import dotenv from "dotenv";
-import { spawnSync } from "child_process";
+import fetch from "node-fetch";
+import { getEmbedding } from "../services/openRouterEmbeddingsClient.js"; // must return number[]
 import { cosineSimilarity } from "../queryChunks.js";
 
-dotenv.config();
+dotenv.config(); // ✅ ensure .env is loaded
+
+console.log(
+  "🔑 OPENROUTER_API_KEY:",
+  process.env.OPENROUTER_API_KEY ? "FOUND" : "MISSING"
+);
 
 /* ================= PATHS ================= */
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const CHUNKS_PATH = path.resolve(__dirname, "../vector_store/chunks.json");
-const AI_LOGIC_PATH = path.resolve(__dirname, "../ai_logic");
-const EMBED_SCRIPT = path.resolve(__dirname, "./embed_text.py");
+const CHUNKS_PATH = path.resolve(
+  process.cwd(),
+  "server/vector_store/chunks.json"
+);
+const AI_LOGIC_PATH = path.resolve(process.cwd(), "server/ai_logic");
 
 /* ================= LOAD CHUNKS ================= */
-
 function loadChunks() {
   if (!fs.existsSync(CHUNKS_PATH)) {
     console.error("chunks.json not found:", CHUNKS_PATH);
@@ -36,8 +38,7 @@ function loadChunks() {
     }));
 }
 
-/* ================= LOAD INTENTS RECURSIVE ================= */
-
+/* ================= LOAD AI INTENTS ================= */
 function loadIntentsRecursive(dir: string, intents: any[] = []) {
   if (!fs.existsSync(dir)) return intents;
 
@@ -56,14 +57,10 @@ function loadIntentsRecursive(dir: string, intents: any[] = []) {
 
     try {
       const data = JSON.parse(fs.readFileSync(fullPath, "utf-8"));
-
       if (Array.isArray(data)) {
         data.forEach((item: any) => {
           if (item?.examples && item?.response) {
-            intents.push({
-              triggers: item.examples,
-              responses: [item.response],
-            });
+            intents.push({ triggers: item.examples, responses: [item.response] });
           } else if (item?.triggers && item?.responses) {
             intents.push(item);
           }
@@ -77,27 +74,33 @@ function loadIntentsRecursive(dir: string, intents: any[] = []) {
   return intents;
 }
 
-/* ================= REAL QUERY EMBEDDING ================= */
+/* ================= EMBED QUERY ================= */
+async function embedQuery(text: string): Promise<number[]> {
+  if (!text || !text.trim()) return [];
 
-function embedQuery(text: string): number[] {
-  if (!fs.existsSync(EMBED_SCRIPT)) {
-    throw new Error("embed_text.py not found.");
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) throw new Error("OPENROUTER_API_KEY missing.");
+
+  let lastErr: any = null;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const embedding = await getEmbedding(text); // returns number[]
+      if (!embedding || !Array.isArray(embedding)) {
+        throw new Error("Invalid embedding returned from OpenRouter");
+      }
+      return embedding;
+    } catch (err) {
+      console.warn(`⚠️ Qwen embedding attempt ${attempt} failed:`, err);
+      lastErr = err;
+    }
   }
 
-  const result = spawnSync("python", [EMBED_SCRIPT, "--text", text], {
-    encoding: "utf-8",
-  });
-
-  if (result.error) throw result.error;
-  if (!result.stdout) throw new Error("Embedding script returned empty output");
-
-  return JSON.parse(result.stdout);
+  throw new Error("❌ Failed to generate embedding after retries: " + lastErr);
 }
 
 /* ================= TOP CHUNKS ================= */
-
 function getTopChunks(queryEmbedding: number[], chunks: any[], limit = 8) {
-  const scored = chunks.map(c => ({
+  const scored = chunks.map((c) => ({
     text: c.text,
     source: c.source,
     score: cosineSimilarity(queryEmbedding, c.embedding),
@@ -106,18 +109,17 @@ function getTopChunks(queryEmbedding: number[], chunks: any[], limit = 8) {
   const sorted = scored.sort((a, b) => b.score - a.score).slice(0, limit);
 
   console.log("\n[Top Similarity Scores]");
-  sorted.forEach(s => console.log(s.score.toFixed(4)));
+  sorted.forEach((s) => console.log(s.score.toFixed(4)));
 
   return sorted;
 }
 
-/* ================= QWEN ================= */
-
+/* ================= QWEN CALL ================= */
 async function callQwen(contextChunks: any[], question: string) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY missing.");
 
-  const context = contextChunks.map(c => c.text).join("\n\n");
+  const context = contextChunks.map((c) => c.text).join("\n\n");
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -134,10 +136,7 @@ async function callQwen(contextChunks: any[], question: string) {
           content:
             "Answer ONLY using provided context. If missing, say: Information not found in knowledge base.",
         },
-        {
-          role: "user",
-          content: `CONTEXT:\n${context}\n\nQUESTION:\n${question}`,
-        },
+        { role: "user", content: `CONTEXT:\n${context}\n\nQUESTION:\n${question}` },
       ],
     }),
   });
@@ -146,26 +145,25 @@ async function callQwen(contextChunks: any[], question: string) {
   return data.choices?.[0]?.message?.content ?? "No response";
 }
 
-/* ================= HYBRID ================= */
-
+/* ================= HYBRID RESPONSE ================= */
 async function hybridResponse(query: string, intents: any[], chunks: any[]) {
   // 1️⃣ Intent match
-  const intentMatch = intents.find(intent =>
+  const intentMatch = intents.find((intent) =>
     intent.triggers.some((t: string) =>
       query.toLowerCase().includes(t.toLowerCase())
     )
   );
 
   if (intentMatch) {
-    return "🎯 Intent Match:\n" + intentMatch.responses.join("\n");
+    return "M-/ Intent Match:\n" + intentMatch.responses.join("\n");
   }
 
   // 2️⃣ Similarity search
-  const queryEmbedding = embedQuery(query);
+  const queryEmbedding = await embedQuery(query);
   const topChunks = getTopChunks(queryEmbedding, chunks, 8);
 
   if (topChunks.length > 0 && topChunks[0].score > 0.75) {
-    return "📂 Similarity Match:\n" + topChunks.map(c => c.text).join("\n\n");
+    return "~B Similarity Match:\n" + topChunks.map((c) => c.text).join("\n\n");
   }
 
   // 3️⃣ Grounded Qwen
@@ -173,7 +171,6 @@ async function hybridResponse(query: string, intents: any[], chunks: any[]) {
 }
 
 /* ================= MAIN ================= */
-
 async function main() {
   const chunks = loadChunks();
   const intents = loadIntentsRecursive(AI_LOGIC_PATH);
@@ -193,8 +190,12 @@ async function main() {
     console.log("\n===== TEST QUERY =====");
     console.log("Query:", query);
 
-    const response = await hybridResponse(query, intents, chunks);
-    console.log("Response:\n", response);
+    try {
+      const response = await hybridResponse(query, intents, chunks);
+      console.log("Response:\n", response);
+    } catch (err) {
+      console.error("❌ Failed to process query:", err);
+    }
   }
 }
 
