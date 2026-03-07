@@ -1,5 +1,6 @@
 // server/index-prod.ts
-import 'dotenv/config';
+
+import "dotenv/config";
 import fs from "fs";
 import path from "path";
 import cors from "cors";
@@ -11,116 +12,130 @@ import { generateHybridResponse } from "./services/generateHybridResponse.js";
 import { memoryService, initializeMemory } from "./services/memoryService.js";
 import { initializeAIIntents } from "./services/json_loader.js";
 
-// ---------------- ENV CHECK ----------------
+// ---------------- ENV VALIDATION ----------------
+
 if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY is missing.");
+  console.error("❌ GEMINI_API_KEY is missing");
   process.exit(1);
 }
+
 console.log("✅ GEMINI_API_KEY loaded");
 
 if (!process.env.OPENROUTER_API_KEY) {
-  console.warn("⚠️ OPENROUTER_API_KEY is missing. Cloud embeddings may fail.");
+  console.warn("⚠️ OPENROUTER_API_KEY missing. Qwen embeddings will fail.");
+} else {
+  console.log("✅ OPENROUTER_API_KEY detected");
 }
 
-// ---------------- GOOGLE SERVICE ACCOUNT ----------------
-if (process.env.SERVICE_ACCOUNT_BASE64) {
+// ---------------- PATH RESOLUTION ----------------
+
+const ROOT_DIR = path.resolve();
+const DIST_DIR = path.join(ROOT_DIR, "dist");
+const VECTOR_DIR = path.join(DIST_DIR, "server", "vector_store");
+const PUBLIC_DIR = path.join(DIST_DIR, "public");
+
+// ---------------- SYSTEM INITIALIZER ----------------
+
+async function initializeSystem() {
   try {
-    const json = Buffer.from(process.env.SERVICE_ACCOUNT_BASE64, "base64").toString("utf8");
-    const keyPath = path.join(process.cwd(), "server/sa-key.json");
-    fs.writeFileSync(keyPath, json);
-    process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
-    console.log("✅ Google service account key created:", keyPath);
+    console.log("🚀 Initializing Neon Vision AI system...");
+
+    // ---- Vector Store Check ----
+    if (!fs.existsSync(VECTOR_DIR)) {
+      console.error("❌ Vector store directory missing:", VECTOR_DIR);
+      process.exit(1);
+    }
+
+    console.log("✅ Vector store found:", VECTOR_DIR);
+
+    // ---- Memory Init ----
+    await initializeMemory();
+    console.log("✅ Memory database initialized");
+
+    // ---- Load JSON Intent Files ----
+    initializeAIIntents();
+    console.log("✅ AI intents loaded");
+
+
   } catch (err) {
-    console.error("❌ Failed to create Google service account key:", err);
+    console.error("❌ System initialization failed:", err);
     process.exit(1);
   }
 }
 
-// ---------------- VECTOR STORE INIT ----------------
-const dbDir = path.resolve(process.cwd(), "server/vector_store");
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-  console.log("✅ Vector DB folder created:", dbDir);
-} else {
-  console.log("✅ Vector DB folder exists:", dbDir);
-}
+// ---------------- SERVER START ----------------
 
-// ---------------- MEMORY DB INIT ----------------
-await initializeMemory();
-console.log("✅ Memory DB initialized");
+async function startServer() {
+  await initializeSystem();
 
-// ---------------- AI INTENTS INIT ----------------
-initializeAIIntents();
-console.log("✅ AI intents initialized");
+  await runApp(async (app: Application, httpServer: Server) => {
 
-// ---------------- START SERVER ----------------
-(async () => {
-  try {
-    await runApp(async (app: Application, httpServer: Server) => {
+    app.use(cors({ origin: "*", credentials: true }));
+    app.use(express.json({ limit: "10mb" }));
+    app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-      app.use(cors({ origin: "*", credentials: true }));
-      app.use(express.json({ limit: "10mb" }));
-      app.use(express.urlencoded({ limit: "10mb", extended: true }));
+    // ---------------- STATIC FILES ----------------
 
-      // Serve static public folder
-      const publicPath = path.resolve(process.cwd(), "public");
-      if (fs.existsSync(publicPath)) {
-        app.use(express.static(publicPath));
-      }
+    if (fs.existsSync(PUBLIC_DIR)) {
+      app.use(express.static(PUBLIC_DIR));
+      console.log("✅ Public folder served:", PUBLIC_DIR);
+    }
 
-      // ---------------- CHAT ROUTE ----------------
-      app.post("/chat", async (req: Request, res: Response) => {
-        let reply = "";
-        try {
-          let { message, sessionId } = req.body as { message?: string; sessionId?: string };
+    // ---------------- CHAT ROUTE ----------------
 
-          if (!message || typeof message !== "string") {
-            return res.status(400).json({ error: "Message is required" });
-          }
-          if (!sessionId || typeof sessionId !== "string") sessionId = "default-session";
+    app.post("/chat", async (req: Request, res: Response) => {
+      try {
 
-          // Save user message
-          await memoryService.addMessage(sessionId, "user", message);
+        let { message, sessionId } = req.body as {
+          message?: string;
+          sessionId?: string;
+        };
 
-          // Generate hybrid response
-          try {
-            reply = await generateHybridResponse({ message, sessionId });
-          } catch (err) {
-            console.warn("⚠️ Hybrid response failed:", err);
-            reply = "";
-          }
-
-          // Fallback if empty
-          if (!reply || reply.trim().length === 0) {
-            reply = "Sure — you can book a call with our team here: [Your Calendly Link]";
-          }
-
-          // Save assistant message
-          await memoryService.addMessage(sessionId, "assistant", reply);
-
-          // Return chat reply
-          return res.json({ reply });
-
-        } catch (err) {
-          console.error("❌ Chat route error:", err);
-          return res.status(500).json({ error: "Internal server error" });
+        if (!message || typeof message !== "string") {
+          return res.status(400).json({ error: "Message is required" });
         }
-      });
 
-      console.log("✅ Hybrid chat route initialized");
+        if (!sessionId || typeof sessionId !== "string") {
+          sessionId = "default-session";
+        }
 
-      // Optional additional routes
-      await setupApp(app);
+        // Store user message
+        await memoryService.addMessage(sessionId, "user", message);
 
-      // Start server
-      const PORT = Number(process.env.PORT) || 5000;
-      httpServer.listen(PORT, () => console.log(` ~@ Server running on port ${PORT}`));
+        // Generate AI response
+        const reply = await generateHybridResponse({
+          message,
+          sessionId,
+        });
+
+        const finalReply =
+          reply && reply.trim().length > 0
+            ? reply
+            : "You can book a strategy call with our team here: [Calendly Link]";
+
+        // Store assistant message
+        await memoryService.addMessage(sessionId, "assistant", finalReply);
+
+        return res.json({ reply: finalReply });
+
+      } catch (err) {
+        console.error("❌ Chat route error:", err);
+        return res.status(500).json({ error: "Internal server error" });
+      }
     });
 
-    console.log("✅ Server bootstrap complete");
+    console.log("✅ Hybrid chat route initialized");
 
-  } catch (err) {
-    console.error("❌ Server bootstrap failed:", err);
-    process.exit(1);
-  }
-})();
+    await setupApp(app);
+
+    const PORT = Number(process.env.PORT) || 10000;
+
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 Neon Vision server running on port ${PORT}`);
+    });
+  });
+}
+
+// ---------------- START ----------------
+
+startServer();

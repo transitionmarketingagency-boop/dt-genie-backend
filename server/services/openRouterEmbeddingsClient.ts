@@ -1,4 +1,5 @@
 // server/services/openRouterEmbeddingsClient.ts
+import "dotenv/config";
 import fetch from "node-fetch";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;

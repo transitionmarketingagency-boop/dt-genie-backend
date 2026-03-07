@@ -1,57 +1,98 @@
 // server/utils/full_system_test.ts
+
+import "dotenv/config";
+
 import { memoryService } from "../services/memoryService.js";
 import { getTopChunks } from "../queryChunks.js";
-import { gemmaClient } from "../services/gemmaClient.js";
-import { geminiClient } from "../services/geminiClient.js";
+import { generateOpenRouter } from "../services/openRouterClient.js";
+import { generateGemini } from "../services/geminiClient.js";
 
 async function runFullTest() {
-  console.log("⚡ Running full system test...");
+
+  console.log("⚡ Running full system test...\n");
 
   try {
+
     const sessionId = "test_session_001";
 
-    // 1️⃣ Test chat memory
+    /* ================= MEMORY TEST ================= */
+
     const history = await memoryService.getHistory(sessionId);
+
     console.log(`✅ Chat memory messages: ${history.length}`);
 
-    // 2️⃣ Test vector store
-    const query = "AI marketing systems";
-    const topChunks = await getTopChunks(query); // ✅ Ensure await
-    console.log(`✅ Vector store entries: ${topChunks.length}`);
-    console.log(`✅ Top chunks for query "${query}":`);
-    topChunks.forEach(c => console.log(`  - ${c.source ?? "unknown"} (score: ${c.score.toFixed(3)})`));
+    /* ================= VECTOR STORE TEST ================= */
 
-    // 3️⃣ Test Gemma
-    console.log("\n M-  Testing Gemma AI client...");
-    try {
-      const gemmaResponse = await gemmaClient("Explain AI marketing systems in simple terms");
+    const query = "AI marketing systems";
+
+    const topChunks = await getTopChunks(query, 8, 0.15);
+
+    console.log(`✅ Vector store results: ${topChunks.length}`);
+
+    console.log(`Top chunks for "${query}":`);
+
+    topChunks.slice(0,5).forEach(c => {
+
       console.log(
-        "✅ Gemma response:",
-        gemmaResponse.slice(0, 200),
-        gemmaResponse.length > 200 ? "..." : ""
+        `  - ${c.source ?? "unknown"} (score: ${c.score?.toFixed(3) ?? "n/a"})`
       );
-    } catch (err: any) {
-      console.error("❌ Gemma test failed:", err.message || err);
+
+    });
+
+    /* ================= QWEN TEST ================= */
+
+    console.log("\n🚀 Testing Qwen (OpenRouter)...");
+
+    try {
+
+      const qwenResponse = await generateOpenRouter(
+        "Explain AI marketing systems in simple terms"
+      );
+
+      console.log(
+        "✅ Qwen response:",
+        qwenResponse.slice(0,200),
+        qwenResponse.length > 200 ? "..." : ""
+      );
+
+    } catch (err:any) {
+
+      console.error("❌ Qwen test failed:", err.message || err);
+
     }
 
-    // 4️⃣ Test Gemini
-    console.log("\n ~V Testing Gemini AI client...");
+    /* ================= GEMINI TEST ================= */
+
+    console.log("\n✨ Testing Gemini fallback...");
+
     try {
-      const geminiResponse = await geminiClient("Explain AI marketing systems in simple terms");
+
+      const geminiResponse = await generateGemini(
+        "Explain AI marketing systems in simple terms"
+      );
+
       console.log(
         "✅ Gemini response:",
-        geminiResponse.slice(0, 200),
+        geminiResponse.slice(0,200),
         geminiResponse.length > 200 ? "..." : ""
       );
-    } catch (err: any) {
+
+    } catch (err:any) {
+
       console.error("❌ Gemini test failed:", err.message || err);
+
     }
 
-    console.log("\n M-/ Full system test completed successfully.");
-  } catch (err: any) {
+    console.log("\n🎉 Full system test completed successfully.");
+
+  } catch (err:any) {
+
     console.error("❌ Full system test failed:", err.message || err);
+
     process.exit(1);
+
   }
+
 }
 
 runFullTest();

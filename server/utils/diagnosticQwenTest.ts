@@ -3,13 +3,13 @@ import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
-import { getEmbedding } from "../services/openRouterEmbeddingsClient.js"; // must return number[]
-import { cosineSimilarity } from "../queryChunks.js";
+import { getTopChunks } from "../queryChunks.js";
+import { getEmbedding } from "../services/openRouterEmbeddingsClient.js";
 
-dotenv.config(); // ✅ ensure .env is loaded
+dotenv.config(); // Load .env
 
 console.log(
-  "🔑 OPENROUTER_API_KEY:",
+  " ~Q OPENROUTER_API_KEY:",
   process.env.OPENROUTER_API_KEY ? "FOUND" : "MISSING"
 );
 
@@ -18,12 +18,12 @@ const CHUNKS_PATH = path.resolve(
   process.cwd(),
   "server/vector_store/chunks.json"
 );
-const AI_LOGIC_PATH = path.resolve(process.cwd(), "server/ai_logic");
+const AI_INTENTS_DIR = path.resolve(process.cwd(), "server/ai_logic");
 
 /* ================= LOAD CHUNKS ================= */
 function loadChunks() {
   if (!fs.existsSync(CHUNKS_PATH)) {
-    console.error("chunks.json not found:", CHUNKS_PATH);
+    console.error("❌ chunks.json not found:", CHUNKS_PATH);
     return [];
   }
 
@@ -38,7 +38,7 @@ function loadChunks() {
     }));
 }
 
-/* ================= LOAD AI INTENTS ================= */
+/* ================= LOAD INTENTS ================= */
 function loadIntentsRecursive(dir: string, intents: any[] = []) {
   if (!fs.existsSync(dir)) return intents;
 
@@ -81,45 +81,49 @@ async function embedQuery(text: string): Promise<number[]> {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY missing.");
 
-  let lastErr: any = null;
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const embedding = await getEmbedding(text); // returns number[]
-      if (!embedding || !Array.isArray(embedding)) {
-        throw new Error("Invalid embedding returned from OpenRouter");
-      }
-      return embedding;
-    } catch (err) {
-      console.warn(`⚠️ Qwen embedding attempt ${attempt} failed:`, err);
-      lastErr = err;
-    }
+  try {
+    const embedding = await getEmbedding(text);
+    if (!embedding || !Array.isArray(embedding)) throw new Error("Invalid embedding");
+    return embedding;
+  } catch (err) {
+    console.error("❌ Embedding failed:", err);
+    return [];
   }
+}
 
-  throw new Error("❌ Failed to generate embedding after retries: " + lastErr);
+/* ================= COSINE SIMILARITY ================= */
+function cosineSimilarity(vecA: number[], vecB: number[]): number {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    const a = vecA[i], b = vecB[i];
+    dot += a * b;
+    normA += a * a;
+    normB += b * b;
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB) + 1e-10);
 }
 
 /* ================= TOP CHUNKS ================= */
-function getTopChunks(queryEmbedding: number[], chunks: any[], limit = 8) {
-  const scored = chunks.map((c) => ({
+function getTopChunksLocal(queryEmbedding: number[], chunks: any[], limit = 8) {
+  const scored = chunks.map(c => ({
     text: c.text,
     source: c.source,
     score: cosineSimilarity(queryEmbedding, c.embedding),
   }));
-
   const sorted = scored.sort((a, b) => b.score - a.score).slice(0, limit);
 
   console.log("\n[Top Similarity Scores]");
-  sorted.forEach((s) => console.log(s.score.toFixed(4)));
+  sorted.forEach((s, i) => console.log(`#${i + 1}: ${s.score.toFixed(4)}`));
 
   return sorted;
 }
 
-/* ================= QWEN CALL ================= */
+/* ================= CALL QWEN ================= */
 async function callQwen(contextChunks: any[], question: string) {
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) throw new Error("OPENROUTER_API_KEY missing.");
 
-  const context = contextChunks.map((c) => c.text).join("\n\n");
+  const context = contextChunks.map(c => c.text).join("\n\n");
 
   const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
     method: "POST",
@@ -128,8 +132,10 @@ async function callQwen(contextChunks: any[], question: string) {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "qwen/qwen-2.5-72b-instruct",
-      temperature: 0,
+      model: "qwen/qwen2.5-32b-instruct",
+      temperature: 0.25,
+      max_tokens: 500,
+      top_p: 0.9,
       messages: [
         {
           role: "system",
@@ -145,58 +151,37 @@ async function callQwen(contextChunks: any[], question: string) {
   return data.choices?.[0]?.message?.content ?? "No response";
 }
 
-/* ================= HYBRID RESPONSE ================= */
-async function hybridResponse(query: string, intents: any[], chunks: any[]) {
-  // 1️⃣ Intent match
-  const intentMatch = intents.find((intent) =>
-    intent.triggers.some((t: string) =>
-      query.toLowerCase().includes(t.toLowerCase())
-    )
+/* ================= DIAGNOSTIC TEST ================= */
+export async function diagnosticQwenTest(question: string) {
+  const chunks = loadChunks();
+  const intents = loadIntentsRecursive(AI_INTENTS_DIR);
+
+  console.log("\n📌 Running diagnostic test for question:", question);
+
+  // 1️⃣ Check intents
+  const intentMatch = intents.find(intent =>
+    intent.triggers.some((t: string) => question.toLowerCase().includes(t.toLowerCase()))
   );
 
   if (intentMatch) {
-    return "M-/ Intent Match:\n" + intentMatch.responses.join("\n");
+    console.log("\n[MATCHED INTENT]:", intentMatch.responses.join("\n"));
   }
 
   // 2️⃣ Similarity search
-  const queryEmbedding = await embedQuery(query);
-  const topChunks = getTopChunks(queryEmbedding, chunks, 8);
+  const queryEmbedding = await embedQuery(question);
+  const topChunks = getTopChunksLocal(queryEmbedding, chunks, 8);
 
-  if (topChunks.length > 0 && topChunks[0].score > 0.75) {
-    return "~B Similarity Match:\n" + topChunks.map((c) => c.text).join("\n\n");
-  }
+  // 3️⃣ Call Qwen
+  const qwenResponse = await callQwen(topChunks, question);
+  console.log("\n[QWEN RESPONSE]:\n", qwenResponse);
 
-  // 3️⃣ Grounded Qwen
-  return await callQwen(topChunks, query);
+  return qwenResponse;
 }
 
-/* ================= MAIN ================= */
-async function main() {
-  const chunks = loadChunks();
-  const intents = loadIntentsRecursive(AI_LOGIC_PATH);
-
-  console.log(`[Diagnostic] Loaded ${chunks.length} chunks`);
-  console.log(`[Diagnostic] Loaded ${intents.length} AI intents`);
-
-  const testQueries = [
-    "List all company services with details and pricing",
-    "Tell me about CGI property tours",
-    "What is your 90-day guarantee?",
-    "Do you offer unlimited revisions?",
-    "Explain how AI transforms marketing in 2026",
-  ];
-
-  for (const query of testQueries) {
-    console.log("\n===== TEST QUERY =====");
-    console.log("Query:", query);
-
-    try {
-      const response = await hybridResponse(query, intents, chunks);
-      console.log("Response:\n", response);
-    } catch (err) {
-      console.error("❌ Failed to process query:", err);
-    }
-  }
+/* ================= RUN DIRECTLY ================= */
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const testQuery = "Tell me about our CGI property marketing services.";
+  diagnosticQwenTest(testQuery).then(() => {
+    console.log("\n[Diagnostic Complete]");
+  });
 }
-
-main();

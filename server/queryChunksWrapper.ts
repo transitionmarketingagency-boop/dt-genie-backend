@@ -1,5 +1,6 @@
-import { getTopChunks } from "./queryChunks.js"; // ✅ ESM-safe
-import { getEmbedding } from "./services/openRouterEmbeddingsClient.js";
+// server/queryChunksWrapper.ts
+import { getTopChunks } from "./queryChunks.js";
+
 export type NormalizedChunk = {
   source: string;
   summary: string;
@@ -12,20 +13,12 @@ export async function fetchRelevantChunks(
 
   if (!query || !query.trim()) return [];
 
-  const queryEmbedding: number[] = await getEmbedding(query);
-
-  const rawChunks = await getTopChunks(query, limit);
+  const rawChunks = await getTopChunks(query, limit); // embedding already handled inside
   if (!Array.isArray(rawChunks)) return [];
 
   const normalized = rawChunks
-    .map((c: any) => {
-      const source =
-        c?.content ||
-        c?.text ||
-        c?.metadata?.content ||
-        c?.metadata?.text ||
-        "";
-
+    .map((c) => {
+      const source = c?.text || "";
       return {
         source: source.trim(),
         summary: source.slice(0, 240)

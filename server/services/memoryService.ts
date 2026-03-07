@@ -36,6 +36,7 @@ export async function initializeMemory(): Promise<void> {
 
 // ---------------- Memory Service ----------------
 export class MemoryService {
+  // Add message to memory
   async addMessage(
     sessionId: string,
     role: "user" | "assistant",
@@ -50,9 +51,12 @@ export class MemoryService {
       timestamp: new Date(),
     };
 
-    const ts = msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
+    const ts =
+      msg.timestamp instanceof Date
+        ? msg.timestamp.toISOString()
+        : new Date(msg.timestamp).toISOString();
 
-    // Correct parameter order
+    // Corrected parameter order
     await db.run(
       `INSERT INTO chat_messages (id, sessionId, role, content, timestamp) VALUES (?, ?, ?, ?, ?)`,
       msg.id,
@@ -69,6 +73,12 @@ export class MemoryService {
     return msg;
   }
 
+  // Alias for hybrid response compatibility
+  saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
+    return this.addMessage(sessionId, role, content);
+  }
+
+  // Get full session history
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
     const db = await dbPromise;
     const rows = await db.all(
@@ -84,6 +94,7 @@ export class MemoryService {
     }));
   }
 
+  // Save entire chat history (overwrite)
   async saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void> {
     const db = await dbPromise;
     await db.exec("BEGIN TRANSACTION");
@@ -96,7 +107,10 @@ export class MemoryService {
       `);
 
       for (const msg of messages) {
-        const ts = msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
+        const ts =
+          msg.timestamp instanceof Date
+            ? msg.timestamp.toISOString()
+            : new Date(msg.timestamp).toISOString();
         await insertStmt.run(msg.id, msg.sessionId, msg.role, msg.content, ts);
       }
 
