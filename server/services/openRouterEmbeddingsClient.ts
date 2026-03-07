@@ -1,6 +1,5 @@
 // server/services/openRouterEmbeddingsClient.ts
 import "dotenv/config";
-import fetch from "node-fetch";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -21,10 +20,8 @@ export async function getEmbedding(text: string): Promise<number[]> {
   if (!text || !text.trim()) return [];
 
   const MAX_RETRIES = 2;
-  let attempt = 0;
 
-  while (attempt <= MAX_RETRIES) {
-    attempt++;
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     try {
       const res = await fetch("https://openrouter.ai/api/v1/embeddings", {
         method: "POST",
@@ -33,7 +30,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
           Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         },
         body: JSON.stringify({
-          model: "qwen/Qwen3-Embedding-4B", // 4B model
+          model: "qwen/Qwen3-Embedding-4B",
           input: text,
         }),
       });
@@ -50,15 +47,19 @@ export async function getEmbedding(text: string): Promise<number[]> {
         throw new Error("Invalid embedding response from OpenRouter");
       }
 
-      return embedding.map(Number); // ensure numeric array
+      return embedding.map(Number);
+
     } catch (err) {
       console.warn(`⚠️ Qwen embedding attempt ${attempt} failed:`, err);
-      if (attempt > MAX_RETRIES) break;
-      await new Promise((res) => setTimeout(res, 2000 * attempt)); // exponential backoff
+
+      if (attempt <= MAX_RETRIES) {
+        await new Promise((res) => setTimeout(res, 2000 * attempt)); // exponential backoff
+      } else {
+        console.error("❌ Failed to generate embedding after retries");
+      }
     }
   }
 
-  console.error("❌ Failed to generate embedding after retries");
   return [];
 }
 
