@@ -1,7 +1,8 @@
 // server/services/memoryService.ts
+
 import * as sqlite from "sqlite";
 import sqlite3 from "sqlite3";
-import type { ChatMessage } from "../../shared/types.js"; // <--- ensure type import
+import type { ChatMessage } from "../../shared/types.js";
 import crypto from "crypto";
 import path from "node:path";
 import fs from "node:fs";
@@ -10,18 +11,29 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ---------------- Memory DB path ----------------
+/* ================= MEMORY PATH ================= */
+
 const memoryDir = path.join(__dirname, "../memory");
 if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
+
 const dbPath = path.join(memoryDir, "chat_memory.db");
 
-// ---------------- Open SQLite ----------------
-const dbPromise = sqlite.open({ filename: dbPath, driver: sqlite3.Database });
+/* ================= SQLITE CONNECTION ================= */
 
-// ---------------- Initialization ----------------
+const dbPromise = sqlite.open({
+  filename: dbPath,
+  driver: sqlite3.Database,
+});
+
+/* ================= INITIALIZATION ================= */
+
 export async function initializeMemory(): Promise<void> {
   try {
     const db = await dbPromise;
+
+    await db.exec(`PRAGMA journal_mode = WAL;`);
+    await db.exec(`PRAGMA synchronous = NORMAL;`);
+
     await db.run(`
       CREATE TABLE IF NOT EXISTS chat_messages (
         id TEXT PRIMARY KEY,
@@ -31,20 +43,35 @@ export async function initializeMemory(): Promise<void> {
         timestamp TEXT NOT NULL
       )
     `);
-    await db.run(`CREATE INDEX IF NOT EXISTS idx_sessionId ON chat_messages (sessionId)`);
+
+    await db.run(`
+      CREATE INDEX IF NOT EXISTS idx_sessionId 
+      ON chat_messages (sessionId)
+    `);
+
     console.log("✅ Memory DB initialized at:", dbPath);
   } catch (err) {
     console.error("❌ Failed to initialize memory DB:", err);
   }
 }
 
-// ---------------- Memory Service ----------------
+/* ================= MEMORY SERVICE ================= */
+
 export class MemoryService {
   private db = dbPromise;
 
-  async addMessage(sessionId: string, role: "user" | "assistant", content: string): Promise<ChatMessage> {
+  /* -------- Add Message -------- */
+
+  async addMessage(
+    sessionId: string,
+    role: "user" | "assistant",
+    content: string
+  ): Promise<ChatMessage> {
+
     const db = await this.db;
+
     const now = new Date();
+
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId,
@@ -52,10 +79,15 @@ export class MemoryService {
       content: content ?? "",
       timestamp: now,
     };
-    const ts = msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
+
+    const ts =
+      msg.timestamp instanceof Date
+        ? msg.timestamp.toISOString()
+        : new Date(msg.timestamp).toISOString();
 
     await db.run(
-      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp) VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
+       VALUES (?, ?, ?, ?, ?)`,
       msg.id,
       msg.sessionId,
       msg.role,
@@ -70,16 +102,26 @@ export class MemoryService {
     return msg;
   }
 
+  /* -------- Alias used by chatbot -------- */
+
   saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
     return this.addMessage(sessionId, role, content);
   }
 
+  /* -------- Get Conversation History -------- */
+
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
+
     const db = await this.db;
+
     const rows = await db.all(
-      `SELECT * FROM chat_messages WHERE sessionId = ? ORDER BY timestamp ASC`,
+      `SELECT * FROM chat_messages
+       WHERE sessionId = ?
+       ORDER BY timestamp ASC
+       LIMIT 50`,
       sessionId
     );
+
     return rows.map((r: any) => ({
       id: r.id,
       sessionId: r.sessionId,
@@ -89,34 +131,61 @@ export class MemoryService {
     }));
   }
 
+  /* -------- Replace Entire History -------- */
+
   async saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void> {
+
     const db = await this.db;
+
     await db.exec("BEGIN TRANSACTION");
+
     try {
-      await db.run(`DELETE FROM chat_messages WHERE sessionId = ?`, sessionId);
+
+      await db.run(
+        `DELETE FROM chat_messages WHERE sessionId = ?`,
+        sessionId
+      );
+
       const insertStmt = await db.prepare(`
         INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
         VALUES (?, ?, ?, ?, ?)
       `);
 
       for (const msg of messages) {
-        const ts = msg.timestamp instanceof Date ? msg.timestamp.toISOString() : new Date(msg.timestamp).toISOString();
-        await insertStmt.run(msg.id, msg.sessionId, msg.role, msg.content, ts);
+
+        const ts =
+          msg.timestamp instanceof Date
+            ? msg.timestamp.toISOString()
+            : new Date(msg.timestamp).toISOString();
+
+        await insertStmt.run(
+          msg.id,
+          msg.sessionId,
+          msg.role,
+          msg.content,
+          ts
+        );
       }
 
       await insertStmt.finalize();
+
       await db.exec("COMMIT");
 
       if (process.env.DEBUG_MEMORY === "true") {
-        console.log(`[Memory] Saved ${messages.length} messages for session ${sessionId}`);
+        console.log(
+          `[Memory] Saved ${messages.length} messages for session ${sessionId}`
+        );
       }
+
     } catch (err) {
+
       await db.exec("ROLLBACK");
+
       console.error("❌ Failed to save chat history:", err);
-      throw err;
     }
   }
 }
 
-// ---------------- Export singleton ----------------
-export const memoryService = new MemoryService(); // <--- export singleton for other modules
+/* ================= SINGLETON EXPORT ================= */
+
+export const memoryService = new MemoryService();

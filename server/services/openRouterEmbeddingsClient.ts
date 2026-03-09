@@ -17,12 +17,15 @@ interface EmbeddingResponse {
  * Get text embeddings using OpenRouter Qwen 4B embedding model
  */
 export async function getEmbedding(text: string): Promise<number[]> {
+
   if (!text || !text.trim()) return [];
 
   const MAX_RETRIES = 2;
 
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+
     try {
+
       const res = await fetch("https://openrouter.ai/api/v1/embeddings", {
         method: "POST",
         headers: {
@@ -41,6 +44,7 @@ export async function getEmbedding(text: string): Promise<number[]> {
       }
 
       const data = (await res.json()) as EmbeddingResponse;
+
       const embedding = data?.data?.[0]?.embedding;
 
       if (!embedding || !Array.isArray(embedding)) {
@@ -50,14 +54,21 @@ export async function getEmbedding(text: string): Promise<number[]> {
       return embedding.map(Number);
 
     } catch (err) {
+
       console.warn(`⚠️ Qwen embedding attempt ${attempt} failed:`, err);
 
       if (attempt <= MAX_RETRIES) {
-        await new Promise((res) => setTimeout(res, 2000 * attempt)); // exponential backoff
+
+        await new Promise((res) => setTimeout(res, 2000 * attempt));
+
       } else {
+
         console.error("❌ Failed to generate embedding after retries");
+
       }
+
     }
+
   }
 
   return [];

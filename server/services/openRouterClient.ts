@@ -30,7 +30,6 @@ function cleanPrompt(prompt: string): string {
   if (!prompt) return "";
 
   let cleaned = prompt
-    .replace(/[^\x00-\x7F]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -58,8 +57,10 @@ function isValidResponse(text: string): boolean {
     "system:"
   ];
 
+  const lower = text.toLowerCase();
+
   for (const p of badPatterns) {
-    if (text.toLowerCase().includes(p)) {
+    if (lower.includes(p)) {
       return false;
     }
   }
@@ -81,12 +82,9 @@ export async function generateOpenRouter(
 
   prompt = cleanPrompt(prompt);
 
-  let attempt = 0;
   let lastError: any = null;
 
-  while (attempt <= MAX_RETRIES) {
-
-    attempt++;
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
@@ -110,7 +108,6 @@ export async function generateOpenRouter(
             temperature: 0.25,
             max_tokens: 500,
             top_p: 0.9,
-
             messages: [
               {
                 role: "system",
@@ -130,18 +127,15 @@ export async function generateOpenRouter(
       clearTimeout(timeout);
 
       if (!res.ok) {
-
         const text = await res.text();
-
         throw new Error(`OpenRouter HTTP ${res.status}: ${text}`);
-
       }
 
       const data = (await res.json()) as OpenRouterResponse;
 
       const content =
-        data?.choices?.[0]?.message?.content ||
-        data?.choices?.[0]?.text ||
+        data?.choices?.[0]?.message?.content ??
+        data?.choices?.[0]?.text ??
         "";
 
       const text = content.trim();

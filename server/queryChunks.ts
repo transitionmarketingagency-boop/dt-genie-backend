@@ -13,14 +13,15 @@ const devPath = path.join(__dirname, "../vector_store/chunks.json");
 
 const chunksPath = fs.existsSync(distPath) ? distPath : devPath;
 
-console.log("📚 Loading chunks from:", chunksPath);
+console.log("📦 Loading chunks from:", chunksPath);
 
 /* ================= CHUNK TYPE ================= */
 
-type Chunk = {
+export type Chunk = {
   text: string;
   source: string | null;
   embedding: number[];
+  intent?: string;
 };
 
 /* ================= LOAD CHUNKS ================= */
@@ -44,6 +45,7 @@ let embeddingSize = 0;
         text: String(c.text),
         source: typeof c.source === "string" ? c.source : null,
         embedding: c.embedding.map(Number).filter((n: number) => !Number.isNaN(n)),
+        intent: typeof c.intent === "string" ? c.intent : undefined,
       }))
       .filter((c: Chunk) => c.embedding.length > 100 && c.text.length > 30);
 
@@ -52,8 +54,7 @@ let embeddingSize = 0;
     }
 
     console.log(`✅ ${cachedChunks.length} chunks loaded`);
-    console.log(`📏 Embedding dimension: ${embeddingSize}`);
-
+    console.log(`🧠 Embedding dimension: ${embeddingSize}`);
   } catch (err) {
     console.error("❌ Failed to load chunks:", err);
   }
@@ -70,12 +71,9 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   let normB = 0;
 
   for (let i = 0; i < vecA.length; i++) {
-    const a = vecA[i];
-    const b = vecB[i];
-
-    dot += a * b;
-    normA += a * a;
-    normB += b * b;
+    dot += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
   }
 
   if (normA === 0 || normB === 0) return 0;
@@ -89,7 +87,11 @@ const queryEmbeddingCache = new Map<string, number[]>();
 const CACHE_LIMIT = 200;
 
 function normalizeQuery(text: string): string {
-  return text.toLowerCase().trim().replace(/\s+/g, " ");
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function cacheEmbedding(key: string, embedding: number[]) {
@@ -97,7 +99,6 @@ function cacheEmbedding(key: string, embedding: number[]) {
     const firstKey = queryEmbeddingCache.keys().next().value;
     if (firstKey !== undefined) queryEmbeddingCache.delete(firstKey);
   }
-
   queryEmbeddingCache.set(key, embedding);
 }
 
@@ -106,8 +107,8 @@ function cacheEmbedding(key: string, embedding: number[]) {
 export async function getTopChunks(
   queryText: string,
   limit = 6,
-  minSimilarity = 0.60
-): Promise<{ text: string; source: string | null; score: number }[]> {
+  minSimilarity = 0.6
+): Promise<{ text: string; source: string | null; score: number; intent?: string }[]> {
 
   if (!queryText?.trim()) return [];
 
@@ -140,34 +141,56 @@ export async function getTopChunks(
     }
   }
 
-  /* ================= SCORE ALL CHUNKS ================= */
+  /* ================= SCORE CHUNKS ================= */
 
-  const scored: { chunk: Chunk; score: number }[] = [];
-
-  for (const chunk of cachedChunks) {
-    const score = cosineSimilarity(queryEmbedding, chunk.embedding);
-
-    scored.push({ chunk, score });
-  }
+  const scored = cachedChunks.map((chunk) => ({
+    chunk,
+    score: cosineSimilarity(queryEmbedding!, chunk.embedding),
+  }));
 
   if (scored.length === 0) return [];
 
-  /* ================= SORT RESULTS ================= */
+  /* ================= SORT ================= */
 
   scored.sort((a, b) => b.score - a.score);
 
-  /* ================= FILTER + LIMIT ================= */
+  /* ================= FILTER ================= */
 
-  const filtered = scored.filter(s => s.score >= minSimilarity);
+  const filtered = scored.filter((s) => s.score >= minSimilarity);
 
-  const finalResults =
-    filtered.length > 0
-      ? filtered.slice(0, limit)
-      : scored.slice(0, limit); // fallback if threshold too strict
+  if (!filtered.length) {
+    console.log("⚠️ No chunks above similarity threshold");
+    return [];
+  }
 
-  return finalResults.map(({ chunk, score }) => ({
-    text: chunk.text,
-    source: chunk.source,
-    score: Number(score.toFixed(4)),
-  }));
+  const unique = new Set<string>();
+
+  const results: {
+    text: string;
+    source: string | null;
+    score: number;
+    intent?: string;
+  }[] = [];
+
+  for (const item of filtered) {
+
+    const text = item.chunk.text.trim();
+
+    if (unique.has(text)) continue;
+
+    unique.add(text);
+
+    results.push({
+      text,
+      source: item.chunk.source,
+      score: Number(item.score.toFixed(4)),
+      intent: item.chunk.intent,
+    });
+
+    if (results.length >= limit) break;
+
+  }
+
+  return results;
+
 }
