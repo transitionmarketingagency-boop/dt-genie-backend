@@ -1,5 +1,3 @@
-// server/services/generateHybridResponse.ts
-
 import { getTopChunks } from "../queryChunks.js";
 import { generateOpenRouter } from "./openRouterClient.js";
 import { generateGemini } from "./geminiClient.js";
@@ -18,12 +16,15 @@ let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
+
   const now = Date.now();
   const ONE_DAY = 86400000;
+
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
   }
+
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
 
@@ -42,7 +43,7 @@ function normalize(text: string): string {
 const staticIntents = {
   greeting: ["hi", "hello", "hey"],
   identity: ["who are you", "about yourself", "tell me about yourself"],
-  book: ["book", "schedule", "call"],
+  book: ["book", "schedule", "call", "meeting"],
 };
 
 const greetingVariations = [
@@ -56,20 +57,26 @@ const greetingVariations = [
 function findMatchingIntent(userMessage: string): string | null {
   const msg = normalize(userMessage);
   const msgWords = msg.split(" ");
+
   let bestMatch: { score: number; response: string } | null = null;
 
   for (const intent of aiIntents) {
     if (!intent?.triggers?.length || !intent?.responses?.length) continue;
 
     let score = 0;
+
     for (const trig of intent.triggers) {
       const trigWords = normalize(trig).split(" ");
       const overlap = trigWords.filter((w) => msgWords.includes(w)).length;
+
       score += trigWords.length ? overlap / trigWords.length : 0;
     }
 
-    if (score > 0.45 && (!bestMatch || score > bestMatch.score)) {
-      bestMatch = { score, response: intent.responses.filter(Boolean).join("\n\n") };
+    if (score > 0.55 && (!bestMatch || score > bestMatch.score)) {
+      bestMatch = {
+        score,
+        response: intent.responses.filter(Boolean).join("\n\n"),
+      };
     }
   }
 
@@ -80,17 +87,26 @@ function findMatchingIntent(userMessage: string): string | null {
 
 async function getEmbeddingKnowledge(userMessage: string): Promise<string> {
   try {
-    const chunks: any[] = await getTopChunks(userMessage, 8, 0.78);
+
+    // LOWERED SIMILARITY THRESHOLD
+    const chunks: any[] = await getTopChunks(userMessage, 6, 0.60);
+
     if (!chunks?.length) return "";
 
     const texts: string[] = [];
+
     for (const c of chunks) {
       if (!c?.text) continue;
-      const trimmed = c.text.slice(0, 600).trim();
-      if (!texts.includes(trimmed)) texts.push(`SOURCE:\n${trimmed}`);
+
+      const cleaned = c.text.trim();
+
+      if (!texts.includes(cleaned)) {
+        texts.push(cleaned);
+      }
     }
 
-    return texts.slice(0, 6).join("\n\n");
+    return texts.slice(0, 5).join("\n\n");
+
   } catch (err) {
     console.error("Embedding retrieval error:", err);
     return "";
@@ -102,6 +118,7 @@ async function getEmbeddingKnowledge(userMessage: string): Promise<string> {
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(null), ms);
+
     promise
       .then((res) => {
         clearTimeout(timer);
@@ -129,10 +146,13 @@ export async function generateHybridResponse({
   sessionId,
   history = [],
 }: HybridRequest): Promise<string> {
+
   try {
+
     const msg = normalize(message);
 
-    /* ===== STATIC INTENT RESPONSES ===== */
+    /* ===== BASIC INTENTS ===== */
+
     if (staticIntents.greeting.some((t) => msg.includes(t))) {
       return greetingVariations[Math.floor(Math.random() * greetingVariations.length)];
     }
@@ -142,113 +162,143 @@ export async function generateHybridResponse({
     }
 
     if (staticIntents.book.some((t) => msg.includes(t))) {
-      return `You can schedule a strategy session here:\nhttps://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future`;
+      return `You can schedule a strategy session here:
+https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future`;
     }
 
     /* ===== MEMORY HISTORY ===== */
+
     let memoryHistory: any[] = [];
+
     try {
       memoryHistory = await memoryService.getHistory(sessionId);
     } catch {
       memoryHistory = history || [];
     }
-    const historyText = memoryHistory.slice(-6).map((h) => `${h.role}: ${h.content}`).join("\n");
+
+    const historyText = memoryHistory
+      .slice(-6)
+      .map((h) => `${h.role}: ${h.content}`)
+      .join("\n");
 
     /* ===== KNOWLEDGE SOURCES ===== */
-    const jsonKnowledge = findMatchingIntent(message) ?? "";
-    const embeddingKnowledge = await getEmbeddingKnowledge(message);
-    let knowledgePool = "";
-    if (jsonKnowledge.length > 20) knowledgePool += `\nINTENT KNOWLEDGE:\n${jsonKnowledge}\n`;
-    if (embeddingKnowledge.length > 20) knowledgePool += `\nVECTOR KNOWLEDGE BASE:\n${embeddingKnowledge}\n`;
 
-    /* ===== PROMPT CONSTRUCTION ===== */
+    const vectorKnowledge = await getEmbeddingKnowledge(message);
+
+    const jsonKnowledge = findMatchingIntent(message) ?? "";
+
+    let knowledgePool = "";
+
+    // VECTOR KNOWLEDGE FIRST (MOST IMPORTANT)
+    if (vectorKnowledge.length > 20) {
+      knowledgePool += `COMPANY KNOWLEDGE:\n${vectorKnowledge}\n\n`;
+    }
+
+    // INTENT KNOWLEDGE SECONDARY
+    if (jsonKnowledge.length > 20) {
+      knowledgePool += `SUPPORTING INFO:\n${jsonKnowledge}\n\n`;
+    }
+
+    /* ===== PROMPT ===== */
+
     const prompt = `
-SYSTEM ROLE
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
-STRICT RULES
-- Only use information from the KNOWLEDGE BASE when discussing company services.
-- Do NOT invent tools, services, statistics, or pricing.
-- If the knowledge base does not contain the answer, say you don't have that information yet.
-- Be professional, clear, and concise.
-- Do NOT repeat introductions unless the user asks who you are.
+You answer questions about the company's marketing services,
+AI automation systems, CGI advertising, SEO strategy, and digital growth.
+
+Use the COMPANY KNOWLEDGE to answer questions whenever possible.
+
+If the answer is not fully available, give the best helpful explanation
+based on the available context.
+
+Be professional, confident, and concise.
 
 --------------------------------
 
-KNOWLEDGE BASE
 ${knowledgePool}
 
 --------------------------------
 
-CONVERSATION CONTEXT
+Conversation context:
 ${historyText}
 
 --------------------------------
 
-USER QUESTION
+User question:
 ${message}
 
 --------------------------------
 
-INSTRUCTIONS
-Provide a helpful response.
-Use short paragraphs or bullet points when helpful.
-Focus on clear practical explanations.
+Answer clearly and helpfully.
 `;
 
     const MIN_RESPONSE_LENGTH = 60;
+
     let response = "";
     let modelUsed = "none";
 
-    /* ===== PRIMARY MODEL: Qwen ===== */
+    /* ===== PRIMARY MODEL ===== */
+
     if (process.env.OPENROUTER_API_KEY) {
-      try {
-        console.log("⚡ Using primary model: Qwen");
-        const qwenResp = await withTimeout(generateOpenRouter(prompt), 12000);
-        if (qwenResp && qwenResp.length >= MIN_RESPONSE_LENGTH) {
-          response = cleanResponse(qwenResp);
-          modelUsed = "Qwen";
-        }
-      } catch (err) {
-        console.error("Qwen error:", err);
+
+      const qwenResp = await withTimeout(
+        generateOpenRouter(prompt),
+        12000
+      );
+
+      if (qwenResp && qwenResp.length >= MIN_RESPONSE_LENGTH) {
+        response = cleanResponse(qwenResp);
+        modelUsed = "Qwen";
       }
+
     }
 
-    /* ===== FALLBACK MODEL: Gemini ===== */
+    /* ===== FALLBACK MODEL ===== */
+
     if ((!response || response.length < MIN_RESPONSE_LENGTH) && canUseGemini()) {
-      try {
-        console.log("⚡ Using fallback model: Gemini");
-        const geminiResp = await withTimeout(generateGemini(prompt), 10000);
-        if (geminiResp && geminiResp.length >= MIN_RESPONSE_LENGTH) {
-          response = cleanResponse(geminiResp);
-          modelUsed = "Gemini";
-          markGeminiUsed();
-        }
-      } catch (err) {
-        console.error("Gemini error:", err);
+
+      const geminiResp = await withTimeout(
+        generateGemini(prompt),
+        10000
+      );
+
+      if (geminiResp && geminiResp.length >= MIN_RESPONSE_LENGTH) {
+        response = cleanResponse(geminiResp);
+        modelUsed = "Gemini";
+        markGeminiUsed();
       }
+
     }
 
     /* ===== SAFE FALLBACK ===== */
+
     if (!response) {
-      response = `I'm ${BOT_NAME}. I can assist with AI marketing systems, CGI property marketing, SEO strategy, and digital growth. How can I help today?`;
+      response = `I'm ${BOT_NAME}. I can assist with AI marketing systems, CGI advertising, automation, SEO strategy, and digital growth services. What would you like to know?`;
       modelUsed = "fallback";
     }
 
     response = enforceBotName(response);
 
     /* ===== SAVE MEMORY ===== */
+
     try {
+
       await memoryService.saveMessage(sessionId, "user", message);
       await memoryService.saveMessage(sessionId, "assistant", response);
+
     } catch {
       console.warn("Memory save failed");
     }
 
     console.log(`[Hybrid RAG] Model=${modelUsed}`);
+
     return response;
+
   } catch (err) {
+
     console.error("Hybrid RAG error:", err);
+
     return `I'm ${BOT_NAME}. We're experiencing a temporary processing issue. Please try again shortly.`;
   }
 }

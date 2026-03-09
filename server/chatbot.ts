@@ -1,52 +1,64 @@
 // server/chatbot.ts
+
 import readline from "readline";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
+
+/* ================= CLI SETUP ================= */
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-console.log(" ~V DT-Genie is ready. Type your message below.\n");
+console.log("🤖 Neon Vision CLI chatbot ready.");
+console.log("Type a message or type 'exit' to quit.\n");
 
-// Simple intent detector (FAST, SAFE)
-function isSimpleIntent(text: string) {
-  const t = text.toLowerCase().trim();
-  return (
-    t === "hi" ||
-    t === "hello" ||
-    t === "hey" ||
-    t === "are you there" ||
-    t === "who are you" ||
-    t.includes("services") ||
-    t.includes("what do you do") ||
-    t.includes("tell me about")
-  );
-}
+/* ================= CHAT LOOP ================= */
 
-async function ask() {
-  rl.question("You: ", async (input) => {
-    if (input.toLowerCase() === "exit") {
-      console.log("\n ~K Goodbye!");
+async function ask(): Promise<void> {
+  rl.question("You: ", async (input: string) => {
+
+    const message = input.trim();
+
+    /* ---- Exit commands ---- */
+
+    if (
+      message.toLowerCase() === "exit" ||
+      message.toLowerCase() === "quit" ||
+      message.toLowerCase() === "bye"
+    ) {
+      console.log("\n👋 Goodbye!\n");
       rl.close();
       process.exit(0);
     }
 
+    /* ---- Ignore empty input ---- */
+
+    if (!message) {
+      ask();
+      return;
+    }
+
     try {
-      // ✅ Updated: pass single object to generateHybridResponse
+
       const response = await generateHybridResponse({
-        message: input,
-        sessionId: "default-session",
+        message,
+        sessionId: "cli-session",
       });
 
-      console.log("\n ~V AI Response:", response, "\n");
+      console.log("\n🤖 AI:", response, "\n");
+
     } catch (err) {
-      console.error("⚠️ Error:", err);
+
+      console.error("⚠️ Error generating response:", err);
       console.log("Sorry — something went wrong.\n");
+
     }
 
     ask();
   });
 }
+
+/* ================= START ================= */
 
 ask();

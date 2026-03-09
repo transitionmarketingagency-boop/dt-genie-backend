@@ -1,21 +1,22 @@
-// server/queryChunks.ts
-
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { getEmbedding as getQwenEmbedding } from "./services/openRouterEmbeddingsClient.js";
 
 /* ================= PATH RESOLUTION ================= */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const distPath = path.join(__dirname, "vector_store", "chunks.json");
 const devPath = path.join(__dirname, "../vector_store/chunks.json");
+
 const chunksPath = fs.existsSync(distPath) ? distPath : devPath;
 
 console.log("📚 Loading chunks from:", chunksPath);
 
 /* ================= CHUNK TYPE ================= */
+
 type Chunk = {
   text: string;
   source: string | null;
@@ -23,6 +24,7 @@ type Chunk = {
 };
 
 /* ================= LOAD CHUNKS ================= */
+
 let cachedChunks: Chunk[] = [];
 let embeddingSize = 0;
 
@@ -51,12 +53,14 @@ let embeddingSize = 0;
 
     console.log(`✅ ${cachedChunks.length} chunks loaded`);
     console.log(`📏 Embedding dimension: ${embeddingSize}`);
+
   } catch (err) {
     console.error("❌ Failed to load chunks:", err);
   }
 })();
 
 /* ================= COSINE SIMILARITY ================= */
+
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!vecA || !vecB) return 0;
   if (vecA.length !== vecB.length) return 0;
@@ -68,16 +72,19 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   for (let i = 0; i < vecA.length; i++) {
     const a = vecA[i];
     const b = vecB[i];
+
     dot += a * b;
     normA += a * a;
     normB += b * b;
   }
 
   if (normA === 0 || normB === 0) return 0;
+
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 /* ================= QUERY CACHE ================= */
+
 const queryEmbeddingCache = new Map<string, number[]>();
 const CACHE_LIMIT = 200;
 
@@ -90,24 +97,30 @@ function cacheEmbedding(key: string, embedding: number[]) {
     const firstKey = queryEmbeddingCache.keys().next().value;
     if (firstKey !== undefined) queryEmbeddingCache.delete(firstKey);
   }
+
   queryEmbeddingCache.set(key, embedding);
 }
 
 /* ================= MAIN RETRIEVAL ================= */
+
 export async function getTopChunks(
   queryText: string,
   limit = 6,
-  minSimilarity = 0.75
+  minSimilarity = 0.60
 ): Promise<{ text: string; source: string | null; score: number }[]> {
+
   if (!queryText?.trim()) return [];
 
   const normalized = normalizeQuery(queryText);
+
   let queryEmbedding = queryEmbeddingCache.get(normalized);
 
   /* ================= GENERATE EMBEDDING ================= */
+
   if (!queryEmbedding) {
     try {
-      queryEmbedding = await getQwenEmbedding(queryText);
+
+      queryEmbedding = await getQwenEmbedding(normalized);
 
       if (!queryEmbedding || queryEmbedding.length === 0) {
         console.error("❌ Empty embedding returned");
@@ -120,27 +133,39 @@ export async function getTopChunks(
       }
 
       cacheEmbedding(normalized, queryEmbedding);
+
     } catch (err) {
       console.error("❌ Qwen embedding failed:", err);
       return [];
     }
   }
 
-  /* ================= SCORING ================= */
+  /* ================= SCORE ALL CHUNKS ================= */
+
   const scored: { chunk: Chunk; score: number }[] = [];
 
   for (const chunk of cachedChunks) {
     const score = cosineSimilarity(queryEmbedding, chunk.embedding);
-    if (score >= minSimilarity) scored.push({ chunk, score });
+
+    scored.push({ chunk, score });
   }
 
   if (scored.length === 0) return [];
 
+  /* ================= SORT RESULTS ================= */
+
   scored.sort((a, b) => b.score - a.score);
 
-  /* ================= TOP RESULTS ================= */
-  const top = scored.slice(0, limit);
-  return top.map(({ chunk, score }) => ({
+  /* ================= FILTER + LIMIT ================= */
+
+  const filtered = scored.filter(s => s.score >= minSimilarity);
+
+  const finalResults =
+    filtered.length > 0
+      ? filtered.slice(0, limit)
+      : scored.slice(0, limit); // fallback if threshold too strict
+
+  return finalResults.map(({ chunk, score }) => ({
     text: chunk.text,
     source: chunk.source,
     score: Number(score.toFixed(4)),

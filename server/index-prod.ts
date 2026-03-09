@@ -5,14 +5,14 @@ import fs from "fs";
 import path from "path";
 import cors from "cors";
 import express, { type Application, type Request, type Response } from "express";
-import { createServer, type Server } from "node:http";
+import { type Server } from "node:http";
 
 import runApp, { setupApp } from "./app.js";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
-import { memoryService, initializeMemory } from "./services/memoryService.js";
+import { initializeMemory } from "./services/memoryService.js";
 import { initializeAIIntents } from "./services/json_loader.js";
 
-// ---------------- ENV VALIDATION ----------------
+/* ================= ENV VALIDATION ================= */
 
 if (!process.env.GEMINI_API_KEY) {
   console.error("❌ GEMINI_API_KEY is missing");
@@ -22,25 +22,26 @@ if (!process.env.GEMINI_API_KEY) {
 console.log("✅ GEMINI_API_KEY loaded");
 
 if (!process.env.OPENROUTER_API_KEY) {
-  console.warn("⚠️ OPENROUTER_API_KEY missing. Qwen embeddings will fail.");
+  console.warn("⚠️ OPENROUTER_API_KEY missing. Qwen embeddings may fail.");
 } else {
   console.log("✅ OPENROUTER_API_KEY detected");
 }
 
-// ---------------- PATH RESOLUTION ----------------
+/* ================= PATH RESOLUTION ================= */
 
 const ROOT_DIR = path.resolve();
 const DIST_DIR = path.join(ROOT_DIR, "dist");
 const VECTOR_DIR = path.join(DIST_DIR, "server", "vector_store");
 const PUBLIC_DIR = path.join(DIST_DIR, "public");
 
-// ---------------- SYSTEM INITIALIZER ----------------
+/* ================= SYSTEM INITIALIZER ================= */
 
 async function initializeSystem() {
   try {
     console.log("🚀 Initializing Neon Vision AI system...");
 
-    // ---- Vector Store Check ----
+    /* ---- Vector Store Check ---- */
+
     if (!fs.existsSync(VECTOR_DIR)) {
       console.error("❌ Vector store directory missing:", VECTOR_DIR);
       process.exit(1);
@@ -48,14 +49,15 @@ async function initializeSystem() {
 
     console.log("✅ Vector store found:", VECTOR_DIR);
 
-    // ---- Memory Init ----
+    /* ---- Memory Init ---- */
+
     await initializeMemory();
     console.log("✅ Memory database initialized");
 
-    // ---- Load JSON Intent Files ----
+    /* ---- Load AI Intent JSON ---- */
+
     initializeAIIntents();
     console.log("✅ AI intents loaded");
-
 
   } catch (err) {
     console.error("❌ System initialization failed:", err);
@@ -63,25 +65,28 @@ async function initializeSystem() {
   }
 }
 
-// ---------------- SERVER START ----------------
+/* ================= SERVER START ================= */
 
 async function startServer() {
+
   await initializeSystem();
 
   await runApp(async (app: Application, httpServer: Server) => {
+
+    /* -------- Middleware -------- */
 
     app.use(cors({ origin: "*", credentials: true }));
     app.use(express.json({ limit: "10mb" }));
     app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-    // ---------------- STATIC FILES ----------------
+    /* -------- Static Files -------- */
 
     if (fs.existsSync(PUBLIC_DIR)) {
       app.use(express.static(PUBLIC_DIR));
       console.log("✅ Public folder served:", PUBLIC_DIR);
     }
 
-    // ---------------- CHAT ROUTE ----------------
+    /* ================= CHAT ROUTE ================= */
 
     app.post("/chat", async (req: Request, res: Response) => {
       try {
@@ -99,10 +104,8 @@ async function startServer() {
           sessionId = "default-session";
         }
 
-        // Store user message
-        await memoryService.addMessage(sessionId, "user", message);
+        /* -------- Generate AI Response -------- */
 
-        // Generate AI response
         const reply = await generateHybridResponse({
           message,
           sessionId,
@@ -111,10 +114,7 @@ async function startServer() {
         const finalReply =
           reply && reply.trim().length > 0
             ? reply
-            : "You can book a strategy call with our team here: [Calendly Link]";
-
-        // Store assistant message
-        await memoryService.addMessage(sessionId, "assistant", finalReply);
+            : "I'm here to help with AI marketing strategy, automation, SEO, and CGI advertising. What would you like to explore?";
 
         return res.json({ reply: finalReply });
 
@@ -126,16 +126,21 @@ async function startServer() {
 
     console.log("✅ Hybrid chat route initialized");
 
+    /* -------- Additional Routes -------- */
+
     await setupApp(app);
+
+    /* -------- Start Server -------- */
 
     const PORT = Number(process.env.PORT) || 10000;
 
     httpServer.listen(PORT, () => {
       console.log(`🚀 Neon Vision server running on port ${PORT}`);
     });
+
   });
 }
 
-// ---------------- START ----------------
+/* ================= START ================= */
 
 startServer();
