@@ -17,7 +17,7 @@ interface OpenRouterResponse {
 
 /* ================= SETTINGS ================= */
 
-const MODEL = "qwen/qwen3.5-flash-02-23";
+const MODEL = "qwen/qwen3-235b-a22b-2507";
 
 const MAX_PROMPT_LENGTH = 3200;
 const REQUEST_TIMEOUT = 15000;
@@ -41,6 +41,22 @@ function cleanPrompt(prompt: string): string {
 
 }
 
+/* ================= RESPONSE CLEANER ================= */
+
+function cleanResponse(text: string): string {
+
+  if (!text) return "";
+
+  let cleaned = text
+    .replace(/assistant:/gi, "")
+    .replace(/system:/gi, "")
+    .replace(/```/g, "")
+    .trim();
+
+  return cleaned;
+
+}
+
 /* ================= RESPONSE VALIDATION ================= */
 
 function isValidResponse(text: string): boolean {
@@ -50,11 +66,8 @@ function isValidResponse(text: string): boolean {
   if (text.length < 20) return false;
 
   const badPatterns = [
-    "```",
     "<|",
-    "|>",
-    "assistant:",
-    "system:"
+    "|>"
   ];
 
   const lower = text.toLowerCase();
@@ -77,7 +90,7 @@ export async function generateOpenRouter(
 
   if (!OPENROUTER_API_KEY) {
     console.error("❌ OPENROUTER_API_KEY missing");
-    return "";
+    return "I'm having trouble accessing my AI systems right now.";
   }
 
   prompt = cleanPrompt(prompt);
@@ -133,12 +146,12 @@ export async function generateOpenRouter(
 
       const data = (await res.json()) as OpenRouterResponse;
 
-      const content =
+      const raw =
         data?.choices?.[0]?.message?.content ??
         data?.choices?.[0]?.text ??
         "";
 
-      const text = content.trim();
+      const text = cleanResponse(raw);
 
       if (!isValidResponse(text)) {
         throw new Error("Invalid response pattern from model");
@@ -172,6 +185,6 @@ export async function generateOpenRouter(
 
   console.error("❌ All OpenRouter attempts failed:", lastError);
 
-  return "";
+  return "I'm having trouble generating a response right now, but I'm still here to help.";
 
 }

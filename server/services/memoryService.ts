@@ -45,7 +45,7 @@ export async function initializeMemory(): Promise<void> {
     `);
 
     await db.run(`
-      CREATE INDEX IF NOT EXISTS idx_sessionId 
+      CREATE INDEX IF NOT EXISTS idx_sessionId
       ON chat_messages (sessionId)
     `);
 
@@ -122,13 +122,21 @@ export class MemoryService {
       sessionId
     );
 
-    return rows.map((r: any) => ({
+    const messages = rows.map((r: any) => ({
       id: r.id,
       sessionId: r.sessionId,
       role: r.role,
-      content: r.content,
+      content: r.content ?? "",
       timestamp: new Date(r.timestamp),
     }));
+
+    if (process.env.DEBUG_MEMORY === "true") {
+      console.log(
+        `[Memory] Retrieved ${messages.length} messages for session ${sessionId}`
+      );
+    }
+
+    return messages;
   }
 
   /* -------- Replace Entire History -------- */
@@ -162,7 +170,7 @@ export class MemoryService {
           msg.id,
           msg.sessionId,
           msg.role,
-          msg.content,
+          msg.content ?? "",
           ts
         );
       }
