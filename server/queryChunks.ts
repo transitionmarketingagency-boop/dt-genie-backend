@@ -4,16 +4,19 @@ import { fileURLToPath } from "url";
 import { getEmbedding as getQwenEmbedding } from "./services/openRouterEmbeddingsClient.js";
 
 /* ================= PATH RESOLUTION ================= */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const distPath = path.join(__dirname, "vector_store", "chunks.json");
 const devPath = path.join(__dirname, "../vector_store/chunks.json");
+
 const chunksPath = fs.existsSync(distPath) ? distPath : devPath;
 
-console.log(" M-& Loading chunks from:", chunksPath);
+console.log("📚 Loading vector chunks from:", chunksPath);
 
 /* ================= CHUNK TYPE ================= */
+
 export type Chunk = {
   text: string;
   source: string;
@@ -21,9 +24,12 @@ export type Chunk = {
   intent: string;
 };
 
-/* ================= LOAD CHUNKS ================= */
+/* ================= CHUNK STORAGE ================= */
+
 let cachedChunks: Chunk[] = [];
 let embeddingSize = 0;
+
+/* ================= LOAD CHUNKS ================= */
 
 (function loadChunksOnce() {
   if (!fs.existsSync(chunksPath)) {
@@ -38,66 +44,97 @@ let embeddingSize = 0;
     cachedChunks = parsed
       .filter((c: any) => c?.text && Array.isArray(c.embedding))
       .map((c: any) => ({
-        text: String(c.text),
-        source: typeof c.source === "string" && c.source.trim() ? c.source : "Digital Transition Marketing",
-        embedding: c.embedding.map(Number).filter((n: number) => !Number.isNaN(n)),
-        intent: typeof c.intent === "string" && c.intent.trim() ? c.intent : "general",
+        text: String(c.text).trim(),
+        source:
+          typeof c.source === "string" && c.source.trim()
+            ? c.source
+            : "Digital Transition Marketing",
+        embedding: c.embedding
+          .map(Number)
+          .filter((n: number) => !Number.isNaN(n)),
+        intent:
+          typeof c.intent === "string" && c.intent.trim()
+            ? c.intent
+            : "general",
       }))
       .filter((c: Chunk) => c.embedding.length > 100 && c.text.length > 30);
 
-    if (cachedChunks.length > 0) embeddingSize = cachedChunks[0].embedding.length;
+    if (cachedChunks.length > 0) {
+      embeddingSize = cachedChunks[0].embedding.length;
+    }
 
     console.log(`✅ ${cachedChunks.length} chunks loaded`);
-    console.log(` M-  Embedding dimension: ${embeddingSize}`);
+    console.log(`📐 Embedding dimension: ${embeddingSize}`);
   } catch (err) {
     console.error("❌ Failed to load chunks:", err);
   }
 })();
 
 /* ================= COSINE SIMILARITY ================= */
+
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
   if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
 
-  let dot = 0, normA = 0, normB = 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+
   for (let i = 0; i < vecA.length; i++) {
-    dot += vecA[i] * vecB[i];
-    normA += vecA[i] ** 2;
-    normB += vecB[i] ** 2;
+    const a = vecA[i];
+    const b = vecB[i];
+
+    dot += a * b;
+    normA += a * a;
+    normB += b * b;
   }
+
   if (normA === 0 || normB === 0) return 0;
 
   return dot / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 /* ================= QUERY CACHE ================= */
+
 const queryEmbeddingCache = new Map<string, number[]>();
 const CACHE_LIMIT = 200;
 
+/* ================= NORMALIZE QUERY ================= */
+
 function normalizeQuery(text: string): string {
-  return text.toLowerCase().replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
+  return text
+    .toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
+
+/* ================= CACHE EMBEDDING ================= */
 
 function cacheEmbedding(key: string, embedding: number[]) {
   if (queryEmbeddingCache.size >= CACHE_LIMIT) {
     const firstKey = queryEmbeddingCache.keys().next().value;
     if (firstKey !== undefined) queryEmbeddingCache.delete(firstKey);
   }
+
   queryEmbeddingCache.set(key, embedding);
 }
 
 /* ================= MAIN RETRIEVAL ================= */
+
 export async function getTopChunks(
   queryText: string,
-  limit = 6,
-  minSimilarity = 0.6
+  limit = 4,
+  minSimilarity = 0.65
 ): Promise<{ text: string; source: string; score: number; intent: string }[]> {
 
   if (!queryText?.trim()) return [];
 
   const normalized = normalizeQuery(queryText);
+
   let queryEmbedding = queryEmbeddingCache.get(normalized);
 
   /* ===== GENERATE EMBEDDING ===== */
+
   if (!queryEmbedding) {
     try {
       queryEmbedding = await getQwenEmbedding(normalized);
@@ -108,26 +145,39 @@ export async function getTopChunks(
       }
 
       if (embeddingSize && queryEmbedding.length !== embeddingSize) {
-        console.error(`❌ Embedding dimension mismatch. Expected ${embeddingSize}, got ${queryEmbedding.length}`);
+        console.error(
+          `❌ Embedding dimension mismatch. Expected ${embeddingSize}, got ${queryEmbedding.length}`
+        );
         return [];
       }
 
       cacheEmbedding(normalized, queryEmbedding);
+
     } catch (err) {
-      console.error("❌ Qwen embedding failed:", err);
+      console.error("❌ Embedding generation failed:", err);
       return [];
     }
   }
 
-  /* ===== SCORE & FILTER ===== */
-  const scored = cachedChunks.map((chunk) => ({
-    chunk,
-    score: cosineSimilarity(queryEmbedding!, chunk.embedding),
-  }));
+  /* ================= SCORE CHUNKS ================= */
+
+  const scored = cachedChunks.map((chunk) => {
+    const similarity = cosineSimilarity(queryEmbedding!, chunk.embedding);
+
+    return {
+      chunk,
+      score: similarity,
+    };
+  });
 
   if (!scored.length) return [];
 
+  /* ================= SORT BY SCORE ================= */
+
   scored.sort((a, b) => b.score - a.score);
+
+  /* ================= FILTER BY SIMILARITY ================= */
+
   const filtered = scored.filter((s) => s.score >= minSimilarity);
 
   if (!filtered.length) {
@@ -135,14 +185,25 @@ export async function getTopChunks(
     return [];
   }
 
-  /* ===== REMOVE DUPLICATES & LIMIT ===== */
-  const unique = new Set<string>();
-  const results: { text: string; source: string; score: number; intent: string }[] = [];
+  /* ================= REMOVE DUPLICATES ================= */
+
+  const uniqueTexts = new Set<string>();
+  const results: {
+    text: string;
+    source: string;
+    score: number;
+    intent: string;
+  }[] = [];
 
   for (const item of filtered) {
+
     const text = item.chunk.text.trim();
-    if (unique.has(text)) continue;
-    unique.add(text);
+
+    if (!text) continue;
+
+    if (uniqueTexts.has(text)) continue;
+
+    uniqueTexts.add(text);
 
     results.push({
       text,
@@ -153,6 +214,10 @@ export async function getTopChunks(
 
     if (results.length >= limit) break;
   }
+
+  console.log(
+    `🔎 Vector search | Query="${normalized.slice(0, 40)}" | Results=${results.length}`
+  );
 
   return results;
 }

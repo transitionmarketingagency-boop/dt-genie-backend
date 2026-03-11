@@ -8,13 +8,18 @@ import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
+/* ================= PATH RESOLUTION ================= */
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ================= MEMORY PATH ================= */
 
 const memoryDir = path.join(__dirname, "../memory");
-if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
+
+if (!fs.existsSync(memoryDir)) {
+  fs.mkdirSync(memoryDir, { recursive: true });
+}
 
 const dbPath = path.join(memoryDir, "chat_memory.db");
 
@@ -25,10 +30,16 @@ const dbPromise = sqlite.open({
   driver: sqlite3.Database,
 });
 
+/* ================= MEMORY LIMITS ================= */
+
+const MAX_HISTORY_MESSAGES = 50;
+const MAX_CONTEXT_MESSAGES = 8;
+
 /* ================= INITIALIZATION ================= */
 
 export async function initializeMemory(): Promise<void> {
   try {
+
     const db = await dbPromise;
 
     await db.exec(`PRAGMA journal_mode = WAL;`);
@@ -50,14 +61,28 @@ export async function initializeMemory(): Promise<void> {
     `);
 
     console.log("✅ Memory DB initialized at:", dbPath);
+
   } catch (err) {
     console.error("❌ Failed to initialize memory DB:", err);
   }
 }
 
+/* ================= NORMALIZE CONTENT ================= */
+
+function normalizeContent(text: string): string {
+
+  if (!text) return "";
+
+  return text
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 4000);
+}
+
 /* ================= MEMORY SERVICE ================= */
 
 export class MemoryService {
+
   private db = dbPromise;
 
   /* -------- Add Message -------- */
@@ -70,20 +95,23 @@ export class MemoryService {
 
     const db = await this.db;
 
+    const normalized = normalizeContent(content);
+
+    if (!normalized) {
+      throw new Error("Attempted to store empty message");
+    }
+
     const now = new Date();
 
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId,
       role,
-      content: content ?? "",
+      content: normalized,
       timestamp: now,
     };
 
-    const ts =
-      msg.timestamp instanceof Date
-        ? msg.timestamp.toISOString()
-        : new Date(msg.timestamp).toISOString();
+    const ts = now.toISOString();
 
     await db.run(
       `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
@@ -96,7 +124,7 @@ export class MemoryService {
     );
 
     if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[Memory] Added message (${role}) for session ${sessionId}`);
+      console.log(`[Memory] Added (${role}) message for session ${sessionId}`);
     }
 
     return msg;
@@ -104,25 +132,31 @@ export class MemoryService {
 
   /* -------- Alias used by chatbot -------- */
 
-  saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
+  saveMessage(
+    sessionId: string,
+    role: "user" | "assistant",
+    content: string
+  ) {
     return this.addMessage(sessionId, role, content);
   }
 
-  /* -------- Get Conversation History -------- */
+  /* -------- Get Full Conversation History -------- */
 
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
 
     const db = await this.db;
 
     const rows = await db.all(
-      `SELECT * FROM chat_messages
+      `SELECT *
+       FROM chat_messages
        WHERE sessionId = ?
-       ORDER BY timestamp ASC
-       LIMIT 50`,
-      sessionId
+       ORDER BY datetime(timestamp) ASC
+       LIMIT ?`,
+      sessionId,
+      MAX_HISTORY_MESSAGES
     );
 
-    const messages = rows.map((r: any) => ({
+    const messages: ChatMessage[] = rows.map((r: any) => ({
       id: r.id,
       sessionId: r.sessionId,
       role: r.role,
@@ -139,9 +173,41 @@ export class MemoryService {
     return messages;
   }
 
+  /* -------- Get Recent Context Window -------- */
+
+  async getRecentContext(sessionId: string): Promise<ChatMessage[]> {
+
+    const db = await this.db;
+
+    const rows = await db.all(
+      `SELECT *
+       FROM chat_messages
+       WHERE sessionId = ?
+       ORDER BY datetime(timestamp) DESC
+       LIMIT ?`,
+      sessionId,
+      MAX_CONTEXT_MESSAGES
+    );
+
+    const messages: ChatMessage[] = rows
+      .reverse()
+      .map((r: any) => ({
+        id: r.id,
+        sessionId: r.sessionId,
+        role: r.role,
+        content: r.content ?? "",
+        timestamp: new Date(r.timestamp),
+      }));
+
+    return messages;
+  }
+
   /* -------- Replace Entire History -------- */
 
-  async saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void> {
+  async saveChatHistory(
+    sessionId: string,
+    messages: ChatMessage[]
+  ): Promise<void> {
 
     const db = await this.db;
 
@@ -170,7 +236,7 @@ export class MemoryService {
           msg.id,
           msg.sessionId,
           msg.role,
-          msg.content ?? "",
+          normalizeContent(msg.content),
           ts
         );
       }
@@ -194,6 +260,6 @@ export class MemoryService {
   }
 }
 
-/* ================= SINGLETON EXPORT ================= */
+/* ================= SINGLETON ================= */
 
 export const memoryService = new MemoryService();

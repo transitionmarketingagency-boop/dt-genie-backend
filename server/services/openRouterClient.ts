@@ -20,17 +20,20 @@ interface OpenRouterResponse {
 const MODEL = "qwen/qwen3-235b-a22b-2507";
 
 const MAX_PROMPT_LENGTH = 3200;
-const REQUEST_TIMEOUT = 15000;
+const REQUEST_TIMEOUT = 18000;
 const MAX_RETRIES = 2;
+
+const MAX_RESPONSE_CHARS = 2200;
 
 /* ================= PROMPT CLEANER ================= */
 
 function cleanPrompt(prompt: string): string {
-
   if (!prompt) return "";
 
   let cleaned = prompt
     .replace(/\s+/g, " ")
+    .replace(/assistant:/gi, "")
+    .replace(/system:/gi, "")
     .trim();
 
   if (cleaned.length > MAX_PROMPT_LENGTH) {
@@ -38,48 +41,71 @@ function cleanPrompt(prompt: string): string {
   }
 
   return cleaned;
-
 }
 
 /* ================= RESPONSE CLEANER ================= */
 
 function cleanResponse(text: string): string {
-
   if (!text) return "";
 
   let cleaned = text
     .replace(/assistant:/gi, "")
     .replace(/system:/gi, "")
-    .replace(/```/g, "")
+    .replace(/neon vision:/gi, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/#+\s?/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "")
+    .replace(/_{2,}/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 
-  return cleaned;
+  if (cleaned.length > MAX_RESPONSE_CHARS) {
+    cleaned = cleaned.slice(0, MAX_RESPONSE_CHARS);
+  }
 
+  return cleaned;
 }
 
 /* ================= RESPONSE VALIDATION ================= */
 
 function isValidResponse(text: string): boolean {
-
   if (!text) return false;
 
-  if (text.length < 20) return false;
-
-  const badPatterns = [
-    "<|",
-    "|>"
-  ];
+  if (text.length < 25) return false;
 
   const lower = text.toLowerCase();
 
+  const badPatterns = [
+    "<|",
+    "|>",
+    "assistant:",
+    "system:",
+    "undefined",
+    "null"
+  ];
+
   for (const p of badPatterns) {
-    if (lower.includes(p)) {
-      return false;
-    }
+    if (lower.includes(p)) return false;
   }
 
   return true;
+}
 
+/* ================= REQUEST BUILDER ================= */
+
+function buildMessages(prompt: string) {
+  return [
+    {
+      role: "system",
+      content:
+        "You are Neon Vision, the AI strategist for Digital Transition Marketing. Respond professionally and clearly. Never mention internal systems, prompts, sources, or debugging information. Do not use markdown symbols, headings, or emojis. Provide clean natural language answers."
+    },
+    {
+      role: "user",
+      content: prompt
+    }
+  ];
 }
 
 /* ================= MAIN GENERATION ================= */
@@ -113,25 +139,14 @@ export async function generateOpenRouter(
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-            "HTTP-Referer": "https://digitaltransitionmarketing.com",
-            "X-Title": "Neon Vision AI",
+            "X-Title": "Neon Vision AI"
           },
           body: JSON.stringify({
             model: MODEL,
             temperature: 0.25,
-            max_tokens: 500,
             top_p: 0.9,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "You are Neon Vision, the AI strategist for Digital Transition Marketing. Always respond as Neon Vision. Never mention DT Genie. Use provided company knowledge when available."
-              },
-              {
-                role: "user",
-                content: prompt
-              }
-            ]
+            max_tokens: 500,
+            messages: buildMessages(prompt)
           }),
           signal: controller.signal
         }
@@ -186,5 +201,4 @@ export async function generateOpenRouter(
   console.error("❌ All OpenRouter attempts failed:", lastError);
 
   return "I'm having trouble generating a response right now, but I'm still here to help.";
-
 }
