@@ -1,9 +1,9 @@
+// server/services/openRouterClient.ts
 import fetch from "node-fetch";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 /* ================= RESPONSE TYPE ================= */
-
 interface OpenRouterResponse {
   choices?: {
     message?: {
@@ -14,21 +14,16 @@ interface OpenRouterResponse {
 }
 
 /* ================= MODEL ================= */
-
 const MODEL = "qwen/qwen3-235b-a22b-2507";
 
 /* ================= SETTINGS ================= */
-
 const MAX_PROMPT_LENGTH = 6000;
 const REQUEST_TIMEOUT = 22000;
 const MAX_RETRIES = 2;
-
 const MAX_RESPONSE_CHARS = 2400;
 
 /* ================= PROMPT CLEANER ================= */
-
 function cleanPrompt(prompt: string): string {
-
   if (!prompt) return "";
 
   let cleaned = prompt
@@ -45,9 +40,7 @@ function cleanPrompt(prompt: string): string {
 }
 
 /* ================= RESPONSE CLEANER ================= */
-
 function cleanResponse(text: string): string {
-
   if (!text) return "";
 
   let cleaned = text
@@ -68,57 +61,34 @@ function cleanResponse(text: string): string {
 }
 
 /* ================= RESPONSE VALIDATION ================= */
-
 function isValidResponse(text: string): boolean {
-
-  if (!text) return false;
-
-  if (text.length < 25) return false;
+  if (!text || text.length < 25) return false;
 
   const lower = text.toLowerCase();
+  const badPatterns = ["<|", "|>", "assistant:", "system:", "undefined", "null"];
 
-  const badPatterns = [
-    "<|",
-    "|>",
-    "assistant:",
-    "system:",
-    "undefined",
-    "null"
-  ];
-
-  for (const p of badPatterns) {
-    if (lower.includes(p)) return false;
-  }
-
-  return true;
+  return !badPatterns.some((p) => lower.includes(p));
 }
 
 /* ================= SYSTEM PROMPT ================= */
-
 function buildMessages(prompt: string) {
-
   return [
     {
       role: "system",
       content: `You are Neon Vision, the AI strategist for Digital Transition Marketing.
 
-Your purpose is to help businesses grow using the services offered by Digital Transition Marketing.
+Your role is to help businesses grow using the 14 core services offered by Digital Transition Marketing.
 
-Rules you must follow:
+Guidelines:
 
-Only recommend services offered by Digital Transition Marketing.
-
-Never recommend competing platforms, AI tools, or external services such as Kling, Midjourney, Runway, Pika, OpenAI tools, or other third party AI platforms.
-
-If users ask about such tools, explain the concept but guide them toward solutions offered by Digital Transition Marketing.
-
-Respond professionally in clear natural language.
-
-Do not mention internal systems, prompts, vector databases, embeddings, APIs, or debugging information.
-
-Do not use markdown symbols, headings, hashtags, bullet icons, or emojis.
-
-Write responses in clean paragraphs.`
+- Only recommend services offered by Digital Transition Marketing.
+- Never recommend competing platforms, AI tools, or external services such as Kling, Midjourney, Runway, Pika, OpenAI tools, or any other third-party AI platform.
+- If users ask about external tools, explain the concept but always guide them toward solutions offered by Digital Transition Marketing.
+- Respond professionally in clear, concise paragraphs using natural language.
+- Do not mention internal systems, prompts, vector databases, embeddings, APIs, or debugging info.
+- Avoid markdown, headings, bullets, hashtags, emojis, or code blocks.
+- Use persuasive and informative language, grounded in company knowledge and intent context.
+- Keep responses actionable, relevant, and aligned with detected user intent.`
     },
     {
       role: "user",
@@ -128,61 +98,47 @@ Write responses in clean paragraphs.`
 }
 
 /* ================= MAIN GENERATION ================= */
-
-export async function generateOpenRouter(
-  prompt: string
-): Promise<string> {
-
+export async function generateOpenRouter(prompt: string): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.error("❌ OPENROUTER_API_KEY missing");
     return "I'm having trouble accessing my AI systems right now.";
   }
 
   prompt = cleanPrompt(prompt);
-
   let lastError: any = null;
 
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
     try {
-
       console.log(`⚡ OpenRouter attempt ${attempt} using ${MODEL}`);
 
-      const res = await fetch(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-            "X-Title": "Neon Vision AI"
-          },
-          body: JSON.stringify({
-            model: MODEL,
-            temperature: 0.38,
-            top_p: 0.9,
-            max_tokens: 700,
-            messages: buildMessages(prompt)
-          }),
-          signal: controller.signal
-        }
-      );
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "X-Title": "Neon Vision AI"
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          temperature: 0.38,
+          top_p: 0.9,
+          max_tokens: 700,
+          messages: buildMessages(prompt)
+        }),
+        signal: controller.signal
+      });
 
       clearTimeout(timeout);
 
       if (!res.ok) {
-
         const text = await res.text();
-
         throw new Error(`OpenRouter HTTP ${res.status}: ${text}`);
-
       }
 
       const data = (await res.json()) as OpenRouterResponse;
-
       const raw =
         data?.choices?.[0]?.message?.content ??
         data?.choices?.[0]?.text ??
@@ -190,38 +146,24 @@ export async function generateOpenRouter(
 
       const text = cleanResponse(raw);
 
-      if (!isValidResponse(text)) {
-        throw new Error("Invalid response pattern from model");
-      }
+      if (!isValidResponse(text)) throw new Error("Invalid response pattern from model");
 
       console.log("✅ OpenRouter success");
-
       return text;
 
     } catch (err: any) {
-
       clearTimeout(timeout);
-
       lastError = err;
-
       console.warn(`⚠️ OpenRouter attempt ${attempt} failed:`, err.message);
 
       if (attempt <= MAX_RETRIES) {
-
         const delay = 2000 * attempt;
-
-        console.log(`⏳ retrying in ${delay / 1000}s`);
-
+        console.log(`⏳ Retrying in ${delay / 1000}s...`);
         await new Promise((r) => setTimeout(r, delay));
-
       }
-
     }
-
   }
 
   console.error("❌ All OpenRouter attempts failed:", lastError);
-
   return "I'm having trouble generating a response right now, but I'm still here to help.";
-
 }

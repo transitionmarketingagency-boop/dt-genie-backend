@@ -9,7 +9,6 @@ if (!OPENROUTER_API_KEY) {
 }
 
 /* ================= RESPONSE TYPE ================= */
-
 interface EmbeddingResponse {
   data?: {
     embedding?: number[];
@@ -17,7 +16,6 @@ interface EmbeddingResponse {
 }
 
 /* ================= EMBEDDING CACHE ================= */
-
 const embeddingCache = new Map<string, number[]>();
 const CACHE_LIMIT = 500;
 
@@ -30,7 +28,6 @@ function cacheEmbedding(key: string, embedding: number[]) {
 }
 
 /* ================= GET EMBEDDING ================= */
-
 export async function getEmbedding(text: string): Promise<number[]> {
   if (!text || !text.trim()) return [];
 
@@ -64,7 +61,6 @@ export async function getEmbedding(text: string): Promise<number[]> {
       }
 
       const data = (await res.json()) as EmbeddingResponse;
-
       const embedding = data?.data?.[0]?.embedding;
 
       if (!embedding || !Array.isArray(embedding)) {
@@ -86,11 +82,12 @@ export async function getEmbedding(text: string): Promise<number[]> {
         console.log(`⏳ Retrying in ${delay / 1000}s...`);
         await new Promise((r) => setTimeout(r, delay));
       } else {
-        console.error("❌ Failed to generate embedding after retries");
+        console.error("❌ Failed to generate embedding after retries", lastError);
       }
     }
   }
 
+  // Return empty embedding as fallback
   return [];
 }
 
