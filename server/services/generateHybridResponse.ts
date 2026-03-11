@@ -50,11 +50,11 @@ const staticIntents = {
   book: ["book", "schedule", "call", "meeting"],
 };
 
-/* ================= SERVICE INTENT DETECTION ================= */
+/* ================= SERVICE INTENT ================= */
 
 const serviceIntents = [
   { keyword: "youtube ads", intent: "youtube_ads" },
-  { keyword: "cgi ads", intent: "cgi_ads" },
+  { keyword: "cgi", intent: "cgi_ads" },
   { keyword: "seo", intent: "seo" },
   { keyword: "vso", intent: "vso" },
   { keyword: "email marketing", intent: "email_marketing" },
@@ -103,40 +103,56 @@ function findMatchingIntent(userMessage: string): string | null {
   return bestMatch?.response ?? null;
 }
 
-/* ================= VECTOR KNOWLEDGE ================= */
+/* ================= ENTERPRISE RAG RETRIEVAL ================= */
 
 async function getEmbeddingKnowledge(
   userMessage: string,
   intent: string
 ): Promise<{ text: string; count: number }> {
   try {
-    const allChunks = await getTopChunks(userMessage, 4, 0.65);
 
-    if (!allChunks?.length) return { text: "", count: 0 };
+    /* QUERY EXPANSION (ENTERPRISE RAG TECHNIQUE) */
 
-    let filtered = allChunks.filter((c) => c.intent === intent);
-    if (!filtered.length) filtered = allChunks;
+    const queries = [
+      userMessage,
+      normalize(userMessage),
+      `${intent} marketing service`
+    ];
 
-    const uniqueTexts = new Set<string>();
-    const formattedChunks: string[] = [];
+    let collected: any[] = [];
+
+    for (const q of queries) {
+      const chunks = await getTopChunks(q, 3, 0.65);
+      if (chunks?.length) collected.push(...chunks);
+    }
+
+    if (!collected.length) return { text: "", count: 0 };
+
+    /* FILTER BY INTENT */
+
+    let filtered = collected.filter((c) => c.intent === intent);
+    if (!filtered.length) filtered = collected;
+
+    /* DEDUPLICATION */
+
+    const seen = new Set<string>();
+    const ranked: string[] = [];
 
     for (const c of filtered) {
       const text = c?.text?.trim();
+      if (!text || seen.has(text)) continue;
 
-      if (!text || uniqueTexts.has(text)) continue;
-
-      uniqueTexts.add(text);
-
-      // CLEAN CHUNKS (NO SOURCE / INTENT METADATA)
-      formattedChunks.push(text);
+      seen.add(text);
+      ranked.push(text);
     }
 
-    const arr = formattedChunks.slice(0, 4);
+    const finalChunks = ranked.slice(0, 4);
 
     return {
-      text: arr.join("\n\n"),
-      count: arr.length,
+      text: finalChunks.join("\n\n"),
+      count: finalChunks.length,
     };
+
   } catch (err) {
     console.error("Embedding retrieval error:", err);
     return { text: "", count: 0 };
@@ -182,7 +198,13 @@ export async function generateHybridResponse({
   try {
     const normalizedMessage = normalize(message);
 
-    /* ===== BASIC INTENTS ===== */
+    /* SAVE USER MESSAGE FIRST */
+
+    try {
+      await memoryService.saveMessage(sessionId, "user", message);
+    } catch {}
+
+    /* BASIC INTENTS */
 
     if (
       normalizedMessage.length < 15 &&
@@ -207,7 +229,7 @@ export async function generateHybridResponse({
       return `You can schedule a strategy session here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future`;
     }
 
-    /* ===== MEMORY HISTORY ===== */
+    /* MEMORY HISTORY */
 
     let memoryHistory: any[] = [];
 
@@ -217,20 +239,19 @@ export async function generateHybridResponse({
       memoryHistory = history || [];
     }
 
-    const recentMessages = memoryHistory.slice(-6);
+    const recentMessages = memoryHistory.slice(-8);
 
     const historyText = recentMessages
       .map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`)
       .join("\n");
 
-    /* ===== INTENT DETECTION ===== */
+    /* INTENT */
 
     const detectedIntent = detectServiceIntent(message);
 
-    /* ===== KNOWLEDGE RETRIEVAL ===== */
+    /* KNOWLEDGE */
 
     const vector = await getEmbeddingKnowledge(message, detectedIntent);
-
     const jsonKnowledge = findMatchingIntent(message) ?? "";
 
     let knowledgePool = "";
@@ -241,22 +262,17 @@ export async function generateHybridResponse({
     if (jsonKnowledge.length > 20)
       knowledgePool += `Supporting information:\n${jsonKnowledge}\n\n`;
 
-    /* ===== PROMPT ===== */
+    /* PROMPT */
 
     const prompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
-Rules:
-
 Respond in clean professional paragraphs.
-Do not use emojis, bullet symbols, hashtags, markdown, or decorative formatting.
-Do not mention sources, internal data, or system processes.
-Do not greet the user again unless it is the first message.
-Only introduce yourself once at the beginning of a conversation.
-Use the company knowledge when relevant.
-If knowledge is missing, answer generally without inventing company claims.
+Do not use emojis, bullet symbols, markdown, or decorative formatting.
+Do not mention internal systems.
+Use company knowledge when relevant.
 
-Relevant service category: ${detectedIntent}
+Relevant service: ${detectedIntent}
 
 ${knowledgePool}
 
@@ -266,23 +282,18 @@ ${historyText}
 User question:
 ${message}
 
-Provide a helpful, accurate, and professional answer.
+Provide a clear helpful answer.
 `;
 
-    /* ===== MODEL EXECUTION ===== */
+    /* MODEL EXECUTION */
 
     const MIN_RESPONSE_LENGTH = 40;
 
     let response = "";
     let modelUsed = "none";
 
-    /* ===== PRIMARY MODEL (QWEN) ===== */
-
     if (process.env.OPENROUTER_API_KEY) {
-      const qwenResp = await withTimeout(
-        generateOpenRouter(prompt),
-        22000
-      );
+      const qwenResp = await withTimeout(generateOpenRouter(prompt), 20000);
 
       if (qwenResp && qwenResp.length >= MIN_RESPONSE_LENGTH) {
         response = cleanResponse(qwenResp);
@@ -290,13 +301,8 @@ Provide a helpful, accurate, and professional answer.
       }
     }
 
-    /* ===== GEMINI FALLBACK ===== */
-
     if ((!response || response.length < MIN_RESPONSE_LENGTH) && canUseGemini()) {
-      const geminiResp = await withTimeout(
-        generateGemini(prompt),
-        12000
-      );
+      const geminiResp = await withTimeout(generateGemini(prompt), 12000);
 
       if (geminiResp && geminiResp.length >= MIN_RESPONSE_LENGTH) {
         response = cleanResponse(geminiResp);
@@ -305,8 +311,6 @@ Provide a helpful, accurate, and professional answer.
       }
     }
 
-    /* ===== FINAL FALLBACK ===== */
-
     if (!response) {
       response = `I am ${BOT_NAME}. I assist businesses with AI marketing systems, automation, SEO, performance advertising, and digital growth strategies.`;
       modelUsed = "fallback";
@@ -314,20 +318,16 @@ Provide a helpful, accurate, and professional answer.
 
     response = enforceBotName(response);
 
-    /* ===== MEMORY SAVE ===== */
-
     try {
-      await memoryService.saveMessage(sessionId, "user", message);
       await memoryService.saveMessage(sessionId, "assistant", response);
-    } catch {
-      console.warn("Memory save failed");
-    }
+    } catch {}
 
     console.log(
       `[Hybrid RAG] Model=${modelUsed} | Intent=${detectedIntent} | Chunks=${vector.count}`
     );
 
     return response;
+
   } catch (err) {
     console.error("Hybrid RAG error:", err);
 
