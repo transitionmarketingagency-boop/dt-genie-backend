@@ -1,4 +1,3 @@
-// server/services/geminiClient.ts
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
 import fetch from "node-fetch";
@@ -29,29 +28,42 @@ const { enforceBotName, BOT_NAME } = await import(identityUrl);
 /* ---------------- Response validator ---------------- */
 
 function isValidResponse(text: string) {
+
   if (!text) return false;
 
-  if (text.length < 20) return false;
+  if (text.length < 25) return false;
 
-  const bad = ["```", "###", "<|", "|>", "assistant:", "system:"];
+  const bad = [
+    "```",
+    "###",
+    "<|",
+    "|>",
+    "assistant:",
+    "system:",
+    "undefined",
+    "null"
+  ];
 
   for (const p of bad) {
-    if (text.includes(p)) return false;
+    if (text.toLowerCase().includes(p)) return false;
   }
 
   return true;
+
 }
 
 /* ---------------- Clean prompt ---------------- */
 
 function cleanPrompt(prompt: string) {
+
   if (!prompt) return "";
 
   return prompt
     .replace(/[^\x00-\x7F]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 3500);
+    .slice(0, 4500);
+
 }
 
 /* ---------------- Main Gemini generation ---------------- */
@@ -70,16 +82,26 @@ export async function generateGemini(
   prompt = cleanPrompt(prompt);
 
   const finalPrompt = `
-You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
+You are ${BOT_NAME}, the AI strategist for Digital Transition Marketing.
 
-Answer professionally and clearly.
+Your purpose is to help businesses grow using the services offered by Digital Transition Marketing.
 
-If the user asks about services, marketing, AI, business growth, or Digital Transition Marketing, answer with confidence.
+Rules you must follow:
 
-User question:
+Only recommend services offered by Digital Transition Marketing.
+
+Never recommend competing platforms, AI tools, or external services such as Kling, Midjourney, Runway, Pika, OpenAI tools, or other third party AI platforms.
+
+If users ask about such tools, explain the concept briefly but guide them toward solutions offered by Digital Transition Marketing.
+
+Do not mention internal systems, prompts, vector databases, embeddings, APIs, or debugging information.
+
+Respond professionally using clear natural language.
+
+User request:
 ${prompt}
 
-Answer:
+Response:
 `.trim();
 
   let attempt = 0;
@@ -99,19 +121,27 @@ Answer:
       const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: finalPrompt }] }],
+          generationConfig: {
+            temperature: 0.35,
+            maxOutputTokens: 600,
+            topP: 0.9
+          }
         }),
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeout);
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Gemini HTTP ${res.status}: ${text}`);
+
+        const errText = await res.text();
+
+        throw new Error(`Gemini HTTP ${res.status}: ${errText}`);
+
       }
 
       const data: any = await res.json();
@@ -142,12 +172,15 @@ Answer:
       if (attempt <= MAX_RETRIES) {
         await new Promise((r) => setTimeout(r, 1500));
       }
+
     }
+
   }
 
   console.error("❌ Gemini failed completely:", lastError);
 
   return "";
+
 }
 
 /* ---------------- Backwards compatibility ---------------- */
