@@ -25,104 +25,120 @@ function normalize(text: string): string {
 /* ================= SERVICES ================= */
 
 const services: Record<string, string[]> = {
+
   voice_search: [
     "voice search",
-    "siri optimization",
+    "voice seo",
     "alexa search",
-    "featured snippets",
-    "position zero",
-    "voice seo"
+    "siri search",
+    "featured snippet",
+    "position zero"
   ],
+
   email_marketing: [
     "email marketing",
-    "klaviyo flows",
-    "abandoned cart",
+    "email automation",
+    "email flows",
     "cold email",
-    "improve open rates",
-    "email automation"
+    "klaviyo",
+    "abandoned cart"
   ],
+
   youtube_ads: [
     "youtube ads",
     "youtube advertising",
-    "youtube video ads",
-    "scale youtube channel"
+    "youtube marketing",
+    "video ads"
   ],
+
   website_design: [
     "website design",
+    "web design",
     "web development",
-    "shopify setup",
+    "shopify store",
     "website redesign",
-    "seo optimized website",
-    "mobile first website"
+    "build website"
   ],
+
   virtual_tours: [
-    "virtual tours",
-    "360 property tour",
-    "nerf render",
+    "virtual tour",
+    "360 tour",
+    "property tour",
     "interactive floor plan",
-    "virtual staging"
+    "nerf render",
+    "real estate tour"
   ],
+
   performance_marketing: [
-    "ppc",
-    "google ads",
     "performance marketing",
-    "increase roas",
-    "lower cac",
-    "ad campaign optimization"
+    "google ads",
+    "ppc",
+    "paid ads",
+    "paid media",
+    "ad campaign",
+    "increase roas"
   ],
+
   ai_automation: [
     "ai automation",
     "ai agents",
     "automate workflows",
-    "crm automation",
-    "ai assistants"
+    "business automation",
+    "crm automation"
   ],
+
   music_production: [
     "music production",
     "mixing",
     "mastering",
-    "ghost producer",
     "audio engineering"
   ],
+
   cgi_marketing: [
+    "cgi advertising",
+    "cgi marketing",
     "cgi ads",
+    "3d advertising",
     "3d product animation",
-    "cgi commercial",
-    "viral cgi ads"
+    "cgi commercial"
   ],
+
   video_audio: [
     "video production",
     "video editing",
-    "ai voiceover",
-    "dolby atmos",
-    "audio production"
+    "audio production",
+    "voiceover",
+    "dolby atmos"
   ],
+
   content_marketing: [
     "content marketing",
     "blog writing",
+    "content strategy",
     "lead magnets",
-    "whitepapers",
-    "case studies"
+    "whitepapers"
   ],
+
   social_media: [
-    "social media marketing",
-    "instagram reels",
-    "shadowban",
+    "social media",
+    "instagram marketing",
+    "tiktok marketing",
     "linkedin growth",
     "social media management"
   ],
+
   geo_ai_seo: [
     "ai seo",
     "generative engine optimization",
+    "geo seo",
     "rank on chatgpt",
-    "ai search optimization",
-    "gemini ranking"
+    "ai search ranking"
   ],
+
   predictive_analytics: [
     "predictive analytics",
-    "sentiment analysis",
     "market prediction",
-    "dark pool tracking",
+    "sentiment analysis",
     "financial analytics"
   ]
 };
@@ -131,10 +147,9 @@ const services: Record<string, string[]> = {
 
 const leadIntent = [
   "generate leads",
-  "get more customers",
+  "get more clients",
+  "more customers",
   "increase sales",
-  "attract clients",
-  "more bookings",
   "predictable leads"
 ];
 
@@ -143,15 +158,13 @@ const pricingIntent = [
   "pricing",
   "how much",
   "cost",
-  "package",
-  "budget"
+  "package"
 ];
 
 const consultationIntent = [
-  "book a call",
-  "schedule a call",
+  "book call",
+  "schedule call",
   "consultation",
-  "meeting",
   "strategy session",
   "audit"
 ];
@@ -166,68 +179,93 @@ const marketingGoals = [
 
 const industries = [
   "real estate",
-  "saas",
   "ecommerce",
+  "saas",
   "travel",
   "hospitality",
   "finance",
   "healthcare",
-  "legal"
+  "legal",
+  "medical aesthetics"
 ];
 
-/* ================= DETECTOR FUNCTIONS ================= */
+/* ================= SERVICE DETECTION ================= */
+
+function detectServiceScore(text: string) {
+
+  const scores: Record<string, number> = {};
+
+  for (const [service, keywords] of Object.entries(services)) {
+
+    let score = 0;
+
+    for (const kw of keywords) {
+
+      if (text.includes(kw)) {
+        score += 1;
+      }
+
+    }
+
+    if (score > 0) {
+      scores[service] = score;
+    }
+
+  }
+
+  return scores;
+
+}
+
+/* ================= MAIN INTENT DETECTOR ================= */
 
 export function detectIntents(message: string): DetectedIntent[] {
+
   const text = normalize(message);
   const results: DetectedIntent[] = [];
 
-  // Services
-  for (const [service, keywords] of Object.entries(services)) {
-    for (const kw of keywords) {
-      if (text.includes(kw)) {
-        results.push({ type: "service", value: service, confidence: 0.9 });
-        break;
-      }
-    }
+  const serviceScores = detectServiceScore(text);
+
+  if (Object.keys(serviceScores).length) {
+
+    const bestService = Object.entries(serviceScores)
+      .sort((a, b) => b[1] - a[1])[0];
+
+    results.push({
+      type: "service",
+      value: bestService[0],
+      confidence: Math.min(bestService[1] / 3, 1)
+    });
+
   }
 
-  // Lead
   for (const kw of leadIntent) {
     if (text.includes(kw)) {
       results.push({ type: "lead", value: kw, confidence: 0.8 });
-      break;
     }
   }
 
-  // Pricing
   for (const kw of pricingIntent) {
     if (text.includes(kw)) {
       results.push({ type: "pricing", value: kw, confidence: 0.8 });
-      break;
     }
   }
 
-  // Consultation
   for (const kw of consultationIntent) {
     if (text.includes(kw)) {
       results.push({ type: "consultation", value: kw, confidence: 0.85 });
-      break;
     }
   }
 
-  // Marketing goals
   for (const kw of marketingGoals) {
     if (text.includes(kw)) {
       results.push({ type: "marketing_goal", value: kw, confidence: 0.7 });
-      break;
     }
   }
 
-  // Industry
   for (const kw of industries) {
     if (text.includes(kw)) {
       results.push({ type: "industry", value: kw, confidence: 0.7 });
-      break;
     }
   }
 
@@ -236,16 +274,17 @@ export function detectIntents(message: string): DetectedIntent[] {
   }
 
   return results;
+
 }
 
-/* ================= SERVICE DETECTION ================= */
+/* ================= HELPER ================= */
 
-/**
- * Returns the most relevant service from a message.
- * If none is detected, returns null.
- */
 export function detectService(message: string): string | null {
+
   const intents = detectIntents(message);
-  const serviceIntent = intents.find(i => i.type === "service");
-  return serviceIntent ? serviceIntent.value : null;
+
+  const service = intents.find(i => i.type === "service");
+
+  return service ? service.value : null;
+
 }

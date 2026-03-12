@@ -44,6 +44,18 @@ const blockedPlatforms = [
   "stability ai"
 ];
 
+/* ================= VECTOR NORMALIZATION ================= */
+
+function normalizeVector(vec: number[]) {
+
+  const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));
+
+  if (!norm) return vec;
+
+  return vec.map(v => v / norm);
+
+}
+
 /* ================= LOAD CHUNKS ================= */
 
 (function loadChunksOnce() {
@@ -64,9 +76,11 @@ const blockedPlatforms = [
 
         const cleanText = String(c.text).trim();
 
-        const embedding = c.embedding
+        let embedding = c.embedding
           .map(Number)
           .filter((n: number) => !Number.isNaN(n));
+
+        embedding = normalizeVector(embedding);
 
         return {
           text: cleanText,
@@ -82,18 +96,23 @@ const blockedPlatforms = [
         };
 
       })
-      .filter(
-        (c: Chunk) =>
-          c.embedding.length > 100 &&
-          c.text.length > 40 &&
-          !blockedPlatforms.some(p =>
-            c.text.toLowerCase().includes(p)
-          )
+      .filter((c: Chunk) =>
+        c.embedding.length > 100 &&
+        c.text.length > 40 &&
+        !blockedPlatforms.some(p =>
+          c.text.toLowerCase().includes(p)
+        )
       );
 
     if (cachedChunks.length > 0) {
       embeddingSize = cachedChunks[0].embedding.length;
     }
+
+    /* ensure consistent embedding dimension */
+
+    cachedChunks = cachedChunks.filter(
+      c => c.embedding.length === embeddingSize
+    );
 
     console.log(`✅ ${cachedChunks.length} chunks loaded`);
     console.log(`📐 Embedding dimension: ${embeddingSize}`);
@@ -105,15 +124,6 @@ const blockedPlatforms = [
 })();
 
 /* ================= VECTOR MATH ================= */
-
-function normalizeVector(vec: number[]) {
-
-  const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));
-
-  if (!norm) return vec;
-
-  return vec.map(v => v / norm);
-}
 
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
 
@@ -152,17 +162,28 @@ function cacheEmbedding(key: string, embedding: number[]) {
 /* ================= TEXT UTILS ================= */
 
 function normalizeQuery(text: string) {
+
   return text
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
 }
+
+/* stopwords to improve keyword scoring */
+
+const stopwords = new Set([
+  "the","a","an","how","what","why","is","are","does","do","can","i","you","about"
+]);
 
 function keywordOverlap(a: string, b: string) {
 
-  const setA = new Set(a.split(" "));
-  const setB = new Set(b.split(" "));
+  const tokensA = a.split(" ").filter(w => !stopwords.has(w));
+  const tokensB = b.split(" ");
+
+  const setA = new Set(tokensA);
+  const setB = new Set(tokensB);
 
   let overlap = 0;
 
@@ -171,6 +192,7 @@ function keywordOverlap(a: string, b: string) {
   }
 
   return overlap / Math.max(setA.size, 1);
+
 }
 
 /* ================= MAIN RETRIEVAL ================= */
@@ -190,7 +212,8 @@ export async function getTopChunks(
   const queries = [
     normalized,
     `${normalized} marketing`,
-    `${normalized} service`
+    `${normalized} service`,
+    `${normalized} digital marketing`
   ];
 
   const allEmbeddings: number[][] = [];
@@ -212,13 +235,17 @@ export async function getTopChunks(
         cacheEmbedding(q, embedding);
 
       } catch (err) {
+
         console.error("❌ Embedding generation failed:", err);
+
         continue;
+
       }
 
     }
 
     allEmbeddings.push(embedding);
+
   }
 
   if (!allEmbeddings.length) return [];
@@ -234,11 +261,10 @@ export async function getTopChunks(
       const semantic = cosineSimilarity(emb, chunk.embedding);
 
       if (semantic > bestScore) bestScore = semantic;
+
     }
 
     const keywordBoost = keywordOverlap(normalized, chunk.text.toLowerCase());
-
-    /* ================= INTENT BOOST ================= */
 
     let intentBoost = 0;
 
@@ -249,8 +275,6 @@ export async function getTopChunks(
     ) {
       intentBoost = 0.08;
     }
-
-    /* ================= HYBRID SCORE ================= */
 
     const hybridScore =
       bestScore * 0.82 +
@@ -273,8 +297,11 @@ export async function getTopChunks(
   let filtered = scored.filter(s => s.score >= minSimilarity);
 
   if (!filtered.length) {
+
     filtered = scored.slice(0, 4);
+
     console.log("⚠️ Vector fallback activated");
+
   }
 
   /* ================= DIVERSITY ================= */
@@ -309,6 +336,7 @@ export async function getTopChunks(
     });
 
     if (results.length >= limit) break;
+
   }
 
   console.log(
@@ -316,4 +344,5 @@ export async function getTopChunks(
   );
 
   return results;
+
 }
