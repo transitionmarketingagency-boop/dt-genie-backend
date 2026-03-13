@@ -17,10 +17,10 @@ export function cleanResponse(raw: string): string {
   /* ===== REMOVE MARKDOWN SYMBOLS ===== */
 
   text = text
-    .replace(/#+\s?/g, "")        // headings
-    .replace(/\*\*/g, "")         // bold
-    .replace(/\*/g, "")           // italic
-    .replace(/_{2,}/g, "")        // underscores
+    .replace(/#+\s?/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "")
+    .replace(/_{2,}/g, "")
     .replace(/`/g, "");
 
   /* ===== REMOVE INTERNAL TOKENS ===== */
@@ -31,10 +31,13 @@ export function cleanResponse(raw: string): string {
     .replace(/user:/gi, "")
     .replace(/<\|.*?\|>/g, "");
 
+  /* ===== FIX WORD MERGING (camelCase spacing) ===== */
+
+  text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
+
   /* ===== REMOVE STRANGE CHARACTERS ===== */
 
-  text = text
-    .replace(/[^\x20-\x7E\n\r]/g, ""); // non-printable ASCII
+  text = text.replace(/[^\x20-\x7E\n\r]/g, "");
 
   /* ===== NORMALIZE WHITESPACE ===== */
 
@@ -45,6 +48,10 @@ export function cleanResponse(raw: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 
+  /* ===== FIX MISSING SPACE AFTER PERIOD ===== */
+
+  text = text.replace(/\.([A-Za-z])/g, ". $1");
+
   /* ===== LENGTH SAFETY ===== */
 
   if (text.length > 2500) {
@@ -52,4 +59,5 @@ export function cleanResponse(raw: string): string {
   }
 
   return text;
+
 }

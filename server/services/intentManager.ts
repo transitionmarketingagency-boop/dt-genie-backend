@@ -13,6 +13,7 @@ export interface Intent {
 }
 
 /* ======================= NORMALIZATION ======================= */
+
 export function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -22,8 +23,11 @@ export function normalize(text: string): string {
 }
 
 /* ======================= INTENTS DATABASE ======================= */
+
 export const intents: Intent[] = [
+
   /* -------------------- SERVICES -------------------- */
+
   {
     name: "voice_search_optimization",
     category: "service",
@@ -34,6 +38,7 @@ export const intents: Intent[] = [
     ],
     description: "Optimizing content for conversational voice queries and securing top results on AI assistants."
   },
+
   {
     name: "ai_email_marketing",
     category: "service",
@@ -44,6 +49,7 @@ export const intents: Intent[] = [
     ],
     description: "AI-optimized email campaigns and automated sequences designed to increase open rates and revenue."
   },
+
   {
     name: "youtube_ad_domination",
     category: "service",
@@ -53,6 +59,7 @@ export const intents: Intent[] = [
     ],
     description: "Transforming video ads into profit machines using AI scripts and hyper-targeted placement."
   },
+
   {
     name: "ai_website_design",
     category: "service",
@@ -62,6 +69,7 @@ export const intents: Intent[] = [
     ],
     description: "High-converting websites built with built-in SEO and AI-driven design processes."
   },
+
   {
     name: "ai_virtual_tours",
     category: "service",
@@ -71,6 +79,7 @@ export const intents: Intent[] = [
     ],
     description: "Creating immersive, high-resolution virtual property experiences with interactive AI hotspots."
   },
+
   {
     name: "performance_marketing_warfare",
     category: "service",
@@ -80,6 +89,7 @@ export const intents: Intent[] = [
     ],
     description: "Autonomous AI-driven paid media management across Google, Meta, and programmatic DSPs."
   },
+
   {
     name: "immersive_cgi_marketing",
     category: "service",
@@ -89,6 +99,7 @@ export const intents: Intent[] = [
     ],
     description: "High-fidelity 3D visual content and animations designed for maximum engagement and conversion."
   },
+
   {
     name: "ai_video_audio_production",
     category: "service",
@@ -98,6 +109,7 @@ export const intents: Intent[] = [
     ],
     description: "Technical video and audio editing optimized for viewer retention and emotional impact."
   },
+
   {
     name: "ai_optimized_content",
     category: "service",
@@ -107,6 +119,7 @@ export const intents: Intent[] = [
     ],
     description: "Data-backed content engineering focused on psychological triggers and lead generation."
   },
+
   {
     name: "ai_social_domination",
     category: "service",
@@ -116,6 +129,7 @@ export const intents: Intent[] = [
     ],
     description: "Managing social platforms by exploiting algorithms to maximize reach and reverse shadowbans."
   },
+
   {
     name: "ai_search_domination_geo",
     category: "service",
@@ -125,6 +139,7 @@ export const intents: Intent[] = [
     ],
     description: "Forcing brand visibility and rankings within AI-generated search results and conversational engines."
   },
+
   {
     name: "ai_predictive_analytics",
     category: "service",
@@ -137,6 +152,7 @@ export const intents: Intent[] = [
   },
 
   /* -------------------- MARKETING -------------------- */
+
   {
     name: "campaign_optimization",
     category: "marketing",
@@ -146,6 +162,7 @@ export const intents: Intent[] = [
     ],
     description: "AI-driven refinement of ad assets and bidding strategies to prevent performance decay."
   },
+
   {
     name: "competitor_warfare",
     category: "marketing",
@@ -157,6 +174,7 @@ export const intents: Intent[] = [
   },
 
   /* -------------------- LEAD GENERATION -------------------- */
+
   {
     name: "lead_generation_intents",
     category: "lead_generation",
@@ -168,6 +186,7 @@ export const intents: Intent[] = [
   },
 
   /* -------------------- SALES -------------------- */
+
   {
     name: "sales_intents",
     category: "sales",
@@ -179,6 +198,7 @@ export const intents: Intent[] = [
   },
 
   /* -------------------- AI AUTOMATION -------------------- */
+
   {
     name: "ai_business_automation",
     category: "ai_automation",
@@ -190,34 +210,37 @@ export const intents: Intent[] = [
     description: "Consolidating fragmented tools into unified, self-healing AI cores to automate business workflows."
   },
 
-  /* -------------------- NEW EXTENSIONS -------------------- */
   {
     name: "ai_chatbots",
     category: "ai_automation",
-    keywords: ["chatbots", "customer support automation", "nlp bots", "conversational ai"],
+    keywords: [
+      "chatbots", "customer support automation", "nlp bots", "conversational ai"
+    ],
     description: "AI-powered chatbots for lead qualification, support, and sales conversion."
   },
+
   {
     name: "ai_data_insights",
     category: "ai_automation",
-    keywords: ["analytics", "ai insights", "business intelligence", "data dashboards"],
+    keywords: [
+      "analytics", "ai insights", "business intelligence", "data dashboards"
+    ],
     description: "Automated data processing and insights generation to inform marketing and sales strategy."
   }
+
 ];
 
 /* ======================= DETECTION FUNCTIONS ======================= */
-
-/**
- * Detect intents from a message.
- * Uses safe regex matching with normalization and balanced scoring.
- * Returns top N intent matches.
- */
 
 export function detectIntent(message: string, topN: number = 1) {
 
   const text = normalize(message);
 
-  const matches: { intent: Intent; score: number; matchedKeywords: string[] }[] = [];
+  const matches: {
+    intent: Intent;
+    score: number;
+    matchedKeywords: string[];
+  }[] = [];
 
   for (const intent of intents) {
 
@@ -227,9 +250,11 @@ export function detectIntent(message: string, topN: number = 1) {
 
       const kwNorm = normalize(kw);
 
-      const escaped = kwNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const escaped =
+        kwNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-      const regex = new RegExp(`\\b${escaped}\\b`, "i");
+      const regex =
+        new RegExp(`\\b${escaped}\\b`, "i");
 
       if (regex.test(text)) {
         matched.add(kwNorm);
@@ -239,7 +264,8 @@ export function detectIntent(message: string, topN: number = 1) {
 
     if (matched.size > 0) {
 
-      const score = Math.min(matched.size / 3, 1);
+      const score =
+        Math.min(matched.size / Math.max(intent.keywords.length, 3), 1);
 
       matches.push({
         intent,
@@ -257,16 +283,15 @@ export function detectIntent(message: string, topN: number = 1) {
 
 }
 
-/**
- * Get intent by exact name
- */
+/* ======================= HELPERS ======================= */
+
 export function getIntentByName(name: string): Intent | undefined {
   return intents.find(i => i.name === name);
 }
 
-/**
- * Get multiple relevant intents (top N)
- */
-export function getRelevantIntents(message: string, limit: number = 3) {
+export function getRelevantIntents(
+  message: string,
+  limit: number = 3
+) {
   return detectIntent(message, limit);
 }
