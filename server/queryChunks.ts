@@ -56,6 +56,26 @@ function normalizeVector(vec: number[]) {
 
 }
 
+/* ================= TEXT NORMALIZATION ================= */
+
+function normalize(text: string) {
+
+  return text
+    ?.toLowerCase()
+    .replace(/[^\w\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim() ?? "";
+
+}
+
+/* ================= TOKENIZATION ================= */
+
+function tokenize(text: string) {
+
+  return normalize(text).split(" ").filter(Boolean);
+
+}
+
 /* ================= LOAD CHUNKS ================= */
 
 (function loadChunksOnce() {
@@ -108,8 +128,6 @@ function normalizeVector(vec: number[]) {
       embeddingSize = cachedChunks[0].embedding.length;
     }
 
-    /* ensure consistent embedding dimension */
-
     cachedChunks = cachedChunks.filter(
       c => c.embedding.length === embeddingSize
     );
@@ -118,7 +136,9 @@ function normalizeVector(vec: number[]) {
     console.log(`📐 Embedding dimension: ${embeddingSize}`);
 
   } catch (err) {
+
     console.error("❌ Failed to load chunks:", err);
+
   }
 
 })();
@@ -127,7 +147,9 @@ function normalizeVector(vec: number[]) {
 
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
 
-  if (!vecA || !vecB || vecA.length !== vecB.length) return 0;
+  if (!vecA || !vecB) return 0;
+
+  if (vecA.length !== vecB.length) return 0;
 
   let dot = 0;
 
@@ -136,9 +158,10 @@ function cosineSimilarity(vecA: number[], vecB: number[]): number {
   }
 
   return dot;
+
 }
 
-/* ================= QUERY CACHE (LRU) ================= */
+/* ================= QUERY CACHE ================= */
 
 const queryEmbeddingCache = new Map<string, number[]>();
 const CACHE_LIMIT = 200;
@@ -152,35 +175,29 @@ function cacheEmbedding(key: string, embedding: number[]) {
   queryEmbeddingCache.set(key, embedding);
 
   if (queryEmbeddingCache.size > CACHE_LIMIT) {
+
     const first = queryEmbeddingCache.keys().next().value;
+
     if (first !== undefined) {
       queryEmbeddingCache.delete(first);
     }
+
   }
-}
-
-/* ================= TEXT UTILS ================= */
-
-function normalizeQuery(text: string) {
-
-  return text
-    .toLowerCase()
-    .replace(/[^\w\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
 
 }
 
-/* stopwords to improve keyword scoring */
+/* ================= STOPWORDS ================= */
 
 const stopwords = new Set([
   "the","a","an","how","what","why","is","are","does","do","can","i","you","about"
 ]);
 
+/* ================= KEYWORD OVERLAP ================= */
+
 function keywordOverlap(a: string, b: string) {
 
-  const tokensA = a.split(" ").filter(w => !stopwords.has(w));
-  const tokensB = b.split(" ");
+  const tokensA = tokenize(a).filter(w => !stopwords.has(w));
+  const tokensB = tokenize(b);
 
   const setA = new Set(tokensA);
   const setB = new Set(tokensB);
@@ -205,7 +222,7 @@ export async function getTopChunks(
 
   if (!queryText?.trim()) return [];
 
-  const normalized = normalizeQuery(queryText);
+  const normalized = normalize(queryText);
 
   /* ================= MULTI QUERY ================= */
 
@@ -228,7 +245,7 @@ export async function getTopChunks(
 
         embedding = await getQwenEmbedding(q);
 
-        if (!embedding || !embedding.length) continue;
+        if (!embedding?.length) continue;
 
         embedding = normalizeVector(embedding);
 
@@ -237,14 +254,15 @@ export async function getTopChunks(
       } catch (err) {
 
         console.error("❌ Embedding generation failed:", err);
-
         continue;
 
       }
 
     }
 
-    allEmbeddings.push(embedding);
+    if (embedding.length === embeddingSize) {
+      allEmbeddings.push(embedding);
+    }
 
   }
 
@@ -264,16 +282,23 @@ export async function getTopChunks(
 
     }
 
-    const keywordBoost = keywordOverlap(normalized, chunk.text.toLowerCase());
+    const keywordBoost = keywordOverlap(normalized, chunk.text);
 
     let intentBoost = 0;
 
-    if (
-      chunk.intent &&
-      chunk.intent !== "general" &&
-      normalized.includes(chunk.intent.replace(/_/g, " "))
-    ) {
-      intentBoost = 0.08;
+    if (chunk.intent && chunk.intent !== "general") {
+
+      const intentTokens = tokenize(chunk.intent.replace(/_/g, " "));
+
+      for (const t of intentTokens) {
+
+        if (normalized.includes(t)) {
+          intentBoost = 0.08;
+          break;
+        }
+
+      }
+
     }
 
     const hybridScore =
@@ -298,7 +323,7 @@ export async function getTopChunks(
 
   if (!filtered.length) {
 
-    filtered = scored.slice(0, 4);
+    filtered = scored.slice(0, Math.max(limit, 4));
 
     console.log("⚠️ Vector fallback activated");
 
@@ -306,7 +331,6 @@ export async function getTopChunks(
 
   /* ================= DIVERSITY ================= */
 
-  const seenSources = new Set<string>();
   const seenTexts = new Set<string>();
 
   const results: {
@@ -319,18 +343,14 @@ export async function getTopChunks(
   for (const item of filtered) {
 
     const text = item.chunk.text.trim();
-    const source = item.chunk.source;
 
     if (!text || seenTexts.has(text)) continue;
 
-    if (seenSources.has(source) && results.length >= limit / 2) continue;
-
     seenTexts.add(text);
-    seenSources.add(source);
 
     results.push({
       text: text.slice(0, 1400),
-      source,
+      source: item.chunk.source,
       score: Number(item.score.toFixed(4)),
       intent: item.chunk.intent
     });

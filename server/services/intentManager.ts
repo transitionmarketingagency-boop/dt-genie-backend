@@ -209,34 +209,52 @@ export const intents: Intent[] = [
 
 /**
  * Detect intents from a message.
- * Returns top N matches with score and matched keywords.
- * Uses word-boundary matching for higher accuracy.
+ * Uses safe regex matching with normalization and balanced scoring.
+ * Returns top N intent matches.
  */
+
 export function detectIntent(message: string, topN: number = 1) {
-  const t = normalize(message);
+
+  const text = normalize(message);
+
   const matches: { intent: Intent; score: number; matchedKeywords: string[] }[] = [];
 
   for (const intent of intents) {
-    const matched: string[] = [];
+
+    const matched = new Set<string>();
 
     for (const kw of intent.keywords) {
+
       const kwNorm = normalize(kw);
-      const regex = new RegExp(`\\b${kwNorm}\\b`, "i"); // word-boundary match
-      if (regex.test(t)) matched.push(kw);
+
+      const escaped = kwNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+      const regex = new RegExp(`\\b${escaped}\\b`, "i");
+
+      if (regex.test(text)) {
+        matched.add(kwNorm);
+      }
+
     }
 
-    if (matched.length > 0) {
+    if (matched.size > 0) {
+
+      const score = Math.min(matched.size / 3, 1);
+
       matches.push({
         intent,
-        score: matched.length / intent.keywords.length,
-        matchedKeywords: matched,
+        score,
+        matchedKeywords: [...matched]
       });
+
     }
+
   }
 
   matches.sort((a, b) => b.score - a.score);
 
-  return matches.slice(0, topN); // always returns an array
+  return matches.slice(0, topN);
+
 }
 
 /**

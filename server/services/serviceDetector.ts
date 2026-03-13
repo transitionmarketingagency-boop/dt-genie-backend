@@ -199,9 +199,14 @@ function detectServiceScore(text: string) {
 
     let score = 0;
 
-    for (const kw of keywords) {
+    // prioritize longer phrases
+    const sortedKeywords = [...keywords].sort((a, b) => b.length - a.length);
 
-      if (text.includes(kw)) {
+    for (const kw of sortedKeywords) {
+
+      const regex = new RegExp(`\\b${kw}\\b`, "i");
+
+      if (regex.test(text)) {
         score += 1;
       }
 
@@ -224,6 +229,8 @@ export function detectIntents(message: string): DetectedIntent[] {
   const text = normalize(message);
   const results: DetectedIntent[] = [];
 
+  const added = new Set<string>();
+
   const serviceScores = detectServiceScore(text);
 
   if (Object.keys(serviceScores).length) {
@@ -237,35 +244,42 @@ export function detectIntents(message: string): DetectedIntent[] {
       confidence: Math.min(bestService[1] / 3, 1)
     });
 
+    added.add(bestService[0]);
+
   }
 
   for (const kw of leadIntent) {
-    if (text.includes(kw)) {
+    if (text.includes(kw) && !added.has(kw)) {
       results.push({ type: "lead", value: kw, confidence: 0.8 });
+      added.add(kw);
     }
   }
 
   for (const kw of pricingIntent) {
-    if (text.includes(kw)) {
+    if (text.includes(kw) && !added.has(kw)) {
       results.push({ type: "pricing", value: kw, confidence: 0.8 });
+      added.add(kw);
     }
   }
 
   for (const kw of consultationIntent) {
-    if (text.includes(kw)) {
+    if (text.includes(kw) && !added.has(kw)) {
       results.push({ type: "consultation", value: kw, confidence: 0.85 });
+      added.add(kw);
     }
   }
 
   for (const kw of marketingGoals) {
-    if (text.includes(kw)) {
+    if (text.includes(kw) && !added.has(kw)) {
       results.push({ type: "marketing_goal", value: kw, confidence: 0.7 });
+      added.add(kw);
     }
   }
 
   for (const kw of industries) {
-    if (text.includes(kw)) {
+    if (text.includes(kw) && !added.has(kw)) {
       results.push({ type: "industry", value: kw, confidence: 0.7 });
+      added.add(kw);
     }
   }
 

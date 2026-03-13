@@ -54,9 +54,11 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
 
 /* ================= CONTEXT COMPRESSION ================= */
 
-function compressContext(chunks: any[], maxLength: number = 420): string {
+function compressContext(chunks: any[], maxLength: number = 350): string {
 
   if (!chunks?.length) return "";
+
+  const seen = new Set<string>();
 
   return chunks
     .map((c, i) => {
@@ -66,7 +68,11 @@ function compressContext(chunks: any[], maxLength: number = 420): string {
         .trim()
         .slice(0, maxLength);
 
-      return txt ? `[Knowledge ${i + 1}] ${txt}` : "";
+      if (!txt || seen.has(txt)) return "";
+
+      seen.add(txt);
+
+      return `[Knowledge ${i + 1}] ${txt}`;
 
     })
     .filter(Boolean)
@@ -80,7 +86,8 @@ async function getEmbeddingKnowledge(userMessage: string): Promise<{ text: strin
 
   try {
 
-    const fusedChunks = await getFusedChunks(userMessage, 8);
+    // Reduced chunk count to avoid context overload
+    const fusedChunks = await getFusedChunks(userMessage, 4);
 
     if (!fusedChunks?.length) {
       return { text: "", count: 0 };
@@ -111,7 +118,11 @@ function looksIncomplete(text: string): boolean {
 
   const trimmed = text.trim();
 
-  return trimmed.length < 40;
+  if (trimmed.length < 40) return true;
+
+  if (!/[.!?]$/.test(trimmed)) return true;
+
+  return false;
 
 }
 
@@ -221,18 +232,15 @@ export async function generateHybridResponse({
 
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
-Core behavior:
+CRITICAL RULE:
+Always answer the USER'S LATEST QUESTION. Ignore previous conversation unless needed for context.
 
-• Always prioritize answering the USER'S LATEST QUESTION.
-• Conversation history is only background context.
-• If the user asks something unrelated to marketing or the company, answer normally and briefly.
+STRICT KNOWLEDGE RULES:
 
-Rules:
-
-- Do not invent pricing, statistics, or guarantees.
-- Do not recommend external agencies.
-- Stay professional, clear, and helpful.
-- Prefer information from the company knowledge provided.
+• Only use the company knowledge provided below.
+• Do NOT invent services, tools, platforms, statistics, or guarantees.
+• If information is missing from the knowledge, say you do not have that information.
+• Do NOT fabricate technology names or proprietary systems.
 
 Detected service focus:
 ${detectedService ?? "general"}
@@ -243,13 +251,13 @@ ${detectedIntentNames.join(", ")}
 Company knowledge:
 ${vector.text}
 
-Conversation history:
+Conversation history (background only):
 ${historyText}
 
-User question:
+USER QUESTION:
 ${message}
 
-Write a helpful and direct answer.
+Provide a clear and helpful answer focused on the user’s question.
 `;
 
     /* ================= MODEL EXECUTION ================= */
