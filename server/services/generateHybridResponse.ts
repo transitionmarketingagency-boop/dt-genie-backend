@@ -4,7 +4,7 @@ import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
-import { detectIntent, normalize, intents, Intent } from "./intentManager.js";
+import { detectIntent, normalize, Intent } from "./intentManager.js";
 import { detectService } from "./serviceDetector.js";
 
 /* ================= GEMINI CONFIG ================= */
@@ -23,17 +23,14 @@ function canUseGemini(): boolean {
   }
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
-function markGeminiUsed() {
-  geminiUsage.count++;
-}
+function markGeminiUsed() { geminiUsage.count++; }
 
 /* ================= TIMEOUT ================= */
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     const timer = setTimeout(() => resolve(null), ms);
-    promise
-      .then(res => { clearTimeout(timer); resolve(res); })
-      .catch(() => { clearTimeout(timer); resolve(null); });
+    promise.then(res => { clearTimeout(timer); resolve(res); })
+           .catch(() => { clearTimeout(timer); resolve(null); });
   });
 }
 
@@ -41,38 +38,40 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
 function compressContext(chunks: any[], maxLength: number = 350): string {
   if (!chunks?.length) return "";
   const seen = new Set<string>();
-  return chunks
-    .map((c, i) => {
-      const txt = c?.text?.replace(/\s+/g, " ").trim().slice(0, maxLength);
-      if (!txt || seen.has(txt)) return "";
-      seen.add(txt);
-      return `[Knowledge ${i + 1}] ${txt}`;
-    })
-    .filter(Boolean)
-    .join("\n");
+  return chunks.map((c, i) => {
+    const txt = c?.text?.replace(/\s+/g, " ").trim().slice(0, maxLength);
+    if (!txt || seen.has(txt)) return "";
+    seen.add(txt);
+    return `[Knowledge ${i + 1}] ${txt}`;
+  }).filter(Boolean).join("\n");
 }
 
 /* ================= NEURAL QUERY EXPANSION ================= */
-async function expandQueryNeural(userMessage: string): Promise<string[]> {
-  // Placeholder: Replace with actual semantic expansion call to Qwen/Gemini if available
+async function expandQueryNeural(userMessage: string, history: string[] = []): Promise<string[]> {
   const normalized = userMessage.trim().toLowerCase();
   const expansions = [normalized];
 
-  // Example expansions: just add small variants to boost vector coverage
-  const keywords = normalized.split(" ").slice(0, 3);
+  // Basic multi-word variations
+  const keywords = normalized.split(" ").slice(0, 5);
   if (keywords.length > 1) {
     expansions.push(`${keywords.join(" ")} marketing`);
     expansions.push(`${keywords.join(" ")} service`);
+    expansions.push(`${keywords.join(" ")} predictive targeting`);
+    expansions.push(`${keywords.join(" ")} CGI ads`);
+    expansions.push(`${keywords.join(" ")} GEO`);
   }
+
+  // Add last 1-2 history messages for context expansion
+  history.slice(-2).forEach(h => expansions.push(h.toLowerCase()));
 
   return Array.from(new Set(expansions));
 }
 
 /* ================= VECTOR KNOWLEDGE ================= */
-async function getEmbeddingKnowledge(userMessage: string): Promise<{ text: string; count: number }> {
+async function getEmbeddingKnowledge(userMessage: string, history: string[] = []): Promise<{ text: string; count: number }> {
   try {
-    const queries = await expandQueryNeural(userMessage);
-    const fusedChunks = await getFusedChunks(userMessage, 4); // still uses userMessage; getFusedChunks internally will handle vectors
+    const queries = await expandQueryNeural(userMessage, history);
+    const fusedChunks = await getFusedChunks(userMessage, 4); // could add multi-query fusion later
     if (!fusedChunks?.length) return { text: "", count: 0 };
     const compressed = compressContext(fusedChunks, 350);
     return { text: compressed, count: fusedChunks.length };
@@ -86,9 +85,7 @@ async function getEmbeddingKnowledge(userMessage: string): Promise<{ text: strin
 function looksIncomplete(text: string): boolean {
   if (!text) return true;
   const trimmed = text.trim();
-  if (trimmed.length < 40) return true;
-  if (!/[.!?]$/.test(trimmed)) return true;
-  return false;
+  return trimmed.length < 40 || !/[.!?]$/.test(trimmed);
 }
 
 /* ================= TOOL SANITIZER ================= */
@@ -110,19 +107,13 @@ function sanitizeTools(text: string): string {
 /* ================= RESPONSE CLEANUP ================= */
 function cleanHybridResponse(text: string): string {
   text = sanitizeTools(text);
-  // Fix repeated AI- prefixes
   text = text.replace(/\b(AI-){2,}/gi, "AI-");
   text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
-  text = text.replace(/\s+/g, " ").trim();
-  return text;
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /* ================= REQUEST TYPE ================= */
-interface HybridRequest {
-  message: string;
-  sessionId: string;
-  history?: any[];
-}
+interface HybridRequest { message: string; sessionId: string; history?: any[]; }
 
 /* ================= MAIN HYBRID SYSTEM ================= */
 export async function generateHybridResponse({ message, sessionId, history = [] }: HybridRequest): Promise<string> {
@@ -131,44 +122,30 @@ export async function generateHybridResponse({ message, sessionId, history = [] 
     await memoryService.saveMessage(sessionId, "user", message);
 
     /* ================= QUICK RESPONSES ================= */
-    if (["hi","hello","hey"].includes(normalizedMessage)) {
-      return `Hello. I am ${BOT_NAME}. How can I assist you today?`;
-    }
-    if (normalizedMessage.includes("who are you")) {
-      return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing. I help businesses implement advanced AI marketing systems, automation, and growth strategies.`;
-    }
-    if (normalizedMessage.includes("book") || normalizedMessage.includes("schedule")) {
-      return `You can schedule a strategy session here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future`;
-    }
+    const greetings = ["hi","hello","hey"];
+    if (greetings.includes(normalizedMessage)) return `Hello. I am ${BOT_NAME}. How can I assist you today?`;
+    if (normalizedMessage.includes("who are you")) return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing. I help businesses implement advanced AI marketing systems, automation, and growth strategies.`;
+    if (normalizedMessage.includes("book") || normalizedMessage.includes("schedule")) return `You can schedule a strategy session here: https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future`;
 
     /* ================= MEMORY ================= */
     let historyMessages: any[] = [];
-    try {
-      historyMessages = await memoryService.getRecentContext(sessionId);
-    } catch {
-      historyMessages = history.slice(-6);
-    }
-    const historyText = historyMessages
-      .slice(-6)
+    try { historyMessages = await memoryService.getRecentContext(sessionId); } 
+    catch { historyMessages = history.slice(-6); }
+
+    const historyText = historyMessages.slice(-5)
       .map(h => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`)
       .join("\n");
 
-    /* ================= INTENT DETECTION ================= */
+    /* ================= INTENT & SERVICE DETECTION ================= */
     let intentMatches: { intent: Intent; score?: number }[] = [];
-    try {
-      const detected = detectIntent(message);
-      if (Array.isArray(detected)) intentMatches = detected as { intent: Intent; score?: number }[];
-    } catch {}
-    const detectedIntentNames = intentMatches.length > 0
-      ? intentMatches.slice(0, 3).map(i => i.intent.name)
-      : ["general"];
+    try { const detected = detectIntent(message); if (Array.isArray(detected)) intentMatches = detected; } catch {}
+    const detectedIntentNames = intentMatches.length > 0 ? intentMatches.slice(0, 3).map(i => i.intent.name) : ["general"];
 
-    /* ================= SERVICE DETECTION ================= */
     let detectedService: string | null = null;
     try { detectedService = detectService(message); } catch {}
 
     /* ================= VECTOR KNOWLEDGE ================= */
-    const vector = await getEmbeddingKnowledge(message);
+    const vector = await getEmbeddingKnowledge(message, historyMessages.map(h => h.content));
 
     /* ================= PROMPT ================= */
     const prompt = `
@@ -178,7 +155,6 @@ CRITICAL RULE:
 Always answer the USER'S LATEST QUESTION. Ignore previous conversation unless needed for context.
 
 STRICT KNOWLEDGE RULES:
-
 • Only use the company knowledge provided below.
 • Do NOT invent services, tools, platforms, statistics, or guarantees.
 • If information is missing from the knowledge, say you do not have that information.
@@ -212,11 +188,7 @@ Provide a clear and helpful answer focused on the user’s question.
         const qwenResp = await withTimeout(generateOpenRouter(prompt), 18000);
         if (qwenResp) {
           const cleaned = cleanResponse(qwenResp);
-          if (!looksIncomplete(cleaned)) {
-            response = cleaned;
-            modelUsed = "Qwen";
-            break;
-          }
+          if (!looksIncomplete(cleaned)) { response = cleaned; modelUsed = "Qwen"; break; }
         }
       }
     }
@@ -226,11 +198,7 @@ Provide a clear and helpful answer focused on the user’s question.
       const geminiResp = await withTimeout(generateGemini(prompt), 12000);
       if (geminiResp) {
         const cleaned = cleanResponse(geminiResp);
-        if (!looksIncomplete(cleaned)) {
-          response = cleaned;
-          modelUsed = "Gemini";
-          markGeminiUsed();
-        }
+        if (!looksIncomplete(cleaned)) { response = cleaned; modelUsed = "Gemini"; markGeminiUsed(); }
       }
     }
 
@@ -240,14 +208,14 @@ Provide a clear and helpful answer focused on the user’s question.
       modelUsed = "fallback";
     }
 
-    /* ================= CLEANUP ================= */
+    /* ================= FINAL CLEANUP ================= */
     response = cleanHybridResponse(enforceBotName(response));
-
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     console.log(`[Hybrid RAG] Model=${modelUsed} | Intents=${detectedIntentNames.join(",")} | Chunks=${vector.count} | Service=${detectedService ?? "none"} | ResponseLen=${response.length}`);
 
     return response;
+
   } catch (err) {
     console.error("Hybrid RAG error:", err);
     return `I am ${BOT_NAME}. There was a temporary processing issue. Please try again shortly.`;
