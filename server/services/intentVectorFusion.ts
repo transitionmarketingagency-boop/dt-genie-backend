@@ -113,13 +113,10 @@ export async function getFusedChunks(
 
   const topN = Math.max(baseTopN, Math.ceil(baseTopN * (1 + complexity)));
 
-  /* ================= VECTOR SEARCH ================= */
+  /* ================= NEURAL QUERY EXPANSION + VECTOR SEARCH ================= */
 
-  const vectorChunks: VectorChunk[] = await getTopChunks(
-    userMessage,
-    topN * 2,
-    0.5
-  );
+  // Uses new neural query expansion from getTopChunks internally
+  const vectorChunks: VectorChunk[] = await getTopChunks(userMessage, topN * 2, 0.5);
 
   if (!vectorChunks?.length) return [];
 
@@ -137,13 +134,10 @@ export async function getFusedChunks(
     const chunkText = normalize(chunk.text);
 
     /* VECTOR SIMILARITY */
-
     const vectorScore = chunk.score || 0;
 
     /* INTENT MATCH */
-
     let intentScore = 0;
-
     for (const detected of intentsWithScore) {
       if (chunk.intent && detected.intent.name === chunk.intent) {
         intentScore = detected.score ?? 0.2;
@@ -152,22 +146,15 @@ export async function getFusedChunks(
     }
 
     /* KEYWORD OVERLAP */
-
     const keywordScore = keywordOverlap(normalizedMessage, chunkText);
 
     /* EXTRA INTENT KEYWORD MATCH */
-
-    const intentKeywordBoost = intentKeywordScore(
-      normalizedMessage,
-      chunkText
-    );
+    const intentKeywordBoost = intentKeywordScore(normalizedMessage, chunkText);
 
     /* SERVICE BOOST */
-
     const serviceScore = serviceBoost(chunkText);
 
     /* FINAL SCORE */
-
     const fusionScore =
       VECTOR_WEIGHT * vectorScore +
       INTENT_WEIGHT * intentScore +
