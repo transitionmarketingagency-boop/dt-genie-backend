@@ -1,9 +1,8 @@
-// server/chatbot.ts
-
 import readline from "readline";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
 import { strategicBrain } from "./services/strategicBrain.js";
 import { memoryService } from "./services/memoryService.js";
+import bookingFlow from "./bookingFlow.js";
 
 /* ================= CLI SETUP ================= */
 const rl = readline.createInterface({
@@ -16,6 +15,16 @@ console.log("Type a message or type 'exit' to quit.\n");
 
 /* ================= SESSION MANAGEMENT ================= */
 const SESSION_ID = "cli-session";
+
+/* ================= BOOKING KEYWORDS ================= */
+const BOOKING_KEYWORDS = [
+  "book a call",
+  "schedule a meeting",
+  "schedule meeting",
+  "schedule call",
+  "book meeting",
+  "book strategy session",
+];
 
 /* ================= CHAT LOOP ================= */
 async function ask(): Promise<void> {
@@ -40,24 +49,61 @@ async function ask(): Promise<void> {
     }
 
     try {
-      /* -------- Save user message to memory -------- */
+      /* ================= SAVE USER MESSAGE ================= */
       await memoryService.saveMessage(SESSION_ID, "user", message);
 
-      /* -------- Strategic Brain Analysis -------- */
+      const lowerMsg = message.toLowerCase();
+
+      /* ================= BOOKING FLOW DETECTION ================= */
+
+      const isBookingKeyword = BOOKING_KEYWORDS.some((kw) =>
+        lowerMsg.includes(kw)
+      );
+
+      const isBookingActive = bookingFlow.isBookingActive?.(SESSION_ID);
+
+      if (isBookingKeyword || isBookingActive) {
+        const bookingResponse = await bookingFlow.startBookingFlow(
+          SESSION_ID,
+          message
+        );
+
+        /* Save assistant response */
+        await memoryService.saveMessage(
+          SESSION_ID,
+          "assistant",
+          bookingResponse.response
+        );
+
+        console.log("\n ~V AI:", bookingResponse.response, "\n");
+
+        /* CLI placeholder for frontend action */
+        if (bookingResponse.frontendScript) {
+          console.log("⚡ Calendly popup trigger received.");
+        }
+
+        ask();
+        return;
+      }
+
+      /* ================= STRATEGIC BRAIN ================= */
+
       const { brainContext } = await strategicBrain(message, SESSION_ID);
 
       console.log(
         `[Brain] Stage: ${brainContext.stage} | Intent: ${brainContext.intent} | LeadScore: ${brainContext.leadScore} | Reasoning: ${brainContext.reasoning}`
       );
 
-      /* -------- Generate AI Response -------- */
+      /* ================= GENERATE AI RESPONSE ================= */
+
       const response = await generateHybridResponse({
         message,
         sessionId: SESSION_ID,
         history: await memoryService.getRecentContext(SESSION_ID),
       });
 
-      /* -------- Save assistant response to memory -------- */
+      /* ================= SAVE RESPONSE ================= */
+
       await memoryService.saveMessage(SESSION_ID, "assistant", response);
 
       console.log("\n ~V AI:", response, "\n");

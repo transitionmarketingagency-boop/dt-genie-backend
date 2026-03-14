@@ -1,5 +1,4 @@
-// bookingFlow.ts
-import memoryService from "./services/memoryService";
+import { memoryService } from "./services/memoryService.js";
 
 type BookingState = {
   step: number;
@@ -9,102 +8,197 @@ type BookingState = {
   calendlyLink?: string;
 };
 
-// In-memory tracker for ongoing booking flows per user
+interface BookingResponse {
+  response: string;
+  nextStep?: number;
+  frontendScript?: string;
+}
+
+/* ================= BOOKING STATE STORAGE ================= */
+
 const ongoingBookings: Record<string, BookingState> = {};
+
+/* ================= CALENDLY LINK ================= */
 
 const baseCalendlyLink =
   "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
 
-export default {
-  startBookingFlow: (userId: string, userMessage: string) => {
+/* ================= EMAIL VALIDATION ================= */
+
+function isValidEmail(email: string): boolean {
+  return /\S+@\S+\.\S+/.test(email);
+}
+
+/* ================= BOOKING FLOW ================= */
+
+const bookingFlow = {
+  startBookingFlow: async (
+    userId: string,
+    userMessage: string
+  ): Promise<BookingResponse> => {
     if (!ongoingBookings[userId]) {
       ongoingBookings[userId] = { step: 1 };
     }
 
-    return this.handleStep(userId, userMessage);
+    return bookingFlow.handleStep(userId, userMessage);
   },
 
-  handleStep: (userId: string, userMessage: string) => {
+  handleStep: async (
+    userId: string,
+    userMessage: string
+  ): Promise<BookingResponse> => {
     const booking = ongoingBookings[userId];
 
+    if (!booking) {
+      ongoingBookings[userId] = { step: 1 };
+      return {
+        response:
+          "Let's start your booking again. Which service are you interested in?",
+        nextStep: 1,
+      };
+    }
+
+    const message = userMessage.trim();
+
     switch (booking.step) {
+      /* ================= STEP 1 ================= */
+
       case 1:
         booking.step = 2;
+
         return {
-          response: `I can help you schedule your strategy session. Which service are you interested in? (AI marketing, CGI property tours, SEO/GEO, General consultation)`,
+          response: `I can help you schedule your strategy session.
+
+Which service are you interested in?
+
+• AI Marketing  
+• CGI Property Tours  
+• SEO / GEO  
+• General Consultation`,
           nextStep: 2,
         };
 
+      /* ================= STEP 2 ================= */
+
       case 2:
-        booking.serviceType = userMessage;
+        booking.serviceType = message;
         booking.step = 3;
+
         return {
-          response: `Great! When would you like to schedule your session? Please provide your preferred date and time.`,
+          response:
+            "Great choice. When would you like to schedule your session? Please share your preferred **date and time**.",
           nextStep: 3,
         };
 
+      /* ================= STEP 3 ================= */
+
       case 3:
-        booking.preferredTime = userMessage;
+        booking.preferredTime = message;
         booking.step = 4;
+
         return {
-          response: `Perfect. Could you share your email so we can send the confirmation?`,
+          response:
+            "Perfect. Please provide your **email address** so we can send the meeting confirmation.",
           nextStep: 4,
         };
 
-      case 4:
-        booking.email = userMessage;
+      /* ================= STEP 4 ================= */
 
-        // Generate dynamic Calendly link with pre-filled name/email
+      case 4:
+        if (!isValidEmail(message)) {
+          return {
+            response: "Please enter a **valid email address** so we can continue.",
+            nextStep: 4,
+          };
+        }
+
+        booking.email = message;
+
         booking.calendlyLink = `${baseCalendlyLink}?email=${encodeURIComponent(
           booking.email
         )}&name=${encodeURIComponent(userId)}`;
 
-        // Store booking in memory service
-        memoryService.storeBooking({
-          userId,
-          serviceType: booking.serviceType,
-          preferredTime: booking.preferredTime,
-          email: booking.email,
-          calendlyLink: booking.calendlyLink,
-          status: "pending",
-        });
+        /* ===== Store booking safely ===== */
 
-        // Trigger frontend popup via chatbot widget (frontend will execute)
+        try {
+          await memoryService.storeBooking({
+            userId,
+            serviceType: booking.serviceType,
+            preferredTime: booking.preferredTime,
+            email: booking.email,
+            calendlyLink: booking.calendlyLink,
+            status: "pending",
+          });
+        } catch (err) {
+          console.error("⚠️ Failed storing booking:", err);
+        }
+
+        /* ===== Calendly popup trigger ===== */
+
         const frontendTriggerScript = `
-          if (window.openCalendlyPopup) {
-            window.openCalendlyPopup();
-          }
-        `;
+if (window.openCalendlyPopup) {
+  window.openCalendlyPopup();
+} else {
+  window.open("${booking.calendlyLink}", "_blank");
+}
+`;
 
-        booking.step = 5; // final step
+        booking.step = 5;
+
         return {
-          response: `Awesome! Your booking info is set for **${booking.serviceType}**. 
-Click the link to **book a call** or the form should have appeared automatically. 
-[Book a Call](${booking.calendlyLink})
+          response: `Awesome! Your booking info is ready for **${booking.serviceType}**.
 
-Once you’ve booked, type 'I booked' so I can confirm your session and next steps.`,
+You can now **book a call** using the link below:
+
+${booking.calendlyLink}
+
+The booking form should also open automatically.
+
+After completing the booking, type **"I booked"** so I can confirm your session.`,
           nextStep: 5,
           frontendScript: frontendTriggerScript,
         };
 
+      /* ================= STEP 5 ================= */
+
       case 5:
-        if (userMessage.toLowerCase().includes("i booked")) {
-          booking.step = 6;
-          memoryService.updateBookingStatus(userId, "confirmed");
-          delete ongoingBookings[userId]; // flow complete
+        if (message.toLowerCase().includes("i booked")) {
+          try {
+            await memoryService.updateBookingStatus(userId, "confirmed");
+          } catch (err) {
+            console.error("⚠️ Failed updating booking status:", err);
+          }
+
+          delete ongoingBookings[userId];
+
           return {
-            response: `✅ Thank you for confirming! Your strategy session is booked. We’ll send you an email with all details shortly.`,
-          };
-        } else {
-          return {
-            response: `Please type 'I booked' once you've completed the booking through the form or the link.`,
+            response:
+              "✅ Perfect! Your strategy session is confirmed. You'll receive the meeting details shortly via email.",
           };
         }
 
-      default:
         return {
-          response: `It seems there’s an issue with the booking flow. Let’s start again. Type 'book a call' to begin.`,
+          response:
+            "Please type **'I booked'** once you've completed the booking through the form.",
+        };
+
+      /* ================= FAILSAFE ================= */
+
+      default:
+        delete ongoingBookings[userId];
+
+        return {
+          response:
+            "Something went wrong with the booking flow. Please type **'book a call'** to start again.",
         };
     }
   },
+
+  /* ================= BOOKING STATE CHECK (FIX FOR CHATBOT.TS) ================= */
+
+  isBookingActive: (userId: string): boolean => {
+    return Boolean(ongoingBookings[userId]);
+  },
 };
+
+export default bookingFlow;

@@ -36,7 +36,7 @@ export async function initializeMemory(): Promise<void> {
     await db.exec(`PRAGMA journal_mode = WAL;`);
     await db.exec(`PRAGMA synchronous = NORMAL;`);
 
-    // Chat messages table
+    /* ================= CHAT TABLE ================= */
     await db.run(`
       CREATE TABLE IF NOT EXISTS chat_messages (
         id TEXT PRIMARY KEY,
@@ -52,7 +52,7 @@ export async function initializeMemory(): Promise<void> {
       ON chat_messages (sessionId)
     `);
 
-    // Strategic memory table
+    /* ================= STRATEGIC MEMORY ================= */
     await db.run(`
       CREATE TABLE IF NOT EXISTS strategic_memory (
         sessionId TEXT PRIMARY KEY,
@@ -62,7 +62,25 @@ export async function initializeMemory(): Promise<void> {
         servicesDiscussed TEXT,
         leadScore INTEGER,
         stage TEXT,
+        budget REAL,
+        timeline TEXT,
+        decisionMaker TEXT,
+        interestLevel TEXT,
         updatedAt TEXT
+      )
+    `);
+
+    /* ================= BOOKINGS TABLE ================= */
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id TEXT PRIMARY KEY,
+        userId TEXT,
+        serviceType TEXT,
+        preferredTime TEXT,
+        email TEXT,
+        calendlyLink TEXT,
+        status TEXT,
+        createdAt TEXT
       )
     `);
 
@@ -86,6 +104,10 @@ export interface StrategicMemory {
   servicesDiscussed?: string[];
   leadScore?: number;
   stage?: string;
+  budget?: number;
+  timeline?: string;
+  decisionMaker?: string;
+  interestLevel?: string;
   updatedAt?: string;
 }
 
@@ -103,7 +125,6 @@ export class MemoryService {
     const normalized = normalizeContent(content);
     if (!normalized) throw new Error("Attempted to store empty message");
 
-    /* ===== DUPLICATE GUARD ===== */
     const last = await db.get(
       `SELECT content, timestamp FROM chat_messages
        WHERE sessionId = ?
@@ -115,6 +136,7 @@ export class MemoryService {
     if (last) {
       const lastTime = new Date(last.timestamp).getTime();
       const nowTime = Date.now();
+
       if (last.content === normalized && nowTime - lastTime < 3000) {
         return {
           id: crypto.randomUUID(),
@@ -127,6 +149,7 @@ export class MemoryService {
     }
 
     const now = new Date();
+
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId,
@@ -175,6 +198,7 @@ export class MemoryService {
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
     try {
       const db = await this.db;
+
       const rows = await db.all(
         `SELECT * FROM chat_messages
          WHERE sessionId = ?
@@ -201,6 +225,7 @@ export class MemoryService {
   async getRecentContext(sessionId: string): Promise<ChatMessage[]> {
     try {
       const db = await this.db;
+
       const rows = await db.all(
         `SELECT * FROM chat_messages
          WHERE sessionId = ?
@@ -231,61 +256,37 @@ export class MemoryService {
     }
   }
 
-  /* -------- Replace Entire History -------- */
-  async saveChatHistory(sessionId: string, messages: ChatMessage[]): Promise<void> {
-    const db = await this.db;
-    await db.exec("BEGIN TRANSACTION");
-    try {
-      await db.run(`DELETE FROM chat_messages WHERE sessionId = ?`, sessionId);
-      const insertStmt = await db.prepare(
-        `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
-         VALUES (?, ?, ?, ?, ?)`
-      );
-
-      for (const msg of messages) {
-        const ts =
-          msg.timestamp instanceof Date
-            ? msg.timestamp.toISOString()
-            : new Date(msg.timestamp).toISOString();
-        await insertStmt.run(
-          msg.id,
-          msg.sessionId,
-          msg.role,
-          normalizeContent(msg.content),
-          ts
-        );
-      }
-
-      await insertStmt.finalize();
-      await db.exec("COMMIT");
-    } catch (err) {
-      await db.exec("ROLLBACK");
-      console.error("❌ Failed to save chat history:", err);
-    }
-  }
-
   /* ================= STRATEGIC MEMORY ================= */
-
   async getStrategicMemory(sessionId: string): Promise<StrategicMemory> {
     const db = await this.db;
+
     const row = await db.get(
       `SELECT * FROM strategic_memory WHERE sessionId = ?`,
       sessionId
     );
+
     if (!row) return {};
+
     return {
       industry: row.industry || undefined,
       businessType: row.businessType || undefined,
       goals: row.goals ? JSON.parse(row.goals) : undefined,
-      servicesDiscussed: row.servicesDiscussed ? JSON.parse(row.servicesDiscussed) : undefined,
+      servicesDiscussed: row.servicesDiscussed
+        ? JSON.parse(row.servicesDiscussed)
+        : undefined,
       leadScore: row.leadScore ?? undefined,
       stage: row.stage || undefined,
+      budget: row.budget ?? undefined,
+      timeline: row.timeline || undefined,
+      decisionMaker: row.decisionMaker || undefined,
+      interestLevel: row.interestLevel || undefined,
       updatedAt: row.updatedAt || undefined,
     };
   }
 
   async updateStrategicMemory(sessionId: string, data: Partial<StrategicMemory>) {
     const db = await this.db;
+
     const existing = await this.getStrategicMemory(sessionId);
 
     const merged = {
@@ -295,8 +296,9 @@ export class MemoryService {
     };
 
     await db.run(
-      `INSERT INTO strategic_memory (sessionId, industry, businessType, goals, servicesDiscussed, leadScore, stage, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO strategic_memory 
+       (sessionId, industry, businessType, goals, servicesDiscussed, leadScore, stage, budget, timeline, decisionMaker, interestLevel, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(sessionId) DO UPDATE SET
          industry=excluded.industry,
          businessType=excluded.businessType,
@@ -304,6 +306,10 @@ export class MemoryService {
          servicesDiscussed=excluded.servicesDiscussed,
          leadScore=excluded.leadScore,
          stage=excluded.stage,
+         budget=excluded.budget,
+         timeline=excluded.timeline,
+         decisionMaker=excluded.decisionMaker,
+         interestLevel=excluded.interestLevel,
          updatedAt=excluded.updatedAt`,
       sessionId,
       merged.industry ?? null,
@@ -312,8 +318,60 @@ export class MemoryService {
       merged.servicesDiscussed ? JSON.stringify(merged.servicesDiscussed) : null,
       merged.leadScore ?? null,
       merged.stage ?? null,
+      merged.budget ?? null,
+      merged.timeline ?? null,
+      merged.decisionMaker ?? null,
+      merged.interestLevel ?? null,
       merged.updatedAt
     );
+  }
+
+  /* ================= BOOKINGS ================= */
+  async storeBooking(data: {
+    userId: string;
+    serviceType?: string;
+    preferredTime?: string;
+    email?: string;
+    calendlyLink?: string;
+    status?: string;
+  }) {
+    const db = await this.db;
+
+    await db.run(
+      `INSERT INTO bookings
+      (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      crypto.randomUUID(),
+      data.userId,
+      data.serviceType ?? null,
+      data.preferredTime ?? null,
+      data.email ?? null,
+      data.calendlyLink ?? null,
+      data.status ?? "pending",
+      new Date().toISOString()
+    );
+
+    if (process.env.DEBUG_MEMORY === "true") {
+      console.log(`[Memory] Booking stored for ${data.userId}`);
+    }
+  }
+
+  async updateBookingStatus(userId: string, status: string) {
+    const db = await this.db;
+
+    await db.run(
+      `UPDATE bookings
+       SET status = ?
+       WHERE userId = ?
+       ORDER BY createdAt DESC
+       LIMIT 1`,
+      status,
+      userId
+    );
+
+    if (process.env.DEBUG_MEMORY === "true") {
+      console.log(`[Memory] Booking updated for ${userId} -> ${status}`);
+    }
   }
 }
 
