@@ -54,10 +54,17 @@ export const intents: Intent[] = [
     name: "youtube_ad_domination",
     category: "service",
     keywords: [
-      "youtube ads", "video funnels", "ad scripts", "shoppable video",
-      "competitor ad cloning", "skip ad waste", "bid surgery"
+      "youtube ads",
+      "video funnels",
+      "video advertising",
+      "youtube campaigns",
+      "youtube video ads",
+      "video marketing",
+      "video ad strategy",
+      "youtube ad optimization",
+      "video conversion funnels"
     ],
-    description: "Transforming video ads into profit machines using AI scripts and hyper-targeted placement."
+    description: "Strategic YouTube advertising campaigns designed to drive awareness, engagement, and high-converting video funnels."
   },
 
   {

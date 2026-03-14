@@ -13,7 +13,7 @@ const devPath = path.join(__dirname, "../vector_store/chunks.json");
 
 const chunksPath = fs.existsSync(distPath) ? distPath : devPath;
 
-console.log("📚 Loading vector chunks from:", chunksPath);
+console.log("🧠 Loading vector chunks from:", chunksPath);
 
 /* ================= TYPES ================= */
 
@@ -50,11 +50,13 @@ const blockedPlatforms = [
 
 function normalizeVector(vec: number[]) {
 
-  if (!Array.isArray(vec) || !vec.length) return vec;
+  if (!Array.isArray(vec) || vec.length === 0) return vec;
 
   const norm = Math.sqrt(vec.reduce((s, v) => s + v * v, 0));
 
-  if (!norm) return vec;
+  if (!norm) {
+    return vec;
+  }
 
   return vec.map(v => v / norm);
 
@@ -127,7 +129,7 @@ function tokenize(text: string) {
         c.embedding.length > 100 &&
         c.text.length > 40 &&
         !blockedPlatforms.some(p =>
-          c.text.toLowerCase().includes(p)
+          normalize(c.text).includes(p)
         )
       );
 
@@ -155,7 +157,6 @@ function tokenize(text: string) {
 function cosineSimilarity(vecA: number[], vecB: number[]): number {
 
   if (!vecA || !vecB) return 0;
-
   if (vecA.length !== vecB.length) return 0;
 
   let dot = 0;
@@ -199,20 +200,8 @@ function cacheEmbedding(key: string, embedding: number[]) {
 /* ================= STOPWORDS ================= */
 
 const stopwords = new Set([
-  "the",
-  "a",
-  "an",
-  "how",
-  "what",
-  "why",
-  "is",
-  "are",
-  "does",
-  "do",
-  "can",
-  "i",
-  "you",
-  "about"
+  "the","a","an","how","what","why","is","are","does","do","can",
+  "i","you","about","tell","me","please","explain","give","info"
 ]);
 
 /* ================= KEYWORD OVERLAP ================= */
@@ -270,7 +259,9 @@ export async function getTopChunks(
 
   for (const q of queries) {
 
-    let embedding = queryEmbeddingCache.get(q);
+    const cacheKey = normalize(q);
+
+    let embedding = queryEmbeddingCache.get(cacheKey);
 
     if (!embedding) {
 
@@ -282,7 +273,7 @@ export async function getTopChunks(
 
         embedding = normalizeVector(embedding);
 
-        cacheEmbedding(q, embedding);
+        cacheEmbedding(cacheKey, embedding);
 
       } catch (err) {
 
@@ -331,11 +322,8 @@ export async function getTopChunks(
       for (const t of intentTokens) {
 
         if (normalized.includes(t)) {
-
           intentBoost = 0.08;
-
           break;
-
         }
 
       }
@@ -403,7 +391,7 @@ export async function getTopChunks(
   }
 
   console.log(
-    `🔎 Vector search | Query="${normalized.slice(0, 40)}" | Results=${results.length}`
+    `🧠 Vector search | Query="${normalized.slice(0, 40)}" | Results=${results.length}`
   );
 
   return results;

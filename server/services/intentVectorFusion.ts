@@ -19,7 +19,7 @@ const SERVICE_BOOST = 0.05;
 
 /* ======================= SAFETY LIMITS ======================= */
 
-const MAX_CHUNKS = 5; // prevents slow responses
+const MAX_CHUNKS = 5;
 
 /* ======================= TEXT NORMALIZATION ======================= */
 
@@ -110,16 +110,15 @@ function serviceBoost(chunkText: string) {
       }
 
     }
-
   }
 
   return 0;
 
 }
 
-/* ======================= FUSION FUNCTION ======================= */
+/* ======================= MAIN FUSION FUNCTION ======================= */
 
-export async function getFusedChunks(
+async function getFusedChunksInternal(
   userMessage: string,
   baseTopN: number = 6
 ): Promise<
@@ -128,8 +127,6 @@ export async function getFusedChunks(
 
   const normalizedMessage = normalize(userMessage);
 
-  /* ================= DYNAMIC TOP-N ================= */
-
   const complexity = complexityScore(userMessage);
 
   let topN = Math.max(
@@ -137,20 +134,14 @@ export async function getFusedChunks(
     Math.ceil(baseTopN * (1 + complexity))
   );
 
-  /* ================= SPEED CAP ================= */
-
   if (topN > MAX_CHUNKS) {
     topN = MAX_CHUNKS;
   }
-
-  /* ================= VECTOR SEARCH ================= */
 
   const vectorChunks: VectorChunk[] =
     await getTopChunks(userMessage, topN * 2, 0.5);
 
   if (!vectorChunks?.length) return [];
-
-  /* ================= INTENT DETECTION ================= */
 
   const detectedIntents = detectIntent(userMessage, 3);
 
@@ -158,17 +149,11 @@ export async function getFusedChunks(
     ? detectedIntents
     : [{ intent: { name: "general" } as Intent, score: 0.2 }];
 
-  /* ================= FUSION ================= */
-
   const fused = vectorChunks.map((chunk) => {
 
     const chunkText = normalize(chunk.text || "");
 
-    /* VECTOR SIMILARITY */
-
     const vectorScore = chunk.score || 0;
-
-    /* INTENT MATCH */
 
     let intentScore = 0;
 
@@ -177,28 +162,19 @@ export async function getFusedChunks(
       if (chunk.intent && detected.intent.name === chunk.intent) {
 
         intentScore = detected.score ?? 0.2;
-
         break;
 
       }
 
     }
 
-    /* KEYWORD OVERLAP */
-
     const keywordScore =
       keywordOverlap(normalizedMessage, chunkText);
-
-    /* EXTRA INTENT KEYWORD MATCH */
 
     const intentKeywordBoost =
       intentKeywordScore(normalizedMessage, chunkText);
 
-    /* SERVICE BOOST */
-
     const serviceScore = serviceBoost(chunkText);
-
-    /* FINAL SCORE */
 
     const fusionScore =
       VECTOR_WEIGHT * vectorScore +
@@ -214,11 +190,7 @@ export async function getFusedChunks(
 
   });
 
-  /* ================= SORT ================= */
-
   fused.sort((a, b) => b.fusionScore - a.fusionScore);
-
-  /* ================= RETURN ================= */
 
   const topChunks = fused.slice(0, topN);
 
@@ -230,3 +202,7 @@ export async function getFusedChunks(
   }));
 
 }
+
+/* ======================= EXPORT ======================= */
+
+export { getFusedChunksInternal as getFusedChunks };

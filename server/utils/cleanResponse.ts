@@ -10,34 +10,37 @@ export function cleanResponse(raw: string): string {
 
   let text = raw;
 
-  /* ===== REMOVE CODE BLOCKS ===== */
+  /* ===== REMOVE CODE BLOCK MARKERS (keep content) ===== */
 
-  text = text.replace(/```[\s\S]*?```/g, "");
+  text = text.replace(/```/g, "");
 
-  /* ===== REMOVE MARKDOWN SYMBOLS ===== */
+  /* ===== REMOVE MARKDOWN HEADERS ===== */
 
-  text = text
-    .replace(/#+\s?/g, "")
-    .replace(/\*\*/g, "")
-    .replace(/\*/g, "")
-    .replace(/_{2,}/g, "")
-    .replace(/`/g, "");
+  text = text.replace(/^#{1,6}\s*/gm, "");
 
-  /* ===== REMOVE INTERNAL TOKENS ===== */
+  /* ===== REMOVE MARKDOWN BOLD / ITALIC ===== */
 
   text = text
-    .replace(/assistant:/gi, "")
-    .replace(/system:/gi, "")
-    .replace(/user:/gi, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/_{2,}(.*?)_{2,}/g, "$1")
+    .replace(/`(.*?)`/g, "$1");
+
+  /* ===== REMOVE INTERNAL TOKENS (ONLY LINE START) ===== */
+
+  text = text
+    .replace(/^assistant:\s*/gim, "")
+    .replace(/^system:\s*/gim, "")
+    .replace(/^user:\s*/gim, "")
     .replace(/<\|.*?\|>/g, "");
 
   /* ===== FIX WORD MERGING (camelCase spacing) ===== */
 
   text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
 
-  /* ===== REMOVE STRANGE CHARACTERS ===== */
+  /* ===== REMOVE STRANGE CONTROL CHARACTERS ===== */
 
-  text = text.replace(/[^\x20-\x7E\n\r]/g, "");
+  text = text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
 
   /* ===== NORMALIZE WHITESPACE ===== */
 
