@@ -15,22 +15,18 @@ interface BookingResponse {
 }
 
 /* ================= BOOKING STATE STORAGE ================= */
-
 const ongoingBookings: Record<string, BookingState> = {};
 
 /* ================= CALENDLY LINK ================= */
-
 const baseCalendlyLink =
   "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
 
 /* ================= EMAIL VALIDATION ================= */
-
 function isValidEmail(email: string): boolean {
   return /\S+@\S+\.\S+/.test(email);
 }
 
 /* ================= BOOKING FLOW ================= */
-
 const bookingFlow = {
   startBookingFlow: async (
     userId: string,
@@ -62,10 +58,8 @@ const bookingFlow = {
 
     switch (booking.step) {
       /* ================= STEP 1 ================= */
-
       case 1:
         booking.step = 2;
-
         return {
           response: `I can help you schedule your strategy session.
 
@@ -79,11 +73,9 @@ Which service are you interested in?
         };
 
       /* ================= STEP 2 ================= */
-
       case 2:
         booking.serviceType = message;
         booking.step = 3;
-
         return {
           response:
             "Great choice. When would you like to schedule your session? Please share your preferred **date and time**.",
@@ -91,11 +83,9 @@ Which service are you interested in?
         };
 
       /* ================= STEP 3 ================= */
-
       case 3:
         booking.preferredTime = message;
         booking.step = 4;
-
         return {
           response:
             "Perfect. Please provide your **email address** so we can send the meeting confirmation.",
@@ -103,7 +93,6 @@ Which service are you interested in?
         };
 
       /* ================= STEP 4 ================= */
-
       case 4:
         if (!isValidEmail(message)) {
           return {
@@ -113,13 +102,11 @@ Which service are you interested in?
         }
 
         booking.email = message;
-
         booking.calendlyLink = `${baseCalendlyLink}?email=${encodeURIComponent(
           booking.email
         )}&name=${encodeURIComponent(userId)}`;
 
         /* ===== Store booking safely ===== */
-
         try {
           await memoryService.storeBooking({
             userId,
@@ -134,7 +121,6 @@ Which service are you interested in?
         }
 
         /* ===== Calendly popup trigger ===== */
-
         const frontendTriggerScript = `
 if (window.openCalendlyPopup) {
   window.openCalendlyPopup();
@@ -160,7 +146,6 @@ After completing the booking, type **"I booked"** so I can confirm your session.
         };
 
       /* ================= STEP 5 ================= */
-
       case 5:
         if (message.toLowerCase().includes("i booked")) {
           try {
@@ -183,10 +168,8 @@ After completing the booking, type **"I booked"** so I can confirm your session.
         };
 
       /* ================= FAILSAFE ================= */
-
       default:
         delete ongoingBookings[userId];
-
         return {
           response:
             "Something went wrong with the booking flow. Please type **'book a call'** to start again.",
@@ -194,8 +177,7 @@ After completing the booking, type **"I booked"** so I can confirm your session.
     }
   },
 
-  /* ================= BOOKING STATE CHECK (FIX FOR CHATBOT.TS) ================= */
-
+  /* ================= BOOKING STATE CHECK ================= */
   isBookingActive: (userId: string): boolean => {
     return Boolean(ongoingBookings[userId]);
   },
