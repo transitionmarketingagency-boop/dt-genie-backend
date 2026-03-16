@@ -1,5 +1,3 @@
-// server/services/strategicBrain.ts
-
 import { getRelevantIntents } from "./intentManager.js";
 import { getFusedChunks } from "./intentVectorFusion.js";
 import { memoryService } from "./memoryService.js";
@@ -35,28 +33,50 @@ export type BrainContext = {
   strategicMemory?: any;
 };
 
+/* ================= TEXT NORMALIZER ================= */
+
+function normalizeText(text: string) {
+
+  let t = text.toLowerCase();
+
+  const corrections: Record<string,string> = {
+    schedual: "schedule",
+    shedule: "schedule",
+    bok: "book",
+    cal: "call"
+  };
+
+  for (const wrong in corrections) {
+    t = t.replace(new RegExp(wrong, "g"), corrections[wrong]);
+  }
+
+  return t;
+}
+
 /* ================= GREETING DETECTOR ================= */
 
 function isGreeting(text: string) {
+
   const greetings = [
     "hi",
     "hello",
     "hey",
     "good morning",
     "good afternoon",
-    "good evening",
+    "good evening"
   ];
 
   const lower = text.trim().toLowerCase();
 
   return greetings.some(
-    (g) => lower === g || lower.startsWith(g + " ")
+    g => lower === g || lower.startsWith(g + " ")
   );
 }
 
 /* ================= BUSINESS SIGNAL DETECTOR ================= */
 
 function detectBusinessSignals(text: string) {
+
   let signals = 0;
 
   const keywords = [
@@ -69,9 +89,13 @@ function detectBusinessSignals(text: string) {
     "ecommerce",
     "clients",
     "revenue",
+    "real estate",
+    "studio",
+    "team",
+    "marketing agency"
   ];
 
-  keywords.forEach((k) => {
+  keywords.forEach(k => {
     if (text.includes(k)) signals++;
   });
 
@@ -81,6 +105,7 @@ function detectBusinessSignals(text: string) {
 /* ================= STAGE DETECTION ================= */
 
 function detectStage(message: string): BrainContext["stage"] {
+
   const text = message.toLowerCase();
 
   if (isGreeting(text)) return "greeting";
@@ -119,22 +144,17 @@ function detectStage(message: string): BrainContext["stage"] {
 /* ================= LEAD SCORING ================= */
 
 function scoreLead(message: string) {
+
   const text = message.toLowerCase();
 
   let score = 0;
 
-  /* business signals */
-
   score += detectBusinessSignals(text);
-
-  /* marketing interest */
 
   if (text.includes("marketing")) score += 1;
   if (text.includes("seo")) score += 2;
   if (text.includes("ads")) score += 2;
   if (text.includes("automation")) score += 2;
-
-  /* buying signals */
 
   if (text.includes("hire")) score += 3;
   if (text.includes("agency")) score += 2;
@@ -149,6 +169,7 @@ function scoreLead(message: string) {
 /* ================= DEAL PROBABILITY ================= */
 
 function estimateDealProbability(stage: string, leadScore: number) {
+
   let probability = 0.1;
 
   if (stage === "discovery") probability = 0.25;
@@ -164,6 +185,7 @@ function estimateDealProbability(stage: string, leadScore: number) {
 /* ================= SERVICE RECOMMENDER ================= */
 
 function recommendService(message: string) {
+
   const text = message.toLowerCase();
 
   if (text.includes("seo") || text.includes("ranking"))
@@ -178,8 +200,17 @@ function recommendService(message: string) {
   if (text.includes("real estate") || text.includes("property"))
     return "CGI Property Tours";
 
+  if (text.includes("cgi ad"))
+    return "CGI Advertising";
+
+  if (text.includes("music") || text.includes("audio"))
+    return "Music Production";
+
   if (text.includes("brand") || text.includes("branding"))
     return "Brand Development";
+
+  if (text.includes("content"))
+    return "Content Marketing";
 
   if (text.includes("ecommerce"))
     return "Ecommerce Growth Systems";
@@ -187,7 +218,7 @@ function recommendService(message: string) {
   return undefined;
 }
 
-/* ================= BOOKING TRIGGER ================= */
+/* ================= BOOKING TRIGGER (SOFT SIGNAL) ================= */
 
 function shouldTriggerBooking(stage: string, leadScore: number) {
 
@@ -207,9 +238,11 @@ export async function strategicBrain(
   sessionId?: string
 ) {
 
+  const normalizedMessage = normalizeText(userMessage);
+
   /* ----- Intent Detection ----- */
 
-  const intents = getRelevantIntents(userMessage, 1);
+  const intents = getRelevantIntents(normalizedMessage, 1);
 
   const primaryIntent =
     intents.length > 0
@@ -218,26 +251,33 @@ export async function strategicBrain(
 
   /* ----- Stage ----- */
 
-  const stage = detectStage(userMessage);
+  const stage = detectStage(normalizedMessage);
 
   /* ----- Lead Score ----- */
 
-  let leadScore = scoreLead(userMessage);
+  let leadScore = scoreLead(normalizedMessage);
 
   /* ----- Strategic Memory Influence ----- */
 
   let strategicMemory: any = {};
 
   if (sessionId) {
-    strategicMemory =
-      await memoryService.getStrategicMemory(sessionId);
 
-    if (strategicMemory?.servicesDiscussed?.length) {
-      leadScore += 1;
-    }
+    try {
 
-    if (strategicMemory?.businessMentioned) {
-      leadScore += 1;
+      strategicMemory =
+        await memoryService.getStrategicMemory(sessionId);
+
+      if (strategicMemory?.servicesDiscussed?.length) {
+        leadScore += 1;
+      }
+
+      if (strategicMemory?.businessMentioned) {
+        leadScore += 1;
+      }
+
+    } catch {
+      strategicMemory = {};
     }
   }
 
@@ -246,50 +286,53 @@ export async function strategicBrain(
   /* ----- Lead Qualification System ----- */
 
   if (sessionId) {
-    leadQualifier.scoreLead(sessionId, {
-      need: leadScore / 10,
-    });
+    try {
+      leadQualifier.scoreLead(sessionId, {
+        need: leadScore / 10,
+      });
+    } catch {}
   }
 
   /* ----- Deal Probability ----- */
 
-  const dealProbability = estimateDealProbability(
-    stage,
-    leadScore
-  );
+  const dealProbability =
+    estimateDealProbability(stage, leadScore);
 
   /* ----- Service Recommendation ----- */
 
-  const recommendedService = recommendService(userMessage);
+  const recommendedService =
+    recommendService(normalizedMessage);
 
-  /* ----- Booking Trigger ----- */
+  /* ----- Booking Trigger (soft signal) ----- */
 
-  const triggerBooking = shouldTriggerBooking(
-    stage,
-    leadScore
-  );
+  const triggerBooking =
+    shouldTriggerBooking(stage, leadScore);
 
   /* ----- Reasoning Engine ----- */
 
-  let reasoning = generateReasoning(userMessage);
+  let reasoning =
+    generateReasoning(normalizedMessage);
 
   if (sessionId) {
+
     try {
+
       const reasoningData =
         await reasoningEngine.analyze(
           sessionId,
-          userMessage
+          normalizedMessage
         );
 
-      reasoning = reasoningData.strategy || reasoning;
-    } catch {
-      // silent fallback
-    }
+      reasoning =
+        reasoningData.strategy || reasoning;
+
+    } catch {}
   }
 
   /* ----- Knowledge Chunks ----- */
 
-  const chunks = await getFusedChunks(userMessage, 5);
+  const chunks =
+    await getFusedChunks(normalizedMessage, 5);
 
   /* ----- Recent Context ----- */
 
@@ -300,24 +343,34 @@ export async function strategicBrain(
   /* ----- Brain Context ----- */
 
   const brainContext: BrainContext = {
+
     message: userMessage,
+
     intent: primaryIntent,
+
     stage,
+
     leadScore,
+
     dealProbability,
+
     recommendedService,
+
     triggerBooking,
+
     reasoning,
-    recentContext: recentContext.map((m) => ({
+
+    recentContext: recentContext.map(m => ({
       role: m.role,
-      content: m.content,
+      content: m.content
     })),
-    strategicMemory,
+
+    strategicMemory
   };
 
   return {
     brainContext,
-    chunks,
+    chunks
   };
 }
 

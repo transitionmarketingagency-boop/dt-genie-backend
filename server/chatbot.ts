@@ -1,3 +1,5 @@
+// server/chatbot.ts
+
 import readline from "readline";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
 import { memoryService } from "./services/memoryService.js";
@@ -28,19 +30,31 @@ const BOOKING_KEYWORDS = [
   "book strategy session",
 ];
 
+/* ================= SAFE HISTORY FETCH ================= */
+
+async function getSafeHistory() {
+  try {
+    return await memoryService.getRecentContext(SESSION_ID);
+  } catch {
+    return [];
+  }
+}
+
 /* ================= CHAT LOOP ================= */
 
 async function ask(): Promise<void> {
   rl.question("You: ", async (input: string) => {
 
-    const message = input.trim();
+    const message = (input || "").trim();
 
     /* ---------- EXIT COMMANDS ---------- */
 
+    const lower = message.toLowerCase();
+
     if (
-      message.toLowerCase() === "exit" ||
-      message.toLowerCase() === "quit" ||
-      message.toLowerCase() === "bye"
+      lower === "exit" ||
+      lower === "quit" ||
+      lower === "bye"
     ) {
       console.log("\n ~K Goodbye!\n");
       rl.close();
@@ -73,7 +87,7 @@ async function ask(): Promise<void> {
       );
 
       const isBookingActive =
-        bookingFlow.isBookingActive?.(SESSION_ID) ?? false;
+        bookingFlow.isBookingActive(SESSION_ID);
 
       if (isBookingKeyword || isBookingActive) {
 
@@ -92,7 +106,7 @@ async function ask(): Promise<void> {
 
         console.log("\n ~V AI:", bookingResponse.response, "\n");
 
-        /* CLI placeholder for frontend booking popup */
+        /* CLI cannot execute frontend scripts */
 
         if (bookingResponse.frontendScript) {
           console.log("⚡ Calendly popup trigger received.");
@@ -107,9 +121,7 @@ async function ask(): Promise<void> {
       const response = await generateHybridResponse({
         message,
         sessionId: SESSION_ID,
-        history: await memoryService.getRecentContext(
-          SESSION_ID
-        ),
+        history: await getSafeHistory(),
       });
 
       console.log("\n ~V AI:", response, "\n");

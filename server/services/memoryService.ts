@@ -33,6 +33,16 @@ const dbPromise = sqlite.open({
 const MAX_HISTORY_MESSAGES = 50;
 const MAX_CONTEXT_MESSAGES = 8;
 
+/* ================= SAFE JSON PARSE ================= */
+
+function safeParse(value: any) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
+}
+
 /* ================= INITIALIZATION ================= */
 
 export async function initializeMemory(): Promise<void> {
@@ -41,6 +51,7 @@ export async function initializeMemory(): Promise<void> {
 
     await db.exec(`PRAGMA journal_mode = WAL;`);
     await db.exec(`PRAGMA synchronous = NORMAL;`);
+    await db.exec(`PRAGMA busy_timeout = 5000;`);
 
     /* ================= CHAT TABLE ================= */
 
@@ -111,7 +122,7 @@ export async function initializeMemory(): Promise<void> {
 
 function normalizeContent(text: string): string {
   if (!text) return "";
-  return text.replace(/\s+/g, " ").trim().slice(0, 4000);
+  return String(text).replace(/\s+/g, " ").trim().slice(0, 4000);
 }
 
 /* ================= TYPES ================= */
@@ -129,7 +140,6 @@ export interface StrategicMemory {
   interestLevel?: string;
   updatedAt?: string;
 
-  // NEW: BANT signals
   bantSignals?: {
     budget?: number;
     authority?: number;
@@ -265,7 +275,6 @@ export class MemoryService {
     } catch (err) {
 
       console.error(`❌ Failed to get history for session ${sessionId}:`, err);
-
       return [];
 
     }
@@ -346,8 +355,8 @@ export class MemoryService {
     return {
       industry: row.industry || undefined,
       businessType: row.businessType || undefined,
-      goals: row.goals ? JSON.parse(row.goals) : undefined,
-      servicesDiscussed: row.servicesDiscussed ? JSON.parse(row.servicesDiscussed) : undefined,
+      goals: row.goals ? safeParse(row.goals) : undefined,
+      servicesDiscussed: row.servicesDiscussed ? safeParse(row.servicesDiscussed) : undefined,
       leadScore: row.leadScore ?? undefined,
       stage: row.stage || undefined,
       budget: row.budget ?? undefined,
@@ -437,7 +446,6 @@ export class MemoryService {
     if (process.env.DEBUG_MEMORY === "true") {
       console.log(`[Memory] Booking stored for ${data.userId}`);
     }
-
   }
 
   async updateBookingStatus(userId: string, status: string) {

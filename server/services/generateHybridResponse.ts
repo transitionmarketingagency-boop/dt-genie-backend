@@ -1,3 +1,5 @@
+// server/services/generateHybridResponse.ts
+
 import { getFusedChunks } from "../services/intentVectorFusion.js";
 import { generateOpenRouter } from "./openRouterClient.js";
 import { generateGemini } from "./geminiClient.js";
@@ -86,9 +88,7 @@ function compressContext(chunks: any[], maxLength: number = 320): string {
 
 function looksIncomplete(text: string): boolean {
   if (!text) return true;
-
   const trimmed = text.trim();
-
   return trimmed.length < 40 || !/[.!?]$/.test(trimmed);
 }
 
@@ -123,8 +123,26 @@ function compressResponse(text: string): string {
   if (text.length < 1200) return text;
 
   const sentences = text.split(/[.!?]/).filter(Boolean);
-
   return sentences.slice(0, 6).join(". ") + ".";
+}
+
+/* ================= QUERY EXPANSION ================= */
+
+async function expandQueryNeural(userMessage: string, history: string[] = []) {
+  const normalized = userMessage.trim().toLowerCase();
+  const expansions = [normalized];
+
+  const words = normalized.split(" ").slice(0, 5);
+
+  if (words.length > 1) {
+    expansions.push(`${words.join(" ")} marketing`);
+    expansions.push(`${words.join(" ")} service`);
+    expansions.push(`${words.join(" ")} strategy`);
+  }
+
+  history.slice(-2).forEach((h) => expansions.push(h.toLowerCase()));
+
+  return Array.from(new Set(expansions));
 }
 
 /* ================= NEURAL BRAIN ================= */
@@ -135,7 +153,8 @@ function neuralBrain(message: string) {
   if (msg.includes("book") || msg.includes("schedule") || msg.includes("meeting"))
     return { type: "booking" };
 
-  if (msg.includes("who are you")) return { type: "identity" };
+  if (msg.includes("who are you"))
+    return { type: "identity" };
 
   return { type: "normal" };
 }
@@ -157,79 +176,60 @@ export async function generateHybridResponse({
 }: HybridRequest): Promise<string> {
   try {
 
-    /* ---------- STRATEGIC BRAIN ---------- */
+    /* SAVE USER MESSAGE */
+
+    await memoryService.saveMessage(sessionId, "user", message);
+
+    /* STRATEGIC BRAIN */
 
     const { brainContext, chunks: strategicChunks = [] } =
       await strategicBrain(message, sessionId);
 
-    /* ---------- LEAD INTELLIGENCE ---------- */
-
     await analyzeLeadSignals(message, sessionId);
 
-    /* ---------- BOOKING CONTINUATION ---------- */
+    /* BOOKING CONTINUATION */
 
     if (bookingFlow.isBookingActive(sessionId)) {
       const bookingResp = await bookingFlow.handleStep(sessionId, message);
 
-      let responseText = bookingResp.response;
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
 
-      if (bookingResp.frontendScript) {
-        responseText += "\n\n<script>" + bookingResp.frontendScript + "</script>";
-      }
-
-      await memoryService.saveMessage(sessionId, "assistant", responseText);
-
-      return responseText;
+      return bookingResp.response;
     }
 
-    /* ---------- SMART BOOKING TRIGGER ---------- */
+    /* SMART BOOKING TRIGGER */
 
     const autoBooking = await shouldTriggerBooking(sessionId, brainContext.stage);
 
     if (autoBooking && !bookingFlow.isBookingActive(sessionId)) {
       const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
 
-      let responseText = bookingResp.response;
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
 
-      if (bookingResp.frontendScript) {
-        responseText += "\n\n<script>" + bookingResp.frontendScript + "</script>";
-      }
-
-      await memoryService.saveMessage(sessionId, "assistant", responseText);
-
-      return responseText;
+      return bookingResp.response;
     }
 
-    /* ---------- NEURAL BRAIN ---------- */
+    /* NEURAL BRAIN */
 
     const brain = neuralBrain(message);
 
     if (brain.type === "identity") {
-
       const identityResponse =
         `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing. I help businesses implement advanced AI marketing systems, automation, and growth strategies.`;
 
       await memoryService.saveMessage(sessionId, "assistant", identityResponse);
-
       return identityResponse;
     }
 
     if (brain.type === "booking") {
-
       const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
 
-      let responseText = bookingResp.response;
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
 
-      if (bookingResp.frontendScript) {
-        responseText += "\n\n<script>" + bookingResp.frontendScript + "</script>";
-      }
-
-      await memoryService.saveMessage(sessionId, "assistant", responseText);
-
-      return responseText;
+      return bookingResp.response;
     }
 
-    /* ---------- HISTORY ---------- */
+    /* HISTORY */
 
     const historyMessages =
       history.length > 0 ? history : await memoryService.getRecentContext(sessionId);
@@ -239,7 +239,7 @@ export async function generateHybridResponse({
       .map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`)
       .join("\n");
 
-    /* ---------- INTENT ---------- */
+    /* INTENT */
 
     let intentMatches: { intent: Intent; score?: number }[] = [];
 
@@ -253,7 +253,7 @@ export async function generateHybridResponse({
         ? intentMatches.slice(0, 3).map((i) => i.intent.name)
         : ["general"];
 
-    /* ---------- SERVICE ---------- */
+    /* SERVICE */
 
     let detectedService: string | null = null;
 
@@ -261,15 +261,15 @@ export async function generateHybridResponse({
       detectedService = detectService(message);
     } catch {}
 
-    /* ---------- VECTOR KNOWLEDGE ---------- */
+    /* VECTOR KNOWLEDGE */
+
+    await expandQueryNeural(message, historyMessages.map((h) => h.content));
 
     const fusedChunks = await getFusedChunks(message, 4);
-
     const mergedChunks = [...strategicChunks, ...(fusedChunks || [])];
-
     const vectorText = compressContext(mergedChunks);
 
-    /* ---------- STRATEGY INSTRUCTIONS ---------- */
+    /* STAGE INSTRUCTION */
 
     let stageInstruction = "";
 
@@ -289,12 +289,16 @@ export async function generateHybridResponse({
       ? "Encourage scheduling a consultation."
       : "";
 
-    /* ---------- PROMPT ---------- */
+    /* PROMPT */
 
     const prompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
-Always answer the USER'S latest question clearly and professionally.
+CRITICAL RULE:
+Always answer the USER'S LATEST QUESTION.
+
+Detected service: ${detectedService ?? "general"}
+Detected intents: ${detectedIntentNames.join(",")}
 
 Conversation stage: ${brainContext.stage}
 Lead score: ${brainContext.leadScore}
@@ -302,9 +306,6 @@ Lead score: ${brainContext.leadScore}
 ${stageInstruction}
 
 ${bookingSignal}
-
-Detected service: ${detectedService ?? "general"}
-Detected intents: ${detectedIntentNames.join(",")}
 
 Company knowledge:
 ${vectorText}
@@ -316,7 +317,7 @@ User question:
 ${message}
 `;
 
-    /* ---------- MODEL EXECUTION ---------- */
+    /* MODEL EXECUTION */
 
     let response = "";
     let modelUsed = "none";
@@ -332,8 +333,6 @@ ${message}
       }
     }
 
-    /* ---------- GEMINI FALLBACK ---------- */
-
     if (!response && canUseGemini()) {
       const geminiResp = await withTimeout(generateGemini(prompt), 12000);
 
@@ -348,8 +347,6 @@ ${message}
       }
     }
 
-    /* ---------- HARD FALLBACK ---------- */
-
     if (!response) {
       response =
         `I am ${BOT_NAME}. I help businesses implement AI-powered marketing systems, automation workflows, predictive analytics, immersive digital experiences, and performance advertising through Digital Transition Marketing.`;
@@ -357,7 +354,7 @@ ${message}
       modelUsed = "fallback";
     }
 
-    /* ---------- CLEANUP ---------- */
+    /* CLEANUP */
 
     response = compressResponse(response);
     response = cleanHybridResponse(enforceBotName(response));
