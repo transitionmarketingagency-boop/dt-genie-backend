@@ -1,10 +1,10 @@
 import readline from "readline";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
-import { strategicBrain } from "./services/strategicBrain.js";
 import { memoryService } from "./services/memoryService.js";
 import bookingFlow from "./bookingFlow.js";
 
 /* ================= CLI SETUP ================= */
+
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
@@ -14,9 +14,11 @@ console.log(" ~V Neon Vision CLI chatbot ready.");
 console.log("Type a message or type 'exit' to quit.\n");
 
 /* ================= SESSION MANAGEMENT ================= */
+
 const SESSION_ID = "cli-session";
 
 /* ================= BOOKING KEYWORDS ================= */
+
 const BOOKING_KEYWORDS = [
   "book a call",
   "schedule a meeting",
@@ -27,11 +29,14 @@ const BOOKING_KEYWORDS = [
 ];
 
 /* ================= CHAT LOOP ================= */
+
 async function ask(): Promise<void> {
   rl.question("You: ", async (input: string) => {
+
     const message = input.trim();
 
-    /* ---- Exit commands ---- */
+    /* ---------- EXIT COMMANDS ---------- */
+
     if (
       message.toLowerCase() === "exit" ||
       message.toLowerCase() === "quit" ||
@@ -42,42 +47,53 @@ async function ask(): Promise<void> {
       process.exit(0);
     }
 
-    /* ---- Ignore empty input ---- */
+    /* ---------- IGNORE EMPTY ---------- */
+
     if (!message) {
       ask();
       return;
     }
 
     try {
+
       /* ================= SAVE USER MESSAGE ================= */
-      await memoryService.saveMessage(SESSION_ID, "user", message);
+
+      await memoryService.saveMessage(
+        SESSION_ID,
+        "user",
+        message
+      );
 
       const lowerMsg = message.toLowerCase();
 
-      /* ================= BOOKING FLOW DETECTION ================= */
+      /* ================= BOOKING DETECTION ================= */
 
       const isBookingKeyword = BOOKING_KEYWORDS.some((kw) =>
         lowerMsg.includes(kw)
       );
 
-      const isBookingActive = bookingFlow.isBookingActive?.(SESSION_ID);
+      const isBookingActive =
+        bookingFlow.isBookingActive?.(SESSION_ID) ?? false;
 
       if (isBookingKeyword || isBookingActive) {
-        const bookingResponse = await bookingFlow.startBookingFlow(
-          SESSION_ID,
-          message
-        );
 
-        /* Save assistant response */
-        await memoryService.saveMessage(
-          SESSION_ID,
-          "assistant",
-          bookingResponse.response
-        );
+        let bookingResponse;
+
+        if (isBookingActive) {
+          bookingResponse =
+            await bookingFlow.handleStep(SESSION_ID, message);
+        } else {
+          bookingResponse =
+            await bookingFlow.startBookingFlow(
+              SESSION_ID,
+              message
+            );
+        }
 
         console.log("\n ~V AI:", bookingResponse.response, "\n");
 
-        /* CLI placeholder for frontend action */
+        /* CLI placeholder for frontend booking popup */
+
         if (bookingResponse.frontendScript) {
           console.log("⚡ Calendly popup trigger received.");
         }
@@ -86,30 +102,25 @@ async function ask(): Promise<void> {
         return;
       }
 
-      /* ================= STRATEGIC BRAIN ================= */
-
-      const { brainContext } = await strategicBrain(message, SESSION_ID);
-
-      console.log(
-        `[Brain] Stage: ${brainContext.stage} | Intent: ${brainContext.intent} | LeadScore: ${brainContext.leadScore} | Reasoning: ${brainContext.reasoning}`
-      );
-
-      /* ================= GENERATE AI RESPONSE ================= */
+      /* ================= GENERATE HYBRID AI RESPONSE ================= */
 
       const response = await generateHybridResponse({
         message,
         sessionId: SESSION_ID,
-        history: await memoryService.getRecentContext(SESSION_ID),
+        history: await memoryService.getRecentContext(
+          SESSION_ID
+        ),
       });
 
-      /* ================= SAVE RESPONSE ================= */
-
-      await memoryService.saveMessage(SESSION_ID, "assistant", response);
-
       console.log("\n ~V AI:", response, "\n");
+
     } catch (err) {
+
       console.error("⚠️ Error generating response:", err);
-      console.log("Sorry — something went wrong.\n");
+
+      console.log(
+        "Sorry — something went wrong. Please try again.\n"
+      );
     }
 
     ask();
@@ -117,4 +128,5 @@ async function ask(): Promise<void> {
 }
 
 /* ================= START ================= */
+
 ask();

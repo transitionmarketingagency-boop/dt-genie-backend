@@ -47,11 +47,35 @@ function isGreeting(text: string) {
     "good evening",
   ];
 
-  const lower = text.toLowerCase();
+  const lower = text.trim().toLowerCase();
 
   return greetings.some(
     (g) => lower === g || lower.startsWith(g + " ")
   );
+}
+
+/* ================= BUSINESS SIGNAL DETECTOR ================= */
+
+function detectBusinessSignals(text: string) {
+  let signals = 0;
+
+  const keywords = [
+    "company",
+    "business",
+    "startup",
+    "agency",
+    "brand",
+    "store",
+    "ecommerce",
+    "clients",
+    "revenue",
+  ];
+
+  keywords.forEach((k) => {
+    if (text.includes(k)) signals++;
+  });
+
+  return signals;
 }
 
 /* ================= STAGE DETECTION ================= */
@@ -65,7 +89,8 @@ function detectStage(message: string): BrainContext["stage"] {
     text.includes("how") ||
     text.includes("strategy") ||
     text.includes("grow") ||
-    text.includes("improve")
+    text.includes("improve") ||
+    text.includes("scale")
   )
     return "strategy";
 
@@ -73,7 +98,8 @@ function detectStage(message: string): BrainContext["stage"] {
     text.includes("service") ||
     text.includes("price") ||
     text.includes("cost") ||
-    text.includes("offer")
+    text.includes("offer") ||
+    text.includes("packages")
   )
     return "service";
 
@@ -82,7 +108,8 @@ function detectStage(message: string): BrainContext["stage"] {
     text.includes("work with") ||
     text.includes("book") ||
     text.includes("schedule") ||
-    text.includes("call")
+    text.includes("call") ||
+    text.includes("consultation")
   )
     return "conversion";
 
@@ -92,24 +119,29 @@ function detectStage(message: string): BrainContext["stage"] {
 /* ================= LEAD SCORING ================= */
 
 function scoreLead(message: string) {
-  let score = 0;
-
   const text = message.toLowerCase();
 
-  if (text.includes("business")) score += 1;
-  if (text.includes("company")) score += 1;
-  if (text.includes("brand")) score += 1;
-  if (text.includes("startup")) score += 1;
+  let score = 0;
 
-  if (text.includes("hire")) score += 2;
-  if (text.includes("agency")) score += 1;
+  /* business signals */
+
+  score += detectBusinessSignals(text);
+
+  /* marketing interest */
 
   if (text.includes("marketing")) score += 1;
-  if (text.includes("seo")) score += 1;
-  if (text.includes("ads")) score += 1;
+  if (text.includes("seo")) score += 2;
+  if (text.includes("ads")) score += 2;
+  if (text.includes("automation")) score += 2;
 
-  if (text.includes("price")) score += 2;
-  if (text.includes("cost")) score += 2;
+  /* buying signals */
+
+  if (text.includes("hire")) score += 3;
+  if (text.includes("agency")) score += 2;
+
+  if (text.includes("price")) score += 3;
+  if (text.includes("cost")) score += 3;
+  if (text.includes("budget")) score += 3;
 
   return Math.min(score, 10);
 }
@@ -121,7 +153,7 @@ function estimateDealProbability(stage: string, leadScore: number) {
 
   if (stage === "discovery") probability = 0.25;
   if (stage === "strategy") probability = 0.4;
-  if (stage === "service") probability = 0.6;
+  if (stage === "service") probability = 0.65;
   if (stage === "conversion") probability = 0.85;
 
   probability += leadScore * 0.03;
@@ -149,15 +181,21 @@ function recommendService(message: string) {
   if (text.includes("brand") || text.includes("branding"))
     return "Brand Development";
 
+  if (text.includes("ecommerce"))
+    return "Ecommerce Growth Systems";
+
   return undefined;
 }
 
 /* ================= BOOKING TRIGGER ================= */
 
 function shouldTriggerBooking(stage: string, leadScore: number) {
+
   if (stage === "conversion") return true;
 
-  if (stage === "service" && leadScore >= 5) return true;
+  if (stage === "service" && leadScore >= 6) return true;
+
+  if (stage === "strategy" && leadScore >= 8) return true;
 
   return false;
 }
@@ -195,6 +233,10 @@ export async function strategicBrain(
       await memoryService.getStrategicMemory(sessionId);
 
     if (strategicMemory?.servicesDiscussed?.length) {
+      leadScore += 1;
+    }
+
+    if (strategicMemory?.businessMentioned) {
       leadScore += 1;
     }
   }
@@ -241,7 +283,7 @@ export async function strategicBrain(
 
       reasoning = reasoningData.strategy || reasoning;
     } catch {
-      // fallback silently
+      // silent fallback
     }
   }
 
@@ -282,6 +324,7 @@ export async function strategicBrain(
 /* ================= FALLBACK REASONING ================= */
 
 function generateReasoning(message: string) {
+
   const text = message.toLowerCase();
 
   if (text.includes("grow"))
