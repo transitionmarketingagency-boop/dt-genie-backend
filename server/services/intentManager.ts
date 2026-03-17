@@ -22,9 +22,31 @@ export function normalize(text: string): string {
     .trim();
 }
 
+/* ======================= UTILS ======================= */
+
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /* ======================= INTENTS DATABASE ======================= */
 
 export const intents: Intent[] = [
+
+  /* -------------------- GENERAL -------------------- */
+
+  {
+    name: "general_greeting",
+    category: "general",
+    keywords: ["hello", "hi", "hey", "good morning", "good afternoon", "good evening"],
+    description: "General greeting or introduction."
+  },
+
+  {
+    name: "general_question",
+    category: "general",
+    keywords: ["what do you do", "who are you", "what services", "what can you do"],
+    description: "General information about the company or assistant."
+  },
 
   /* -------------------- SERVICES -------------------- */
 
@@ -32,9 +54,9 @@ export const intents: Intent[] = [
     name: "voice_search_optimization",
     category: "service",
     keywords: [
-      "voice search", "vso", "position zero", "featured snippets",
-      "conversational queries", "alexa", "siri", "google assistant",
-      "aeo", "answer engine optimization", "voice rank tracking"
+      "voice search","vso","position zero","featured snippets",
+      "conversational queries","alexa","siri","google assistant",
+      "aeo","answer engine optimization","voice rank tracking"
     ],
     description: "Optimizing content for conversational voice queries and securing top results on AI assistants."
   },
@@ -43,119 +65,115 @@ export const intents: Intent[] = [
     name: "ai_email_marketing",
     category: "service",
     keywords: [
-      "email marketing", "email automation", "klaviyo", "cold email",
-      "abandoned cart", "b2b pipeline accelerator", "deliverability shield",
-      "email audits", "newsletter automation"
+      "email marketing","email automation","klaviyo","cold email",
+      "abandoned cart","b2b pipeline accelerator","deliverability shield",
+      "email audits","newsletter automation"
     ],
-    description: "AI-optimized email campaigns and automated sequences designed to increase open rates and revenue."
+    description: "AI-optimized email campaigns and automated sequences."
   },
 
   {
     name: "youtube_ad_domination",
     category: "service",
     keywords: [
-      "youtube ads",
-      "video funnels",
-      "video advertising",
-      "youtube campaigns",
-      "youtube video ads",
-      "video marketing",
-      "video ad strategy",
-      "youtube ad optimization",
-      "video conversion funnels"
+      "youtube ads","video funnels","video advertising",
+      "youtube campaigns","youtube video ads",
+      "video marketing","video ad strategy",
+      "youtube ad optimization","video conversion funnels"
     ],
-    description: "Strategic YouTube advertising campaigns designed to drive awareness, engagement, and high-converting video funnels."
+    description: "Strategic YouTube advertising campaigns."
   },
 
   {
     name: "ai_website_design",
     category: "service",
     keywords: [
-      "website design", "mobile-first", "seo optimized", "shopify",
-      "woocommerce", "load times", "e-commerce development", "website maintenance"
+      "website design","mobile first","seo optimized","shopify",
+      "woocommerce","load times","e commerce development","website maintenance"
     ],
-    description: "High-converting websites built with built-in SEO and AI-driven design processes."
+    description: "High-converting websites built with SEO and AI design processes."
   },
 
   {
     name: "ai_virtual_tours",
     category: "service",
     keywords: [
-      "virtual tours", "nerf rendering", "lidar", "photorealistic",
-      "360 spins", "dynamic staging", "matterport migration", "off-plan renders"
+      "virtual tours","nerf rendering","lidar","photorealistic",
+      "360 spins","dynamic staging","matterport migration","off plan renders"
     ],
-    description: "Creating immersive, high-resolution virtual property experiences with interactive AI hotspots."
+    description: "Immersive virtual property experiences."
   },
 
   {
     name: "performance_marketing_warfare",
     category: "service",
     keywords: [
-      "performance marketing", "ppc", "real-time bidding", "predictive targeting",
-      "ad warfare", "algorithmic ad domination", "conversion rate optimization", "creative fatigue detection"
+      "performance marketing","ppc","real time bidding",
+      "predictive targeting","conversion rate optimization",
+      "creative fatigue detection"
     ],
-    description: "Autonomous AI-driven paid media management across Google, Meta, and programmatic DSPs."
+    description: "AI-driven paid media optimization."
   },
 
   {
     name: "immersive_cgi_marketing",
     category: "service",
     keywords: [
-      "cgi marketing", "cgi ads", "3d animation", "viral ar effects",
-      "product renders", "cgi commercials", "special effects"
+      "cgi marketing","cgi ads","3d animation",
+      "viral ar effects","product renders","cgi commercials"
     ],
-    description: "High-fidelity 3D visual content and animations designed for maximum engagement and conversion."
+    description: "High-fidelity CGI marketing content."
   },
 
   {
     name: "ai_video_audio_production",
     category: "service",
     keywords: [
-      "video production", "audio production", "spatial audio", "dolby atmos",
-      "retention heatmaps", "conversion editing", "eye-tracking algorithms"
+      "video production","audio production","spatial audio",
+      "dolby atmos","retention heatmaps","conversion editing"
     ],
-    description: "Technical video and audio editing optimized for viewer retention and emotional impact."
+    description: "Video and audio production optimized for retention."
   },
 
   {
     name: "ai_optimized_content",
     category: "service",
     keywords: [
-      "content creation", "blog writing", "whitepapers", "case studies",
-      "conversion triggers", "multi-format content", "lead magnets"
+      "content creation","blog writing","whitepapers",
+      "case studies","lead magnets","conversion triggers"
     ],
-    description: "Data-backed content engineering focused on psychological triggers and lead generation."
+    description: "Conversion-focused content marketing."
   },
 
   {
     name: "ai_social_domination",
     category: "service",
     keywords: [
-      "social media management", "linkedin feed hijacking", "tiktok shadowban",
-      "reels reach", "community management", "algorithm hacking", "audience mining"
+      "social media management","linkedin marketing",
+      "tiktok growth","reels reach",
+      "community management","audience mining"
     ],
-    description: "Managing social platforms by exploiting algorithms to maximize reach and reverse shadowbans."
+    description: "Social media growth and algorithm optimization."
   },
 
   {
     name: "ai_search_domination_geo",
     category: "service",
     keywords: [
-      "geo", "generative engine optimization", "chatgpt ranking", "gemini ranking",
-      "ai seo", "ai search indexing", "plagiarism shield"
+      "geo","generative engine optimization","chatgpt ranking",
+      "gemini ranking","ai seo","ai search indexing"
     ],
-    description: "Forcing brand visibility and rankings within AI-generated search results and conversational engines."
+    description: "Ranking brands in AI-driven search engines."
   },
 
   {
     name: "ai_predictive_analytics",
     category: "service",
     keywords: [
-      "predictive analytics", "market foresight", "sentiment analysis",
-      "dark pool tracking", "data intelligence", "hedge fund-grade dashboards",
-      "whale tracking"
+      "predictive analytics","sentiment analysis",
+      "data intelligence","market forecasting","data dashboards"
     ],
-    description: "Harnessing real-time data feeds to predict market shifts and institutional movements before they occur."
+    description: "Advanced predictive business analytics."
   },
 
   /* -------------------- MARKETING -------------------- */
@@ -164,20 +182,21 @@ export const intents: Intent[] = [
     name: "campaign_optimization",
     category: "marketing",
     keywords: [
-      "ad creatives", "campaign optimization", "creative fatigue", "ad rotation",
-      "creative testing", "rpm optimization", "dynamic creative optimization"
+      "ad creatives","campaign optimization",
+      "creative fatigue","creative testing",
+      "dynamic creative optimization"
     ],
-    description: "AI-driven refinement of ad assets and bidding strategies to prevent performance decay."
+    description: "AI-driven ad optimization."
   },
 
   {
     name: "competitor_warfare",
     category: "marketing",
     keywords: [
-      "competitor ad interception", "competitor gap analysis", "competitor hijacking",
-      "sabotage strategies", "market anomalies"
+      "competitor analysis","competitor gap analysis",
+      "competitor strategy","market competition"
     ],
-    description: "Aggressive strategies to identify and exploit rival vulnerabilities in the digital marketplace."
+    description: "Competitive marketing strategy."
   },
 
   /* -------------------- LEAD GENERATION -------------------- */
@@ -186,10 +205,11 @@ export const intents: Intent[] = [
     name: "lead_generation_intents",
     category: "lead_generation",
     keywords: [
-      "lead generation", "lead scoring", "pipeline management", "lead capture",
-      "landing pages", "conversion copy", "nurture system", "opt-in forms", "lead magnet funnels"
+      "lead generation","lead capture","lead magnet",
+      "pipeline management","landing pages",
+      "conversion copy","opt in forms"
     ],
-    description: "Strategic intents focused on identifying, capturing, and qualifying high-value prospects."
+    description: "Lead acquisition and nurturing."
   },
 
   /* -------------------- SALES -------------------- */
@@ -198,10 +218,10 @@ export const intents: Intent[] = [
     name: "sales_intents",
     category: "sales",
     keywords: [
-      "roi maximization", "sales goals", "pipeline growth", "b2b sales",
-      "high-intent shoppers", "purchase intent", "upselling", "cross-selling"
+      "roi","sales growth","pipeline growth",
+      "purchase intent","upselling","cross selling"
     ],
-    description: "Intents focused on converting leads into revenue and aligning marketing with sales targets."
+    description: "Revenue and sales optimization."
   },
 
   /* -------------------- AI AUTOMATION -------------------- */
@@ -210,36 +230,41 @@ export const intents: Intent[] = [
     name: "ai_business_automation",
     category: "ai_automation",
     keywords: [
-      "ai automation", "ai agents", "self-healing workflows", "crm integration",
-      "process automation", "automation spine", "intelligent process automation",
-      "workflow orchestration", "autonomous engagement", "battle ready execution"
+      "ai automation","ai agents","process automation",
+      "workflow automation","crm integration",
+      "workflow orchestration"
     ],
-    description: "Consolidating fragmented tools into unified, self-healing AI cores to automate business workflows."
+    description: "Business automation with AI systems."
   },
 
   {
     name: "ai_chatbots",
     category: "ai_automation",
     keywords: [
-      "chatbots", "customer support automation", "nlp bots", "conversational ai"
+      "chatbot","chatbots","conversational ai",
+      "customer support automation"
     ],
-    description: "AI-powered chatbots for lead qualification, support, and sales conversion."
+    description: "AI chatbots for automation."
   },
 
   {
     name: "ai_data_insights",
     category: "ai_automation",
     keywords: [
-      "analytics", "ai insights", "business intelligence", "data dashboards"
+      "analytics","ai insights",
+      "business intelligence","data dashboards"
     ],
-    description: "Automated data processing and insights generation to inform marketing and sales strategy."
+    description: "Automated business intelligence."
   }
 
 ];
 
-/* ======================= DETECTION FUNCTIONS ======================= */
+/* ======================= INTENT DETECTION ======================= */
 
-export function detectIntent(message: string, topN: number = 1) {
+export function detectIntent(
+  message: string,
+  topN: number = 3
+) {
 
   const text = normalize(message);
 
@@ -253,26 +278,29 @@ export function detectIntent(message: string, topN: number = 1) {
 
     const matched = new Set<string>();
 
-    for (const kw of intent.keywords) {
+    for (const keyword of intent.keywords) {
 
-      const kwNorm = normalize(kw);
-
-      const escaped =
-        kwNorm.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const kw = normalize(keyword);
 
       const regex =
-        new RegExp(`\\b${escaped}\\b`, "i");
+        new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
 
       if (regex.test(text)) {
-        matched.add(kwNorm);
+        matched.add(kw);
       }
 
     }
 
     if (matched.size > 0) {
 
+      const keywordCoverage =
+        matched.size / intent.keywords.length;
+
       const score =
-        Math.min(matched.size / Math.max(intent.keywords.length, 3), 1);
+        Math.min(
+          keywordCoverage * 1.5,
+          1
+        );
 
       matches.push({
         intent,
@@ -285,6 +313,13 @@ export function detectIntent(message: string, topN: number = 1) {
   }
 
   matches.sort((a, b) => b.score - a.score);
+
+  if (process.env.DEBUG_INTENTS === "true") {
+    console.log(
+      "[IntentManager]",
+      matches.slice(0, topN)
+    );
+  }
 
   return matches.slice(0, topN);
 

@@ -3,6 +3,8 @@ import { shouldTriggerBooking } from "../services/bookingTrigger.js";
 import { memoryService, StrategicMemory } from "../services/memoryService.js";
 import { BANTSignals } from "../services/leadIntelligence.js";
 
+type Stage = "greeting" | "discovery" | "strategy" | "service" | "conversion";
+
 interface MockMemory extends Partial<StrategicMemory> {
   leadScore?: number;
   bantSignals?: Record<keyof BANTSignals, number>;
@@ -10,7 +12,7 @@ interface MockMemory extends Partial<StrategicMemory> {
 }
 
 async function runBrutalTests() {
-  console.log("🧪 Starting brutal booking trigger tests...");
+  console.log(" M-* Starting brutal booking trigger tests...");
 
   const testSession = "test-session-brutal";
 
@@ -22,11 +24,10 @@ async function runBrutalTests() {
   // Define edge case test scenarios
   const testCases: {
     description: string;
-    stage: string;
+    stage: Stage;
     memory: MockMemory;
     expected: boolean;
   }[] = [
-    // --- Conversion Stage ---
     {
       description: "Conversion stage, high leadScore",
       stage: "conversion",
@@ -39,8 +40,6 @@ async function runBrutalTests() {
       memory: { leadScore: 0.4 },
       expected: false,
     },
-
-    // --- Service Stage ---
     {
       description: "Service stage, moderate leadScore, strong BANT",
       stage: "service",
@@ -69,8 +68,6 @@ async function runBrutalTests() {
       },
       expected: true,
     },
-
-    // --- Strategy Stage ---
     {
       description: "Strategy stage, moderate leadScore, strong BANT",
       stage: "strategy",
@@ -98,8 +95,6 @@ async function runBrutalTests() {
       },
       expected: false,
     },
-
-    // --- Edge Cases ---
     {
       description: "No memory at all",
       stage: "service",
@@ -138,7 +133,7 @@ async function runBrutalTests() {
         bantSignals: { budget: 0.2, authority: 0.2, need: 0.2, timeline: 0.2 },
         recentMessages: ["ready to hire now", "urgent call needed"],
       },
-      expected: false, // still under threshold
+      expected: false,
     },
     {
       description: "Maxed out BANT and recent context",
@@ -153,27 +148,24 @@ async function runBrutalTests() {
   ];
 
   for (const test of testCases) {
-    // Mock memory service responses
-    const memory: StrategicMemory & { bantSignals?: Record<keyof BANTSignals, number> } =
-      {
-        leadScore: test.memory.leadScore ?? 0,
-        bantSignals: test.memory.bantSignals ?? { budget: 0, authority: 0, need: 0, timeline: 0 },
-      };
+    const memory: StrategicMemory & { bantSignals?: Record<keyof BANTSignals, number> } = {
+      leadScore: test.memory.leadScore ?? 0,
+      bantSignals: test.memory.bantSignals ?? { budget: 0, authority: 0, need: 0, timeline: 0 },
+    };
 
     // Mock recent context
     (memoryService as any).getStrategicMemory = async () => memory;
     (memoryService as any).getRecentContext = async () =>
       (test.memory.recentMessages ?? []).map((msg) => ({ content: msg }));
 
-    const result = await shouldTriggerBooking(testSession, test.stage);
+    // Cast stage as Stage to satisfy TS
+    const result = await shouldTriggerBooking(testSession, test.stage as Stage);
 
     const status = result === test.expected ? "✅" : "❌";
-    console.log(
-      `[${status}] ${test.description} -> Expected = ${test.expected}, Got = ${result}`
-    );
+    console.log(`[${status}] ${test.description} -> Expected = ${test.expected}, Got = ${result}`);
   }
 
-  console.log("🧪 Brutal booking trigger tests completed.");
+  console.log(" M-* Brutal booking trigger tests completed.");
 }
 
 runBrutalTests();

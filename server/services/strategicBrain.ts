@@ -36,47 +36,45 @@ export type BrainContext = {
 /* ================= TEXT NORMALIZER ================= */
 
 function normalizeText(text: string) {
-
   let t = text.toLowerCase();
 
-  const corrections: Record<string,string> = {
+  const corrections: Record<string, string> = {
     schedual: "schedule",
     shedule: "schedule",
     bok: "book",
-    cal: "call"
+    cal: "call",
   };
 
   for (const wrong in corrections) {
-    t = t.replace(new RegExp(wrong, "g"), corrections[wrong]);
+    const regex = new RegExp(`\\b${wrong}\\b`, "g");
+    t = t.replace(regex, corrections[wrong]);
   }
 
-  return t;
+  return t.trim();
 }
 
 /* ================= GREETING DETECTOR ================= */
 
 function isGreeting(text: string) {
-
   const greetings = [
     "hi",
     "hello",
     "hey",
     "good morning",
     "good afternoon",
-    "good evening"
+    "good evening",
   ];
 
-  const lower = text.trim().toLowerCase();
+  const lower = text.trim();
 
   return greetings.some(
-    g => lower === g || lower.startsWith(g + " ")
+    (g) => lower === g || lower.startsWith(g + " ")
   );
 }
 
 /* ================= BUSINESS SIGNAL DETECTOR ================= */
 
 function detectBusinessSignals(text: string) {
-
   let signals = 0;
 
   const keywords = [
@@ -92,41 +90,25 @@ function detectBusinessSignals(text: string) {
     "real estate",
     "studio",
     "team",
-    "marketing agency"
+    "marketing agency",
   ];
 
-  keywords.forEach(k => {
+  for (const k of keywords) {
     if (text.includes(k)) signals++;
-  });
+  }
 
-  return signals;
+  return Math.min(signals, 4);
 }
 
 /* ================= STAGE DETECTION ================= */
 
 function detectStage(message: string): BrainContext["stage"] {
 
-  const text = message.toLowerCase();
+  const text = message;
 
   if (isGreeting(text)) return "greeting";
 
-  if (
-    text.includes("how") ||
-    text.includes("strategy") ||
-    text.includes("grow") ||
-    text.includes("improve") ||
-    text.includes("scale")
-  )
-    return "strategy";
-
-  if (
-    text.includes("service") ||
-    text.includes("price") ||
-    text.includes("cost") ||
-    text.includes("offer") ||
-    text.includes("packages")
-  )
-    return "service";
+  /* conversion signals first (highest intent) */
 
   if (
     text.includes("hire") ||
@@ -138,6 +120,28 @@ function detectStage(message: string): BrainContext["stage"] {
   )
     return "conversion";
 
+  /* service interest */
+
+  if (
+    text.includes("service") ||
+    text.includes("price") ||
+    text.includes("cost") ||
+    text.includes("offer") ||
+    text.includes("packages")
+  )
+    return "service";
+
+  /* strategic questions */
+
+  if (
+    text.includes("how") ||
+    text.includes("strategy") ||
+    text.includes("grow") ||
+    text.includes("improve") ||
+    text.includes("scale")
+  )
+    return "strategy";
+
   return "discovery";
 }
 
@@ -145,7 +149,7 @@ function detectStage(message: string): BrainContext["stage"] {
 
 function scoreLead(message: string) {
 
-  const text = message.toLowerCase();
+  const text = message;
 
   let score = 0;
 
@@ -168,7 +172,10 @@ function scoreLead(message: string) {
 
 /* ================= DEAL PROBABILITY ================= */
 
-function estimateDealProbability(stage: string, leadScore: number) {
+function estimateDealProbability(
+  stage: BrainContext["stage"],
+  leadScore: number
+) {
 
   let probability = 0.1;
 
@@ -186,7 +193,7 @@ function estimateDealProbability(stage: string, leadScore: number) {
 
 function recommendService(message: string) {
 
-  const text = message.toLowerCase();
+  const text = message;
 
   if (text.includes("seo") || text.includes("ranking"))
     return "SEO / GEO Optimization";
@@ -220,7 +227,10 @@ function recommendService(message: string) {
 
 /* ================= BOOKING TRIGGER (SOFT SIGNAL) ================= */
 
-function shouldTriggerBooking(stage: string, leadScore: number) {
+function shouldTriggerBooking(
+  stage: BrainContext["stage"],
+  leadScore: number
+) {
 
   if (stage === "conversion") return true;
 
@@ -240,7 +250,7 @@ export async function strategicBrain(
 
   const normalizedMessage = normalizeText(userMessage);
 
-  /* ----- Intent Detection ----- */
+  /* ---------- INTENT DETECTION ---------- */
 
   const intents = getRelevantIntents(normalizedMessage, 1);
 
@@ -249,15 +259,15 @@ export async function strategicBrain(
       ? intents[0].intent.name
       : "general";
 
-  /* ----- Stage ----- */
+  /* ---------- STAGE ---------- */
 
   const stage = detectStage(normalizedMessage);
 
-  /* ----- Lead Score ----- */
+  /* ---------- LEAD SCORE ---------- */
 
   let leadScore = scoreLead(normalizedMessage);
 
-  /* ----- Strategic Memory Influence ----- */
+  /* ---------- STRATEGIC MEMORY ---------- */
 
   let strategicMemory: any = {};
 
@@ -279,36 +289,41 @@ export async function strategicBrain(
     } catch {
       strategicMemory = {};
     }
+
   }
 
   leadScore = Math.min(leadScore, 10);
 
-  /* ----- Lead Qualification System ----- */
+  /* ---------- LEAD QUALIFIER ---------- */
 
   if (sessionId) {
+
     try {
+
       leadQualifier.scoreLead(sessionId, {
-        need: leadScore / 10,
+        need: leadScore / 10
       });
+
     } catch {}
+
   }
 
-  /* ----- Deal Probability ----- */
+  /* ---------- DEAL PROBABILITY ---------- */
 
   const dealProbability =
     estimateDealProbability(stage, leadScore);
 
-  /* ----- Service Recommendation ----- */
+  /* ---------- SERVICE RECOMMENDATION ---------- */
 
   const recommendedService =
     recommendService(normalizedMessage);
 
-  /* ----- Booking Trigger (soft signal) ----- */
+  /* ---------- BOOKING SIGNAL ---------- */
 
   const triggerBooking =
     shouldTriggerBooking(stage, leadScore);
 
-  /* ----- Reasoning Engine ----- */
+  /* ---------- REASONING ---------- */
 
   let reasoning =
     generateReasoning(normalizedMessage);
@@ -324,23 +339,35 @@ export async function strategicBrain(
         );
 
       reasoning =
-        reasoningData.strategy || reasoning;
+        reasoningData?.strategy || reasoning;
 
     } catch {}
+
   }
 
-  /* ----- Knowledge Chunks ----- */
+  /* ---------- KNOWLEDGE CHUNKS ---------- */
 
   const chunks =
     await getFusedChunks(normalizedMessage, 5);
 
-  /* ----- Recent Context ----- */
+  /* ---------- CONTEXT ---------- */
 
-  const recentContext = sessionId
-    ? await memoryService.getRecentContext(sessionId)
-    : [];
+  let recentContext: any[] = [];
 
-  /* ----- Brain Context ----- */
+  if (sessionId) {
+
+    try {
+
+      recentContext =
+        await memoryService.getRecentContext(sessionId);
+
+    } catch {
+      recentContext = [];
+    }
+
+  }
+
+  /* ---------- FINAL CONTEXT ---------- */
 
   const brainContext: BrainContext = {
 
@@ -360,25 +387,27 @@ export async function strategicBrain(
 
     reasoning,
 
-    recentContext: recentContext.map(m => ({
+    recentContext: (recentContext || []).map((m: any) => ({
       role: m.role,
       content: m.content
     })),
 
     strategicMemory
+
   };
 
   return {
     brainContext,
     chunks
   };
+
 }
 
 /* ================= FALLBACK REASONING ================= */
 
 function generateReasoning(message: string) {
 
-  const text = message.toLowerCase();
+  const text = message;
 
   if (text.includes("grow"))
     return "User wants business growth strategy";
@@ -393,4 +422,5 @@ function generateReasoning(message: string) {
     return "User is exploring AI automation";
 
   return "General marketing inquiry";
+
 }
