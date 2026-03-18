@@ -40,7 +40,7 @@ const RECENT_CONTEXT_KEYWORDS = [
   "ready",
 ];
 
-/* ================= NEW: DIRECT INTENT KEYWORDS ================= */
+/* ================= DIRECT INTENT KEYWORDS ================= */
 
 const STRONG_INTENT_KEYWORDS = [
   "i want to hire",
@@ -53,7 +53,7 @@ const STRONG_INTENT_KEYWORDS = [
   "let's do this",
 ];
 
-/* ================= NEW: REJECTION KEYWORDS ================= */
+/* ================= REJECTION KEYWORDS ================= */
 
 const REJECTION_KEYWORDS = [
   "not now",
@@ -69,10 +69,9 @@ const REJECTION_KEYWORDS = [
 const MAX_CONTEXT_BOOST = 0.25;
 const BOOST_PER_KEYWORD = 0.05;
 
-/* ================= NEW: COOLDOWN ================= */
+/* ================= COOLDOWN ================= */
 
 const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 minutes
-
 const bookingCooldownMap = new Map<string, number>();
 
 /* ================= NORMALIZE ================= */
@@ -81,7 +80,7 @@ function normalize(text: string): string {
   return text.toLowerCase().trim();
 }
 
-/* ================= NEW: KEYWORD CHECK ================= */
+/* ================= KEYWORD CHECK ================= */
 
 function containsKeyword(text: string, keywords: string[]): boolean {
   const msg = normalize(text);
@@ -94,7 +93,7 @@ function applyRecentContextBoost(
   recentMessages: string[],
   baseConfidence: number
 ): number {
-  if (!recentMessages || recentMessages.length === 0) return baseConfidence;
+  if (!recentMessages?.length) return baseConfidence;
 
   let keywordHits = 0;
 
@@ -132,12 +131,11 @@ function calculateBantConfidence(bant: Partial<BANTSignals>): number {
   return Math.min(Math.max(confidence, 0), 1);
 }
 
-/* ================= NEW: COOLDOWN CHECK ================= */
+/* ================= COOLDOWN CHECK ================= */
 
 function isInCooldown(sessionId: string): boolean {
   const lastTrigger = bookingCooldownMap.get(sessionId);
   if (!lastTrigger) return false;
-
   return Date.now() - lastTrigger < BOOKING_COOLDOWN_MS;
 }
 
@@ -202,7 +200,7 @@ export async function shouldTriggerBooking(
       return true;
     }
 
-    /* ===== CALCULATE BANT ===== */
+    /* ===== CALCULATE BANT CONFIDENCE ===== */
 
     let bantConfidence = calculateBantConfidence(bant);
 
@@ -231,14 +229,14 @@ export async function shouldTriggerBooking(
       );
     }
 
-    /* ===== CONDITION 1 ===== */
+    /* ===== CONDITION 1: CONVERSION STAGE ===== */
 
     if (stage === "conversion" && leadScore >= LEAD_SCORE_THRESHOLD) {
       markTriggered(sessionId);
       return true;
     }
 
-    /* ===== CONDITION 2 ===== */
+    /* ===== CONDITION 2: SERVICE/STRATEGY STAGE ===== */
 
     if (
       (stage === "service" || stage === "strategy") &&
