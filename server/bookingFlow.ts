@@ -2,6 +2,7 @@
 
 import { memoryService } from "./services/memoryService.js";
 import { shouldTriggerBooking } from "./services/bookingTrigger.js";
+import { detectService } from "./services/serviceDetector.js"; // ✅ NEW (SAFE)
 
 /* ================= TYPES ================= */
 
@@ -109,24 +110,41 @@ const bookingFlow = {
       ongoingBookings[userId] = booking;
 
       return {
-        response:
-          "Let's restart your booking. Which service are you interested in?",
+        response: "Let’s restart your booking. What would you like help with?",
         nextStep: 1,
       };
     }
 
     switch (booking.step) {
 
+      /* ================= STEP 1 (FIXED) ================= */
+
       case 1:
         booking.step = 2;
+
+        // ✅ Detect service dynamically
+        let detectedService: string | null = null;
+        try {
+          detectedService = detectService(message);
+        } catch {}
+
+        if (detectedService) {
+          booking.serviceType = detectedService;
+
+          return {
+            response: `Great — we’ll focus on **${detectedService}**. When would you like to schedule your session?`,
+            nextStep: 3, // skip manual selection
+          };
+        }
 
         return {
           response:
             `I’ll help you schedule your strategy session.\n\n` +
-            `Which service are you interested in?\n\n` +
-            `• AI Marketing\n• CGI Property Tours\n• SEO / GEO\n• General Consultation`,
+            `What would you like to focus on? (e.g. lead generation, SEO, automation, ads)`,
           nextStep: 2,
         };
+
+      /* ================= STEP 2 ================= */
 
       case 2:
         booking.serviceType = message || "General Consultation";
@@ -134,9 +152,12 @@ const bookingFlow = {
 
         return {
           response:
-            "Great choice. When would you like to schedule your session? Please share your preferred **date and time**.",
+            `Got it — we’ll focus on **${booking.serviceType}**.\n\n` +
+            `When would you like to schedule your session? Please share your preferred **date and time**.`,
           nextStep: 3,
         };
+
+      /* ================= STEP 3 ================= */
 
       case 3:
         booking.preferredTime = message;
@@ -147,6 +168,8 @@ const bookingFlow = {
             "Perfect. Please provide your **email address** so we can confirm your booking.",
           nextStep: 4,
         };
+
+      /* ================= STEP 4 ================= */
 
       case 4:
         if (!isValidEmail(message)) {
@@ -159,8 +182,6 @@ const bookingFlow = {
         booking.email = message.toLowerCase();
         booking.calendlyLink = baseCalendlyLink;
 
-        /* ===== STORE BOOKING (FIXED) ===== */
-
         try {
           await memoryService.storeBooking({
             userId,
@@ -170,12 +191,11 @@ const bookingFlow = {
             calendlyLink: booking.calendlyLink,
             status: "pending",
 
-            // 🔥 SAFE EXTENSION (NO TS ERROR)
             ...(booking.leadScore !== undefined && { leadScore: booking.leadScore }),
             ...(booking.dealProbability !== undefined && { dealProbability: booking.dealProbability }),
             ...(booking.triggerBooking !== undefined && { triggerBooking: booking.triggerBooking }),
 
-          } as any); // ✅ KEY FIX
+          } as any);
         } catch (err) {
           console.error("⚠️ Failed storing booking:", err);
         }
@@ -206,6 +226,8 @@ const bookingFlow = {
           nextStep: 5,
           frontendScript,
         };
+
+      /* ================= STEP 5 ================= */
 
       case 5:
         if (message.toLowerCase().includes("i booked")) {

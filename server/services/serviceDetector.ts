@@ -14,6 +14,8 @@ export type DetectedIntent = {
   confidence: number;
 };
 
+/* ================= NORMALIZATION ================= */
+
 function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -26,46 +28,114 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+/* ================= SMART MATCH ================= */
+
+function matchKeyword(text: string, keyword: string): number {
+  const kw = normalize(keyword);
+
+  // exact phrase match (strong signal)
+  const exactRegex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
+  if (exactRegex.test(text)) return 1;
+
+  // partial token match (weaker signal)
+  const words = kw.split(" ");
+  let hits = 0;
+
+  for (const w of words) {
+    if (text.includes(w)) hits++;
+  }
+
+  return hits / words.length * 0.6;
+}
+
 /* ================= SERVICES ================= */
 
-const services: Record<string, string[]> = {
-  voice_search: ["voice search","voice seo","alexa search","siri search","featured snippet","position zero"],
-  email_marketing: ["email marketing","email automation","email flows","cold email","klaviyo","abandoned cart"],
-  youtube_ads: ["youtube ads","youtube advertising","youtube marketing","video ads"],
-  website_design: ["website design","web design","web development","shopify store","website redesign","build website"],
-  virtual_tours: ["virtual tour","360 tour","property tour","interactive floor plan","nerf render","real estate tour"],
-  performance_marketing: ["performance marketing","google ads","ppc","paid ads","paid media","ad campaign","increase roas"],
-  ai_automation: ["ai automation","ai agents","automate workflows","business automation","crm automation"],
-  music_production: ["music production","mixing","mastering","audio engineering"],
-  cgi_marketing: ["cgi advertising","cgi marketing","cgi ads","3d advertising","3d product animation","cgi commercial"],
-  video_audio: ["video production","video editing","audio production","voiceover","dolby atmos"],
-  content_marketing: ["content marketing","blog writing","content strategy","lead magnets","whitepapers"],
-  social_media: ["social media","instagram marketing","tiktok marketing","linkedin growth","social media management"],
-  geo_ai_seo: ["ai seo","generative engine optimization","geo seo","rank on chatgpt","ai search ranking"],
-  predictive_analytics: ["predictive analytics","market prediction","sentiment analysis","financial analytics"]
+const services: Record<string, { keywords: string[]; weight: number }> = {
+  voice_search: {
+    keywords: ["voice search","voice seo","alexa search","siri search","featured snippet","position zero"],
+    weight: 1
+  },
+  email_marketing: {
+    keywords: ["email marketing","email automation","email flows","cold email","klaviyo","abandoned cart"],
+    weight: 1
+  },
+  youtube_ads: {
+    keywords: ["youtube ads","youtube advertising","video ads"],
+    weight: 1.1
+  },
+  website_design: {
+    keywords: ["website design","web development","shopify store","build website","website redesign"],
+    weight: 1
+  },
+  virtual_tours: {
+    keywords: ["virtual tour","360 tour","property tour","real estate tour","interactive floor plan"],
+    weight: 1.2
+  },
+  performance_marketing: {
+    keywords: ["google ads","ppc","paid ads","paid media","ad campaign","increase roas"],
+    weight: 1.3
+  },
+  ai_automation: {
+    keywords: ["ai automation","ai agents","automate workflows","crm automation"],
+    weight: 1.3
+  },
+  music_production: {
+    keywords: ["music production","mixing","mastering","audio engineering"],
+    weight: 0.9
+  },
+  cgi_marketing: {
+    keywords: ["cgi advertising","cgi ads","3d advertising","3d animation","cgi commercial"],
+    weight: 1.4
+  },
+  video_audio: {
+    keywords: ["video production","video editing","audio production","voiceover"],
+    weight: 1
+  },
+  content_marketing: {
+    keywords: ["content marketing","blog writing","content strategy","lead magnets"],
+    weight: 1
+  },
+  social_media: {
+    keywords: ["social media","instagram marketing","tiktok marketing","linkedin growth"],
+    weight: 1
+  },
+  geo_ai_seo: {
+    keywords: ["ai seo","geo seo","rank on chatgpt","ai search ranking"],
+    weight: 1.5
+  },
+  predictive_analytics: {
+    keywords: ["predictive analytics","market prediction","sentiment analysis"],
+    weight: 1.2
+  }
 };
 
 /* ================= OTHER INTENTS ================= */
 
-const leadIntent = ["generate leads","get more clients","more customers","increase sales","predictable leads"];
+const leadIntent = ["generate leads","get more clients","more customers","increase sales"];
 const pricingIntent = ["price","pricing","how much","cost","package"];
 const consultationIntent = ["book call","schedule call","consultation","strategy session","audit"];
-const marketingGoals = ["increase traffic","grow brand","increase engagement","boost visibility","grow online presence"];
-const industries = ["real estate","ecommerce","saas","travel","hospitality","finance","healthcare","legal","medical aesthetics"];
+const marketingGoals = ["increase traffic","grow brand","boost visibility","grow online presence"];
+const industries = ["real estate","ecommerce","saas","travel","finance","healthcare"];
 
 /* ================= SERVICE DETECTION ================= */
 
-function detectServiceScore(text: string): Record<string, number> {
+function detectServiceScores(text: string): Record<string, number> {
   const scores: Record<string, number> = {};
-  for (const [service, keywords] of Object.entries(services)) {
+
+  for (const [service, config] of Object.entries(services)) {
     let score = 0;
-    const sortedKeywords = [...keywords].sort((a,b)=>b.length-a.length);
-    for (const kw of sortedKeywords) {
-      const regex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
-      if (regex.test(text)) score += 1;
+
+    for (const kw of config.keywords) {
+      score += matchKeyword(text, kw);
     }
-    if (score > 0) scores[service] = Math.min(score / keywords.length, 1);
+
+    score = (score / config.keywords.length) * config.weight;
+
+    if (score > 0.15) {
+      scores[service] = Math.min(score, 1);
+    }
   }
+
   return scores;
 }
 
@@ -76,16 +146,28 @@ export function detectIntents(message: string): DetectedIntent[] {
   const results: DetectedIntent[] = [];
   const added = new Set<string>();
 
-  // Detect service
-  const serviceScores = detectServiceScore(text);
-  if (Object.keys(serviceScores).length) {
-    const bestService = Object.entries(serviceScores).sort((a,b)=>b[1]-a[1])[0];
-    results.push({ type:"service", value:bestService[0], confidence:bestService[1] });
-    added.add(bestService[0]);
+  /* ---------- MULTI SERVICE DETECTION ---------- */
+  const serviceScores = detectServiceScores(text);
+
+  const sortedServices = Object.entries(serviceScores)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3); // allow top 3 services
+
+  for (const [service, score] of sortedServices) {
+    results.push({
+      type: "service",
+      value: service,
+      confidence: Number(score.toFixed(2))
+    });
+    added.add(service);
   }
 
-  // Detect other intents
-  const addIntent = (kws: string[], type: DetectedIntent["type"], conf: number) => {
+  /* ---------- OTHER INTENTS ---------- */
+  const addIntent = (
+    kws: string[],
+    type: DetectedIntent["type"],
+    conf: number
+  ) => {
     for (const kw of kws) {
       if (text.includes(kw) && !added.has(kw)) {
         results.push({ type, value: kw, confidence: conf });
@@ -94,13 +176,20 @@ export function detectIntents(message: string): DetectedIntent[] {
     }
   };
 
-  addIntent(leadIntent,"lead",0.8);
-  addIntent(pricingIntent,"pricing",0.8);
-  addIntent(consultationIntent,"consultation",0.85);
-  addIntent(marketingGoals,"marketing_goal",0.7);
-  addIntent(industries,"industry",0.7);
+  addIntent(leadIntent, "lead", 0.8);
+  addIntent(pricingIntent, "pricing", 0.85);
+  addIntent(consultationIntent, "consultation", 0.9);
+  addIntent(marketingGoals, "marketing_goal", 0.75);
+  addIntent(industries, "industry", 0.7);
 
-  if (!results.length) results.push({ type:"general", value:"general", confidence:0.3 });
+  /* ---------- FALLBACK ---------- */
+  if (!results.length) {
+    results.push({
+      type: "general",
+      value: "general",
+      confidence: 0.3
+    });
+  }
 
   return results;
 }
@@ -109,6 +198,16 @@ export function detectIntents(message: string): DetectedIntent[] {
 
 export function detectService(message: string): string | null {
   const intents = detectIntents(message);
-  const service = intents.find(i=>i.type==="service");
+  const service = intents.find((i) => i.type === "service");
   return service ? service.value : null;
+}
+
+/* ================= NEW (IMPORTANT) ================= */
+/* MULTI-SERVICE HELPER FOR ADVANCED SYSTEM */
+
+export function detectMultipleServices(message: string): string[] {
+  const intents = detectIntents(message);
+  return intents
+    .filter((i) => i.type === "service")
+    .map((i) => i.value);
 }

@@ -152,6 +152,24 @@ function compressResponse(text: string): string {
   return sentences.slice(0, 6).join(". ") + ".";
 }
 
+
+function enforceResponseRules(text: string): string {
+  if (!text) return text;
+
+  return text
+    // Fix broken pricing like "$2,:" or "$7,"
+    .replace(/\$\d+,\s*/g, "")
+
+    // Reduce pilot spam (keep logic, just tone it down)
+    .replace(/CGI & Performance Pilot/gi, "our performance system")
+
+    // Remove repetitive fallback loops
+    .replace(/I want to give you a precise answer — could you clarify[^.]*\./gi, "")
+
+    .trim();
+}
+
+
 /* ================= QUERY EXPANSION ================= */
 
 async function expandQueryNeural(userMessage: string, history: string[] = []) {
@@ -249,8 +267,15 @@ export async function generateHybridResponse({
     const vectorCount = mergedChunks.length;
 
     /* ---------- PROMPT ---------- */
-    const prompt = `
-You are ${BOT_NAME}, AI strategist.
+const prompt = `
+You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
+
+CRITICAL RULES:
+- ONLY use provided context for services, pricing, and tiers
+- DO NOT invent or guess pricing
+- If pricing is missing → explain value instead of guessing
+- Avoid repeating the same offer excessively
+- Be precise, natural, and strategic
 
 Intent: ${detectedIntentNames.join(",")}
 Service: ${detectedService ?? "general"}
@@ -288,22 +313,57 @@ ${message}
     if (!response) { response = smartFallback(); modelUsed = "fallback"; }
 
     /* ---------- CLEANUP ---------- */
-    response = fixBrokenOutput(response);
-    response = compressResponse(response);
-    response = cleanHybridResponse(enforceBotName(response));
 
-    if (brainContext.leadScore > 0.75 && shouldIncludeCTA(message, intentCategories)) {
-      response += "\n\n👉 If you're serious about results, schedule a quick strategy call.";
-    }
+/* ================= FINAL RESPONSE CLEANER ================= */
 
-    await memoryService.saveMessage(sessionId, "assistant", response);
+function enforceResponseRules(text: string): string {
+  if (!text) return text;
 
-    console.log(`[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(",")} | Chunks=${vectorCount} | Service=${detectedService ?? "none"} | LeadScore=${brainContext.leadScore}`);
+  return text
+    // Fix broken pricing artifacts like "$2,:" or "$7,"
+    .replace(/\$\d+,\s*/g, "")
 
-    return response;
+    // Reduce overuse of pilot naming (not removing logic)
+    .replace(/CGI & Performance Pilot/gi, "our performance system")
 
-  } catch (err) {
-    console.error("Hybrid RAG error:", err);
-    return `There was a temporary processing issue. Please try again shortly.`;
-  }
+    // Remove repeated fallback loops
+    .replace(/I want to give you a precise answer — could you clarify[^.]*\./gi, "")
+
+    // Remove accidental duplicate sentences
+    .replace(/(.+?)\1{1,}/gi, "$1")
+
+    .trim();
+}
+
+/* ---------- CLEANUP ---------- */
+
+response = fixBrokenOutput(response);
+response = enforceResponseRules(response); // 🔥 NEW (critical)
+response = compressResponse(response);
+response = cleanHybridResponse(enforceBotName(response));
+
+/* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
+
+if (brainContext.leadScore > 0.75 && shouldIncludeCTA(message, intentCategories)) {
+  response += "\n\n👉 If you want, we can map this to your exact goals and get you started quickly.";
+}
+
+/* ---------- SAVE MEMORY ---------- */
+
+await memoryService.saveMessage(sessionId, "assistant", response);
+
+/* ---------- DEBUG LOG (FIXED) ---------- */
+
+console.log(
+  `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(",")} | Chunks=${vectorCount} | Service=${detectedService ?? "none"} | LeadScore=${brainContext.leadScore}`
+);
+
+/* ---------- RETURN ---------- */
+
+return response;
+
+} catch (err) {
+  console.error("Hybrid RAG error:", err);
+  return `There was a temporary processing issue. Please try again shortly.`;
+}
 }

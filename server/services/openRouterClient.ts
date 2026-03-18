@@ -7,9 +7,7 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 /* ================= RESPONSE TYPE ================= */
 interface OpenRouterResponse {
   choices?: {
-    message?: {
-      content?: string;
-    };
+    message?: { content?: string };
     text?: string;
   }[];
 }
@@ -62,7 +60,7 @@ function buildMessages(prompt: string, highIntent: boolean = false) {
     {
       role: "system",
       content: `You are Neon Vision, AI strategist for Digital Transition Marketing.
-      
+
 Your role is to help businesses grow using the 14 core services of Digital Transition Marketing.
 
 Guidelines:
@@ -75,7 +73,8 @@ Guidelines:
         highIntent
           ? "executive, confident, persuasive"
           : "friendly, informative, clear"
-      }.`
+      }.
+`
     },
     {
       role: "user",
@@ -184,5 +183,7 @@ export async function generateOpenRouter(
   }
 
   console.error("❌ All OpenRouter attempts failed:", lastError);
-  return "I'm currently having trouble generating a response, but I can provide guidance manually.";
+
+  // fallback manual guidance
+  return "I'm currently having trouble generating a response, but I can provide guidance manually based on your needs.";
 }

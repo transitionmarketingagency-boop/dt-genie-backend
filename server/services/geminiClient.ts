@@ -25,7 +25,18 @@ const { enforceBotName, BOT_NAME } = await import(identityUrl);
 /* ---------------- Response validator ---------------- */
 function isValidResponse(text: string) {
   if (!text || text.length < 25) return false;
-  const badPatterns = ["```", "###", "<|", "|>", "assistant:", "system:", "undefined", "null", "error", "traceback"];
+  const badPatterns = [
+    "```",
+    "###",
+    "<|",
+    "|>",
+    "assistant:",
+    "system:",
+    "undefined",
+    "null",
+    "error",
+    "traceback",
+  ];
   return !badPatterns.some((p) => text.toLowerCase().includes(p));
 }
 
@@ -43,7 +54,17 @@ function cleanPrompt(prompt: string) {
 function detectHighIntent(prompt: string): boolean {
   if (!prompt) return false;
   const text = prompt.toLowerCase();
-  const signals = ["hire", "book", "schedule", "consultation", "call", "work with", "i want", "sign up", "let's start"];
+  const signals = [
+    "hire",
+    "book",
+    "schedule",
+    "consultation",
+    "call",
+    "work with",
+    "i want",
+    "sign up",
+    "let's start",
+  ];
   return signals.some((s) => text.includes(s));
 }
 
@@ -109,10 +130,10 @@ Provide a concise, relevant, professional response.
           generationConfig: {
             temperature: highIntent ? 0.42 : 0.35,
             maxOutputTokens: 600,
-            topP: highIntent ? 0.95 : 0.9
-          }
+            topP: highIntent ? 0.95 : 0.9,
+          },
         }),
-        signal: controller.signal
+        signal: controller.signal,
       });
 
       clearTimeout(timeout);
