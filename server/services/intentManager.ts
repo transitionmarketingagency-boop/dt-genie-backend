@@ -1,8 +1,6 @@
 /* =====================================================
-   INTENT MANAGER
-   Consolidates services, marketing, sales, lead gen, AI automation
-   Provides keyword-based detection for hybrid RAG system
-   Strict TS, dynamic scoring, and extended intents
+   INTENT MANAGER (FINAL PRODUCTION VERSION)
+   Hybrid detection: keyword + phrase + scoring + intent boosting
 ===================================================== */
 
 export interface Intent {
@@ -28,6 +26,23 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function containsPhrase(text: string, phrase: string): boolean {
+  return text.includes(normalize(phrase));
+}
+
+/* ======================= STRONG BUYING SIGNALS ======================= */
+
+const STRONG_INTENT_PHRASES = [
+  "i want to hire",
+  "i want to work with you",
+  "how do we start",
+  "let's start",
+  "ready to begin",
+  "book a call",
+  "schedule a call",
+  "get started",
+];
+
 /* ======================= INTENTS DATABASE ======================= */
 
 export const intents: Intent[] = [
@@ -45,7 +60,7 @@ export const intents: Intent[] = [
     name: "general_question",
     category: "general",
     keywords: ["what do you do", "who are you", "what services", "what can you do"],
-    description: "General information about the company or assistant."
+    description: "General info about company or assistant."
   },
 
   /* -------------------- SERVICES -------------------- */
@@ -53,127 +68,85 @@ export const intents: Intent[] = [
   {
     name: "voice_search_optimization",
     category: "service",
-    keywords: [
-      "voice search","vso","position zero","featured snippets",
-      "conversational queries","alexa","siri","google assistant",
-      "aeo","answer engine optimization","voice rank tracking"
-    ],
-    description: "Optimizing content for conversational voice queries and securing top results on AI assistants."
+    keywords: ["voice search","vso","position zero","featured snippets","alexa","siri","google assistant","aeo","answer engine optimization"],
+    description: "Voice search optimization."
   },
 
   {
     name: "ai_email_marketing",
     category: "service",
-    keywords: [
-      "email marketing","email automation","klaviyo","cold email",
-      "abandoned cart","b2b pipeline accelerator","deliverability shield",
-      "email audits","newsletter automation"
-    ],
-    description: "AI-optimized email campaigns and automated sequences."
+    keywords: ["email marketing","email automation","klaviyo","cold email","newsletter automation"],
+    description: "Email campaigns and automation."
   },
 
   {
     name: "youtube_ad_domination",
     category: "service",
-    keywords: [
-      "youtube ads","video funnels","video advertising",
-      "youtube campaigns","youtube video ads",
-      "video marketing","video ad strategy",
-      "youtube ad optimization","video conversion funnels"
-    ],
-    description: "Strategic YouTube advertising campaigns."
+    keywords: ["youtube ads","video marketing","video funnels","youtube campaigns"],
+    description: "YouTube advertising."
   },
 
   {
     name: "ai_website_design",
     category: "service",
-    keywords: [
-      "website design","mobile first","seo optimized","shopify",
-      "woocommerce","load times","e commerce development","website maintenance"
-    ],
-    description: "High-converting websites built with SEO and AI design processes."
+    keywords: ["website design","shopify","woocommerce","seo website","web development"],
+    description: "Website development services."
   },
 
   {
     name: "ai_virtual_tours",
     category: "service",
-    keywords: [
-      "virtual tours","nerf rendering","lidar","photorealistic",
-      "360 spins","dynamic staging","matterport migration","off plan renders"
-    ],
-    description: "Immersive virtual property experiences."
+    keywords: ["virtual tours","360 tours","3d tours","real estate renders"],
+    description: "Virtual property experiences."
   },
 
   {
     name: "performance_marketing_warfare",
     category: "service",
-    keywords: [
-      "performance marketing","ppc","real time bidding",
-      "predictive targeting","conversion rate optimization",
-      "creative fatigue detection"
-    ],
-    description: "AI-driven paid media optimization."
+    keywords: ["ppc","performance marketing","ads","conversion optimization"],
+    description: "Paid ads optimization."
   },
 
   {
     name: "immersive_cgi_marketing",
     category: "service",
-    keywords: [
-      "cgi marketing","cgi ads","3d animation",
-      "viral ar effects","product renders","cgi commercials"
-    ],
-    description: "High-fidelity CGI marketing content."
+    keywords: ["cgi","3d ads","cgi ads","product renders"],
+    description: "CGI marketing."
   },
 
   {
     name: "ai_video_audio_production",
     category: "service",
-    keywords: [
-      "video production","audio production","spatial audio",
-      "dolby atmos","retention heatmaps","conversion editing"
-    ],
-    description: "Video and audio production optimized for retention."
+    keywords: ["video production","audio production","editing","content production"],
+    description: "Media production."
   },
 
   {
     name: "ai_optimized_content",
     category: "service",
-    keywords: [
-      "content creation","blog writing","whitepapers",
-      "case studies","lead magnets","conversion triggers"
-    ],
-    description: "Conversion-focused content marketing."
+    keywords: ["content creation","blogs","copywriting","content marketing"],
+    description: "Content marketing."
   },
 
   {
     name: "ai_social_domination",
     category: "service",
-    keywords: [
-      "social media management","linkedin marketing",
-      "tiktok growth","reels reach",
-      "community management","audience mining"
-    ],
-    description: "Social media growth and algorithm optimization."
+    keywords: ["social media","instagram","tiktok","linkedin marketing"],
+    description: "Social growth."
   },
 
   {
     name: "ai_search_domination_geo",
     category: "service",
-    keywords: [
-      "geo","generative engine optimization","chatgpt ranking",
-      "gemini ranking","ai seo","ai search indexing"
-    ],
-    description: "Ranking brands in AI-driven search engines."
+    keywords: ["geo","ai seo","chatgpt ranking","gemini ranking"],
+    description: "AI search ranking."
   },
 
   {
     name: "ai_predictive_analytics",
     category: "service",
-    keywords: [
-      "predictive analytics","sentiment analysis",
-      "data intelligence","market forecasting","data dashboards"
-    ],
-    description: "Advanced predictive business analytics."
+    keywords: ["analytics","data","predictive","forecasting"],
+    description: "Data intelligence."
   },
 
   /* -------------------- MARKETING -------------------- */
@@ -181,22 +154,15 @@ export const intents: Intent[] = [
   {
     name: "campaign_optimization",
     category: "marketing",
-    keywords: [
-      "ad creatives","campaign optimization",
-      "creative fatigue","creative testing",
-      "dynamic creative optimization"
-    ],
-    description: "AI-driven ad optimization."
+    keywords: ["campaign optimization","ad creatives","creative testing"],
+    description: "Ad optimization."
   },
 
   {
     name: "competitor_warfare",
     category: "marketing",
-    keywords: [
-      "competitor analysis","competitor gap analysis",
-      "competitor strategy","market competition"
-    ],
-    description: "Competitive marketing strategy."
+    keywords: ["competitor analysis","competition","market research"],
+    description: "Competitive strategy."
   },
 
   /* -------------------- LEAD GENERATION -------------------- */
@@ -204,12 +170,8 @@ export const intents: Intent[] = [
   {
     name: "lead_generation_intents",
     category: "lead_generation",
-    keywords: [
-      "lead generation","lead capture","lead magnet",
-      "pipeline management","landing pages",
-      "conversion copy","opt in forms"
-    ],
-    description: "Lead acquisition and nurturing."
+    keywords: ["lead generation","leads","pipeline","conversion","landing page"],
+    description: "Lead generation."
   },
 
   /* -------------------- SALES -------------------- */
@@ -217,11 +179,8 @@ export const intents: Intent[] = [
   {
     name: "sales_intents",
     category: "sales",
-    keywords: [
-      "roi","sales growth","pipeline growth",
-      "purchase intent","upselling","cross selling"
-    ],
-    description: "Revenue and sales optimization."
+    keywords: ["roi","sales","revenue","growth","increase sales"],
+    description: "Sales optimization."
   },
 
   /* -------------------- AI AUTOMATION -------------------- */
@@ -229,43 +188,76 @@ export const intents: Intent[] = [
   {
     name: "ai_business_automation",
     category: "ai_automation",
-    keywords: [
-      "ai automation","ai agents","process automation",
-      "workflow automation","crm integration",
-      "workflow orchestration"
-    ],
-    description: "Business automation with AI systems."
+    keywords: ["automation","ai agents","workflow","crm"],
+    description: "Automation systems."
   },
 
   {
     name: "ai_chatbots",
     category: "ai_automation",
-    keywords: [
-      "chatbot","chatbots","conversational ai",
-      "customer support automation"
-    ],
-    description: "AI chatbots for automation."
+    keywords: ["chatbot","chatbots","ai assistant"],
+    description: "Chatbot systems."
   },
 
   {
     name: "ai_data_insights",
     category: "ai_automation",
-    keywords: [
-      "analytics","ai insights",
-      "business intelligence","data dashboards"
-    ],
-    description: "Automated business intelligence."
+    keywords: ["data insights","analytics dashboard","business intelligence"],
+    description: "AI insights."
   }
 
 ];
 
+/* ======================= SCORING ENGINE ======================= */
+
+function calculateIntentScore(text: string, intent: Intent) {
+  const matched = new Set<string>();
+  let phraseBoost = 0;
+  let repetitionBoost = 0;
+
+  for (const keyword of intent.keywords) {
+    const kw = normalize(keyword);
+
+    const regex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
+
+    if (regex.test(text)) {
+      matched.add(kw);
+
+      const occurrences = text.split(kw).length - 1;
+      if (occurrences > 1) {
+        repetitionBoost += 0.05 * occurrences;
+      }
+    }
+
+    if (containsPhrase(text, kw)) {
+      phraseBoost += 0.1;
+    }
+  }
+
+  if (matched.size === 0) {
+    return { score: 0, matchedKeywords: [] };
+  }
+
+  const keywordCoverage = matched.size / intent.keywords.length;
+
+  let score =
+    keywordCoverage * 1.2 +
+    phraseBoost +
+    repetitionBoost;
+
+  if (text.length < 20) {
+    score *= 0.85;
+  }
+
+  return {
+    score: Math.min(score, 1),
+    matchedKeywords: [...matched],
+  };
+}
+
 /* ======================= INTENT DETECTION ======================= */
 
-export function detectIntent(
-  message: string,
-  topN: number = 3
-) {
-
+export function detectIntent(message: string, topN: number = 3) {
   const text = normalize(message);
 
   const matches: {
@@ -274,55 +266,56 @@ export function detectIntent(
     matchedKeywords: string[];
   }[] = [];
 
+  const isStrongIntent = STRONG_INTENT_PHRASES.some(p =>
+    text.includes(p)
+  );
+
   for (const intent of intents) {
+    const { score, matchedKeywords } =
+      calculateIntentScore(text, intent);
 
-    const matched = new Set<string>();
-
-    for (const keyword of intent.keywords) {
-
-      const kw = normalize(keyword);
-
-      const regex =
-        new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
-
-      if (regex.test(text)) {
-        matched.add(kw);
-      }
-
-    }
-
-    if (matched.size > 0) {
-
-      const keywordCoverage =
-        matched.size / intent.keywords.length;
-
-      const score =
-        Math.min(
-          keywordCoverage * 1.5,
-          1
-        );
-
+    if (score > 0) {
       matches.push({
         intent,
         score,
-        matchedKeywords: [...matched]
+        matchedKeywords,
       });
-
     }
+  }
 
+  /* ===== BOOST BUYING SIGNALS ===== */
+  if (isStrongIntent) {
+    matches.forEach(m => {
+      if (
+        m.intent.category === "sales" ||
+        m.intent.category === "lead_generation"
+      ) {
+        m.score = Math.min(m.score + 0.3, 1);
+      }
+    });
   }
 
   matches.sort((a, b) => b.score - a.score);
 
+  /* ===== FALLBACK ===== */
+  if (matches.length === 0) {
+    return [{
+      intent: {
+        name: "general_fallback",
+        category: "general",
+        keywords: [],
+        description: "Fallback intent"
+      },
+      score: 0.3,
+      matchedKeywords: []
+    }];
+  }
+
   if (process.env.DEBUG_INTENTS === "true") {
-    console.log(
-      "[IntentManager]",
-      matches.slice(0, topN)
-    );
+    console.log("[IntentManager FINAL]", matches.slice(0, topN));
   }
 
   return matches.slice(0, topN);
-
 }
 
 /* ======================= HELPERS ======================= */
@@ -331,9 +324,6 @@ export function getIntentByName(name: string): Intent | undefined {
   return intents.find(i => i.name === name);
 }
 
-export function getRelevantIntents(
-  message: string,
-  limit: number = 3
-) {
+export function getRelevantIntents(message: string, limit: number = 3) {
   return detectIntent(message, limit);
 }

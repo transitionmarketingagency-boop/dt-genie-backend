@@ -103,12 +103,9 @@ function detectBusinessSignals(text: string) {
 /* ================= STAGE DETECTION ================= */
 
 function detectStage(message: string): BrainContext["stage"] {
-
   const text = message;
 
   if (isGreeting(text)) return "greeting";
-
-  /* conversion signals first (highest intent) */
 
   if (
     text.includes("hire") ||
@@ -120,8 +117,6 @@ function detectStage(message: string): BrainContext["stage"] {
   )
     return "conversion";
 
-  /* service interest */
-
   if (
     text.includes("service") ||
     text.includes("price") ||
@@ -130,8 +125,6 @@ function detectStage(message: string): BrainContext["stage"] {
     text.includes("packages")
   )
     return "service";
-
-  /* strategic questions */
 
   if (
     text.includes("how") ||
@@ -148,9 +141,7 @@ function detectStage(message: string): BrainContext["stage"] {
 /* ================= LEAD SCORING ================= */
 
 function scoreLead(message: string) {
-
   const text = message;
-
   let score = 0;
 
   score += detectBusinessSignals(text);
@@ -176,7 +167,6 @@ function estimateDealProbability(
   stage: BrainContext["stage"],
   leadScore: number
 ) {
-
   let probability = 0.1;
 
   if (stage === "discovery") probability = 0.25;
@@ -192,7 +182,6 @@ function estimateDealProbability(
 /* ================= SERVICE RECOMMENDER ================= */
 
 function recommendService(message: string) {
-
   const text = message;
 
   if (text.includes("seo") || text.includes("ranking"))
@@ -231,13 +220,9 @@ function shouldTriggerBooking(
   stage: BrainContext["stage"],
   leadScore: number
 ) {
-
   if (stage === "conversion") return true;
-
   if (stage === "service" && leadScore >= 6) return true;
-
   if (stage === "strategy" && leadScore >= 8) return true;
-
   return false;
 }
 
@@ -247,166 +232,99 @@ export async function strategicBrain(
   userMessage: string,
   sessionId?: string
 ) {
-
   const normalizedMessage = normalizeText(userMessage);
 
   /* ---------- INTENT DETECTION ---------- */
-
   const intents = getRelevantIntents(normalizedMessage, 1);
-
   const primaryIntent =
-    intents.length > 0
-      ? intents[0].intent.name
-      : "general";
+    intents.length > 0 ? intents[0].intent.name : "general";
 
   /* ---------- STAGE ---------- */
-
   const stage = detectStage(normalizedMessage);
 
   /* ---------- LEAD SCORE ---------- */
-
   let leadScore = scoreLead(normalizedMessage);
 
   /* ---------- STRATEGIC MEMORY ---------- */
-
   let strategicMemory: any = {};
-
   if (sessionId) {
-
     try {
-
-      strategicMemory =
-        await memoryService.getStrategicMemory(sessionId);
-
-      if (strategicMemory?.servicesDiscussed?.length) {
-        leadScore += 1;
-      }
-
-      if (strategicMemory?.businessMentioned) {
-        leadScore += 1;
-      }
-
+      strategicMemory = await memoryService.getStrategicMemory(sessionId);
+      if (strategicMemory?.servicesDiscussed?.length) leadScore += 1;
+      if (strategicMemory?.businessMentioned) leadScore += 1;
     } catch {
       strategicMemory = {};
     }
-
   }
-
   leadScore = Math.min(leadScore, 10);
 
   /* ---------- LEAD QUALIFIER ---------- */
-
   if (sessionId) {
-
     try {
-
-      leadQualifier.scoreLead(sessionId, {
-        need: leadScore / 10
-      });
-
+      leadQualifier.scoreLead(sessionId, { need: leadScore / 10 });
     } catch {}
-
   }
 
   /* ---------- DEAL PROBABILITY ---------- */
-
-  const dealProbability =
-    estimateDealProbability(stage, leadScore);
+  const dealProbability = estimateDealProbability(stage, leadScore);
 
   /* ---------- SERVICE RECOMMENDATION ---------- */
-
-  const recommendedService =
-    recommendService(normalizedMessage);
+  const recommendedService = recommendService(normalizedMessage);
 
   /* ---------- BOOKING SIGNAL ---------- */
-
-  const triggerBooking =
-    shouldTriggerBooking(stage, leadScore);
+  const triggerBooking = shouldTriggerBooking(stage, leadScore);
 
   /* ---------- REASONING ---------- */
-
-  let reasoning =
-    generateReasoning(normalizedMessage);
-
+  let reasoning = generateReasoning(normalizedMessage);
   if (sessionId) {
-
     try {
-
-      const reasoningData =
-        await reasoningEngine.analyze(
-          sessionId,
-          normalizedMessage
-        );
-
-      reasoning =
-        reasoningData?.strategy || reasoning;
-
+      const reasoningData = await reasoningEngine.analyze(
+        sessionId,
+        normalizedMessage
+      );
+      reasoning = reasoningData?.strategy || reasoning;
     } catch {}
-
   }
 
   /* ---------- KNOWLEDGE CHUNKS ---------- */
-
-  const chunks =
-    await getFusedChunks(normalizedMessage, 5);
+  const chunks = await getFusedChunks(normalizedMessage, 5);
 
   /* ---------- CONTEXT ---------- */
-
   let recentContext: any[] = [];
-
   if (sessionId) {
-
     try {
-
-      recentContext =
-        await memoryService.getRecentContext(sessionId);
-
+      recentContext = await memoryService.getRecentContext(sessionId);
     } catch {
       recentContext = [];
     }
-
   }
 
-  /* ---------- FINAL CONTEXT ---------- */
-
+  /* ---------- FINAL BRAIN CONTEXT ---------- */
   const brainContext: BrainContext = {
-
     message: userMessage,
-
     intent: primaryIntent,
-
     stage,
-
     leadScore,
-
     dealProbability,
-
     recommendedService,
-
     triggerBooking,
-
     reasoning,
-
-    recentContext: (recentContext || []).map((m: any) => ({
+    recentContext: recentContext.map((m: any) => ({
       role: m.role,
-      content: m.content
+      content: m.content,
     })),
-
-    strategicMemory
-
+    strategicMemory,
   };
 
   return {
     brainContext,
-    chunks
+    chunks,
   };
-
 }
 
 /* ================= FALLBACK REASONING ================= */
 
 function generateReasoning(message: string) {
-
   const text = message;
 
   if (text.includes("grow"))
@@ -422,5 +340,4 @@ function generateReasoning(message: string) {
     return "User is exploring AI automation";
 
   return "General marketing inquiry";
-
 }

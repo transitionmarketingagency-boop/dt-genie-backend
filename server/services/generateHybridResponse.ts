@@ -13,6 +13,44 @@ import bookingFlow from "../bookingFlow.js";
 import { analyzeLeadSignals } from "./leadIntelligence.js";
 import { shouldTriggerBooking } from "./bookingTrigger.js";
 
+/* ================= NEW: SAFETY HELPERS ================= */
+
+function detectBookingRejection(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("not now") ||
+    msg.includes("don't want") ||
+    msg.includes("dont want") ||
+    msg.includes("later") ||
+    msg.includes("no thanks") ||
+    msg.includes("stop")
+  );
+}
+
+function smartFallback(): string {
+  return `I want to give you a precise answer — could you clarify what specific outcome you're aiming for? For example: more leads, conversions, or scaling revenue?`;
+}
+
+function fixBrokenOutput(text: string): string {
+  if (!text) return text;
+
+  return text
+    .replace(/\$1,(\s|$)/g, "$1000 ")
+    .replace(/-win frameworks/g, "14-day rapid deployment")
+    .replace(/within will work/g, "within 90 days")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function applyHighIntentBoost(text: string, leadScore: number): string {
+  if (leadScore < 0.75) return text;
+
+  return (
+    text +
+    "\n\n👉 If you're serious about results, the fastest way forward is to map this to your business in a quick strategy call."
+  );
+}
+
 /* ================= GEMINI CONFIG ================= */
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -62,22 +100,16 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
 const MAX_CONTEXT_CHARS = 1200;
 
 function compressContext(chunks: any[], maxLength: number = 300): string {
-
   if (!chunks?.length) return "";
 
   const seen = new Set<string>();
 
   return chunks
     .map((c, i) => {
-
       const txt = c?.text?.replace(/\s+/g, " ").trim().slice(0, maxLength);
-
       if (!txt || seen.has(txt)) return "";
-
       seen.add(txt);
-
       return `[Knowledge ${i + 1}] ${txt}`;
-
     })
     .filter(Boolean)
     .join("\n")
@@ -85,18 +117,14 @@ function compressContext(chunks: any[], maxLength: number = 300): string {
 }
 
 function looksIncomplete(text: string): boolean {
-
   if (!text) return true;
-
   const trimmed = text.trim();
-
   return trimmed.length < 40 || !/[.!?]$/.test(trimmed);
 }
 
 /* ================= TOOL SANITIZER ================= */
 
 function sanitizeTools(text: string): string {
-
   const toolMap: Record<string, string> = {
     Creatify: "advanced AI content systems",
     Wisepops: "AI marketing automation tools",
@@ -107,9 +135,7 @@ function sanitizeTools(text: string): string {
   };
 
   for (const [tool, replacement] of Object.entries(toolMap)) {
-
     text = text.replace(new RegExp(`\\b${tool}\\b`, "gi"), replacement);
-
   }
 
   return text;
@@ -118,15 +144,11 @@ function sanitizeTools(text: string): string {
 /* ================= CONTACT BLOCKER ================= */
 
 function removeContactInfo(text: string): string {
-
   if (!text) return "";
 
   text = text.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "");
-
   text = text.replace(/\+?\d[\d\s-]{7,}\d/g, "");
-
   text = text.replace(/\d{1,5}\s\w+(\s\w+){0,5},?\s\w{2,20}/gi, "");
-
   text = text.replace(
     /(contact us at|reach us at|email us at|call us at)[^.]*\./gi,
     ""
@@ -136,46 +158,33 @@ function removeContactInfo(text: string): string {
 }
 
 function cleanHybridResponse(text: string): string {
-
   text = sanitizeTools(text);
-
   text = removeContactInfo(text);
-
   text = text.replace(/\b(AI-){2,}/gi, "AI-");
-
   text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
-
   text = text.replace(/\bIll\b/g, "I'll");
-
   return text.replace(/\s+/g, " ").trim();
 }
 
 function compressResponse(text: string): string {
-
   if (text.length < 1100) return text;
-
   const sentences = text.split(/[.!?]/).filter(Boolean);
-
   return sentences.slice(0, 6).join(". ") + ".";
 }
 
 /* ================= QUERY EXPANSION ================= */
 
 async function expandQueryNeural(userMessage: string, history: string[] = []) {
-
   const normalized = userMessage.trim().toLowerCase();
-
   const expansions = [normalized];
 
   const words = normalized.split(" ").slice(0, 5);
 
   if (words.length > 1) {
-
     expansions.push(`${words.join(" ")} marketing`);
     expansions.push(`${words.join(" ")} service`);
     expansions.push(`${words.join(" ")} strategy`);
     expansions.push(`${words.join(" ")} implementation`);
-
   }
 
   history.slice(-2).forEach((h) => expansions.push(h.toLowerCase()));
@@ -186,7 +195,6 @@ async function expandQueryNeural(userMessage: string, history: string[] = []) {
 /* ================= NEURAL BRAIN ================= */
 
 function neuralBrain(message: string) {
-
   const msg = message.trim().toLowerCase();
 
   const greetingRegex =
@@ -204,37 +212,28 @@ function neuralBrain(message: string) {
   return { type: "normal" };
 }
 
-/* ================= REQUEST TYPE ================= */
-
-interface HybridRequest {
-  message: string;
-  sessionId: string;
-  history?: any[];
-}
-
 /* ================= MAIN SYSTEM ================= */
 
 export async function generateHybridResponse({
   message,
   sessionId,
   history = [],
-}: HybridRequest): Promise<string> {
-
+}: any): Promise<string> {
   try {
-
-    /* ---------- STRATEGIC BRAIN ---------- */
-
     const { brainContext, chunks: strategicChunks = [] } =
       await strategicBrain(message, sessionId);
 
     await analyzeLeadSignals(message, sessionId);
 
-    /* ---------- BOOKING CONTINUATION ---------- */
+    /* ---------- BOOKING CONTINUATION FIX ---------- */
 
     if (bookingFlow.isBookingActive(sessionId)) {
+      if (detectBookingRejection(message)) {
+        bookingFlow.reset(sessionId);
+        return "No problem — we can continue here. What would you like to explore?";
+      }
 
-      const bookingResp =
-        await bookingFlow.handleStep(sessionId, message);
+      const bookingResp = await bookingFlow.handleStep(sessionId, message);
 
       await memoryService.saveMessage(
         sessionId,
@@ -245,13 +244,16 @@ export async function generateHybridResponse({
       return bookingResp.response;
     }
 
-    /* ---------- SMART BOOKING TRIGGER ---------- */
+    /* ---------- SMART BOOKING TRIGGER FIX ---------- */
 
     const autoBooking =
       await shouldTriggerBooking(sessionId, brainContext.stage);
 
-    if (autoBooking && !bookingFlow.isBookingActive(sessionId)) {
-
+    if (
+      autoBooking &&
+      !bookingFlow.isBookingActive(sessionId) &&
+      !detectBookingRejection(message)
+    ) {
       const bookingResp =
         await bookingFlow.startBookingFlow(sessionId, message);
 
@@ -269,12 +271,10 @@ export async function generateHybridResponse({
     const brain = neuralBrain(message);
 
     if (brain.type === "identity") {
-
-      return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing. I help businesses implement advanced AI marketing systems, automation, and growth strategies.`;
+      return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
     }
 
     if (brain.type === "booking") {
-
       const bookingResp =
         await bookingFlow.startBookingFlow(sessionId, message);
 
@@ -308,12 +308,8 @@ export async function generateHybridResponse({
     let intentMatches: { intent: Intent; score?: number }[] = [];
 
     try {
-
       const detected = detectIntent(message);
-
-      if (Array.isArray(detected))
-        intentMatches = detected;
-
+      if (Array.isArray(detected)) intentMatches = detected;
     } catch {}
 
     const detectedIntentNames =
@@ -329,7 +325,7 @@ export async function generateHybridResponse({
       detectedService = detectService(message);
     } catch {}
 
-    /* ---------- VECTOR KNOWLEDGE ---------- */
+    /* ---------- VECTOR ---------- */
 
     const expandedQueries =
       await expandQueryNeural(
@@ -338,10 +334,7 @@ export async function generateHybridResponse({
       );
 
     const fusedChunks =
-      await getFusedChunks(
-        expandedQueries.join(" "),
-        4
-      );
+      await getFusedChunks(expandedQueries.join(" "), 4);
 
     const mergedChunks =
       [...strategicChunks, ...(fusedChunks || [])]
@@ -350,76 +343,30 @@ export async function generateHybridResponse({
           arr.findIndex((x) => x.text === c.text) === i
       );
 
-    const vectorText =
-      compressContext(mergedChunks);
+    const vectorText = compressContext(mergedChunks);
 
-    const vectorCount =
-      mergedChunks.length;
-
-    /* ---------- STAGE INSTRUCTION ---------- */
-
-    let stageInstruction = "";
-
-    if (brainContext.stage === "discovery")
-      stageInstruction =
-        "Ask clarifying questions about the user's business.";
-
-    if (brainContext.stage === "strategy")
-      stageInstruction =
-        "Provide strategic insights for business growth.";
-
-    if (brainContext.stage === "service")
-      stageInstruction =
-        "Explain relevant services clearly.";
-
-    if (brainContext.stage === "conversion")
-      stageInstruction =
-        "Encourage booking a consultation if helpful.";
-
-    const bookingSignal =
-      autoBooking
-        ? "Encourage scheduling a consultation."
-        : "";
+    const vectorCount = mergedChunks.length;
 
     /* ---------- PROMPT ---------- */
 
     const prompt = `
-You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
+You are ${BOT_NAME}, AI strategist.
 
-CRITICAL RULES:
-Always answer the USER'S LATEST QUESTION.
+Answer clearly and strategically.
 
-STRICT KNOWLEDGE POLICY:
-Only use the company knowledge provided below.
+Intent: ${detectedIntentNames.join(",")}
+Service: ${detectedService ?? "general"}
 
-Do NOT invent:
-• services
-• tools
-• pricing
-• contact information
-• phone numbers
-• emails
-• addresses
-
-If information is not available in the knowledge base, say you do not have that information.
-
-Detected service: ${detectedService ?? "general"}
-Detected intents: ${detectedIntentNames.join(",")}
-
-Conversation stage: ${brainContext.stage}
+Stage: ${brainContext.stage}
 Lead score: ${brainContext.leadScore}
 
-${stageInstruction}
-
-${bookingSignal}
-
-Company knowledge:
+Context:
 ${vectorText}
 
-Conversation history:
+Conversation:
 ${historyText}
 
-USER QUESTION:
+User:
 ${message}
 `;
 
@@ -431,80 +378,50 @@ ${message}
     const MAX_ATTEMPTS = 2;
 
     for (let i = 0; i < MAX_ATTEMPTS; i++) {
-
       const qwenResp =
-        await withTimeout(
-          generateOpenRouter(prompt),
-          18000
-        );
+        await withTimeout(generateOpenRouter(prompt), 18000);
 
       if (qwenResp) {
-
-        const cleaned =
-          cleanResponse(qwenResp);
-
+        const cleaned = cleanResponse(qwenResp);
         if (!looksIncomplete(cleaned)) {
-
           response = cleaned;
-
           modelUsed = "Qwen";
-
           break;
         }
       }
     }
 
-    /* ---------- GEMINI FALLBACK ---------- */
+    /* ---------- GEMINI ---------- */
 
     if (!response && canUseGemini()) {
-
       const geminiResp =
-        await withTimeout(
-          generateGemini(prompt),
-          12000
-        );
+        await withTimeout(generateGemini(prompt), 12000);
 
       if (geminiResp) {
-
-        const cleaned =
-          cleanResponse(geminiResp);
-
+        const cleaned = cleanResponse(geminiResp);
         if (!looksIncomplete(cleaned)) {
-
           response = cleaned;
-
           modelUsed = "Gemini";
-
           markGeminiUsed();
         }
       }
     }
 
-    /* ---------- HARD FALLBACK ---------- */
+    /* ---------- SMART FALLBACK ---------- */
 
     if (!response) {
-
-      response =
-        `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing. I help businesses implement advanced AI marketing systems, automation, performance advertising, and growth strategies.`;
-
+      response = smartFallback();
       modelUsed = "fallback";
     }
 
     /* ---------- CLEANUP ---------- */
 
-    response =
-      compressResponse(response);
+    response = fixBrokenOutput(response);
+    response = compressResponse(response);
+    response = cleanHybridResponse(enforceBotName(response));
+    response = applyHighIntentBoost(response, brainContext.leadScore);
 
-    response =
-      cleanHybridResponse(
-        enforceBotName(response)
-      );
-
-    await memoryService.saveMessage(
-      sessionId,
-      "assistant",
-      response
-    );
+    await memoryService.saveMessage(sessionId, "assistant", response);
 
     console.log(
       `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(
@@ -513,11 +430,8 @@ ${message}
     );
 
     return response;
-
   } catch (err) {
-
     console.error("Hybrid RAG error:", err);
-
-    return `I am ${BOT_NAME}. There was a temporary processing issue. Please try again shortly.`;
+    return `There was a temporary processing issue. Please try again shortly.`;
   }
 }

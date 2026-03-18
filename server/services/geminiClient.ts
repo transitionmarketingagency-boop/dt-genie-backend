@@ -3,6 +3,7 @@ import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
 import fetch from "node-fetch";
 import * as dotenv from "dotenv";
+import { strategicBrain } from "./strategicBrain.js";
 
 /* ---------------- ESM safe paths ---------------- */
 const __filename = fileURLToPath(import.meta.url);
@@ -14,7 +15,6 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 /* ---------------- Gemini config ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
-
 const TIMEOUT = 12000;
 const MAX_RETRIES = 1;
 
@@ -25,7 +25,6 @@ const { enforceBotName, BOT_NAME } = await import(identityUrl);
 /* ---------------- Response validator ---------------- */
 function isValidResponse(text: string) {
   if (!text || text.length < 25) return false;
-
   const badPatterns = ["```", "###", "<|", "|>", "assistant:", "system:", "undefined", "null"];
   return !badPatterns.some((p) => text.toLowerCase().includes(p));
 }
@@ -40,15 +39,35 @@ function cleanPrompt(prompt: string) {
     .slice(0, 4500);
 }
 
+/* ---------------- High-intent detection ---------------- */
+function detectHighIntent(prompt: string): boolean {
+  const text = prompt.toLowerCase();
+  const signals = ["hire", "book", "schedule", "consultation", "call", "work with", "i want", "sign up", "let's start"];
+  return signals.some((s) => text.includes(s));
+}
+
 /* ---------------- Main Gemini generation ---------------- */
-export async function generateGemini(prompt: string): Promise<string> {
+export async function generateGemini(prompt: string, sessionId?: string): Promise<string> {
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) {
     console.error("❌ GEMINI_API_KEY missing");
-    return "";
+    return "Apologies, I cannot access AI systems currently, but I can still assist with guidance.";
   }
 
   prompt = cleanPrompt(prompt);
+
+  // Integrate strategicBrain context if sessionId provided
+  let contextText = "";
+  if (sessionId) {
+    try {
+      const { brainContext } = await strategicBrain(prompt, sessionId);
+      contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. `;
+    } catch (err) {
+      console.warn("⚠️ strategicBrain context fetch failed:", err);
+    }
+  }
+
+  const highIntent = detectHighIntent(prompt);
 
   const finalPrompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
@@ -58,11 +77,12 @@ Your role is to assist businesses using the 14 core services offered by Digital 
 Guidelines:
 - Only promote the company's services.
 - Never recommend external platforms, AI tools, or third-party services such as Kling, Midjourney, Runway, Pika, OpenAI tools, etc.
-- If the user mentions such tools, explain the concept briefly and guide them to the company's solutions.
+- If the user mentions such tools, explain briefly and guide them to the company's solutions.
 - Respond in clear, professional natural language without markdown, headings, emojis, or code symbols.
 - Focus on actionable, context-aware guidance aligned with the user's intent.
 - Maintain factual accuracy and rely on company knowledge only.
 
+${contextText}
 User request:
 ${prompt}
 
@@ -74,12 +94,11 @@ Provide a concise, relevant, professional response.
 
   while (attempt <= MAX_RETRIES) {
     attempt++;
-
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT);
 
     try {
-      console.log(`⚡ Gemini fallback attempt ${attempt}`);
+      console.log(`⚡ Gemini attempt ${attempt} (highIntent=${highIntent})`);
 
       const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
         method: "POST",
@@ -89,9 +108,9 @@ Provide a concise, relevant, professional response.
         body: JSON.stringify({
           contents: [{ parts: [{ text: finalPrompt }] }],
           generationConfig: {
-            temperature: 0.35,
+            temperature: highIntent ? 0.42 : 0.35,
             maxOutputTokens: 600,
-            topP: 0.9
+            topP: highIntent ? 0.95 : 0.9
           }
         }),
         signal: controller.signal
@@ -116,7 +135,7 @@ Provide a concise, relevant, professional response.
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
-      console.warn(`⚠️ Gemini attempt ${attempt} failed:`, err.message);
+      console.warn(`⚠️ Gemini attempt ${attempt} failed:`, err?.message ?? err);
 
       if (attempt <= MAX_RETRIES) {
         const delay = 1500 * attempt;
@@ -127,7 +146,7 @@ Provide a concise, relevant, professional response.
   }
 
   console.error("❌ Gemini failed completely:", lastError);
-  return "";
+  return "I'm having trouble generating a response right now, but I can still provide advice or guidance.";
 }
 
 /* ---------------- Backwards compatibility ---------------- */
