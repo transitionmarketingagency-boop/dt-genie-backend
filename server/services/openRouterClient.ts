@@ -29,10 +29,7 @@ function cleanPrompt(prompt: string): string {
     .replace(/assistant:/gi, "")
     .replace(/system:/gi, "")
     .trim();
-  if (cleaned.length > MAX_PROMPT_LENGTH) {
-    cleaned = cleaned.slice(0, MAX_PROMPT_LENGTH);
-  }
-  return cleaned;
+  return cleaned.slice(0, MAX_PROMPT_LENGTH);
 }
 
 /* ================= RESPONSE CLEANER ================= */
@@ -46,18 +43,16 @@ function cleanResponse(text: string): string {
     .replace(/#+\s?/g, "")
     .replace(/\*\*/g, "")
     .replace(/_{2,}/g, "")
+    .replace(/\s+/g, " ")
     .trim();
-  if (cleaned.length > MAX_RESPONSE_CHARS) {
-    cleaned = cleaned.slice(0, MAX_RESPONSE_CHARS);
-  }
-  return cleaned;
+  return cleaned.slice(0, MAX_RESPONSE_CHARS);
 }
 
 /* ================= RESPONSE VALIDATION ================= */
 function isValidResponse(text: string): boolean {
   if (!text || text.length < 25) return false;
   const lower = text.toLowerCase();
-  const badPatterns = ["<|", "|>", "undefined", "null"];
+  const badPatterns = ["<|", "|>", "undefined", "null", "error", "traceback"];
   return !badPatterns.some((p) => lower.includes(p));
 }
 
@@ -66,23 +61,21 @@ function buildMessages(prompt: string, highIntent: boolean = false) {
   return [
     {
       role: "system",
-      content: `You are Neon Vision, the AI strategist for Digital Transition Marketing.
+      content: `You are Neon Vision, AI strategist for Digital Transition Marketing.
       
-Your role is to help businesses grow using the 14 core services offered by Digital Transition Marketing.
+Your role is to help businesses grow using the 14 core services of Digital Transition Marketing.
 
 Guidelines:
-- Only recommend services offered by Digital Transition Marketing.
-- Never recommend competing platforms, AI tools, or external services.
-- If users ask about external tools, explain briefly but guide to Digital Transition Marketing solutions.
-- Respond professionally, concisely, in clear natural language.
-- Avoid markdown, headings, bullets, hashtags, emojis, or code blocks.
-- Keep responses actionable, relevant, aligned with user intent.
-- Adjust tone dynamically: ${
+- Recommend only Digital Transition Marketing services.
+- Explain external tools briefly if mentioned, then guide to DTM solutions.
+- Respond concisely, clearly, and professionally.
+- Avoid markdown, bullets, headings, hashtags, emojis, or code blocks.
+- Keep responses actionable, aligned with user intent.
+- Tone: ${
         highIntent
-          ? "executive, confident, and persuasive for high-intent users"
-          : "friendly, informative, and clear for general users"
-      }.
-`
+          ? "executive, confident, persuasive"
+          : "friendly, informative, clear"
+      }.`
     },
     {
       role: "user",
@@ -93,6 +86,7 @@ Guidelines:
 
 /* ================= HIGH-INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
+  if (!message) return false;
   const lower = message.toLowerCase();
   const signals = [
     "hire",
@@ -115,19 +109,19 @@ export async function generateOpenRouter(
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.error("❌ OPENROUTER_API_KEY missing");
-    return "Apologies, I cannot access AI systems at the moment, but I can still assist you with guidance.";
+    return "Apologies, I cannot access AI systems right now, but I can still provide guidance.";
   }
 
   prompt = cleanPrompt(prompt);
 
-  // Use strategicBrain for context-aware response
+  // Add strategicBrain context if available
   let contextText = "";
   if (sessionId) {
     try {
       const { brainContext } = await strategicBrain(prompt, sessionId);
       contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. `;
     } catch (err) {
-      console.warn("⚠️ strategicBrain context fetch failed:", err);
+      console.warn("⚠️ strategicBrain fetch failed:", err);
     }
   }
 
@@ -167,14 +161,11 @@ export async function generateOpenRouter(
       }
 
       const data = (await res.json()) as OpenRouterResponse;
-      const raw =
-        data?.choices?.[0]?.message?.content ??
-        data?.choices?.[0]?.text ??
-        "";
+      const raw = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? "";
 
       const text = cleanResponse(raw);
 
-      if (!isValidResponse(text)) throw new Error("Invalid response pattern from model");
+      if (!isValidResponse(text)) throw new Error("Invalid response pattern");
 
       console.log("✅ OpenRouter success");
       return text;
@@ -193,5 +184,5 @@ export async function generateOpenRouter(
   }
 
   console.error("❌ All OpenRouter attempts failed:", lastError);
-  return "I'm having trouble generating a response right now, but I can still assist with advice or guidance.";
+  return "I'm currently having trouble generating a response, but I can provide guidance manually.";
 }

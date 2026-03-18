@@ -25,7 +25,7 @@ const { enforceBotName, BOT_NAME } = await import(identityUrl);
 /* ---------------- Response validator ---------------- */
 function isValidResponse(text: string) {
   if (!text || text.length < 25) return false;
-  const badPatterns = ["```", "###", "<|", "|>", "assistant:", "system:", "undefined", "null"];
+  const badPatterns = ["```", "###", "<|", "|>", "assistant:", "system:", "undefined", "null", "error", "traceback"];
   return !badPatterns.some((p) => text.toLowerCase().includes(p));
 }
 
@@ -41,6 +41,7 @@ function cleanPrompt(prompt: string) {
 
 /* ---------------- High-intent detection ---------------- */
 function detectHighIntent(prompt: string): boolean {
+  if (!prompt) return false;
   const text = prompt.toLowerCase();
   const signals = ["hire", "book", "schedule", "consultation", "call", "work with", "i want", "sign up", "let's start"];
   return signals.some((s) => text.includes(s));
@@ -51,7 +52,7 @@ export async function generateGemini(prompt: string, sessionId?: string): Promis
   const API_KEY = process.env.GEMINI_API_KEY;
   if (!API_KEY) {
     console.error("❌ GEMINI_API_KEY missing");
-    return "Apologies, I cannot access AI systems currently, but I can still assist with guidance.";
+    return "Apologies, I cannot access AI systems currently, but I can still provide guidance.";
   }
 
   prompt = cleanPrompt(prompt);
@@ -76,11 +77,11 @@ Your role is to assist businesses using the 14 core services offered by Digital 
 
 Guidelines:
 - Only promote the company's services.
-- Never recommend external platforms, AI tools, or third-party services such as Kling, Midjourney, Runway, Pika, OpenAI tools, etc.
-- If the user mentions such tools, explain briefly and guide them to the company's solutions.
+- Never recommend external platforms or third-party tools (Kling, Midjourney, Runway, Pika, OpenAI, etc.).
+- Explain external tools briefly if mentioned, then guide to company solutions.
 - Respond in clear, professional natural language without markdown, headings, emojis, or code symbols.
-- Focus on actionable, context-aware guidance aligned with the user's intent.
-- Maintain factual accuracy and rely on company knowledge only.
+- Provide actionable, context-aware guidance aligned with user intent.
+- Maintain factual accuracy and rely only on company knowledge.
 
 ${contextText}
 User request:
@@ -102,9 +103,7 @@ Provide a concise, relevant, professional response.
 
       const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: finalPrompt }] }],
           generationConfig: {
@@ -146,7 +145,7 @@ Provide a concise, relevant, professional response.
   }
 
   console.error("❌ Gemini failed completely:", lastError);
-  return "I'm having trouble generating a response right now, but I can still provide advice or guidance.";
+  return "I'm having trouble generating a response right now, but I can still provide guidance.";
 }
 
 /* ---------------- Backwards compatibility ---------------- */
