@@ -179,19 +179,21 @@ const bookingFlow = {
       }
 
       /* ================= STEP 2 ================= */
-
       case 2: {
-        booking.serviceType = message || "General Consultation";
-        booking.step = 3;
+  const detected =
+    detectService(message) || fallbackServiceDetection(message);
 
-        return {
-          response:
-            `Got it — we’ll focus on **${booking.serviceType}**.\n\n` +
-            `When would you like to schedule your session? Please share your preferred **date and time**.`,
-          nextStep: 3,
-        };
-      }
+  booking.serviceType = detected || "Strategy Session";
+  booking.step = 3;
 
+  return {
+    response:
+      `Got it — we’ll focus on **${booking.serviceType}**.\n\n` +
+      `When would you like to schedule your session? Please share your preferred **date and time**.`,
+    nextStep: 3,
+  };
+}
+      
       /* ================= STEP 3 ================= */
 
       case 3: {

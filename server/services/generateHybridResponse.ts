@@ -126,7 +126,7 @@ function compressContext(chunks: any[], maxLength: number = 300): string {
 function looksIncomplete(text: string): boolean {
   if (!text) return true;
   const trimmed = text.trim();
-  return trimmed.length < 40 || !/[.!?]$/.test(trimmed);
+  return trimmed.length < 30; // simplified length check
 }
 
 function sanitizeTools(text: string): string {
@@ -156,9 +156,20 @@ function removeContactInfo(text: string): string {
 function cleanHybridResponse(text: string): string {
   text = sanitizeTools(text);
   text = removeContactInfo(text);
+
+  // Fix common typos or formatting
+  const spellMap: Record<string, string> = {
+    "Ill": "I'll",
+    "dont": "don't",
+    "wont": "won't",
+    "cant": "can't",
+  };
+  for (const [wrong, correct] of Object.entries(spellMap)) {
+    text = text.replace(new RegExp(`\\b${wrong}\\b`, "gi"), correct);
+  }
+
   text = text.replace(/\b(AI-){2,}/gi, "AI-");
   text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
-  text = text.replace(/\bIll\b/g, "I'll");
   return text.replace(/\s+/g, " ").trim();
 }
 
@@ -319,38 +330,33 @@ INSTRUCTIONS:
 let response = "";
 let modelUsed = "none";
 
-const qwenPromise = withTimeout(generateOpenRouter(prompt), 14000);
-const geminiPromise = canUseGemini()
-  ? withTimeout(generateGemini(prompt), 10000)
-  : Promise.resolve(null);
+const qwenPromise = withTimeout(generateOpenRouter(prompt), 12000);
+const geminiPromise = canUseGemini() ? withTimeout(generateGemini(prompt), 8000) : Promise.resolve(null);
 
 const [qwenResp, geminiResp] = await Promise.all([qwenPromise, geminiPromise]);
 
-// Prefer Qwen if valid
-if (qwenResp) {
-  const cleaned = cleanResponse(qwenResp);
-  if (!looksIncomplete(cleaned)) {
-    response = cleaned;
-    modelUsed = "Qwen";
+// Prefer first valid response
+const candidates = [
+  { resp: qwenResp, name: "Qwen" },
+  { resp: geminiResp, name: "Gemini", mark: markGeminiUsed },
+];
+
+for (const c of candidates) {
+  if (c.resp) {
+    const cleaned = cleanResponse(c.resp);
+    if (!looksIncomplete(cleaned)) {
+      response = cleaned;
+      modelUsed = c.name;
+      if (c.mark) c.mark();
+      break;
+    }
   }
 }
 
-// Fallback to Gemini ONLY if needed
-if (!response && geminiResp) {
-  const cleaned = cleanResponse(geminiResp);
-  if (!looksIncomplete(cleaned)) {
-    response = cleaned;
-    modelUsed = "Gemini";
-    markGeminiUsed();
-  }
-}
-
-// Final fallback
 if (!response) {
   response = smartFallback();
   modelUsed = "fallback";
 }
-
 
     /* ---------- CLEANUP ---------- */
 
@@ -362,10 +368,13 @@ response = cleanHybridResponse(enforceBotName(response));
 
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
-if (shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage)) {
-  response += "\n\n👉 If you want, we can map this to your exact goals and get you started quickly.";
+if (
+  brainContext.leadScore > 0.75 &&
+  shouldIncludeCTA(message, intentCategories) &&
+  !response.toLowerCase().includes("map this to your goals")
+) {
+  response += "\n\n👉 If you'd like, I can map this into a clear execution plan for you.";
 }
-
 /* ---------- SAVE MEMORY ---------- */
 
 await memoryService.saveMessage(sessionId, "assistant", response);
