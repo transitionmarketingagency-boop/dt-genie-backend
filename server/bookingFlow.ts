@@ -1,8 +1,7 @@
 // server/bookingFlow.ts
 
 import { memoryService } from "./services/memoryService.js";
-import { shouldTriggerBooking } from "./services/bookingTrigger.js";
-import { detectService } from "./services/serviceDetector.js"; // ✅ NEW (SAFE)
+import { detectService } from "./services/serviceDetector.js";
 
 /* ================= TYPES ================= */
 
@@ -56,9 +55,37 @@ function cleanupExpiredBookings() {
   }
 }
 
+/* ================= SAFE TYPE GUARDS ================= */
+
+// ✅ Fix TS error: ensure valid stage
+function isValidStage(stage: any): stage is Stage {
+  return ["greeting", "discovery", "strategy", "service", "conversion"].includes(stage);
+}
+
+/* ================= SMART HELPERS ================= */
+
+function normalize(text: string) {
+  return (text || "").toLowerCase().trim();
+}
+
+function fallbackServiceDetection(message: string): string | null {
+  const msg = normalize(message);
+
+  if (msg.includes("seo")) return "SEO Optimization";
+  if (msg.includes("ads") || msg.includes("advertising")) return "Performance Marketing";
+  if (msg.includes("automation") || msg.includes("ai")) return "AI Marketing Automation";
+  if (msg.includes("content")) return "Content Marketing";
+  if (msg.includes("brand")) return "Brand Development";
+  if (msg.includes("ecommerce")) return "Ecommerce Growth Systems";
+
+  return null;
+}
+
 /* ================= BOOKING FLOW ================= */
 
 const bookingFlow = {
+
+  /* ================= START ================= */
 
   startBookingFlow: async (
     userId: string,
@@ -92,6 +119,8 @@ const bookingFlow = {
     delete ongoingBookings[userId];
   },
 
+  /* ================= CORE FLOW ================= */
+
   handleStep: async (
     userId: string,
     userMessage: string
@@ -117,23 +146,27 @@ const bookingFlow = {
 
     switch (booking.step) {
 
-      /* ================= STEP 1 (FIXED) ================= */
+      /* ================= STEP 1 ================= */
 
-      case 1:
+      case 1: {
         booking.step = 2;
 
-        // ✅ Detect service dynamically
         let detectedService: string | null = null;
+
         try {
           detectedService = detectService(message);
         } catch {}
+
+        if (!detectedService) {
+          detectedService = fallbackServiceDetection(message);
+        }
 
         if (detectedService) {
           booking.serviceType = detectedService;
 
           return {
-            response: `Great — we’ll focus on **${detectedService}**. When would you like to schedule your session?`,
-            nextStep: 3, // skip manual selection
+            response: `Great — we’ll focus on **${detectedService}**.\n\nWhen would you like to schedule your session?`,
+            nextStep: 3,
           };
         }
 
@@ -143,10 +176,11 @@ const bookingFlow = {
             `What would you like to focus on? (e.g. lead generation, SEO, automation, ads)`,
           nextStep: 2,
         };
+      }
 
       /* ================= STEP 2 ================= */
 
-      case 2:
+      case 2: {
         booking.serviceType = message || "General Consultation";
         booking.step = 3;
 
@@ -156,10 +190,11 @@ const bookingFlow = {
             `When would you like to schedule your session? Please share your preferred **date and time**.`,
           nextStep: 3,
         };
+      }
 
       /* ================= STEP 3 ================= */
 
-      case 3:
+      case 3: {
         booking.preferredTime = message;
         booking.step = 4;
 
@@ -168,10 +203,11 @@ const bookingFlow = {
             "Perfect. Please provide your **email address** so we can confirm your booking.",
           nextStep: 4,
         };
+      }
 
-      /* ================= STEP 4 ================= */
+      /* ================= STEP 4 (FIXED) ================= */
 
-      case 4:
+      case 4: {
         if (!isValidEmail(message)) {
           return {
             response: "Please enter a **valid email address** to continue.",
@@ -181,6 +217,29 @@ const bookingFlow = {
 
         booking.email = message.toLowerCase();
         booking.calendlyLink = baseCalendlyLink;
+
+        // ✅ SAFE strategic memory mapping (FIXED)
+        try {
+          const strategicMemory: any = await memoryService.getStrategicMemory(userId);
+
+          if (strategicMemory) {
+            if (typeof strategicMemory.leadScore === "number") {
+              booking.leadScore = strategicMemory.leadScore;
+            }
+
+            if (typeof strategicMemory.dealProbability === "number") {
+              booking.dealProbability = strategicMemory.dealProbability;
+            }
+
+            if (typeof strategicMemory.triggerBooking === "boolean") {
+              booking.triggerBooking = strategicMemory.triggerBooking;
+            }
+
+            if (isValidStage(strategicMemory.stage)) {
+              booking.stage = strategicMemory.stage;
+            }
+          }
+        } catch {}
 
         try {
           await memoryService.storeBooking({
@@ -226,11 +285,12 @@ const bookingFlow = {
           nextStep: 5,
           frontendScript,
         };
+      }
 
       /* ================= STEP 5 ================= */
 
-      case 5:
-        if (message.toLowerCase().includes("i booked")) {
+      case 5: {
+        if (normalize(message).includes("i booked")) {
 
           try {
             await memoryService.updateBookingStatus(userId, "confirmed");
@@ -250,6 +310,9 @@ const bookingFlow = {
           response:
             "Once you complete the booking, type **'I booked'** to confirm your session.",
         };
+      }
+
+      /* ================= FALLBACK ================= */
 
       default:
         delete ongoingBookings[userId];
@@ -260,6 +323,8 @@ const bookingFlow = {
         };
     }
   },
+
+  /* ================= STATE CHECK ================= */
 
   isBookingActive: (userId: string): boolean => {
     cleanupExpiredBookings();

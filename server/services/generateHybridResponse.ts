@@ -40,12 +40,28 @@ function fixBrokenOutput(text: string): string {
     .trim();
 }
 
-function shouldIncludeCTA(message: string, intentCategories: string[] = []): boolean {
+
+function shouldIncludeCTA(
+  message: string,
+  intentCategories: string[] = [],
+  leadScore: number = 0,
+  stage: string = "discovery"
+): boolean {
   const lower = message.toLowerCase();
-  const ctaKeywords = ["call", "strategy", "consultation", "schedule"];
-  if (!ctaKeywords.some((k) => lower.includes(k))) return false;
-  if (intentCategories.includes("general") || intentCategories.includes("ai_automation")) return false;
-  return true;
+
+  const explicitIntent =
+    lower.includes("call") ||
+    lower.includes("schedule") ||
+    lower.includes("consultation");
+
+  const highIntent =
+    leadScore >= 7 ||
+    stage === "service" ||
+    stage === "conversion";
+
+  if (intentCategories.includes("general")) return false;
+
+  return explicitIntent || highIntent;
 }
 
 /* ================= GEMINI CONFIG ================= */
@@ -157,18 +173,13 @@ function enforceResponseRules(text: string): string {
   if (!text) return text;
 
   return text
-    // Fix broken pricing like "$2,:" or "$7,"
     .replace(/\$\d+,\s*/g, "")
-
-    // Reduce pilot spam (keep logic, just tone it down)
     .replace(/CGI & Performance Pilot/gi, "our performance system")
-
-    // Remove repetitive fallback loops
     .replace(/I want to give you a precise answer — could you clarify[^.]*\./gi, "")
-
+    .replace(/(.+?)\1{1,}/gi, "$1")
+    .replace(/\s+/g, " ")
     .trim();
 }
-
 
 /* ================= QUERY EXPANSION ================= */
 
@@ -270,72 +281,79 @@ export async function generateHybridResponse({
 const prompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
+ROLE:
+You help businesses grow using AI-powered marketing systems, focusing on results, strategy, and conversion.
+
 CRITICAL RULES:
-- ONLY use provided context for services, pricing, and tiers
-- DO NOT invent or guess pricing
-- If pricing is missing → explain value instead of guessing
-- Avoid repeating the same offer excessively
-- Be precise, natural, and strategic
+- Only use provided context (no guessing pricing or services)
+- If pricing is missing → explain value instead
+- Be natural, human, and strategic (not robotic)
+- Avoid repetition and generic answers
+- Focus on solving the user's business problem
 
-Intent: ${detectedIntentNames.join(",")}
-Service: ${detectedService ?? "general"}
-Stage: ${brainContext.stage}
-Lead score: ${brainContext.leadScore}
+USER ANALYSIS:
+- Intent: ${detectedIntentNames.join(",")}
+- Service Interest: ${detectedService ?? "general"}
+- Funnel Stage: ${brainContext.stage}
+- Lead Score: ${brainContext.leadScore}
+- Strategy Insight: ${brainContext.reasoning}
 
-Context:
+KNOWLEDGE:
 ${vectorText}
 
-Conversation:
+CONVERSATION:
 ${historyText}
 
-User:
+USER MESSAGE:
 ${message}
+
+INSTRUCTIONS:
+- Give a clear, useful, and tailored answer
+- If user shows intent → guide toward solution
+- If high intent → naturally move toward next step (no hard sell)
+- Keep it concise but impactful
 `;
 
-    /* ---------- HYBRID MODEL EXECUTION ---------- */
-    let response = "";
-    let modelUsed = "none";
+/* ---------- HYBRID MODEL EXECUTION (PARALLEL FIRST-SUCCESS) ---------- */
 
-    const qwenResp = await withTimeout(generateOpenRouter(prompt), 15000);
-    if (qwenResp) {
-      const cleaned = cleanResponse(qwenResp);
-      if (!looksIncomplete(cleaned)) { response = cleaned; modelUsed = "Qwen"; }
-    }
+let response = "";
+let modelUsed = "none";
 
-    if (!response && canUseGemini()) {
-      const geminiResp = await withTimeout(generateGemini(prompt), 10000);
-      if (geminiResp) {
-        const cleaned = cleanResponse(geminiResp);
-        if (!looksIncomplete(cleaned)) { response = cleaned; modelUsed = "Gemini"; markGeminiUsed(); }
-      }
-    }
+const qwenPromise = withTimeout(generateOpenRouter(prompt), 14000);
+const geminiPromise = canUseGemini()
+  ? withTimeout(generateGemini(prompt), 10000)
+  : Promise.resolve(null);
 
-    if (!response) { response = smartFallback(); modelUsed = "fallback"; }
+const [qwenResp, geminiResp] = await Promise.all([qwenPromise, geminiPromise]);
+
+// Prefer Qwen if valid
+if (qwenResp) {
+  const cleaned = cleanResponse(qwenResp);
+  if (!looksIncomplete(cleaned)) {
+    response = cleaned;
+    modelUsed = "Qwen";
+  }
+}
+
+// Fallback to Gemini ONLY if needed
+if (!response && geminiResp) {
+  const cleaned = cleanResponse(geminiResp);
+  if (!looksIncomplete(cleaned)) {
+    response = cleaned;
+    modelUsed = "Gemini";
+    markGeminiUsed();
+  }
+}
+
+// Final fallback
+if (!response) {
+  response = smartFallback();
+  modelUsed = "fallback";
+}
+
 
     /* ---------- CLEANUP ---------- */
 
-/* ================= FINAL RESPONSE CLEANER ================= */
-
-function enforceResponseRules(text: string): string {
-  if (!text) return text;
-
-  return text
-    // Fix broken pricing artifacts like "$2,:" or "$7,"
-    .replace(/\$\d+,\s*/g, "")
-
-    // Reduce overuse of pilot naming (not removing logic)
-    .replace(/CGI & Performance Pilot/gi, "our performance system")
-
-    // Remove repeated fallback loops
-    .replace(/I want to give you a precise answer — could you clarify[^.]*\./gi, "")
-
-    // Remove accidental duplicate sentences
-    .replace(/(.+?)\1{1,}/gi, "$1")
-
-    .trim();
-}
-
-/* ---------- CLEANUP ---------- */
 
 response = fixBrokenOutput(response);
 response = enforceResponseRules(response); // 🔥 NEW (critical)
@@ -344,7 +362,7 @@ response = cleanHybridResponse(enforceBotName(response));
 
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
-if (brainContext.leadScore > 0.75 && shouldIncludeCTA(message, intentCategories)) {
+if (shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage)) {
   response += "\n\n👉 If you want, we can map this to your exact goals and get you started quickly.";
 }
 

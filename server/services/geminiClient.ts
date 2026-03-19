@@ -15,8 +15,8 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 /* ---------------- Gemini config ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
-const TIMEOUT = 12000;
-const MAX_RETRIES = 1;
+const TIMEOUT = 25000; // increased to handle longer prompts
+const MAX_RETRIES = 2;
 
 /* ---------------- Import identity helpers ---------------- */
 const identityUrl = pathToFileURL(join(__dirname, "../system/identity.js")).href;
@@ -44,10 +44,10 @@ function isValidResponse(text: string) {
 function cleanPrompt(prompt: string) {
   if (!prompt) return "";
   return prompt
-    .replace(/[^\x00-\x7F]+/g, " ")
     .replace(/\s+/g, " ")
+    .replace(/\x00/g, "")
     .trim()
-    .slice(0, 4500);
+    .slice(0, 4800); // slightly shorter to handle overhead
 }
 
 /* ---------------- High-intent detection ---------------- */
@@ -64,8 +64,29 @@ function detectHighIntent(prompt: string): boolean {
     "i want",
     "sign up",
     "let's start",
+    "ready to invest",
+    "asap",
+    "fast start",
   ];
   return signals.some((s) => text.includes(s));
+}
+
+/* ---------------- Clean AI response ---------------- */
+function cleanResponse(text: string) {
+  if (!text) return "";
+  let cleaned = text
+    .replace(/assistant:/gi, "")
+    .replace(/system:/gi, "")
+    .replace(/#{1,}/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/_{2,}/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Remove any accidental contact info
+  cleaned = cleaned.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
+  return cleaned;
 }
 
 /* ---------------- Main Gemini generation ---------------- */
@@ -82,8 +103,13 @@ export async function generateGemini(prompt: string, sessionId?: string): Promis
   let contextText = "";
   if (sessionId) {
     try {
-      const { brainContext } = await strategicBrain(prompt, sessionId);
-      contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. `;
+      const { brainContext, chunks } = await strategicBrain(prompt, sessionId);
+
+      // Include pricing info only, ignore contact info entirely
+      const pricingChunk = chunks.find(c => c.intent.toLowerCase().includes("pricing"));
+      const pricingInfo = pricingChunk ? pricingChunk.text : "Pricing info not available.";
+
+      contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. Pricing info: ${pricingInfo}. `;
     } catch (err) {
       console.warn("⚠️ strategicBrain context fetch failed:", err);
     }
@@ -103,6 +129,7 @@ Guidelines:
 - Respond in clear, professional natural language without markdown, headings, emojis, or code symbols.
 - Provide actionable, context-aware guidance aligned with user intent.
 - Maintain factual accuracy and rely only on company knowledge.
+- Never provide contact info or fake details.
 
 ${contextText}
 User request:
@@ -129,7 +156,7 @@ Provide a concise, relevant, professional response.
           contents: [{ parts: [{ text: finalPrompt }] }],
           generationConfig: {
             temperature: highIntent ? 0.42 : 0.35,
-            maxOutputTokens: 600,
+            maxOutputTokens: 700,
             topP: highIntent ? 0.95 : 0.9,
           },
         }),
@@ -144,7 +171,9 @@ Provide a concise, relevant, professional response.
       }
 
       const data: any = await res.json();
-      const content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+      let content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+      content = cleanResponse(content);
 
       if (!content) throw new Error("Gemini empty response");
       if (!isValidResponse(content)) throw new Error("Gemini invalid response");
