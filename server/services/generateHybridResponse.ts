@@ -26,8 +26,17 @@ function detectBookingRejection(message: string): boolean {
   );
 }
 
-function smartFallback(): string {
-  return `I want to give you a precise answer — could you clarify what specific outcome you're aiming for? For example: more leads, conversions, or scaling revenue?`;
+function smartFallback(message: string): string {
+  return `I couldn't fully generate a strong answer for that, but here's a quick direction:
+
+Based on your input ("${message.slice(0, 60)}..."), you're likely looking for a strategic solution.
+
+Let me refine this — are you focused more on:
+• Getting more leads
+• Improving conversions
+• Scaling revenue
+
+Tell me, and I’ll give you a precise breakdown.`;
 }
 
 function fixBrokenOutput(text: string): string {
@@ -126,7 +135,12 @@ function compressContext(chunks: any[], maxLength: number = 300): string {
 function looksIncomplete(text: string): boolean {
   if (!text) return true;
   const trimmed = text.trim();
-  return trimmed.length < 30; // simplified length check
+
+  if (trimmed.length < 50) return true;
+  if (!/[.!?]$/.test(trimmed)) return true;
+  if (trimmed.includes("I'm having trouble")) return true;
+
+  return false;
 }
 
 function sanitizeTools(text: string): string {
@@ -154,23 +168,51 @@ function removeContactInfo(text: string): string {
 }
 
 function cleanHybridResponse(text: string): string {
+  if (!text) return "";
+
   text = sanitizeTools(text);
   text = removeContactInfo(text);
 
-  // Fix common typos or formatting
-  const spellMap: Record<string, string> = {
-    "Ill": "I'll",
-    "dont": "don't",
-    "wont": "won't",
-    "cant": "can't",
+  // 🔥 REMOVE NON-ENGLISH / BROKEN TOKENS (Chinese etc.)
+  text = text.replace(/[^\x00-\x7F]+/g, " ");
+
+  // 🔥 FIX COMMON MODEL SPELLING COLLAPSE
+  const fixes: Record<string, string> = {
+    trafic: "traffic",
+    mised: "missed",
+    vilas: "villas",
+    Gogle: "Google",
+    asistants: "assistants",
+    enginer: "engineer",
+    enginering: "engineering",
+    se: "see",
+    diferent: "different",
+    busines: "business",
+    acros: "across",
+    tols: "tools",
+    ned: "need",
+    loking: "looking",
+    kep: "keep",
+    ganing: "gaining",
+    ful: "full",
+    funel: "funnel",
   };
-  for (const [wrong, correct] of Object.entries(spellMap)) {
+
+  for (const [wrong, correct] of Object.entries(fixes)) {
     text = text.replace(new RegExp(`\\b${wrong}\\b`, "gi"), correct);
   }
 
+  // formatting cleanup
   text = text.replace(/\b(AI-){2,}/gi, "AI-");
   text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
-  return text.replace(/\s+/g, " ").trim();
+
+  // remove non-latin characters (fix Chinese bug)
+text = text.replace(/[^\x00-\x7F]+/g, "");
+
+// fix broken words spacing
+text = text.replace(/\b([a-z])\s+([a-z])\b/gi, "$1$2");
+
+return text.replace(/\s+/g, " ").trim();
 }
 
 function compressResponse(text: string): string {
@@ -265,9 +307,9 @@ export async function generateHybridResponse({
       return bookingResp.response;
     }
     if (brain.type === "greeting") {
-      return `Hello! I'm ${BOT_NAME}, your AI marketing strategist. How can I help your business today?`;
-    }
-
+  return `Hey — glad you're here. What are you working on right now?`;
+}
+    
     /* ---------- HISTORY ---------- */
     const historyMessages = history.length > 0 ? history : await memoryService.getRecentContext(sessionId);
     const historyText = historyMessages.slice(-5).map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`).join("\n");
@@ -301,10 +343,17 @@ CRITICAL RULES:
 - Be natural, human, and strategic (not robotic)
 - Avoid repetition and generic answers
 - Focus on solving the user's business problem
+- DO NOT over-focus on one service (like GEO)
+- Dynamically choose from ALL services:
+  (SEO, Performance Marketing, CGI Ads, Automation, Analytics, Content, Branding)
+- Recommend combinations, not single solutions
 
 USER ANALYSIS:
 - Intent: ${detectedIntentNames.join(",")}
-- Service Interest: ${detectedService ?? "general"}
+- Service Interest: ${detectedService ?? "multi-service"}
+- Available Services: GEO, Performance Marketing, AI Automation, Content, Branding, Web Development, CGI Ads, Analytics
+- Do NOT over-focus on one service (like SEO/GEO); adapt based on user problem
+- Mention relevant services dynamically, not repeatedly
 - Funnel Stage: ${brainContext.stage}
 - Lead Score: ${brainContext.leadScore}
 - Strategy Insight: ${brainContext.reasoning}
@@ -325,17 +374,24 @@ INSTRUCTIONS:
 - Keep it concise but impactful
 `;
 
-/* ---------- HYBRID MODEL EXECUTION (PARALLEL FIRST-SUCCESS) ---------- */
+/* ---------- HYBRID MODEL EXECUTION (FAST + RELIABLE) ---------- */
 
 let response = "";
 let modelUsed = "none";
 
-const qwenPromise = withTimeout(generateOpenRouter(prompt), 12000);
-const geminiPromise = canUseGemini() ? withTimeout(generateGemini(prompt), 8000) : Promise.resolve(null);
+// Run both models in parallel (fast timeouts)
+const qwenPromise = withTimeout(generateOpenRouter(prompt), 8000);
+const geminiPromise = canUseGemini()
+  ? withTimeout(generateGemini(prompt), 6000)
+  : Promise.resolve(null);
 
-const [qwenResp, geminiResp] = await Promise.all([qwenPromise, geminiPromise]);
+// ⚡ Wait for BOTH (ensures fallback safety + avoids undefined vars)
+const [qwenResp, geminiResp] = await Promise.all([
+  qwenPromise,
+  geminiPromise,
+]);
 
-// Prefer first valid response
+// 🎯 Priority: Qwen → Gemini (controlled + stable)
 const candidates = [
   { resp: qwenResp, name: "Qwen" },
   { resp: geminiResp, name: "Gemini", mark: markGeminiUsed },
@@ -344,37 +400,39 @@ const candidates = [
 for (const c of candidates) {
   if (c.resp) {
     const cleaned = cleanResponse(c.resp);
+
     if (!looksIncomplete(cleaned)) {
       response = cleaned;
       modelUsed = c.name;
+
       if (c.mark) c.mark();
       break;
     }
   }
 }
 
+// 🛟 Final fallback (only if both fail)
 if (!response) {
-  response = smartFallback();
+response = smartFallback(message);
   modelUsed = "fallback";
 }
 
-    /* ---------- CLEANUP ---------- */
-
+/* ---------- CLEANUP ---------- */
 
 response = fixBrokenOutput(response);
-response = enforceResponseRules(response); // 🔥 NEW (critical)
+response = enforceResponseRules(response);
 response = compressResponse(response);
 response = cleanHybridResponse(enforceBotName(response));
 
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
 if (
-  brainContext.leadScore > 0.75 &&
-  shouldIncludeCTA(message, intentCategories) &&
-  !response.toLowerCase().includes("map this to your goals")
+  shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage) &&
+  !response.toLowerCase().includes("map this")
 ) {
-  response += "\n\n👉 If you'd like, I can map this into a clear execution plan for you.";
+  response += "\n\n👉 If you'd like, I can map this into a clear execution plan tailored to your business.";
 }
+
 /* ---------- SAVE MEMORY ---------- */
 
 await memoryService.saveMessage(sessionId, "assistant", response);
@@ -391,6 +449,6 @@ return response;
 
 } catch (err) {
   console.error("Hybrid RAG error:", err);
-  return `There was a temporary processing issue. Please try again shortly.`;
+  return "There was a temporary processing issue. Please try again shortly.";
 }
 }
