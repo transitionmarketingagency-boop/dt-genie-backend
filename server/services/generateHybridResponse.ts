@@ -26,18 +26,31 @@ function detectBookingRejection(message: string): boolean {
   );
 }
 
-function smartFallback(message: string): string {
+function smartFallback(message: string, context: string = ""): string {
   const msg = message.toLowerCase();
 
+  // Context-aware dynamic fallback
   if (msg.includes("traffic") && msg.includes("sales")) {
-    return "If you're getting traffic but no sales, the issue is usually conversion — not visibility. This often comes down to weak messaging, poor offer positioning, or friction in the funnel. The fix isn't more traffic, it's improving how that traffic converts. Want me to break this down for your setup?";
+    return "You're likely dealing with a conversion gap, not a traffic problem. This usually comes down to messaging, offer clarity, or funnel friction. The fastest way to fix this is identifying where users drop off and optimizing that step.";
   }
 
   if (msg.includes("roas") || msg.includes("ads")) {
-    return "If ROAS is dropping while scaling, it's usually due to audience fatigue, creative saturation, or inefficient budget allocation. Scaling isn't just about spending more — it's about maintaining efficiency while expanding reach. I can map out a fix if you want.";
+    return "Dropping ROAS during scaling usually signals creative fatigue, audience saturation, or inefficient budget distribution. The fix is not scaling harder, but scaling smarter with better creative and targeting resets.";
   }
 
-  return "Got it — let’s break this down properly. What’s your main goal right now: more leads, better conversions, or scaling revenue?";
+  if (msg.length < 10) {
+    return "Tell me a bit more about what you're trying to achieve, and I’ll map out a clear direction for you.";
+  }
+
+  // Dynamic fallback instead of generic loop
+  return `Based on what you're asking, it looks like you're trying to improve your business performance but something isn't fully aligned yet.
+
+The key is identifying whether the issue is:
+- Traffic quality
+- Conversion system
+- Or overall strategy
+
+If you want, I can break this down specifically for your situation.`;
 }
 
 function fixBrokenOutput(text: string): string {
@@ -139,11 +152,10 @@ function looksIncomplete(text: string): boolean {
   const trimmed = text.trim();
 
   // Accept shorter responses; only reject clearly too short
-  if (trimmed.length < 40) return true;
+if (trimmed.length < 30) return true;
 
-  // Relax sentence ending check
-  if (/[^\w\s.!?]$/.test(trimmed)) return true;
-
+// Only reject if clearly broken ending
+if (!/[.!?]$/.test(trimmed) && trimmed.length < 80) return true;
   // Reject fallback / error phrases
   if (
     trimmed.includes("I'm having trouble") ||
@@ -203,26 +215,36 @@ function cleanHybridResponse(text: string): string {
 }
 
 function spellCorrectionLayer(text: string): string {
-  const fixes: Record<string, string> = {
-    inteligent: "intelligent",
-    aproach: "approach",
-    chanels: "channels",
-    eficiency: "efficiency",
-    busines: "business",
-    diferent: "different",
-    trafic: "traffic",
-    mised: "missed",
-    loking: "looking",
-    ganing: "gaining",
-    funel: "funnel",
-    geting: "getting",
-    Gogle: "Google",
-    boking: "booking",
-    Il: "I'll",
-    Tel: "Tell",
-    ned: "need",
-    ecomerce: "ecommerce",
-  };
+const fixes: Record<string, string> = {
+  inteligent: "intelligent",
+  aproach: "approach",
+  chanels: "channels",
+  eficiency: "efficiency",
+  busines: "business",
+  diferent: "different",
+  trafic: "traffic",
+  mised: "missed",
+  loking: "looking",
+  ganing: "gaining",
+  funel: "funnel",
+  geting: "getting",
+  Gogle: "Google",
+  boking: "booking",
+  Il: "I'll",
+  Tel: "Tell",
+  ned: "need",
+  ecomerce: "ecommerce",
+  ful: "full",
+  god: "good",
+  hapy: "happy",
+  seing: "seeing",
+  pul: "pull",
+  asistants: "assistants",
+  mesaging: "messaging",
+  cal: "call",
+  bok: "book",
+  wories: "worries"
+};
 
   let corrected = text;
 
@@ -248,7 +270,8 @@ function grammarPolishLayer(text: string): string {
 
 function isLowQuality(text: string): boolean {
   if (!text) return true;
-  if (text.length < 30) return true;
+  if (text.length < 40) return true;
+if (text.split(" ").length < 8) return true;
   if (text.includes("I'm having trouble")) return true;
   if (/^[^a-zA-Z0-9]+$/.test(text)) return true;
   return false;
@@ -264,18 +287,30 @@ function compressResponse(text: string): string {
 function enforceResponseRules(text: string): string {
   if (!text) return text;
 
-// Remove repeated phrases like fallback triggers
-  text = text.replace(/Let me tighten that up/gi, "");
+  text = text
+    /* ===== REMOVE FALLBACK PHRASES ===== */
+    .replace(/let me tighten that up[^.]*\./gi, "")
+    .replace(/got it.? let'?s break this down properly[^.]*\./gi, "")
+    .replace(/what'?s your main goal right now[^?]*\?/gi, "")
+    .replace(/tell me,? and i['’]ll map this properly[^.]*\./gi, "")
 
-  return text
+    /* ===== REMOVE GENERIC AI FILLER ===== */
+    .replace(/from what you're asking[^.]*\./gi, "")
+    .replace(/it looks like you're trying to[^.]*\./gi, "")
+
+    /* ===== CLEAN GARBAGE ===== */
     .replace(/\$\d+,\s*/g, "")
     .replace(/CGI & Performance Pilot/gi, "our performance system")
-    .replace(/I want to give you a precise answer — could you clarify[^.]*\./gi, "")
+
+    /* ===== REMOVE REPETITION ===== */
     .replace(/(.+?)\1{1,}/gi, "$1")
+
+    /* ===== NORMALIZE ===== */
     .replace(/\s+/g, " ")
     .trim();
-}
 
+  return text;
+}
 /* ================= QUERY EXPANSION ================= */
 
 async function expandQueryNeural(userMessage: string, history: string[] = []) {
@@ -354,7 +389,7 @@ if (brain.type === "greeting") {
     "Good to have you here. What are you trying to grow?",
     "Let’s dive in — what’s your current focus?",
   ];
-  return greetings[Math.floor(Math.random() * greetings.length)];
+return greetings[Math.floor(Math.random() * greetings.length)] + " Tell me what you're trying to achieve.";
 }    
     /* ---------- HISTORY ---------- */
     const historyMessages: any[] =
@@ -463,12 +498,11 @@ for (const c of candidates) {
   }
 }
 
-// Final fallback (only if both fail)
-if (!response) {
-response = smartFallback(message);
+// Final fallback (only if both fail OR response is weak)
+if (!response || isLowQuality(response)) {
+  response = smartFallback(message);
   modelUsed = "fallback";
 }
-
 /* ---------- CLEANUP ---------- */
 
 response = fixBrokenOutput(response);
@@ -512,6 +546,14 @@ await memoryService.saveMessage(sessionId, "assistant", response);
 console.log(
   `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(",")} | Chunks=${vectorCount} | Service=${detectedService ?? "none"} | LeadScore=${brainContext.leadScore}`
 );
+
+
+// FINAL POLISH FIX (CRITICAL)
+response = response
+  .replace(/\s([.,!?])/g, "$1")
+  .replace(/([a-z])([A-Z])/g, "$1 $2")
+  .replace(/\s+/g, " ")
+  .trim();
 
 /* ---------- RETURN ---------- */
 
