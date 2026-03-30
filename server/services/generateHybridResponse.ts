@@ -27,16 +27,17 @@ function detectBookingRejection(message: string): boolean {
 }
 
 function smartFallback(message: string): string {
-  return `Let me tighten that up for you.
+  const msg = message.toLowerCase();
 
-From what you're asking ("${message.slice(0, 60)}..."), it looks like you're trying to move toward a clearer growth direction.
+  if (msg.includes("traffic") && msg.includes("sales")) {
+    return "If you're getting traffic but no sales, the issue is usually conversion — not visibility. This often comes down to weak messaging, poor offer positioning, or friction in the funnel. The fix isn't more traffic, it's improving how that traffic converts. Want me to break this down for your setup?";
+  }
 
-Are you focused more on:
-- getting more leads
-- improving conversions
-- scaling revenue
+  if (msg.includes("roas") || msg.includes("ads")) {
+    return "If ROAS is dropping while scaling, it's usually due to audience fatigue, creative saturation, or inefficient budget allocation. Scaling isn't just about spending more — it's about maintaining efficiency while expanding reach. I can map out a fix if you want.";
+  }
 
-Tell me, and I’ll map this properly for you.`;
+  return "Got it — let’s break this down properly. What’s your main goal right now: more leads, better conversions, or scaling revenue?";
 }
 
 function fixBrokenOutput(text: string): string {
@@ -137,13 +138,13 @@ function looksIncomplete(text: string): boolean {
 
   const trimmed = text.trim();
 
-  // Too short → likely weak / incomplete
-  if (trimmed.length < 80) return true;
+  // Accept shorter responses; only reject clearly too short
+  if (trimmed.length < 40) return true;
 
-  // No proper sentence ending → often cut / broken
-  if (!/[.!?]$/.test(trimmed)) return true;
+  // Relax sentence ending check
+  if (/[^\w\s.!?]$/.test(trimmed)) return true;
 
-  // Contains fallback / failure phrases
+  // Reject fallback / error phrases
   if (
     trimmed.includes("I'm having trouble") ||
     trimmed.toLowerCase().includes("couldn't generate") ||
@@ -156,7 +157,8 @@ function looksIncomplete(text: string): boolean {
   if (!/[a-zA-Z]/.test(trimmed)) return true;
 
   // Too repetitive (model glitch)
-if (/(.+?)\\1{2,}/i.test(trimmed)) return true;
+  if (/(.+?)\\1{2,}/i.test(trimmed)) return true;
+
   return false;
 }
 
@@ -213,6 +215,13 @@ function spellCorrectionLayer(text: string): string {
     loking: "looking",
     ganing: "gaining",
     funel: "funnel",
+    geting: "getting",
+    Gogle: "Google",
+    boking: "booking",
+    Il: "I'll",
+    Tel: "Tell",
+    ned: "need",
+    ecomerce: "ecommerce",
   };
 
   let corrected = text;
@@ -254,6 +263,9 @@ function compressResponse(text: string): string {
 
 function enforceResponseRules(text: string): string {
   if (!text) return text;
+
+// Remove repeated phrases like fallback triggers
+  text = text.replace(/Let me tighten that up/gi, "");
 
   return text
     .replace(/\$\d+,\s*/g, "")
@@ -336,10 +348,14 @@ export async function generateHybridResponse({
       await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
       return bookingResp.response;
     }
-    if (brain.type === "greeting") {
-  return `Hey - glad you're here. What are you working on right now?`;
-}
-    
+if (brain.type === "greeting") {
+  const greetings = [
+    "Hey — what are you working on right now?",
+    "Good to have you here. What are you trying to grow?",
+    "Let’s dive in — what’s your current focus?",
+  ];
+  return greetings[Math.floor(Math.random() * greetings.length)];
+}    
     /* ---------- HISTORY ---------- */
     const historyMessages: any[] =
   Array.isArray(history) && history.length > 0
@@ -461,15 +477,16 @@ response = cleanHybridResponse(response);
 response = spellCorrectionLayer(response);
 response = grammarPolishLayer(response);
 
-if (isLowQuality(response)) {
+if (isLowQuality(response) && modelUsed !== "Gemini") {
   console.log("⚠️ Low quality detected — retrying with Gemini");
 
   const retry = await generateGemini(prompt);
   if (retry) {
-  response = fixBrokenOutput(retry);
-response = cleanHybridResponse(response);
-response = spellCorrectionLayer(response);
-response = grammarPolishLayer(response);
+    response = fixBrokenOutput(retry);
+    response = cleanHybridResponse(response);
+    response = spellCorrectionLayer(response);
+    response = grammarPolishLayer(response);
+    modelUsed = "Gemini";
   }
 }
 
@@ -481,9 +498,9 @@ response = enforceBotName(response);
 
 if (
   shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage) &&
-  !response.toLowerCase().includes("map this")
+  !response.toLowerCase().includes("execution plan")
 ) {
-response += "\n\nIf you'd like, I can map this into a clear execution plan tailored to your business.";
+  response += "\n\nIf you'd like, I can map this into a clear execution plan tailored to your business.";
 }
 
 /* ---------- SAVE MEMORY ---------- */
