@@ -27,16 +27,16 @@ function detectBookingRejection(message: string): boolean {
 }
 
 function smartFallback(message: string): string {
-  return `I couldn't fully generate a strong answer for that, but here's a quick direction:
+  return `Let me tighten that up for you.
 
-Based on your input ("${message.slice(0, 60)}..."), you're likely looking for a strategic solution.
+From what you're asking ("${message.slice(0, 60)}..."), it looks like you're trying to move toward a clearer growth direction.
 
-Let me refine this — are you focused more on:
-• Getting more leads
-• Improving conversions
-• Scaling revenue
+Are you focused more on:
+- getting more leads
+- improving conversions
+- scaling revenue
 
-Tell me, and I’ll give you a precise breakdown.`;
+Tell me, and I’ll map this properly for you.`;
 }
 
 function fixBrokenOutput(text: string): string {
@@ -134,12 +134,29 @@ function compressContext(chunks: any[], maxLength: number = 300): string {
 
 function looksIncomplete(text: string): boolean {
   if (!text) return true;
+
   const trimmed = text.trim();
 
-  if (trimmed.length < 50) return true;
-  if (!/[.!?]$/.test(trimmed)) return true;
-  if (trimmed.includes("I'm having trouble")) return true;
+  // Too short → likely weak / incomplete
+  if (trimmed.length < 80) return true;
 
+  // No proper sentence ending → often cut / broken
+  if (!/[.!?]$/.test(trimmed)) return true;
+
+  // Contains fallback / failure phrases
+  if (
+    trimmed.includes("I'm having trouble") ||
+    trimmed.toLowerCase().includes("couldn't generate") ||
+    trimmed.toLowerCase().includes("something went wrong")
+  ) {
+    return true;
+  }
+
+  // No real language (garbage / symbols)
+  if (!/[a-zA-Z]/.test(trimmed)) return true;
+
+  // Too repetitive (model glitch)
+if (/(.+?)\\1{2,}/i.test(trimmed)) return true;
   return false;
 }
 
@@ -170,49 +187,62 @@ function removeContactInfo(text: string): string {
 function cleanHybridResponse(text: string): string {
   if (!text) return "";
 
+  // basic sanitization
   text = sanitizeTools(text);
   text = removeContactInfo(text);
 
-  // 🔥 REMOVE NON-ENGLISH / BROKEN TOKENS (Chinese etc.)
-  text = text.replace(/[^\x00-\x7F]+/g, " ");
+  // remove non-ascii (fix Chinese bug)
+  text = text.replace(/[^\x00-\x7F.,!?'"()\-\s]/g, "");
 
-  // 🔥 FIX COMMON MODEL SPELLING COLLAPSE
+  // normalize spacing
+  text = text.replace(/\s+/g, " ");
+
+  return text.trim();
+}
+
+function spellCorrectionLayer(text: string): string {
   const fixes: Record<string, string> = {
+    inteligent: "intelligent",
+    aproach: "approach",
+    chanels: "channels",
+    eficiency: "efficiency",
+    busines: "business",
+    diferent: "different",
     trafic: "traffic",
     mised: "missed",
-    vilas: "villas",
-    Gogle: "Google",
-    asistants: "assistants",
-    enginer: "engineer",
-    enginering: "engineering",
-    se: "see",
-    diferent: "different",
-    busines: "business",
-    acros: "across",
-    tols: "tools",
-    ned: "need",
     loking: "looking",
-    kep: "keep",
     ganing: "gaining",
-    ful: "full",
     funel: "funnel",
   };
 
-  for (const [wrong, correct] of Object.entries(fixes)) {
-    text = text.replace(new RegExp(`\\b${wrong}\\b`, "gi"), correct);
+  let corrected = text;
+
+  for (const [wrong, right] of Object.entries(fixes)) {
+    corrected = corrected.replace(new RegExp(`\\b${wrong}\\b`, "gi"), right);
   }
 
-  // formatting cleanup
-  text = text.replace(/\b(AI-){2,}/gi, "AI-");
-  text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
+  // fix "today s"
+  corrected = corrected.replace(/\b([a-z]+)\s([s])\b/gi, "$1's");
 
-  // remove non-latin characters (fix Chinese bug)
-text = text.replace(/[^\x00-\x7F]+/g, "");
+  return corrected;
+}
 
-// fix broken words spacing
-text = text.replace(/\b([a-z])\s+([a-z])\b/gi, "$1$2");
+function grammarPolishLayer(text: string): string {
+  let t = text;
 
-return text.replace(/\s+/g, " ").trim();
+  t = t.replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase());
+  t = t.replace(/\s+/g, " ");
+  t = t.replace(/([.!?]){2,}/g, "$1");
+
+  return t.trim();
+}
+
+function isLowQuality(text: string): boolean {
+  if (!text) return true;
+  if (text.length < 30) return true;
+  if (text.includes("I'm having trouble")) return true;
+  if (/^[^a-zA-Z0-9]+$/.test(text)) return true;
+  return false;
 }
 
 function compressResponse(text: string): string {
@@ -307,12 +337,18 @@ export async function generateHybridResponse({
       return bookingResp.response;
     }
     if (brain.type === "greeting") {
-  return `Hey — glad you're here. What are you working on right now?`;
+  return `Hey - glad you're here. What are you working on right now?`;
 }
     
     /* ---------- HISTORY ---------- */
-    const historyMessages = history.length > 0 ? history : await memoryService.getRecentContext(sessionId);
-    const historyText = historyMessages.slice(-5).map((h) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content}`).join("\n");
+    const historyMessages: any[] =
+  Array.isArray(history) && history.length > 0
+    ? history
+    : await memoryService.getRecentContext(sessionId) || [];
+    const historyText = historyMessages
+  .slice(-5)
+  .map((h: any) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`)
+  .join("\n");
 
     /* ---------- INTENT & SERVICE ---------- */
     let intentMatches: { intent: Intent; score?: number }[] = [];
@@ -320,7 +356,7 @@ export async function generateHybridResponse({
     const detectedIntentNames = intentMatches.length > 0 ? intentMatches.slice(0, 3).map((i) => i.intent.name) : ["general"];
     const intentCategories = intentMatches.map((i) => i.intent.category);
 
-    let detectedService: string | null = null;
+let detectedService: string | null = null;
     try { detectedService = detectService(message); } catch {}
 
     /* ---------- VECTOR KNOWLEDGE ---------- */
@@ -391,7 +427,7 @@ const [qwenResp, geminiResp] = await Promise.all([
   geminiPromise,
 ]);
 
-// 🎯 Priority: Qwen → Gemini (controlled + stable)
+// Priority: Qwen -> Gemini (controlled + stable)
 const candidates = [
   { resp: qwenResp, name: "Qwen" },
   { resp: geminiResp, name: "Gemini", mark: markGeminiUsed },
@@ -411,7 +447,7 @@ for (const c of candidates) {
   }
 }
 
-// 🛟 Final fallback (only if both fail)
+// Final fallback (only if both fail)
 if (!response) {
 response = smartFallback(message);
   modelUsed = "fallback";
@@ -420,9 +456,26 @@ response = smartFallback(message);
 /* ---------- CLEANUP ---------- */
 
 response = fixBrokenOutput(response);
+
+response = cleanHybridResponse(response);
+response = spellCorrectionLayer(response);
+response = grammarPolishLayer(response);
+
+if (isLowQuality(response)) {
+  console.log("⚠️ Low quality detected — retrying with Gemini");
+
+  const retry = await generateGemini(prompt);
+  if (retry) {
+  response = fixBrokenOutput(retry);
+response = cleanHybridResponse(response);
+response = spellCorrectionLayer(response);
+response = grammarPolishLayer(response);
+  }
+}
+
 response = enforceResponseRules(response);
 response = compressResponse(response);
-response = cleanHybridResponse(enforceBotName(response));
+response = enforceBotName(response);
 
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
@@ -430,7 +483,7 @@ if (
   shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage) &&
   !response.toLowerCase().includes("map this")
 ) {
-  response += "\n\n👉 If you'd like, I can map this into a clear execution plan tailored to your business.";
+response += "\n\nIf you'd like, I can map this into a clear execution plan tailored to your business.";
 }
 
 /* ---------- SAVE MEMORY ---------- */
