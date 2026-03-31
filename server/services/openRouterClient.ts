@@ -130,16 +130,19 @@ export async function generateOpenRouter(
 
   prompt = cleanPrompt(prompt);
 
-  if (recentCache.has(prompt)) {
-    return recentCache.get(prompt)!;
-  }
+const cacheKey = `${sessionId || "global"}:${prompt}`;
 
+if (recentCache.has(cacheKey)) {
+  return recentCache.get(cacheKey)!;
+}
   // Add strategicBrain context if available
   let contextText = "";
   if (sessionId) {
     try {
-      const { brainContext, chunks } = await strategicBrain(prompt, sessionId);
-
+const { brainContext, chunks } = await strategicBrain(
+  prompt.slice(0, 500), // prevent prompt pollution
+  sessionId
+);
       // Extract pricing info only (ignore contact chunks entirely)
       const pricingChunk = chunks.find(c => c.intent.toLowerCase().includes("pricing"));
       const pricingInfo = pricingChunk ? pricingChunk.text : "Pricing info not available.";
@@ -213,8 +216,12 @@ export async function generateOpenRouter(
     }
   }
 
-  console.error("❌ All OpenRouter attempts failed:", lastError);
-  const fallback = "I'm currently having trouble generating a response, but I can provide guidance manually based on your needs.";
-  recentCache.set(prompt, fallback);
-  return fallback;
+console.error("❌ All OpenRouter attempts failed:", lastError);
+
+const fallback =
+  "I'm currently having trouble generating a response right now, but I can still guide you. Tell me a bit more about your goal and I’ll help you move forward.";
+
+recentCache.set(cacheKey, fallback);
+
+return fallback;
 }

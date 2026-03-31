@@ -28,7 +28,10 @@ function escapeRegex(text: string): string {
 }
 
 function containsPhrase(text: string, phrase: string): boolean {
-  return text.includes(normalize(phrase));
+  const normalizedText = normalize(text);
+  const normalizedPhrase = normalize(phrase);
+
+  return new RegExp(`\\b${escapeRegex(normalizedPhrase)}\\b`, "i").test(normalizedText);
 }
 
 /* ======================= STRONG BUYING SIGNALS ======================= */

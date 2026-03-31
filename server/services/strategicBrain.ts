@@ -57,25 +57,30 @@ function detectBusinessSignals(text: string) {
   return Math.min(signals, 4);
 }
 
-/* ================= STAGE DETECTION ================= */
+/* ================= STAGE DETECTION (FIXED) ================= */
 function detectStage(message: string): BrainContext["stage"] {
-  const text = message;
+  const text = message.toLowerCase();
+
   if (isGreeting(text)) return "greeting";
-  if (["book","schedule","call","hire","consultation"].some(w => text.includes(w))) return "conversion";
-  if (["price","cost","package","service"].some(w => text.includes(w))) return "service";
-  if (["how","strategy","grow","scale","improve"].some(w => text.includes(w))) return "strategy";
+
+  if (/(book|schedule|call|hire|consultation)/.test(text)) return "conversion";
+
+  if (/(price|cost|package|service|how much)/.test(text)) return "service";
+
+  if (/(strategy|plan|approach|how do i|how to)/.test(text)) return "strategy";
+
   return "discovery";
 }
 
-/* ================= LEAD SCORING ================= */
+/* ================= LEAD SCORING (FIXED) ================= */
 function scoreLead(message: string) {
   const text = message;
   let score = detectBusinessSignals(text);
 
-  if (text.includes("seo")) score += 2;
-  if (text.includes("ads")) score += 2;
-  if (text.includes("automation")) score += 2;
-  if (text.includes("ai")) score += 1;
+  if (/\bseo\b/.test(text)) score += 2;
+  if (/\bads\b/.test(text)) score += 2;
+  if (/\bautomation\b/.test(text)) score += 2;
+  if (/\bai\b/.test(text)) score += 1;
 
   if (text.includes("hire") || text.includes("agency")) score += 3;
   if (text.includes("price") || text.includes("cost") || text.includes("budget")) score += 3;
@@ -103,7 +108,7 @@ function shouldTriggerBooking(stage: BrainContext["stage"], leadScore: number) {
   return false;
 }
 
-/* ================= FALLBACK REASONING (DYNAMIC) ================= */
+/* ================= FALLBACK REASONING ================= */
 function generateReasoning(
   message: string,
   detectedServices: { value: string; confidence: number }[]
@@ -121,7 +126,7 @@ function generateReasoning(
   return "General marketing inquiry";
 }
 
-/* ================= DYNAMIC SERVICE RECOMMENDER ================= */
+/* ================= SERVICE RECOMMENDER ================= */
 function pickRecommendedService(detectedServices: { value: string; confidence: number }[]) {
   if (!detectedServices || detectedServices.length === 0) return "general";
   return [...detectedServices].sort((a, b) => b.confidence - a.confidence)[0].value;
@@ -131,15 +136,12 @@ function pickRecommendedService(detectedServices: { value: string; confidence: n
 export async function strategicBrain(userMessage: string, sessionId?: string) {
   const normalizedMessage = normalizeText(userMessage);
 
-  // Intent detection
   const intents = getRelevantIntents(normalizedMessage, 1);
   const primaryIntent = intents.length > 0 ? intents[0].intent.name : "general";
 
-  // Stage detection & lead scoring
   const stage = detectStage(normalizedMessage);
   let leadScore = scoreLead(normalizedMessage);
 
-  // Memory integration
   let strategicMemory: any = {};
   if (sessionId) {
     try {
@@ -152,27 +154,24 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   }
   leadScore = Math.min(leadScore, 10);
 
-  // Lead qualifier update
   if (sessionId) {
     try {
       leadQualifier.scoreLead(sessionId, { need: leadScore / 10 });
     } catch {}
   }
 
-  // Deal probability
   const dealProbability = estimateDealProbability(stage, leadScore);
 
-  // Service detection (dynamic)
-  const detectedServices = detectIntents(normalizedMessage)
+  /* ===== SAFE SERVICE DETECTION (FIXED) ===== */
+  const detectedServicesRaw = detectIntents(normalizedMessage) || [];
+
+  const detectedServices = detectedServicesRaw
     .filter(i => i.type === "service")
     .map(i => ({ value: i.value, confidence: i.confidence }));
 
   const recommendedService = pickRecommendedService(detectedServices);
-
-  // Booking trigger
   const triggerBooking = shouldTriggerBooking(stage, leadScore);
 
-  // Reasoning (UPDATED HERE)
   let reasoning = generateReasoning(normalizedMessage, detectedServices);
 
   if (sessionId) {
@@ -182,16 +181,15 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     } catch {}
   }
 
-  // Fetch fused chunks
   const chunks = await getFusedChunks(normalizedMessage, 5);
 
-  // STRICT CONTACT SANITIZATION (FIXED)
-  const sanitizedChunks = chunks.filter(
-    c =>
+  /* ===== SAFE SANITIZATION (FIXED) ===== */
+  const sanitizedChunks = (chunks || []).filter(
+    (c: any) =>
+      c?.text &&
       !/(contact|email|phone|call me|reach me|@|www\.|http)/i.test(c.text)
   );
 
-  // Recent context
   let recentContext: any[] = [];
   if (sessionId) {
     try {

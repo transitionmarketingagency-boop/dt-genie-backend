@@ -214,56 +214,49 @@ function cleanHybridResponse(text: string): string {
   return text.trim();
 }
 
-function spellCorrectionLayer(text: string): string {
-const fixes: Record<string, string> = {
-  inteligent: "intelligent",
-  aproach: "approach",
-  chanels: "channels",
-  eficiency: "efficiency",
-  busines: "business",
-  diferent: "different",
-  trafic: "traffic",
-  mised: "missed",
-  loking: "looking",
-  ganing: "gaining",
-  funel: "funnel",
-  geting: "getting",
-  Gogle: "Google",
-  boking: "booking",
-  Il: "I'll",
-  Tel: "Tell",
-  ned: "need",
-  ecomerce: "ecommerce",
-  ful: "full",
-  god: "good",
-  hapy: "happy",
-  seing: "seeing",
-  pul: "pull",
-  asistants: "assistants",
-  mesaging: "messaging",
-  cal: "call",
-  bok: "book",
-  wories: "worries"
-};
+function spellAndGrammarFix(text: string): string {
+  if (!text) return "";
 
-  let corrected = text;
+  const fixes: Record<string, string> = {
+    comon: "common",
+    excelent: "excellent",
+    trafic: "traffic",
+    busines: "business",
+    busineses: "businesses",
+    ned: "need",
+    eforts: "efforts",
+    funel: "funnel",
+    loking: "looking",
+    geting: "getting",
+    mising: "missing",
+    wories: "worries",
+    mesage: "message",
+    ofer: "offer",
+    diferent: "different",
+    chanels: "channels",
+    acros: "across",
+    efective: "effective",
+    eficient: "efficient",
+    boking: "booking",
+    tel: "tell",
+    realy: "really"
+  };
 
-  for (const [wrong, right] of Object.entries(fixes)) {
-    corrected = corrected.replace(new RegExp(`\\b${wrong}\\b`, "gi"), right);
-  }
-
-  // fix "today s"
-  corrected = corrected.replace(/\b([a-z]+)\s([s])\b/gi, "$1's");
-
-  return corrected;
-}
-
-function grammarPolishLayer(text: string): string {
   let t = text;
 
-  t = t.replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase());
+  for (const [wrong, correct] of Object.entries(fixes)) {
+    t = t.replace(new RegExp(`\\b${wrong}\\b`, "gi"), correct);
+  }
+
+  // Fix broken words stuck together
+  t = t.replace(/([a-z])([A-Z])/g, "$1 $2");
+
+  // Fix missing spaces
+  t = t.replace(/([a-z])([.,!?])/g, "$1$2 ");
+
+  // Normalize sentences
   t = t.replace(/\s+/g, " ");
-  t = t.replace(/([.!?]){2,}/g, "$1");
+  t = t.replace(/([.!?])\s*([a-z])/g, (_, p1, p2) => `${p1} ${p2.toUpperCase()}`);
 
   return t.trim();
 }
@@ -278,14 +271,37 @@ if (text.split(" ").length < 8) return true;
 }
 
 function compressResponse(text: string): string {
-  if (text.length < 1100) return text;
-  const sentences = text.split(/[.!?]/).filter(Boolean);
-  return sentences.slice(0, 6).join(". ") + ".";
+  if (text.length < 1200) return text;
+
+  const sentences = text.match(/[^.!?]+[.!?]+/g);
+  if (!sentences) return text;
+
+  return sentences.slice(0, 6).join(" ").trim();
 }
 
+/* ✅ ADD IT HERE ↓↓↓ */
+
+function enforceStructure(text: string): string {
+  if (!text) return text;
+
+  // If already structured, skip
+  if (text.includes("\n- ")) return text;
+
+  const parts = text.split(". ").filter(Boolean);
+
+  if (parts.length < 3) return text;
+
+  return [
+    parts[0] + ".",
+    "\nKey Points:",
+    ...parts.slice(1, 4).map(p => `- ${p.trim()}.`)
+  ].join("\n");
+}
+
+/* continue existing functions */
 
 function enforceResponseRules(text: string): string {
-  if (!text) return text;
+  if (!text) return "";
 
   text = text
     /* ===== REMOVE FALLBACK PHRASES ===== */
@@ -311,6 +327,7 @@ function enforceResponseRules(text: string): string {
 
   return text;
 }
+
 /* ================= QUERY EXPANSION ================= */
 
 async function expandQueryNeural(userMessage: string, history: string[] = []) {
@@ -385,12 +402,13 @@ export async function generateHybridResponse({
     }
 if (brain.type === "greeting") {
   const greetings = [
-    "Hey — what are you working on right now?",
-    "Good to have you here. What are you trying to grow?",
-    "Let’s dive in — what’s your current focus?",
+    "What are you currently trying to grow or improve?",
+    "Tell me — what’s your main focus right now?",
+    "What kind of results are you aiming for?",
   ];
-return greetings[Math.floor(Math.random() * greetings.length)] + " Tell me what you're trying to achieve.";
-}    
+  return greetings[Math.floor(Math.random() * greetings.length)];
+}
+
     /* ---------- HISTORY ---------- */
     const historyMessages: any[] =
   Array.isArray(history) && history.length > 0
@@ -499,42 +517,48 @@ for (const c of candidates) {
 }
 
 // Final fallback (only if both fail OR response is weak)
-if (!response || isLowQuality(response)) {
+if (!response) {
   response = smartFallback(message);
   modelUsed = "fallback";
 }
-/* ---------- CLEANUP ---------- */
 
+/* ---------- CLEANUP (FIXED PIPELINE) ---------- */
+
+// Initial cleanup
 response = fixBrokenOutput(response);
-
 response = cleanHybridResponse(response);
-response = spellCorrectionLayer(response);
-response = grammarPolishLayer(response);
 
-if (isLowQuality(response) && modelUsed !== "Gemini") {
+// Strong grammar + spelling correction (REPLACED old layers)
+response = spellAndGrammarFix(response);
+
+// Retry ONLY if Qwen failed badly (not for all cases)
+if (isLowQuality(response) && modelUsed === "Qwen") {
   console.log("⚠️ Low quality detected — retrying with Gemini");
 
   const retry = await generateGemini(prompt);
+
   if (retry) {
     response = fixBrokenOutput(retry);
     response = cleanHybridResponse(response);
-    response = spellCorrectionLayer(response);
-    response = grammarPolishLayer(response);
+    response = spellAndGrammarFix(response);
     modelUsed = "Gemini";
   }
 }
 
+// Final enforcement layers (ORDER IS CRITICAL)
 response = enforceResponseRules(response);
+response = enforceStructure(response);
 response = compressResponse(response);
+response = finalQualityCheck(response);
 response = enforceBotName(response);
 
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
 if (
-  shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage) &&
-  !response.toLowerCase().includes("execution plan")
+  shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage)
 ) {
-  response += "\n\nIf you'd like, I can map this into a clear execution plan tailored to your business.";
+  response = response.replace(/\.*$/, "");
+  response += ".\n\nIf you'd like, I can map this into a clear execution plan tailored to your business.";
 }
 
 /* ---------- SAVE MEMORY ---------- */
@@ -554,6 +578,25 @@ response = response
   .replace(/([a-z])([A-Z])/g, "$1 $2")
   .replace(/\s+/g, " ")
   .trim();
+
+
+function finalQualityCheck(text: string): string {
+  if (!text) return "";
+
+  // Ensure proper ending
+  if (!/[.!?]$/.test(text)) {
+    text += ".";
+  }
+
+  // Remove broken endings
+  text = text.replace(/([a-z])$/, "$1.");
+
+  // Prevent cut sentences
+  text = text.replace(/\b(and|or|but|with|to|for)\.$/gi, "");
+
+  return text.trim();
+}
+
 
 /* ---------- RETURN ---------- */
 

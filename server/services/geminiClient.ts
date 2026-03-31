@@ -15,12 +15,12 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 /* ---------------- Gemini config ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
-const TIMEOUT = 25000; // increased to handle longer prompts
+const TIMEOUT = 25000;
 const MAX_RETRIES = 2;
 
 /* ---------------- Import identity helpers ---------------- */
 const identityUrl = pathToFileURL(join(__dirname, "../system/identity.js")).href;
-const { enforceBotName, BOT_NAME } = await import(identityUrl);
+const { BOT_NAME } = await import(identityUrl);
 
 /* ---------------- Response validator ---------------- */
 function isValidResponse(text: string) {
@@ -47,7 +47,7 @@ function cleanPrompt(prompt: string) {
     .replace(/\s+/g, " ")
     .replace(/\x00/g, "")
     .trim()
-    .slice(0, 4800); // slightly shorter to handle overhead
+    .slice(0, 4800);
 }
 
 /* ---------------- High-intent detection ---------------- */
@@ -84,14 +84,19 @@ function cleanResponse(text: string) {
     .replace(/\s+/g, " ")
     .trim();
 
-  // Remove any accidental contact info
+  // Remove accidental contact info
   cleaned = cleaned.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
+
   return cleaned;
 }
 
 /* ---------------- Main Gemini generation ---------------- */
-export async function generateGemini(prompt: string, sessionId?: string): Promise<string> {
+export async function generateGemini(
+  prompt: string,
+  sessionId?: string
+): Promise<string> {
   const API_KEY = process.env.GEMINI_API_KEY;
+
   if (!API_KEY) {
     console.error("❌ GEMINI_API_KEY missing");
     return "Apologies, I cannot access AI systems currently, but I can still provide guidance.";
@@ -99,15 +104,24 @@ export async function generateGemini(prompt: string, sessionId?: string): Promis
 
   prompt = cleanPrompt(prompt);
 
-  // Integrate strategicBrain context if sessionId provided
+  /* ================= STRATEGIC BRAIN (FIXED) ================= */
   let contextText = "";
+
   if (sessionId) {
     try {
-      const { brainContext, chunks } = await strategicBrain(prompt, sessionId);
+      const { brainContext, chunks } = await strategicBrain(
+        prompt.slice(0, 500), // ✅ FIX: prevent token overload
+        sessionId
+      );
 
-      // Include pricing info only, ignore contact info entirely
-      const pricingChunk = chunks.find(c => c.intent.toLowerCase().includes("pricing"));
-      const pricingInfo = pricingChunk ? pricingChunk.text : "Pricing info not available.";
+      // ✅ SAFE chunk access (prevents crash)
+      const pricingChunk = chunks?.find(
+        (c: any) => c.intent?.toLowerCase().includes("pricing")
+      );
+
+      const pricingInfo = pricingChunk
+        ? pricingChunk.text
+        : "Pricing info not available.";
 
       contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. Pricing info: ${pricingInfo}. `;
     } catch (err) {
@@ -124,7 +138,7 @@ Your role is to assist businesses using the 14 core services offered by Digital 
 
 Guidelines:
 - Only promote the company's services.
-- Never recommend external platforms or third-party tools (Kling, Midjourney, Runway, Pika, OpenAI, etc.).
+- Never recommend external platforms or third-party tools.
 - Explain external tools briefly if mentioned, then guide to company solutions.
 - Respond in clear, professional natural language without markdown, headings, emojis, or code symbols.
 - Provide actionable, context-aware guidance aligned with user intent.
@@ -143,6 +157,7 @@ Provide a concise, relevant, professional response.
 
   while (attempt <= MAX_RETRIES) {
     attempt++;
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), TIMEOUT);
 
@@ -171,7 +186,9 @@ Provide a concise, relevant, professional response.
       }
 
       const data: any = await res.json();
-      let content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+      let content =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
 
       content = cleanResponse(content);
 
@@ -179,12 +196,18 @@ Provide a concise, relevant, professional response.
       if (!isValidResponse(content)) throw new Error("Gemini invalid response");
 
       console.log("✅ Gemini success");
-      return enforceBotName(content);
+
+      // ✅ FIX: DO NOT enforceBotName here (handled later in hybrid layer)
+      return content;
 
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
-      console.warn(`⚠️ Gemini attempt ${attempt} failed:`, err?.message ?? err);
+
+      console.warn(
+        `⚠️ Gemini attempt ${attempt} failed:`,
+        err?.message ?? err
+      );
 
       if (attempt <= MAX_RETRIES) {
         const delay = 1500 * attempt;
@@ -195,6 +218,7 @@ Provide a concise, relevant, professional response.
   }
 
   console.error("❌ Gemini failed completely:", lastError);
+
   return "I'm having trouble generating a response right now, but I can still provide guidance.";
 }
 
