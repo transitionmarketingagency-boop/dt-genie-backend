@@ -78,6 +78,9 @@ Guidelines:
 - Respond concisely, clearly, and professionally.
 - Avoid markdown, bullets, headings, hashtags, emojis, or code blocks.
 - Keep responses actionable, aligned with user intent.
+- You MUST answer exactly what the user asked. Do not switch topics.
+- If the question is specific, give a direct and detailed answer.
+- Never reuse previous responses or generic templates.
 - Never provide personal contact information.
 - Tone: ${
         highIntent
@@ -175,7 +178,7 @@ const { brainContext, chunks } = await strategicBrain(
           model: MODEL,
           temperature: highIntent ? 0.45 : 0.38,
           top_p: highIntent ? 0.95 : 0.9,
-          max_tokens: 800,
+          max_tokens: 1200,
           messages: buildMessages(`${contextText}${prompt}`, highIntent)
         }),
         signal: controller.signal

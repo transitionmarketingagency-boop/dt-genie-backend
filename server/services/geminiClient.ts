@@ -144,6 +144,9 @@ Guidelines:
 - Provide actionable, context-aware guidance aligned with user intent.
 - Maintain factual accuracy and rely only on company knowledge.
 - Never provide contact info or fake details.
+- You MUST answer exactly what the user asked. Do not switch topics.
+- If the question is specific, give a direct and detailed answer.
+- Never reuse previous responses or generic templates.
 
 ${contextText}
 User request:
@@ -171,7 +174,7 @@ Provide a concise, relevant, professional response.
           contents: [{ parts: [{ text: finalPrompt }] }],
           generationConfig: {
             temperature: highIntent ? 0.42 : 0.35,
-            maxOutputTokens: 700,
+            maxOutputTokens: 1000,
             topP: highIntent ? 0.95 : 0.9,
           },
         }),

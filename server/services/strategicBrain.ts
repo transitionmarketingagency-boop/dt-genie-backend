@@ -19,6 +19,7 @@ export type BrainContext = {
   recentContext?: { role: string; content: string }[];
   strategicMemory?: any;
   detectedServices?: string[];
+  dynamicGreeting?: string;
 };
 
 /* ================= TEXT NORMALIZER ================= */
@@ -44,6 +45,32 @@ function isGreeting(text: string) {
   return greetings.some((g) => lower === g || lower.startsWith(g + " "));
 }
 
+/* ================= DYNAMIC SMART GREETING ================= */
+function generateDynamicGreeting(sessionMemory?: any) {
+  const now = new Date();
+  const hour = now.getHours();
+  let baseGreeting = "Hello";
+
+  if (hour >= 5 && hour < 12) baseGreeting = "Good morning";
+  else if (hour >= 12 && hour < 17) baseGreeting = "Good afternoon";
+  else if (hour >= 17 && hour < 22) baseGreeting = "Good evening";
+  else baseGreeting = "Hi";
+
+  const variations = [
+    `${baseGreeting}! How’s your day going?`,
+    `${baseGreeting}! Ready to grow your business today?`,
+    `${baseGreeting}! What marketing goals are we tackling?`,
+    `${baseGreeting}! Let’s talk strategy for your brand.`,
+  ];
+
+  const index = sessionMemory?.greetingIndex
+    ? (sessionMemory.greetingIndex + 1) % variations.length
+    : 0;
+  if (sessionMemory) sessionMemory.greetingIndex = index;
+
+  return variations[index];
+}
+
 /* ================= BUSINESS SIGNAL DETECTOR ================= */
 function detectBusinessSignals(text: string) {
   let signals = 0;
@@ -57,22 +84,17 @@ function detectBusinessSignals(text: string) {
   return Math.min(signals, 4);
 }
 
-/* ================= STAGE DETECTION (FIXED) ================= */
+/* ================= STAGE DETECTION ================= */
 function detectStage(message: string): BrainContext["stage"] {
   const text = message.toLowerCase();
-
-  if (isGreeting(text)) return "greeting";
-
+  if (isGreeting(text) && text.split(" ").length <= 3) return "greeting";
   if (/(book|schedule|call|hire|consultation)/.test(text)) return "conversion";
-
   if (/(price|cost|package|service|how much)/.test(text)) return "service";
-
   if (/(strategy|plan|approach|how do i|how to)/.test(text)) return "strategy";
-
   return "discovery";
 }
 
-/* ================= LEAD SCORING (FIXED) ================= */
+/* ================= LEAD SCORING ================= */
 function scoreLead(message: string) {
   const text = message;
   let score = detectBusinessSignals(text);
@@ -113,31 +135,42 @@ function generateReasoning(
   message: string,
   detectedServices: { value: string; confidence: number }[]
 ) {
-  if (detectedServices && detectedServices.length > 0) {
-    const topService = [...detectedServices].sort((a, b) => b.confidence - a.confidence)[0].value;
-    return `User is interested in ${topService}`;
-  }
+  try {
+    if (detectedServices?.length) {
+      const topService = [...detectedServices].sort((a, b) => b.confidence - a.confidence)[0].value;
+      return `User is interested in ${topService}`;
+    }
 
-  const text = message;
-  if (text.includes("grow")) return "User wants business growth strategy";
-  if (text.includes("ads")) return "User is interested in advertising solutions";
-  if (text.includes("seo")) return "User is exploring search optimization";
-  if (text.includes("automation")) return "User is exploring AI automation";
-  return "General marketing inquiry";
+    const text = message;
+    if (text.includes("grow")) return "User wants business growth strategy";
+    if (text.includes("ads")) return "User is interested in advertising solutions";
+    if (text.includes("seo")) return "User is exploring search optimization";
+    if (text.includes("automation")) return "User is exploring AI automation";
+    return "General marketing inquiry";
+  } catch {
+    return "General marketing inquiry"; 
+  }
 }
 
 /* ================= SERVICE RECOMMENDER ================= */
 function pickRecommendedService(detectedServices: { value: string; confidence: number }[]) {
-  if (!detectedServices || detectedServices.length === 0) return "general";
-  return [...detectedServices].sort((a, b) => b.confidence - a.confidence)[0].value;
+  try {
+    if (!detectedServices?.length) return "general";
+    return [...detectedServices].sort((a, b) => b.confidence - a.confidence)[0].value;
+  } catch {
+    return "general";
+  }
 }
 
 /* ================= MAIN STRATEGIC BRAIN ================= */
 export async function strategicBrain(userMessage: string, sessionId?: string) {
   const normalizedMessage = normalizeText(userMessage);
 
-  const intents = getRelevantIntents(normalizedMessage, 1);
-  const primaryIntent = intents.length > 0 ? intents[0].intent.name : "general";
+  let primaryIntent = "general";
+  try {
+    const intents = getRelevantIntents(normalizedMessage, 1);
+    if (intents.length > 0) primaryIntent = intents[0].intent.name;
+  } catch {}
 
   const stage = detectStage(normalizedMessage);
   let leadScore = scoreLead(normalizedMessage);
@@ -162,12 +195,16 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   const dealProbability = estimateDealProbability(stage, leadScore);
 
-  /* ===== SAFE SERVICE DETECTION (FIXED) ===== */
-  const detectedServicesRaw = detectIntents(normalizedMessage) || [];
-
-  const detectedServices = detectedServicesRaw
-    .filter(i => i.type === "service")
-    .map(i => ({ value: i.value, confidence: i.confidence }));
+  /* ===== SAFE SERVICE DETECTION ===== */
+  let detectedServices: { value: string; confidence: number }[] = [];
+  try {
+    const detectedServicesRaw = detectIntents(normalizedMessage) || [];
+    detectedServices = detectedServicesRaw
+      .filter(i => i.type === "service")
+      .map(i => ({ value: i.value, confidence: i.confidence }));
+  } catch {
+    detectedServices = [];
+  }
 
   const recommendedService = pickRecommendedService(detectedServices);
   const triggerBooking = shouldTriggerBooking(stage, leadScore);
@@ -181,14 +218,16 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     } catch {}
   }
 
-  const chunks = await getFusedChunks(normalizedMessage, 5);
-
-  /* ===== SAFE SANITIZATION (FIXED) ===== */
-  const sanitizedChunks = (chunks || []).filter(
-    (c: any) =>
-      c?.text &&
-      !/(contact|email|phone|call me|reach me|@|www\.|http)/i.test(c.text)
-  );
+  /* ===== SAFE CHUNK FUSION & SANITIZATION ===== */
+  let chunks: any[] = [];
+  try {
+    const fusedChunks = await getFusedChunks(normalizedMessage, 5);
+    chunks = (fusedChunks || []).filter(
+      (c: any) => c?.text && !/(contact|email|phone|call me|reach me|@|www\.|http)/i.test(c.text)
+    );
+  } catch {
+    chunks = [];
+  }
 
   let recentContext: any[] = [];
   if (sessionId) {
@@ -199,6 +238,8 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     }
   }
 
+  const dynamicGreeting = stage === "greeting" ? generateDynamicGreeting(strategicMemory) : undefined;
+
   const brainContext: BrainContext = {
     message: userMessage,
     intent: primaryIntent,
@@ -208,16 +249,21 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     recommendedService,
     triggerBooking,
     reasoning,
-    recentContext: recentContext.map((m: any) => ({
-      role: m.role,
-      content: m.content
-    })),
+    recentContext: recentContext.map((m: any) => ({ role: m.role, content: m.content })),
     strategicMemory,
-    detectedServices: detectedServices.map(d => d.value)
+    detectedServices: detectedServices.map(d => d.value),
+    dynamicGreeting
   };
+
+  /* ===== FINAL ENFORCEMENT LAYERS ===== */
+  brainContext.reasoning = brainContext.reasoning || "General marketing inquiry";
+  brainContext.recommendedService = brainContext.recommendedService || "general";
+  brainContext.detectedServices = brainContext.detectedServices?.length
+    ? brainContext.detectedServices
+    : ["general"];
 
   return {
     brainContext,
-    chunks: sanitizedChunks
+    chunks
   };
 }

@@ -43,14 +43,14 @@ function smartFallback(message: string, context: string = ""): string {
   }
 
   // Dynamic fallback instead of generic loop
-  return `Based on what you're asking, it looks like you're trying to improve your business performance but something isn't fully aligned yet.
+return `You're likely facing a strategy misalignment rather than a single-channel issue.
 
-The key is identifying whether the issue is:
-- Traffic quality
-- Conversion system
-- Or overall strategy
+The fastest way to fix this is to identify:
+- Where your funnel is breaking
+- Whether the issue is traffic quality or conversion
+- And how your messaging aligns with user intent
 
-If you want, I can break this down specifically for your situation.`;
+If you want, I can break this down specifically for your business and map a clear execution plan.`;
 }
 
 function fixBrokenOutput(text: string): string {
@@ -152,26 +152,29 @@ function looksIncomplete(text: string): boolean {
   const trimmed = text.trim();
 
   // Accept shorter responses; only reject clearly too short
-if (trimmed.length < 30) return true;
 
-// Only reject if clearly broken ending
-if (!/[.!?]$/.test(trimmed) && trimmed.length < 80) return true;
-  // Reject fallback / error phrases
-  if (
-    trimmed.includes("I'm having trouble") ||
-    trimmed.toLowerCase().includes("couldn't generate") ||
-    trimmed.toLowerCase().includes("something went wrong")
-  ) {
-    return true;
-  }
 
-  // No real language (garbage / symbols)
-  if (!/[a-zA-Z]/.test(trimmed)) return true;
+if (trimmed.length < 25) return true;
 
-  // Too repetitive (model glitch)
-  if (/(.+?)\\1{2,}/i.test(trimmed)) return true;
+// Allow incomplete punctuation if content is strong
+if (trimmed.length < 60 && !/[.!?]$/.test(trimmed)) return true;
 
-  return false;
+// Reject only clearly broken responses
+if (
+  trimmed.includes("I'm having trouble") ||
+  trimmed.toLowerCase().includes("couldn't generate") ||
+  trimmed.toLowerCase().includes("something went wrong")
+) {
+  return true;
+}
+
+// Reject garbage only
+if (!/[a-zA-Z]/.test(trimmed)) return true;
+
+// Detect extreme repetition only
+if (/(.{20,})\1{2,}/i.test(trimmed)) return true;
+
+return false;
 }
 
 function sanitizeTools(text: string): string {
@@ -218,8 +221,6 @@ function spellAndGrammarFix(text: string): string {
   if (!text) return "";
 
   const fixes: Record<string, string> = {
-    comon: "common",
-    excelent: "excellent",
     trafic: "traffic",
     busines: "business",
     busineses: "businesses",
@@ -228,18 +229,20 @@ function spellAndGrammarFix(text: string): string {
     funel: "funnel",
     loking: "looking",
     geting: "getting",
-    mising: "missing",
-    wories: "worries",
     mesage: "message",
     ofer: "offer",
     diferent: "different",
     chanels: "channels",
     acros: "across",
-    efective: "effective",
     eficient: "efficient",
     boking: "booking",
     tel: "tell",
-    realy: "really"
+    realy: "really",
+    tomorow: "tomorrow",
+    sesion: "session",
+    cal: "call",
+    wil: "will",
+    overal: "overall"
   };
 
   let t = text;
@@ -248,15 +251,17 @@ function spellAndGrammarFix(text: string): string {
     t = t.replace(new RegExp(`\\b${wrong}\\b`, "gi"), correct);
   }
 
-  // Fix broken words stuck together
-  t = t.replace(/([a-z])([A-Z])/g, "$1 $2");
+  // Fix broken numeric phrases
+  t = t.replace(/(\d*)-minute/g, "30-minute");
 
   // Fix missing spaces
-  t = t.replace(/([a-z])([.,!?])/g, "$1$2 ");
+  t = t.replace(/([a-z])([A-Z])/g, "$1 $2");
 
-  // Normalize sentences
-  t = t.replace(/\s+/g, " ");
-  t = t.replace(/([.!?])\s*([a-z])/g, (_, p1, p2) => `${p1} ${p2.toUpperCase()}`);
+  // Fix punctuation spacing
+  t = t.replace(/\s([.,!?])/g, "$1");
+
+  // Capitalize sentences properly
+  t = t.replace(/(^\w|\.\s+\w)/g, (c) => c.toUpperCase());
 
   return t.trim();
 }
@@ -276,7 +281,14 @@ function compressResponse(text: string): string {
   const sentences = text.match(/[^.!?]+[.!?]+/g);
   if (!sentences) return text;
 
-  return sentences.slice(0, 6).join(" ").trim();
+const selected = sentences.slice(0, 6).join(" ").trim();
+
+// Ensure last sentence is complete
+if (!/[.!?]$/.test(selected)) {
+  return selected + ".";
+}
+
+return selected;
 }
 
 /* ✅ ADD IT HERE ↓↓↓ */
@@ -285,7 +297,10 @@ function enforceStructure(text: string): string {
   if (!text) return text;
 
   // If already structured, skip
-  if (text.includes("\n- ")) return text;
+// Only structure LONG strategic responses
+if (text.length < 180) return text;
+
+if (text.includes("\n- ")) return text;
 
   const parts = text.split(". ").filter(Boolean);
 
@@ -350,11 +365,32 @@ async function expandQueryNeural(userMessage: string, history: string[] = []) {
 
 function neuralBrain(message: string) {
   const msg = message.trim().toLowerCase();
+
+  // Greeting regex (only trigger for short, standalone greetings)
   const greetingRegex = /^(hi|hello|hey|good morning|good afternoon|good evening)$/i;
 
-  if (msg.includes("book") || msg.includes("schedule") || msg.includes("meeting")) return { type: "booking" };
-  if (greetingRegex.test(msg)) return { type: "greeting" };
-  if (msg.includes("who are you")) return { type: "identity" };
+  // Booking / scheduling intent
+  if (
+    msg.includes("book") ||
+    msg.includes("schedule") ||
+    msg.includes("meeting") ||
+    msg.includes("appointment") ||
+    msg.includes("call")
+  ) {
+    return { type: "booking" };
+  }
+
+  // Identity query
+  if (msg.includes("who are you")) {
+    return { type: "identity" };
+  }
+
+  // Greeting (only if message is very short)
+  if (greetingRegex.test(msg) && msg.length < 5) {
+    return { type: "greeting" };
+  }
+
+  // Default
   return { type: "normal" };
 }
 
@@ -400,7 +436,8 @@ export async function generateHybridResponse({
       await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
       return bookingResp.response;
     }
-if (brain.type === "greeting") {
+
+if (brain.type === "greeting" && message.trim().length < 10) {
   const greetings = [
     "What are you currently trying to grow or improve?",
     "Tell me — what’s your main focus right now?",
@@ -531,9 +568,13 @@ response = cleanHybridResponse(response);
 // Strong grammar + spelling correction (REPLACED old layers)
 response = spellAndGrammarFix(response);
 
-// Retry ONLY if Qwen failed badly (not for all cases)
-if (isLowQuality(response) && modelUsed === "Qwen") {
-  console.log("⚠️ Low quality detected — retrying with Gemini");
+// Retry ONLY if Qwen failed badly (PREVENT FALLBACK LOOP)
+if (
+  modelUsed === "Qwen" &&
+  (isLowQuality(response) ||
+   response.toLowerCase().includes("based on what you're asking"))
+) {
+  console.log("⚠️ Low quality or generic response detected — retrying with Gemini");
 
   const retry = await generateGemini(prompt);
 
@@ -541,16 +582,26 @@ if (isLowQuality(response) && modelUsed === "Qwen") {
     response = fixBrokenOutput(retry);
     response = cleanHybridResponse(response);
     response = spellAndGrammarFix(response);
-    modelUsed = "Gemini";
+
+    // Only switch model if retry is actually better
+    if (!isLowQuality(response)) {
+      modelUsed = "Gemini";
+    }
   }
 }
 
 // Final enforcement layers (ORDER IS CRITICAL)
 response = enforceResponseRules(response);
 response = enforceStructure(response);
-response = compressResponse(response);
+
+// ✅ SMART LENGTH CONTROL: only compress if too long
+if (response.length > 1200) {
+  response = compressResponse(response);
+}
+
 response = finalQualityCheck(response);
 response = enforceBotName(response);
+
 
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
@@ -574,9 +625,12 @@ console.log(
 
 // FINAL POLISH FIX (CRITICAL)
 response = response
-  .replace(/\s([.,!?])/g, "$1")
-  .replace(/([a-z])([A-Z])/g, "$1 $2")
+  // Normalize spacing
   .replace(/\s+/g, " ")
+  // Remove space before punctuation
+  .replace(/\s([.,!?])/g, "$1")
+  // Ensure proper spacing after punctuation
+  .replace(/([.!?])([^\s])/g, "$1 $2")
   .trim();
 
 
