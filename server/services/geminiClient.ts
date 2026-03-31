@@ -22,7 +22,18 @@ const MAX_RETRIES = 2;
 const identityUrl = pathToFileURL(join(__dirname, "../system/identity.js")).href;
 const { BOT_NAME } = await import(identityUrl);
 
-/* ---------------- Response validator ---------------- */
+/* ---------------- Caching ---------------- */
+const recentCache: Map<string, string> = new Map();
+const variationCache: Map<string, number> = new Map();
+
+/* ---------------- Fallback variants ---------------- */
+const fallbackVariants = [
+  "I'm having some trouble generating a detailed response right now, but I can still guide you. Could you provide a bit more context about your goal?",
+  "Apologies, AI response is delayed. Please describe your needs in more detail so I can assist effectively.",
+  "Temporary issue with AI processing. Share more details about your project, and I’ll provide actionable guidance."
+];
+
+/* ---------------- Validators & Cleaners ---------------- */
 function isValidResponse(text: string) {
   if (!text || text.length < 25) return false;
   const badPatterns = [
@@ -40,14 +51,34 @@ function isValidResponse(text: string) {
   return !badPatterns.some((p) => text.toLowerCase().includes(p));
 }
 
-/* ---------------- Clean prompt ---------------- */
 function cleanPrompt(prompt: string) {
   if (!prompt) return "";
-  return prompt
+  return prompt.replace(/\s+/g, " ").replace(/\x00/g, "").trim().slice(0, 4800);
+}
+
+function cleanResponse(text: string) {
+  if (!text) return "";
+  let cleaned = text
+    .replace(/assistant:/gi, "")
+    .replace(/system:/gi, "")
+    .replace(/#{1,}/g, "")
+    .replace(/```[\s\S]*?```/g, "")
+    .replace(/\*\*/g, "")
+    .replace(/_{2,}/g, "")
     .replace(/\s+/g, " ")
-    .replace(/\x00/g, "")
-    .trim()
-    .slice(0, 4800);
+    .trim();
+
+  // Remove accidental contact info
+  cleaned = cleaned.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
+
+  // Minor spelling fixes for common marketing terms
+  cleaned = cleaned.replace(/\bbusines\b/gi, "business");
+  cleaned = cleaned.replace(/\baproach\b/gi, "approach");
+  cleaned = cleaned.replace(/\bmesaging\b/gi, "messaging");
+  cleaned = cleaned.replace(/\btrafic\b/gi, "traffic");
+  cleaned = cleaned.replace(/\bfunnel\b/gi, "funnel");
+
+  return cleaned;
 }
 
 /* ---------------- High-intent detection ---------------- */
@@ -71,30 +102,8 @@ function detectHighIntent(prompt: string): boolean {
   return signals.some((s) => text.includes(s));
 }
 
-/* ---------------- Clean AI response ---------------- */
-function cleanResponse(text: string) {
-  if (!text) return "";
-  let cleaned = text
-    .replace(/assistant:/gi, "")
-    .replace(/system:/gi, "")
-    .replace(/#{1,}/g, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/\*\*/g, "")
-    .replace(/_{2,}/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  // Remove accidental contact info
-  cleaned = cleaned.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
-
-  return cleaned;
-}
-
 /* ---------------- Main Gemini generation ---------------- */
-export async function generateGemini(
-  prompt: string,
-  sessionId?: string
-): Promise<string> {
+export async function generateGemini(prompt: string, sessionId?: string): Promise<string> {
   const API_KEY = process.env.GEMINI_API_KEY;
 
   if (!API_KEY) {
@@ -103,34 +112,28 @@ export async function generateGemini(
   }
 
   prompt = cleanPrompt(prompt);
+  const cacheKey = `${sessionId || "global"}:${prompt}`;
+  if (recentCache.has(cacheKey)) return recentCache.get(cacheKey)!;
 
-  /* ================= STRATEGIC BRAIN (FIXED) ================= */
+  /* ---------------- Strategic Brain & Context ---------------- */
   let contextText = "";
-
   if (sessionId) {
     try {
-      const { brainContext, chunks } = await strategicBrain(
-        prompt.slice(0, 500), // ✅ FIX: prevent token overload
-        sessionId
-      );
+      const [brainContextResult] = await Promise.all([
+        strategicBrain(prompt.slice(0, 500), sessionId)
+      ]);
 
-      // ✅ SAFE chunk access (prevents crash)
-      const pricingChunk = chunks?.find(
-        (c: any) => c.intent?.toLowerCase().includes("pricing")
-      );
-
-      const pricingInfo = pricingChunk
-        ? pricingChunk.text
-        : "Pricing info not available.";
+      const { brainContext, chunks } = brainContextResult;
+      const pricingChunk = chunks?.find((c: any) => c.intent?.toLowerCase().includes("pricing"));
+      const pricingInfo = pricingChunk ? pricingChunk.text : "Pricing info not available.";
 
       contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. Pricing info: ${pricingInfo}. `;
     } catch (err) {
-      console.warn("⚠️ strategicBrain context fetch failed:", err);
+      console.warn("⚠️ strategicBrain fetch failed:", err);
     }
   }
 
   const highIntent = detectHighIntent(prompt);
-
   const finalPrompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
@@ -189,28 +192,23 @@ Provide a concise, relevant, professional response.
       }
 
       const data: any = await res.json();
-
-      let content =
-        data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-
+      let content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
       content = cleanResponse(content);
 
-      if (!content) throw new Error("Gemini empty response");
-      if (!isValidResponse(content)) throw new Error("Gemini invalid response");
+      if (!content || !isValidResponse(content)) throw new Error("Gemini invalid or empty response");
 
+      // Avoid repeated responses in session
+      if (variationCache.has(cacheKey)) content += " ";
+      variationCache.set(cacheKey, (variationCache.get(cacheKey) || 0) + 1);
+
+      recentCache.set(cacheKey, content);
       console.log("✅ Gemini success");
-
-      // ✅ FIX: DO NOT enforceBotName here (handled later in hybrid layer)
       return content;
 
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
-
-      console.warn(
-        `⚠️ Gemini attempt ${attempt} failed:`,
-        err?.message ?? err
-      );
+      console.warn(`⚠️ Gemini attempt ${attempt} failed:`, err?.message ?? err);
 
       if (attempt <= MAX_RETRIES) {
         const delay = 1500 * attempt;
@@ -221,8 +219,9 @@ Provide a concise, relevant, professional response.
   }
 
   console.error("❌ Gemini failed completely:", lastError);
-
-  return "I'm having trouble generating a response right now, but I can still provide guidance.";
+  const fallback = fallbackVariants[Math.floor(Math.random() * fallbackVariants.length)];
+  recentCache.set(cacheKey, fallback);
+  return fallback;
 }
 
 /* ---------------- Backwards compatibility ---------------- */

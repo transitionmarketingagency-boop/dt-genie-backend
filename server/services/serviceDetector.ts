@@ -10,7 +10,7 @@ export type DetectedIntent = {
     | "marketing_goal"
     | "industry"
     | "general"
-    | "redirect"; // NEW: fallback redirect type
+    | "redirect"; // fallback type
   value: string;
   confidence: number;
 };
@@ -39,7 +39,6 @@ function matchKeyword(text: string, keyword: string): number {
   // partial token match (weaker signal)
   const words = kw.split(" ");
   let hits = 0;
-
   for (const w of words) {
     if (text.includes(w)) hits++;
   }
@@ -47,7 +46,7 @@ function matchKeyword(text: string, keyword: string): number {
   return (hits / words.length) * 0.6;
 }
 
-/* ================= SERVICES ================= */
+/* ================= SERVICES + SYNONYMS ================= */
 const services: Record<string, { keywords: string[]; weight: number }> = {
   voice_search: {
     keywords: ["near me now","siri optimization","position zero","alexa search","featured snippets"],
@@ -66,15 +65,15 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
     weight: 1
   },
   virtual_tours: {
-    keywords: ["nerf renders","360 property tour","interactive floor plan","virtual staging"],
+    keywords: ["nerf renders","360 property tour","interactive floor plan","virtual staging","cgi tours","cgi ads"],
     weight: 1
   },
   performance_marketing: {
-    keywords: ["lower cac","increase roas","ppc management","stop ad bots","real-time bidding"],
+    keywords: ["lower cac","increase roas","ppc management","stop ad bots","real-time bidding","ads ecosystem"],
     weight: 1
   },
   ai_automation: {
-    keywords: ["ai agents","automate workflows","replace saas tools","crm automation","ai assistants"],
+    keywords: ["ai agents","automate workflows","replace saas tools","crm automation","ai assistants","ai marketing ecosystem"],
     weight: 1
   },
   music_production: {
@@ -82,7 +81,7 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
     weight: 1
   },
   cgi_marketing: {
-    keywords: ["viral cgi ads","3d product animation","realistic cgi","cgi commercial"],
+    keywords: ["viral cgi ads","3d product animation","realistic cgi","cgi commercial","cgi marketing","cgi visuals"],
     weight: 1
   },
   video_audio: {
@@ -98,7 +97,7 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
     weight: 1
   },
   geo_ai_seo: {
-    keywords: ["rank on chatgpt","optimize for gemini","ai indexing","ai search seo"],
+    keywords: ["rank on chatgpt","optimize for gemini","ai indexing","ai search seo","geo optimization"],
     weight: 1
   },
   predictive_analytics: {

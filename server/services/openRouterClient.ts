@@ -14,10 +14,10 @@ interface OpenRouterResponse {
 
 /* ================= MODEL & SETTINGS ================= */
 const MODEL = "qwen/qwen3-235b-a22b-2507";
-const MAX_PROMPT_LENGTH = 5000; 
-const REQUEST_TIMEOUT = 28000; 
+const MAX_PROMPT_LENGTH = 5000;
+const REQUEST_TIMEOUT = 28000;
 const MAX_RETRIES = 2;
-const MAX_RESPONSE_CHARS = 3000; 
+const MAX_RESPONSE_CHARS = 3000;
 
 /* ================= PROMPT CLEANER ================= */
 function cleanPrompt(prompt: string): string {
@@ -44,7 +44,7 @@ function cleanResponse(text: string): string {
     .replace(/\s+/g, " ")
     .trim();
 
-  // Remove any accidental mentions of contact info
+  // Remove accidental mentions of contact info
   cleaned = cleaned.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
 
   if (cleaned.length > MAX_RESPONSE_CHARS) {
@@ -120,6 +120,14 @@ function detectHighIntent(message: string): boolean {
 
 /* ================= RESPONSE CACHING ================= */
 const recentCache: Map<string, string> = new Map();
+const variationCache: Map<string, number> = new Map();
+
+/* ================= DYNAMIC FALLBACKS ================= */
+const fallbackVariants = [
+  "I'm currently having trouble generating a response right now, but I can still guide you. Tell me a bit more about your goal and I’ll help you move forward.",
+  "Apologies, I’m experiencing some issues. Share your goal and I’ll provide actionable guidance manually.",
+  "My AI is temporarily unavailable, but I can still help you plan your next step. Please describe your needs."
+];
 
 /* ================= MAIN GENERATION ================= */
 export async function generateOpenRouter(
@@ -132,26 +140,30 @@ export async function generateOpenRouter(
   }
 
   prompt = cleanPrompt(prompt);
+  const cacheKey = `${sessionId || "global"}:${prompt}`;
 
-const cacheKey = `${sessionId || "global"}:${prompt}`;
+  // Return from cache if already processed
+  if (recentCache.has(cacheKey)) {
+    return recentCache.get(cacheKey)!;
+  }
 
-if (recentCache.has(cacheKey)) {
-  return recentCache.get(cacheKey)!;
-}
   // Add strategicBrain context if available
   let contextText = "";
   if (sessionId) {
     try {
-const { brainContext, chunks } = await strategicBrain(
-  prompt.slice(0, 500), // prevent prompt pollution
-  sessionId
-);
-      // Extract pricing info only (ignore contact chunks entirely)
-      const pricingChunk = chunks.find(c => c.intent.toLowerCase().includes("pricing"));
+      const [brainContextResult] = await Promise.all([
+        strategicBrain(prompt.slice(0, 500), sessionId)
+      ]);
+
+      const { brainContext, chunks } = brainContextResult;
+
+      // Extract pricing info only
+      const pricingChunk = chunks.find(
+        (c: any) => c?.intent?.toLowerCase?.().includes("pricing") && c?.text
+      );
       const pricingInfo = pricingChunk ? pricingChunk.text : "Pricing info not available.";
 
       contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. Pricing info: ${pricingInfo}. `;
-
     } catch (err) {
       console.warn("⚠️ strategicBrain fetch failed:", err);
     }
@@ -194,18 +206,23 @@ const { brainContext, chunks } = await strategicBrain(
       const data = (await res.json()) as OpenRouterResponse;
       let raw = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? "";
 
-      // Ensure any accidental contact info is sanitized
+      // Remove accidental contact info
       raw = raw.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
 
-      const text = cleanResponse(raw);
+      let text = cleanResponse(raw);
+
+      // Slight variation to avoid repetitive responses
+      if (variationCache.has(cacheKey)) {
+        text = `${text} `.trim();
+      }
+      variationCache.set(cacheKey, (variationCache.get(cacheKey) || 0) + 1);
 
       if (!isValidResponse(text)) throw new Error("Invalid response pattern");
 
-      recentCache.set(prompt, text);
+      recentCache.set(cacheKey, text);
 
       console.log("✅ OpenRouter success");
       return text;
-
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
@@ -219,12 +236,12 @@ const { brainContext, chunks } = await strategicBrain(
     }
   }
 
-console.error("❌ All OpenRouter attempts failed:", lastError);
+  console.error("❌ All OpenRouter attempts failed:", lastError);
 
-const fallback =
-  "I'm currently having trouble generating a response right now, but I can still guide you. Tell me a bit more about your goal and I’ll help you move forward.";
+  // Dynamic fallback selection
+  const variantIndex = Math.floor(Math.random() * fallbackVariants.length);
+  const fallback = fallbackVariants[variantIndex];
 
-recentCache.set(cacheKey, fallback);
-
-return fallback;
+  recentCache.set(cacheKey, fallback);
+  return fallback;
 }

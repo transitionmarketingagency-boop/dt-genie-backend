@@ -1,6 +1,6 @@
 // server/services/intentManager.ts
 /* =====================================================
-   INTENT MANAGER (FINAL PRODUCTION VERSION)
+   INTENT MANAGER (FIXED PRODUCTION VERSION)
    Hybrid detection: keyword + phrase + scoring + intent boosting
 ===================================================== */
 
@@ -12,7 +12,6 @@ export interface Intent {
 }
 
 /* ======================= NORMALIZATION ======================= */
-
 export function normalize(text: string): string {
   return text
     .toLowerCase()
@@ -22,7 +21,6 @@ export function normalize(text: string): string {
 }
 
 /* ======================= UTILS ======================= */
-
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -35,7 +33,6 @@ function containsPhrase(text: string, phrase: string): boolean {
 }
 
 /* ======================= STRONG BUYING SIGNALS ======================= */
-
 const STRONG_INTENT_PHRASES = [
   "i want to hire",
   "i want to work with you",
@@ -48,7 +45,6 @@ const STRONG_INTENT_PHRASES = [
 ];
 
 /* ======================= INTENTS DATABASE ======================= */
-
 export const intents: Intent[] = [
   /* -------------------- GENERAL -------------------- */
   {
@@ -91,49 +87,49 @@ export const intents: Intent[] = [
   {
     name: "ai_virtual_tours",
     category: "service",
-    keywords: ["virtual tours","360 tours","3d tours","real estate renders"],
+    keywords: ["virtual tours","360 tours","3d tours","real estate renders","cgi tours","interactive floor plans"],
     description: "Virtual property experiences."
   },
   {
     name: "performance_marketing_warfare",
     category: "service",
-    keywords: ["ppc","performance marketing","ads","conversion optimization"],
+    keywords: ["ppc","performance marketing","ads","conversion optimization","lower cac","increase roas"],
     description: "Paid ads optimization."
   },
   {
     name: "immersive_cgi_marketing",
     category: "service",
-    keywords: ["cgi","3d ads","cgi ads","product renders"],
+    keywords: ["cgi","3d ads","cgi ads","product renders","viral cgi","realistic cgi"],
     description: "CGI marketing."
   },
   {
     name: "ai_video_audio_production",
     category: "service",
-    keywords: ["video production","audio production","editing","content production"],
+    keywords: ["video production","audio production","editing","content production","ai voiceover","retention heatmaps"],
     description: "Media production."
   },
   {
     name: "ai_optimized_content",
     category: "service",
-    keywords: ["content creation","blogs","copywriting","content marketing"],
+    keywords: ["content creation","blogs","copywriting","content marketing","lead magnets"],
     description: "Content marketing."
   },
   {
     name: "ai_social_domination",
     category: "service",
-    keywords: ["social media","instagram","tiktok","linkedin marketing"],
+    keywords: ["social media","instagram","tiktok","linkedin marketing","hack algorithm","shadowban fix"],
     description: "Social growth."
   },
   {
     name: "ai_search_domination_geo",
     category: "service",
-    keywords: ["geo","ai seo","chatgpt ranking","gemini ranking"],
+    keywords: ["geo","ai seo","chatgpt ranking","gemini ranking","rank on chatgpt","optimize for gemini","ai indexing"],
     description: "AI search ranking."
   },
   {
     name: "ai_predictive_analytics",
     category: "service",
-    keywords: ["analytics","data","predictive","forecasting"],
+    keywords: ["analytics","data","predictive","forecasting","market shifts","sentiment analysis"],
     description: "Data intelligence."
   },
   /* -------------------- MARKETING -------------------- */
@@ -185,7 +181,6 @@ export const intents: Intent[] = [
 ];
 
 /* ======================= SCORING ENGINE ======================= */
-
 function calculateIntentScore(text: string, intent: Intent) {
   const matched = new Set<string>();
   let phraseBoost = 0;
@@ -215,15 +210,9 @@ function calculateIntentScore(text: string, intent: Intent) {
 }
 
 /* ======================= INTENT DETECTION ======================= */
-
 export function detectIntent(message: string, topN: number = 3) {
   const text = normalize(message);
-
-  const matches: {
-    intent: Intent;
-    score: number;
-    matchedKeywords: string[];
-  }[] = [];
+  const matches: { intent: Intent; score: number; matchedKeywords: string[] }[] = [];
 
   const isStrongIntent = STRONG_INTENT_PHRASES.some(p => text.includes(p));
 
@@ -258,14 +247,13 @@ export function detectIntent(message: string, topN: number = 3) {
   }
 
   if (process.env.DEBUG_INTENTS === "true") {
-    console.log("[IntentManager FINAL]", matches.slice(0, topN));
+    console.log("[IntentManager FIXED]", matches.slice(0, topN));
   }
 
   return matches.slice(0, topN);
 }
 
 /* ======================= HELPERS ======================= */
-
 export function getIntentByName(name: string): Intent | undefined {
   return intents.find(i => i.name === name);
 }

@@ -18,13 +18,20 @@ export class LeadQualifier {
     timeline: 0.15,
   };
 
-  /* Score a lead based on provided BANT info */
+  /**
+   * Score a lead based on provided BANT info
+   * @param sessionId User session identifier
+   * @param bantData Partial BANT data with values 0-1
+   */
   scoreLead(sessionId: string, bantData: Partial<LeadScore>): LeadScore {
+    // Ensure all values are clamped between 0 and 1
+    const clamp = (val?: number) => Math.max(0, Math.min(1, val ?? 0));
+
     const score: LeadScore = {
-      budget: bantData.budget ?? 0,
-      authority: bantData.authority ?? 0,
-      need: bantData.need ?? 0,
-      timeline: bantData.timeline ?? 0,
+      budget: clamp(bantData.budget),
+      authority: clamp(bantData.authority),
+      need: clamp(bantData.need),
+      timeline: clamp(bantData.timeline),
     };
 
     score.total =
@@ -33,16 +40,26 @@ export class LeadQualifier {
       (score.need ?? 0) * this.weights.need +
       (score.timeline ?? 0) * this.weights.timeline;
 
-    // Save to strategic memory
-    this.updateLeadScore(sessionId, score.total);
+    // Async update to memoryService, non-blocking
+    this.updateLeadScore(sessionId, score.total).catch((err) =>
+      console.warn(`⚠️ Failed to update lead score for session ${sessionId}:`, err)
+    );
 
     return score;
   }
 
-  /* Update total lead score in memoryService */
+  /**
+   * Update total lead score in memoryService
+   * @param sessionId User session identifier
+   * @param score Total lead score
+   */
   private async updateLeadScore(sessionId: string, score?: number) {
-    const memory: StrategicMemory = await memoryService.getStrategicMemory(sessionId);
-    await memoryService.updateStrategicMemory(sessionId, { ...memory, leadScore: score });
+    try {
+      const memory: StrategicMemory = (await memoryService.getStrategicMemory(sessionId)) || {};
+      await memoryService.updateStrategicMemory(sessionId, { ...memory, leadScore: score });
+    } catch (err) {
+      console.error(`❌ Error updating strategic memory for session ${sessionId}:`, err);
+    }
   }
 }
 
