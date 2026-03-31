@@ -53,15 +53,6 @@ The fastest way to fix this is to identify:
 If you want, I can break this down specifically for your business and map a clear execution plan.`;
 }
 
-function fixBrokenOutput(text: string): string {
-  if (!text) return text;
-  return text
-    .replace(/\$1,(\s|$)/g, "$1000 ")
-    .replace(/-win frameworks/g, "14-day rapid deployment")
-    .replace(/within will work/g, "within 90 days")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 
 function shouldIncludeCTA(
@@ -208,8 +199,6 @@ function cleanHybridResponse(text: string): string {
   text = sanitizeTools(text);
   text = removeContactInfo(text);
 
-  // remove non-ascii (fix Chinese bug)
-  text = text.replace(/[^\x00-\x7F.,!?'"()\-\s]/g, "");
 
   // normalize spacing
   text = text.replace(/\s+/g, " ");
@@ -217,54 +206,6 @@ function cleanHybridResponse(text: string): string {
   return text.trim();
 }
 
-function spellAndGrammarFix(text: string): string {
-  if (!text) return "";
-
-  const fixes: Record<string, string> = {
-    trafic: "traffic",
-    busines: "business",
-    busineses: "businesses",
-    ned: "need",
-    eforts: "efforts",
-    funel: "funnel",
-    loking: "looking",
-    geting: "getting",
-    mesage: "message",
-    ofer: "offer",
-    diferent: "different",
-    chanels: "channels",
-    acros: "across",
-    eficient: "efficient",
-    boking: "booking",
-    tel: "tell",
-    realy: "really",
-    tomorow: "tomorrow",
-    sesion: "session",
-    cal: "call",
-    wil: "will",
-    overal: "overall"
-  };
-
-  let t = text;
-
-  for (const [wrong, correct] of Object.entries(fixes)) {
-    t = t.replace(new RegExp(`\\b${wrong}\\b`, "gi"), correct);
-  }
-
-  // Fix broken numeric phrases
-  t = t.replace(/(\d*)-minute/g, "30-minute");
-
-  // Fix missing spaces
-  t = t.replace(/([a-z])([A-Z])/g, "$1 $2");
-
-  // Fix punctuation spacing
-  t = t.replace(/\s([.,!?])/g, "$1");
-
-  // Capitalize sentences properly
-  t = t.replace(/(^\w|\.\s+\w)/g, (c) => c.toUpperCase());
-
-  return t.trim();
-}
 
 function isLowQuality(text: string): boolean {
   if (!text) return true;
@@ -289,58 +230,6 @@ if (!/[.!?]$/.test(selected)) {
 }
 
 return selected;
-}
-
-/* ✅ ADD IT HERE ↓↓↓ */
-
-function enforceStructure(text: string): string {
-  if (!text) return text;
-
-  // If already structured, skip
-// Only structure LONG strategic responses
-if (text.length < 180) return text;
-
-if (text.includes("\n- ")) return text;
-
-  const parts = text.split(". ").filter(Boolean);
-
-  if (parts.length < 3) return text;
-
-  return [
-    parts[0] + ".",
-    "\nKey Points:",
-    ...parts.slice(1, 4).map(p => `- ${p.trim()}.`)
-  ].join("\n");
-}
-
-/* continue existing functions */
-
-function enforceResponseRules(text: string): string {
-  if (!text) return "";
-
-  text = text
-    /* ===== REMOVE FALLBACK PHRASES ===== */
-    .replace(/let me tighten that up[^.]*\./gi, "")
-    .replace(/got it.? let'?s break this down properly[^.]*\./gi, "")
-    .replace(/what'?s your main goal right now[^?]*\?/gi, "")
-    .replace(/tell me,? and i['’]ll map this properly[^.]*\./gi, "")
-
-    /* ===== REMOVE GENERIC AI FILLER ===== */
-    .replace(/from what you're asking[^.]*\./gi, "")
-    .replace(/it looks like you're trying to[^.]*\./gi, "")
-
-    /* ===== CLEAN GARBAGE ===== */
-    .replace(/\$\d+,\s*/g, "")
-    .replace(/CGI & Performance Pilot/gi, "our performance system")
-
-    /* ===== REMOVE REPETITION ===== */
-    .replace(/(.+?)\1{1,}/gi, "$1")
-
-    /* ===== NORMALIZE ===== */
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return text;
 }
 
 /* ================= QUERY EXPANSION ================= */
@@ -559,47 +448,57 @@ if (!response) {
   modelUsed = "fallback";
 }
 
-/* ---------- CLEANUP (FIXED PIPELINE) ---------- */
+/* ---------- CLEANUP (STABLE + NON-DESTRUCTIVE) ---------- */
 
-// Initial cleanup
-response = fixBrokenOutput(response);
-response = cleanHybridResponse(response);
+// ✅ Single source of truth cleanup (DO NOT duplicate elsewhere)
+response = cleanResponse(response);
 
-// Strong grammar + spelling correction (REPLACED old layers)
-response = spellAndGrammarFix(response);
+// ✅ Remove sensitive/contact artifacts only
+response = removeContactInfo(response);
 
-// Retry ONLY if Qwen failed badly (PREVENT FALLBACK LOOP)
+// ✅ Light normalization (safe only — no aggressive mutation)
+response = response
+  .replace(/\s+/g, " ")        // normalize spacing
+  .replace(/\s([.,!?])/g, "$1") // remove space before punctuation
+  .trim();
+
+/* ---------- SAFE RETRY LOGIC (ONLY IF TRULY BAD) ---------- */
+
 if (
   modelUsed === "Qwen" &&
   (isLowQuality(response) ||
-   response.toLowerCase().includes("based on what you're asking"))
+    response.toLowerCase().includes("i'm having trouble") ||
+    response.toLowerCase().includes("couldn't generate"))
 ) {
-  console.log("⚠️ Low quality or generic response detected — retrying with Gemini");
+  console.log("⚠️ Low-quality response detected — retrying with Gemini");
 
   const retry = await generateGemini(prompt);
 
   if (retry) {
-    response = fixBrokenOutput(retry);
-    response = cleanHybridResponse(response);
-    response = spellAndGrammarFix(response);
+    let retryClean = cleanResponse(retry);
+    retryClean = removeContactInfo(retryClean);
 
-    // Only switch model if retry is actually better
-    if (!isLowQuality(response)) {
+    retryClean = retryClean
+      .replace(/\s+/g, " ")
+      .replace(/\s([.,!?])/g, "$1")
+      .trim();
+
+    // ✅ Only switch if actually better
+    if (!isLowQuality(retryClean)) {
+      response = retryClean;
       modelUsed = "Gemini";
     }
   }
 }
 
-// Final enforcement layers (ORDER IS CRITICAL)
-response = enforceResponseRules(response);
-response = enforceStructure(response);
+/* ---------- LENGTH CONTROL (SAFE) ---------- */
 
-// ✅ SMART LENGTH CONTROL: only compress if too long
 if (response.length > 1200) {
   response = compressResponse(response);
 }
 
-response = finalQualityCheck(response);
+/* ---------- FINAL IDENTITY ENFORCEMENT ---------- */
+
 response = enforceBotName(response);
 
 
@@ -623,33 +522,6 @@ console.log(
 );
 
 
-// FINAL POLISH FIX (CRITICAL)
-response = response
-  // Normalize spacing
-  .replace(/\s+/g, " ")
-  // Remove space before punctuation
-  .replace(/\s([.,!?])/g, "$1")
-  // Ensure proper spacing after punctuation
-  .replace(/([.!?])([^\s])/g, "$1 $2")
-  .trim();
-
-
-function finalQualityCheck(text: string): string {
-  if (!text) return "";
-
-  // Ensure proper ending
-  if (!/[.!?]$/.test(text)) {
-    text += ".";
-  }
-
-  // Remove broken endings
-  text = text.replace(/([a-z])$/, "$1.");
-
-  // Prevent cut sentences
-  text = text.replace(/\b(and|or|but|with|to|for)\.$/gi, "");
-
-  return text.trim();
-}
 
 
 /* ---------- RETURN ---------- */

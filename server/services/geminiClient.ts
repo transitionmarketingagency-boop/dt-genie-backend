@@ -28,14 +28,15 @@ const variationCache: Map<string, number> = new Map();
 
 /* ---------------- Fallback variants ---------------- */
 const fallbackVariants = [
-  "I'm having some trouble generating a detailed response right now, but I can still guide you. Could you provide a bit more context about your goal?",
-  "Apologies, AI response is delayed. Please describe your needs in more detail so I can assist effectively.",
-  "Temporary issue with AI processing. Share more details about your project, and I’ll provide actionable guidance."
+  "I'm currently having trouble generating a response, but I can still guide you. Tell me a bit more about your goal.",
+  "Apologies, there’s a temporary delay. Share your goal and I’ll help you move forward.",
+  "There’s a temporary issue with AI processing. Describe your situation and I’ll guide you step by step."
 ];
 
-/* ---------------- Validators & Cleaners ---------------- */
+/* ---------------- Validators ---------------- */
 function isValidResponse(text: string) {
   if (!text || text.length < 25) return false;
+
   const badPatterns = [
     "```",
     "###",
@@ -46,37 +47,49 @@ function isValidResponse(text: string) {
     "undefined",
     "null",
     "error",
-    "traceback",
+    "traceback"
   ];
+
   return !badPatterns.some((p) => text.toLowerCase().includes(p));
 }
 
+/* ---------------- Prompt Cleaner ---------------- */
 function cleanPrompt(prompt: string) {
   if (!prompt) return "";
-  return prompt.replace(/\s+/g, " ").replace(/\x00/g, "").trim().slice(0, 4800);
+  return prompt
+    .replace(/\s+/g, " ")
+    .replace(/\x00/g, "")
+    .trim()
+    .slice(0, 4800);
 }
 
+/* ---------------- SAFE Response Cleaner ---------------- */
 function cleanResponse(text: string) {
   if (!text) return "";
-  let cleaned = text
+
+  let cleaned = text;
+
+  /* ===== REMOVE INTERNAL TOKENS ===== */
+  cleaned = cleaned
     .replace(/assistant:/gi, "")
-    .replace(/system:/gi, "")
-    .replace(/#{1,}/g, "")
+    .replace(/system:/gi, "");
+
+  /* ===== REMOVE MARKDOWN SAFELY ===== */
+  cleaned = cleaned
     .replace(/```[\s\S]*?```/g, "")
-    .replace(/\*\*/g, "")
-    .replace(/_{2,}/g, "")
+    .replace(/^#{1,6}\s*/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/_{2,}(.*?)_{2,}/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`([^`]*)`/g, "$1");
+
+  /* ===== REMOVE CONTROL CHARACTERS ===== */
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+
+  /* ===== NORMALIZE WHITESPACE ===== */
+  cleaned = cleaned
     .replace(/\s+/g, " ")
     .trim();
-
-  // Remove accidental contact info
-  cleaned = cleaned.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
-
-  // Minor spelling fixes for common marketing terms
-  cleaned = cleaned.replace(/\bbusines\b/gi, "business");
-  cleaned = cleaned.replace(/\baproach\b/gi, "approach");
-  cleaned = cleaned.replace(/\bmesaging\b/gi, "messaging");
-  cleaned = cleaned.replace(/\btrafic\b/gi, "traffic");
-  cleaned = cleaned.replace(/\bfunnel\b/gi, "funnel");
 
   return cleaned;
 }
@@ -84,7 +97,9 @@ function cleanResponse(text: string) {
 /* ---------------- High-intent detection ---------------- */
 function detectHighIntent(prompt: string): boolean {
   if (!prompt) return false;
+
   const text = prompt.toLowerCase();
+
   const signals = [
     "hire",
     "book",
@@ -97,8 +112,9 @@ function detectHighIntent(prompt: string): boolean {
     "let's start",
     "ready to invest",
     "asap",
-    "fast start",
+    "fast start"
   ];
+
   return signals.some((s) => text.includes(s));
 }
 
@@ -108,15 +124,19 @@ export async function generateGemini(prompt: string, sessionId?: string): Promis
 
   if (!API_KEY) {
     console.error("❌ GEMINI_API_KEY missing");
-    return "Apologies, I cannot access AI systems currently, but I can still provide guidance.";
+    return "I’m unable to access AI systems right now, but I can still guide you if you share more details.";
   }
 
   prompt = cleanPrompt(prompt);
   const cacheKey = `${sessionId || "global"}:${prompt}`;
-  if (recentCache.has(cacheKey)) return recentCache.get(cacheKey)!;
 
-  /* ---------------- Strategic Brain & Context ---------------- */
+  if (recentCache.has(cacheKey)) {
+    return recentCache.get(cacheKey)!;
+  }
+
+  /* ---------------- Strategic Brain Context ---------------- */
   let contextText = "";
+
   if (sessionId) {
     try {
       const [brainContextResult] = await Promise.all([
@@ -124,38 +144,41 @@ export async function generateGemini(prompt: string, sessionId?: string): Promis
       ]);
 
       const { brainContext, chunks } = brainContextResult;
-      const pricingChunk = chunks?.find((c: any) => c.intent?.toLowerCase().includes("pricing"));
-      const pricingInfo = pricingChunk ? pricingChunk.text : "Pricing info not available.";
 
-      contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. Pricing info: ${pricingInfo}. `;
+      const pricingChunk = chunks?.find(
+        (c: any) => c?.intent?.toLowerCase?.().includes("pricing") && c?.text
+      );
+
+      const pricingInfo = pricingChunk
+        ? pricingChunk.text
+        : "Pricing info not available.";
+
+      contextText = `Context: stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, service=${brainContext.recommendedService}. ${pricingInfo}`;
     } catch (err) {
       console.warn("⚠️ strategicBrain fetch failed:", err);
     }
   }
 
   const highIntent = detectHighIntent(prompt);
+
   const finalPrompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
-Your role is to assist businesses using the 14 core services offered by Digital Transition Marketing.
+Your role is to help businesses grow using AI-powered marketing systems.
 
 Guidelines:
-- Only promote the company's services.
-- Never recommend external platforms or third-party tools.
-- Explain external tools briefly if mentioned, then guide to company solutions.
-- Respond in clear, professional natural language without markdown, headings, emojis, or code symbols.
-- Provide actionable, context-aware guidance aligned with user intent.
-- Maintain factual accuracy and rely only on company knowledge.
-- Never provide contact info or fake details.
-- You MUST answer exactly what the user asked. Do not switch topics.
-- If the question is specific, give a direct and detailed answer.
-- Never reuse previous responses or generic templates.
+- Be clear, natural, and professional
+- Focus on solving the user’s problem
+- Do not use markdown, symbols, or formatting
+- Do not provide contact details
+- Answer exactly what the user asked
 
 ${contextText}
+
 User request:
 ${prompt}
 
-Provide a concise, relevant, professional response.
+Provide a clear, concise, helpful response.
 `.trim();
 
   let attempt = 0;
@@ -178,10 +201,10 @@ Provide a concise, relevant, professional response.
           generationConfig: {
             temperature: highIntent ? 0.42 : 0.35,
             maxOutputTokens: 1000,
-            topP: highIntent ? 0.95 : 0.9,
-          },
+            topP: highIntent ? 0.95 : 0.9
+          }
         }),
-        signal: controller.signal,
+        signal: controller.signal
       });
 
       clearTimeout(timeout);
@@ -192,22 +215,32 @@ Provide a concise, relevant, professional response.
       }
 
       const data: any = await res.json();
-      let content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
+      let content =
+        data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+
       content = cleanResponse(content);
 
-      if (!content || !isValidResponse(content)) throw new Error("Gemini invalid or empty response");
+      if (!content || !isValidResponse(content)) {
+        throw new Error("Gemini invalid or empty response");
+      }
 
-      // Avoid repeated responses in session
-      if (variationCache.has(cacheKey)) content += " ";
+      // Slight variation to prevent repetition
+      if (variationCache.has(cacheKey)) {
+        content = `${content} `;
+      }
+
       variationCache.set(cacheKey, (variationCache.get(cacheKey) || 0) + 1);
 
       recentCache.set(cacheKey, content);
+
       console.log("✅ Gemini success");
       return content;
 
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
+
       console.warn(`⚠️ Gemini attempt ${attempt} failed:`, err?.message ?? err);
 
       if (attempt <= MAX_RETRIES) {
@@ -219,7 +252,10 @@ Provide a concise, relevant, professional response.
   }
 
   console.error("❌ Gemini failed completely:", lastError);
-  const fallback = fallbackVariants[Math.floor(Math.random() * fallbackVariants.length)];
+
+  const fallback =
+    fallbackVariants[Math.floor(Math.random() * fallbackVariants.length)];
+
   recentCache.set(cacheKey, fallback);
   return fallback;
 }

@@ -1,6 +1,8 @@
 // server/services/openRouterClient.ts
+
 import fetch from "node-fetch";
 import { strategicBrain } from "./strategicBrain.js";
+import { cleanResponse } from "../utils/cleanResponse.js"; // ✅ SINGLE SOURCE CLEANER
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -17,49 +19,25 @@ const MODEL = "qwen/qwen3-235b-a22b-2507";
 const MAX_PROMPT_LENGTH = 5000;
 const REQUEST_TIMEOUT = 28000;
 const MAX_RETRIES = 2;
-const MAX_RESPONSE_CHARS = 3000;
 
 /* ================= PROMPT CLEANER ================= */
 function cleanPrompt(prompt: string): string {
   if (!prompt) return "";
-  let cleaned = prompt
+  return prompt
     .replace(/\s+/g, " ")
     .replace(/assistant:/gi, "")
     .replace(/system:/gi, "")
-    .trim();
-  return cleaned.slice(0, MAX_PROMPT_LENGTH);
-}
-
-/* ================= RESPONSE CLEANER ================= */
-function cleanResponse(text: string): string {
-  if (!text) return "";
-  let cleaned = text
-    .replace(/assistant:/gi, "")
-    .replace(/system:/gi, "")
-    .replace(/neon vision:/gi, "")
-    .replace(/```[\s\S]*?```/g, "")
-    .replace(/#+\s?/g, "")
-    .replace(/\*\*/g, "")
-    .replace(/_{2,}/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-
-  // Remove accidental mentions of contact info
-  cleaned = cleaned.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
-
-  if (cleaned.length > MAX_RESPONSE_CHARS) {
-    const sliced = cleaned.slice(0, MAX_RESPONSE_CHARS);
-    return sliced.slice(0, sliced.lastIndexOf(" "));
-  }
-
-  return cleaned;
+    .trim()
+    .slice(0, MAX_PROMPT_LENGTH);
 }
 
 /* ================= RESPONSE VALIDATION ================= */
 function isValidResponse(text: string): boolean {
-  if (!text || text.length < 25) return false;
+  if (!text || text.length < 15) return false;
+
   const lower = text.toLowerCase();
-  const badPatterns = ["<|", "|>", "undefined", "null", "error", "traceback"];
+  const badPatterns = ["<|", "|>", "undefined", "null", "traceback"];
+
   return !badPatterns.some((p) => lower.includes(p));
 }
 
@@ -70,24 +48,21 @@ function buildMessages(prompt: string, highIntent: boolean = false) {
       role: "system",
       content: `You are Neon Vision, AI strategist for Digital Transition Marketing.
 
-Your role is to help businesses grow using the 14 core services of Digital Transition Marketing.
+Your role is to help businesses grow using Digital Transition Marketing services.
 
 Guidelines:
-- Recommend only Digital Transition Marketing services.
-- Explain external tools briefly if mentioned, then guide to DTM solutions.
-- Respond concisely, clearly, and professionally.
-- Avoid markdown, bullets, headings, hashtags, emojis, or code blocks.
-- Keep responses actionable, aligned with user intent.
-- You MUST answer exactly what the user asked. Do not switch topics.
-- If the question is specific, give a direct and detailed answer.
-- Never reuse previous responses or generic templates.
-- Never provide personal contact information.
+- Recommend only relevant services
+- Respond clearly, naturally, and professionally
+- Avoid markdown, symbols, or formatting artifacts
+- Be direct and useful
+- Answer exactly what the user asks
+- No generic templates
+- No contact info
 - Tone: ${
         highIntent
-          ? "executive, confident, persuasive"
-          : "friendly, informative, clear"
-      }.
-`
+          ? "confident and strategic"
+          : "clear and helpful"
+      }`
     },
     {
       role: "user",
@@ -99,7 +74,9 @@ Guidelines:
 /* ================= HIGH-INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
   if (!message) return false;
+
   const lower = message.toLowerCase();
+
   const signals = [
     "hire",
     "book",
@@ -111,22 +88,20 @@ function detectHighIntent(message: string): boolean {
     "let's start",
     "sign up",
     "ready to invest",
-    "asap",
-    "fast start",
-    "how soon can we"
+    "asap"
   ];
+
   return signals.some((s) => lower.includes(s));
 }
 
 /* ================= RESPONSE CACHING ================= */
 const recentCache: Map<string, string> = new Map();
-const variationCache: Map<string, number> = new Map();
 
-/* ================= DYNAMIC FALLBACKS ================= */
+/* ================= FALLBACKS ================= */
 const fallbackVariants = [
-  "I'm currently having trouble generating a response right now, but I can still guide you. Tell me a bit more about your goal and I’ll help you move forward.",
-  "Apologies, I’m experiencing some issues. Share your goal and I’ll provide actionable guidance manually.",
-  "My AI is temporarily unavailable, but I can still help you plan your next step. Please describe your needs."
+  "I’m having a temporary issue generating a response, but I can still guide you. Tell me more about your goal.",
+  "There’s a temporary issue right now, but I can still help. What are you trying to achieve?",
+  "I can still guide you manually—tell me what you're trying to improve."
 ];
 
 /* ================= MAIN GENERATION ================= */
@@ -136,88 +111,93 @@ export async function generateOpenRouter(
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
     console.error("❌ OPENROUTER_API_KEY missing");
-    return "Apologies, I cannot access AI systems right now, but I can still provide guidance.";
+    return "I’m unable to access AI systems right now, but I can still guide you.";
   }
 
   prompt = cleanPrompt(prompt);
   const cacheKey = `${sessionId || "global"}:${prompt}`;
 
-  // Return from cache if already processed
+  /* ---------- CACHE ---------- */
   if (recentCache.has(cacheKey)) {
     return recentCache.get(cacheKey)!;
   }
 
-  // Add strategicBrain context if available
+  /* ---------- STRATEGIC CONTEXT ---------- */
   let contextText = "";
+
   if (sessionId) {
     try {
-      const [brainContextResult] = await Promise.all([
-        strategicBrain(prompt.slice(0, 500), sessionId)
-      ]);
-
-      const { brainContext, chunks } = brainContextResult;
-
-      // Extract pricing info only
-      const pricingChunk = chunks.find(
-        (c: any) => c?.intent?.toLowerCase?.().includes("pricing") && c?.text
+      const { brainContext, chunks } = await strategicBrain(
+        prompt.slice(0, 500),
+        sessionId
       );
-      const pricingInfo = pricingChunk ? pricingChunk.text : "Pricing info not available.";
 
-      contextText = `Context: User stage=${brainContext.stage}, leadScore=${brainContext.leadScore}, recommendedService=${brainContext.recommendedService}. Pricing info: ${pricingInfo}. `;
+      const pricingChunk = chunks.find(
+        (c: any) =>
+          c?.intent?.toLowerCase?.().includes("pricing") && c?.text
+      );
+
+      const pricingInfo = pricingChunk
+        ? pricingChunk.text
+        : "Pricing info not available.";
+
+      contextText = `Context: stage=${brainContext.stage}, leadScore=${brainContext.leadScore}. ${pricingInfo}`;
     } catch (err) {
-      console.warn("⚠️ strategicBrain fetch failed:", err);
+      console.warn("⚠️ strategicBrain failed:", err);
     }
   }
 
   const highIntent = detectHighIntent(prompt);
   let lastError: any = null;
 
+  /* ---------- RETRY LOOP ---------- */
   for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
     try {
-      console.log(`⚡ OpenRouter attempt ${attempt} using ${MODEL} (highIntent=${highIntent})`);
+      console.log(`⚡ OpenRouter attempt ${attempt}`);
 
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "X-Title": "Neon Vision AI"
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          temperature: highIntent ? 0.45 : 0.38,
-          top_p: highIntent ? 0.95 : 0.9,
-          max_tokens: 1200,
-          messages: buildMessages(`${contextText}${prompt}`, highIntent)
-        }),
-        signal: controller.signal
-      });
+      const res = await fetch(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+            "X-Title": "Neon Vision AI"
+          },
+          body: JSON.stringify({
+            model: MODEL,
+            temperature: highIntent ? 0.45 : 0.38,
+            top_p: 0.9,
+            max_tokens: 1200,
+            messages: buildMessages(`${contextText} ${prompt}`, highIntent)
+          }),
+          signal: controller.signal
+        }
+      );
 
       clearTimeout(timeout);
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(`OpenRouter HTTP ${res.status}: ${text}`);
+        throw new Error(`HTTP ${res.status}: ${text}`);
       }
 
       const data = (await res.json()) as OpenRouterResponse;
-      let raw = data?.choices?.[0]?.message?.content ?? data?.choices?.[0]?.text ?? "";
 
-      // Remove accidental contact info
-      raw = raw.replace(/(?:contact|email|phone|call me|reach me)/gi, "");
+      let raw =
+        data?.choices?.[0]?.message?.content ||
+        data?.choices?.[0]?.text ||
+        "";
 
+      // ✅ ONLY CLEAN ONCE (CRITICAL FIX)
       let text = cleanResponse(raw);
 
-      // Slight variation to avoid repetitive responses
-      if (variationCache.has(cacheKey)) {
-        text = `${text} `.trim();
+      if (!isValidResponse(text)) {
+        throw new Error("Invalid response");
       }
-      variationCache.set(cacheKey, (variationCache.get(cacheKey) || 0) + 1);
-
-      if (!isValidResponse(text)) throw new Error("Invalid response pattern");
 
       recentCache.set(cacheKey, text);
 
@@ -226,21 +206,20 @@ export async function generateOpenRouter(
     } catch (err: any) {
       clearTimeout(timeout);
       lastError = err;
-      console.warn(`⚠️ OpenRouter attempt ${attempt} failed:`, err?.message ?? err);
+
+      console.warn(`⚠️ Attempt ${attempt} failed:`, err?.message);
 
       if (attempt <= MAX_RETRIES) {
-        const delay = 1500 * attempt;
-        console.log(`⏳ Retrying in ${delay / 1000}s...`);
-        await new Promise((r) => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, 1200 * attempt));
       }
     }
   }
 
-  console.error("❌ All OpenRouter attempts failed:", lastError);
+  console.error("❌ OpenRouter failed:", lastError);
 
-  // Dynamic fallback selection
-  const variantIndex = Math.floor(Math.random() * fallbackVariants.length);
-  const fallback = fallbackVariants[variantIndex];
+  /* ---------- FALLBACK ---------- */
+  const fallback =
+    fallbackVariants[Math.floor(Math.random() * fallbackVariants.length)];
 
   recentCache.set(cacheKey, fallback);
   return fallback;
