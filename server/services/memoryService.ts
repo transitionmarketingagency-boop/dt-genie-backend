@@ -121,11 +121,16 @@ export async function initializeMemory(): Promise<void> {
 
 /* ================= NORMALIZE CONTENT ================= */
 
-function normalizeContent(text: string): string {
-  if (!text) return "";
-  let normalized = String(text).normalize("NFKC"); // prevent hidden unicode issues
-  normalized = normalized.replace(/\s+/g, " ").trim();
-  return normalized.slice(0, 4000); // truncate last
+function normalizeContent(text: unknown): string {
+  if (typeof text !== "string" || !text.trim()) return "";
+  // Normalize and remove control characters
+  let normalized = text
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001F\u007F]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  // Truncate safely without breaking surrogate pairs
+  return [...normalized].slice(0, 4000).join("");
 }
 
 /* ================= TYPES ================= */
@@ -187,16 +192,20 @@ export class MemoryService {
       const lastTime = new Date(last.timestamp).getTime();
       const nowTime = Date.now();
 
-if (last.content === normalized && nowTime - lastTime < 3000) {
+const lastTimestamp = new Date(last.timestamp);
+if (!isNaN(lastTimestamp.getTime()) &&
+    last.content === normalized &&
+    nowTime - lastTimestamp.getTime() < 3000
+) {
   if (process.env.DEBUG_MEMORY === "true") {
     console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
   }
   return {
-    id: last.id, // reuse last id instead of generating new
+    id: last.id,
     sessionId,
     role,
     content: normalized,
-    timestamp: new Date(last.timestamp),
+    timestamp: lastTimestamp,
   };
 }
 
@@ -352,10 +361,10 @@ saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
     let bant: StrategicMemory["bantSignals"] = undefined;
 
 bant = {
-  budget: row.budget ?? undefined,
-  authority: row.decisionMaker ? 1 : undefined,
-  need: row.interestLevel != null ? 0.8 : undefined,
-  timeline: row.timeline != null ? 0.7 : undefined,
+  budget: typeof row.budget === "number" ? row.budget : undefined,
+  authority: row.decisionMaker && row.decisionMaker.trim() ? 1 : undefined,
+  need: row.interestLevel && row.interestLevel.trim() ? 0.8 : undefined,
+  timeline: row.timeline && row.timeline.trim() ? 0.7 : undefined,
 };
 
     return {
@@ -387,8 +396,8 @@ bant = {
 const merged: StrategicMemory = {
   ...existing,
   ...data,
-  goals: data.goals ?? existing.goals,
-  servicesDiscussed: data.servicesDiscussed ?? existing.servicesDiscussed,
+  goals: data.goals !== undefined ? data.goals : existing.goals,
+  servicesDiscussed: data.servicesDiscussed !== undefined ? data.servicesDiscussed : existing.servicesDiscussed,
   updatedAt: new Date().toISOString(),
 };
 
@@ -437,19 +446,27 @@ const merged: StrategicMemory = {
 
     const db = await this.db;
 
-    await db.run(
-      `INSERT INTO bookings
-      (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      crypto.randomUUID(),
-      data.userId,
-      data.serviceType ?? null,
-      data.preferredTime ?? null,
-      data.email ?? null,
-      data.calendlyLink ?? null,
-      data.status ?? "pending",
-      new Date().toISOString()
-    );
+if (!data.userId || !data.userId.trim()) {
+  throw new Error("Booking must include a valid userId");
+}
+
+const bookingId = crypto.randomUUID();
+const createdAt = new Date().toISOString();
+
+await db.run(
+  `INSERT INTO bookings
+   (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
+   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  bookingId,
+  data.userId,
+  data.serviceType ?? null,
+  data.preferredTime ?? null,
+  data.email ?? null,
+  data.calendlyLink ?? null,
+  data.status ?? "pending",
+  createdAt
+);
+
 
     if (process.env.DEBUG_MEMORY === "true") {
       console.log(`[Memory] Booking stored for ${data.userId}`);

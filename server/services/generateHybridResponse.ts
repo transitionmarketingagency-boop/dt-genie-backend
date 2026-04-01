@@ -69,8 +69,8 @@ function shouldIncludeCTA(
     lower.includes("schedule") ||
     lower.includes("consultation");
 
-  const highIntent =
-    leadScore >= 7 ||
+    const highIntent =
+  leadScore >= 0.7 ||
     stage === "service" ||
     stage === "conversion";
 
@@ -220,7 +220,7 @@ function cleanHybridResponse(text: string): string {
 
 function isLowQuality(text: string): boolean {
   if (!text) return true;
-  if (text.length < 40) return true;
+  if (text.length < 25) return true;
 if (text.split(" ").length < 8) return true;
   if (text.includes("I'm having trouble")) return true;
   if (/^[^a-zA-Z0-9]+$/.test(text)) return true;
@@ -341,12 +341,17 @@ const { brainContext, chunks: strategicChunks = [] } = brainData;
       return bookingResp.response;
     }
 
-if (brain.type === "greeting" && message.trim().length < 10) {
+if (
+  brain.type === "greeting" &&
+  message.trim().split(" ").length <= 2 &&
+  message.trim().length <= 12
+) {
   const greetings = [
     "What are you currently trying to grow or improve?",
     "Tell me — what’s your main focus right now?",
     "What kind of results are you aiming for?",
   ];
+  // pick randomly
   return greetings[Math.floor(Math.random() * greetings.length)];
 }
 
@@ -460,7 +465,7 @@ let response = "";
 let modelUsed = "none";
 
 // Run both models in parallel (fast timeouts)
-const qwenPromise = withTimeout(generateOpenRouter(prompt), 4800);
+const qwenPromise = withTimeout(generateOpenRouter(prompt), 6500);
 
 const geminiPromise = canUseGemini()
   ? withTimeout(generateGemini(prompt), 3200)
@@ -472,7 +477,7 @@ const qwenResp = await qwenPromise;
 let geminiResp: string | null = null;
 
 if (!qwenResp || looksIncomplete(qwenResp)) {
-  if (canUseGemini()) {
+  if (canUseGemini() && message.length > 15) {
     geminiResp = await geminiPromise;
   }
 }
@@ -490,7 +495,20 @@ if (qwenResp && !looksIncomplete(qwenResp)) {
 
 // Final fallback (only if both fail OR response is weak)
 if (!response) {
-  response = smartFallback(message);
+  // prevent repeating same fallback again and again
+  const lastMessages = await memoryService.getRecentContext(sessionId);
+  const lastAssistant = lastMessages
+    ?.reverse()
+    ?.find((m: any) => m.role === "assistant")?.content || "";
+
+  const fallback = smartFallback(message);
+
+  if (lastAssistant && lastAssistant.includes(fallback.slice(0, 60))) {
+    response = "Tell me a bit more about your situation so I can give you something specific to work with.";
+  } else {
+    response = fallback;
+  }
+
   modelUsed = "fallback";
 }
 
@@ -505,8 +523,16 @@ response = response.replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "");
 response = response.replace(/[^\x00-\x7F]+/g, "");
 
 response = response
+  // normalize spaces
   .replace(/\s+/g, " ")
+  // remove spaces before punctuation
   .replace(/\s([.,!?])/g, "$1")
+  // remove common LLM fallback phrases that should never reach user
+  .replace(
+    /(i'?m having (a )?(temporary )?delay.*|there'?s a slight delay.*|i can still help you strategically.*)/gi,
+    ""
+  )
+  // final trim
   .trim();
 
 /* ---------- SAFE RETRY LOGIC (ONLY IF TRULY BAD) ---------- */
@@ -570,13 +596,32 @@ console.log(
 
 
 // 🚨 FINAL SAFETY CHECK (prevents broken outputs)
-if (looksIncomplete(response) || isLowQuality(response)) {
+if (
+  (!response || looksIncomplete(response) || isLowQuality(response)) &&
+  modelUsed !== "fallback"
+) {
   console.log("⚠️ Final response failed validation → using fallback");
 
   const safeFallback = smartFallback(message);
 
-  if (!looksIncomplete(safeFallback)) {
+  // Only switch if fallback is valid
+  if (safeFallback && !looksIncomplete(safeFallback) && !isLowQuality(safeFallback)) {
     response = safeFallback;
+    modelUsed = "fallback";
+  }
+}
+
+// Prevent repeating the same assistant message consecutively
+const lastMessages = await memoryService.getRecentContext(sessionId);
+const lastAssistant = lastMessages
+  ?.reverse()
+  ?.find((m: any) => m.role === "assistant")?.content;
+
+if (lastAssistant && lastAssistant === response) {
+  const repeatFallback = smartFallback(message);
+  if (repeatFallback && !looksIncomplete(repeatFallback) && !isLowQuality(repeatFallback)) {
+    response = repeatFallback;
+    modelUsed = "fallback";
   }
 }
 

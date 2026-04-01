@@ -14,13 +14,10 @@ interface OpenRouterResponse {
   }[];
 }
 
-/* ================= MODEL & SETTINGS (OPTIMIZED) ================= */
+/* ================= MODEL & SETTINGS ================= */
 const MODEL = "qwen/qwen3-235b-a22b-2507";
 
-/* ⚡ SPEED OPTIMIZATION */
-const REQUEST_TIMEOUT = 14000;   // was 28000
-const MAX_RETRIES = 0;           // ❌ removed retry delays
-
+const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 4200;
 
 /* ================= PROMPT CLEANER ================= */
@@ -32,17 +29,57 @@ function cleanPrompt(prompt: string): string {
     .slice(0, MAX_PROMPT_LENGTH) || "";
 }
 
-/* ================= RESPONSE VALIDATION ================= */
+/* ================= VALIDATION HELPERS ================= */
+
 function isValidResponse(text: string): boolean {
-  if (!text || text.length < 20) return false;
+  if (!text || text.length < 15) return false;
 
   const lower = text.toLowerCase();
-  return !["<|", "|>", "undefined", "null", "traceback"].some((p) =>
-    lower.includes(p)
+
+  if (
+    lower.includes("<|") ||
+    lower.includes("|>") ||
+    lower.includes("undefined") ||
+    lower.includes("null") ||
+    lower.includes("traceback")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isFakeDelay(text: string): boolean {
+  const t = text.toLowerCase();
+
+  return (
+    t.includes("temporary delay") ||
+    t.includes("slight delay") ||
+    t.includes("having trouble") ||
+    t.includes("try again shortly") ||
+    t.includes("i can still guide you")
   );
 }
 
-/* ================= SYSTEM PROMPT (UPGRADED) ================= */
+function containsNonEnglish(text: string): boolean {
+  return /[^\x00-\x7F]/.test(text);
+}
+
+function ensureComplete(text: string): string {
+  if (!/[.!?]$/.test(text)) return text + ".";
+  return text;
+}
+
+function fixSpacing(text: string): string {
+  return text
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([a-zA-Z])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-zA-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* ================= SYSTEM PROMPT ================= */
 function buildMessages(prompt: string, highIntent: boolean = false) {
   return [
     {
@@ -50,21 +87,20 @@ function buildMessages(prompt: string, highIntent: boolean = false) {
       content: `You are Neon Vision, AI strategist for Digital Transition Marketing.
 
 Your job:
-Help businesses grow using clear, practical, strategic marketing advice.
+Give clear, specific, and practical marketing advice.
 
 Rules:
-- Be direct, natural, and human (not robotic)
-- Focus on solving the user's actual problem
-- Do NOT give generic or vague answers
-- Do NOT use markdown, symbols, or formatting
-- Recommend relevant services when useful
-- Do NOT hallucinate pricing or details
-- Keep responses concise but impactful
 - Answer exactly what the user asked
+- Be concise but complete
+- Avoid generic responses
+- Do NOT mention delays, errors, or system limitations
+- Do NOT output broken or incomplete sentences
+- Use natural human tone
+- Focus on solving real business problems
 
 Tone: ${
         highIntent
-          ? "confident, strategic, decision-oriented"
+          ? "direct, confident, decision-focused"
           : "clear, helpful, professional"
       }`
     },
@@ -75,7 +111,7 @@ Tone: ${
   ];
 }
 
-/* ================= HIGH INTENT ================= */
+/* ================= INTENT ================= */
 function detectHighIntent(message: string): boolean {
   const lower = message.toLowerCase();
 
@@ -83,25 +119,16 @@ function detectHighIntent(message: string): boolean {
     "hire",
     "book",
     "schedule",
-    "consultation",
     "call",
     "work with",
     "i want",
     "let's start",
-    "ready to invest",
-    "asap"
+    "ready"
   ].some((s) => lower.includes(s));
 }
 
 /* ================= CACHE ================= */
 const recentCache: Map<string, string> = new Map();
-
-/* ================= FALLBACK ================= */
-const fallbackVariants = [
-  "I’m having a temporary delay, but I can still guide you. Tell me more about your goal.",
-  "There’s a slight delay right now. What are you trying to achieve?",
-  "I can still help you strategically—just tell me your situation."
-];
 
 /* ================= MAIN FUNCTION ================= */
 export async function generateOpenRouter(
@@ -110,7 +137,7 @@ export async function generateOpenRouter(
 ): Promise<string> {
 
   if (!OPENROUTER_API_KEY) {
-    return "I’m unable to access AI systems right now, but I can still guide you.";
+    return "I can still guide you — tell me what you're trying to achieve.";
   }
 
   prompt = cleanPrompt(prompt);
@@ -121,7 +148,7 @@ export async function generateOpenRouter(
     return recentCache.get(cacheKey)!;
   }
 
-  /* ⚡ NON-BLOCKING CONTEXT (CRITICAL SPEED FIX) */
+  /* ---------- CONTEXT (NON-BLOCKING) ---------- */
   let contextText = "";
 
   if (sessionId) {
@@ -138,7 +165,7 @@ export async function generateOpenRouter(
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
   try {
-    console.log("⚡ OpenRouter fast-call");
+    console.log("⚡ OpenRouter call");
 
     const res = await fetch(
       "https://openrouter.ai/api/v1/chat/completions",
@@ -151,9 +178,9 @@ export async function generateOpenRouter(
         },
         body: JSON.stringify({
           model: MODEL,
-          temperature: highIntent ? 0.42 : 0.35,
+          temperature: highIntent ? 0.45 : 0.35,
           top_p: 0.9,
-          max_tokens: 900, // ⚡ reduced for speed
+          max_tokens: 800,
           messages: buildMessages(`${contextText} ${prompt}`, highIntent)
         }),
         signal: controller.signal
@@ -171,16 +198,21 @@ export async function generateOpenRouter(
       data?.choices?.[0]?.text ||
       "";
 
-    /* ✅ SINGLE CLEAN PIPELINE */
-    const text = cleanResponse(raw);
+    let text = cleanResponse(raw);
 
-    if (!isValidResponse(text)) {
-      throw new Error("Invalid response");
+    /* ---------- HARD VALIDATION PIPELINE ---------- */
+
+    if (!isValidResponse(text) || isFakeDelay(text) || containsNonEnglish(text)) {
+      throw new Error("Rejected bad model output");
     }
 
+    text = fixSpacing(text);
+    text = ensureComplete(text);
+
+    /* ---------- CACHE ONLY CLEAN RESPONSES ---------- */
     recentCache.set(cacheKey, text);
 
-    console.log("✅ OpenRouter success (fast)");
+    console.log("✅ OpenRouter success");
     return text;
 
   } catch (err: any) {
@@ -188,10 +220,7 @@ export async function generateOpenRouter(
 
     console.warn("⚠️ OpenRouter failed:", err?.message);
 
-    const fallback =
-      fallbackVariants[Math.floor(Math.random() * fallbackVariants.length)];
-
-    recentCache.set(cacheKey, fallback);
-    return fallback;
+    // ⚠️ NO MORE "DELAY" RESPONSES
+    return "";
   }
 }

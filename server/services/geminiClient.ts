@@ -1,51 +1,32 @@
 // server/services/geminiClient.ts
+
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
 import fetch from "node-fetch";
 import * as dotenv from "dotenv";
 import { strategicBrain } from "./strategicBrain.js";
 
-/* ---------------- ESM safe paths ---------------- */
+/* ---------------- ESM PATHS ---------------- */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/* ---------------- Load .env ---------------- */
+/* ---------------- ENV ---------------- */
 dotenv.config({ path: join(__dirname, "../../.env") });
 
-/* ---------------- Gemini config (OPTIMIZED) ---------------- */
+/* ---------------- CONFIG ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
 
-/* ⚡ SPEED OPTIMIZATION */
-const TIMEOUT = 16000;       // was 25000
-const MAX_RETRIES = 0;       // ❌ removed retry delays
+const TIMEOUT = 12000;
 
-/* ---------------- Identity ---------------- */
+/* ---------------- IDENTITY ---------------- */
 const identityUrl = pathToFileURL(join(__dirname, "../system/identity.js")).href;
 const { BOT_NAME } = await import(identityUrl);
 
-/* ---------------- Cache ---------------- */
+/* ---------------- CACHE ---------------- */
 const recentCache: Map<string, string> = new Map();
 
-/* ---------------- Fallback ---------------- */
-const fallbackVariants = [
-  "I’m having a temporary delay, but I can still guide you. Tell me a bit more about your goal.",
-  "There’s a slight delay right now. Share your situation and I’ll help you move forward.",
-  "I can still help you strategically — just tell me more about what you're trying to achieve."
-];
-
-/* ---------------- Validators ---------------- */
-function isValidResponse(text: string) {
-  if (!text || text.length < 25) return false;
-
-  const badPatterns = [
-    "```", "<|", "|>", "assistant:", "system:", "undefined", "null", "error"
-  ];
-
-  return !badPatterns.some((p) => text.toLowerCase().includes(p));
-}
-
-/* ---------------- Prompt Cleaner ---------------- */
+/* ---------------- PROMPT CLEAN ---------------- */
 function cleanPrompt(prompt: string) {
   return prompt
     ?.replace(/\s+/g, " ")
@@ -54,7 +35,60 @@ function cleanPrompt(prompt: string) {
     .slice(0, 4000) || "";
 }
 
-/* ---------------- LIGHT Response Cleaner (FAST) ---------------- */
+/* ---------------- VALIDATION ---------------- */
+
+function isValidResponse(text: string) {
+  if (!text || text.length < 15) return false;
+
+  const lower = text.toLowerCase();
+
+  if (
+    lower.includes("```") ||
+    lower.includes("<|") ||
+    lower.includes("|>") ||
+    lower.includes("assistant:") ||
+    lower.includes("system:") ||
+    lower.includes("undefined") ||
+    lower.includes("null") ||
+    lower.includes("error")
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function isFakeDelay(text: string): boolean {
+  const t = text.toLowerCase();
+
+  return (
+    t.includes("temporary delay") ||
+    t.includes("slight delay") ||
+    t.includes("having trouble") ||
+    t.includes("try again shortly") ||
+    t.includes("i can still guide you")
+  );
+}
+
+function containsNonEnglish(text: string): boolean {
+  return /[^\x00-\x7F]/.test(text);
+}
+
+function ensureComplete(text: string): string {
+  if (!/[.!?]$/.test(text)) return text + ".";
+  return text;
+}
+
+function fixSpacing(text: string): string {
+  return text
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([a-zA-Z])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-zA-Z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/* ---------------- CLEAN RESPONSE ---------------- */
 function cleanResponse(text: string) {
   return text
     ?.replace(/assistant:|system:/gi, "")
@@ -63,33 +97,43 @@ function cleanResponse(text: string) {
     .trim() || "";
 }
 
-/* ---------------- High Intent ---------------- */
+/* ---------------- INTENT ---------------- */
 function detectHighIntent(prompt: string): boolean {
   const text = prompt.toLowerCase();
 
   return [
-    "hire", "book", "schedule", "call",
-    "work with", "i want", "let's start",
-    "ready to invest", "asap"
+    "hire",
+    "book",
+    "schedule",
+    "call",
+    "work with",
+    "i want",
+    "let's start",
+    "ready"
   ].some((s) => text.includes(s));
 }
 
 /* ---------------- MAIN FUNCTION ---------------- */
-export async function generateGemini(prompt: string, sessionId?: string): Promise<string> {
+export async function generateGemini(
+  prompt: string,
+  sessionId?: string
+): Promise<string> {
+
   const API_KEY = process.env.GEMINI_API_KEY;
 
   if (!API_KEY) {
-    return "I’m unable to access AI systems right now, but I can still guide you if you share more details.";
+    return "";
   }
 
   prompt = cleanPrompt(prompt);
   const cacheKey = `${sessionId || "global"}:${prompt}`;
 
+  /* ---------- CACHE ---------- */
   if (recentCache.has(cacheKey)) {
     return recentCache.get(cacheKey)!;
   }
 
-  /* ⚡ NON-BLOCKING STRATEGIC CONTEXT */
+  /* ---------- CONTEXT (NON-BLOCKING) ---------- */
   let contextText = "";
 
   if (sessionId) {
@@ -102,20 +146,20 @@ export async function generateGemini(prompt: string, sessionId?: string): Promis
 
   const highIntent = detectHighIntent(prompt);
 
-  /* 🔥 IMPROVED PROMPT (LESS GENERIC, MORE STRATEGIC) */
+  /* ---------- PROMPT ---------- */
   const finalPrompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
 Your job:
-Help businesses grow using clear, practical, strategic marketing advice.
+Give clear, specific, and practical marketing advice.
 
 Rules:
-- Be direct, clear, and natural (not robotic)
-- Focus on solving the user's problem
-- Do NOT use markdown, symbols, or formatting
-- Do NOT give generic answers
-- Do NOT hallucinate services or pricing
-- Give actionable insights
+- Answer exactly what the user asked
+- Be concise but complete
+- Avoid generic responses
+- Do NOT mention delays, errors, or system issues
+- Do NOT output broken or incomplete sentences
+- Focus on solving real business problems
 
 ${contextText}
 
@@ -129,7 +173,7 @@ Response:
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
 
   try {
-    console.log(`⚡ Gemini fast-call (highIntent=${highIntent})`);
+    console.log(`⚡ Gemini call (highIntent=${highIntent})`);
 
     const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
       method: "POST",
@@ -137,7 +181,7 @@ Response:
       body: JSON.stringify({
         contents: [{ parts: [{ text: finalPrompt }] }],
         generationConfig: {
-          temperature: highIntent ? 0.4 : 0.3,
+          temperature: highIntent ? 0.45 : 0.35,
           maxOutputTokens: 800,
           topP: 0.9
         }
@@ -156,13 +200,22 @@ Response:
 
     content = cleanResponse(content);
 
-    if (!isValidResponse(content)) {
-      throw new Error("Invalid Gemini response");
+    /* ---------- HARD VALIDATION ---------- */
+    if (
+      !isValidResponse(content) ||
+      isFakeDelay(content) ||
+      containsNonEnglish(content)
+    ) {
+      throw new Error("Rejected bad Gemini output");
     }
 
+    content = fixSpacing(content);
+    content = ensureComplete(content);
+
+    /* ---------- CACHE CLEAN ONLY ---------- */
     recentCache.set(cacheKey, content);
 
-    console.log("✅ Gemini success (fast)");
+    console.log("✅ Gemini success");
     return content;
 
   } catch (err: any) {
@@ -170,13 +223,10 @@ Response:
 
     console.warn("⚠️ Gemini failed:", err?.message || err);
 
-    const fallback =
-      fallbackVariants[Math.floor(Math.random() * fallbackVariants.length)];
-
-    recentCache.set(cacheKey, fallback);
-    return fallback;
+    // ⚠️ NO MORE FAKE FALLBACKS
+    return "";
   }
 }
 
-/* ---------------- Compatibility ---------------- */
+/* ---------------- EXPORT ---------------- */
 export const geminiClient = generateGemini;
