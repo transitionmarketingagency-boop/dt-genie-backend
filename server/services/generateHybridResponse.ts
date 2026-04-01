@@ -296,8 +296,12 @@ export async function generateHybridResponse({
 }): Promise<string> {
   try {
     /* ---------- STRATEGIC BRAIN ---------- */
-    const { brainContext, chunks: strategicChunks = [] } = await strategicBrain(message, sessionId);
-    await analyzeLeadSignals(message, sessionId);
+const [brainData] = await Promise.all([
+  strategicBrain(message, sessionId),
+  analyzeLeadSignals(message, sessionId) // fire in parallel
+]);
+
+const { brainContext, chunks: strategicChunks = [] } = brainData;
 
     /* ---------- BOOKING FLOW ---------- */
     if (bookingFlow.isBookingActive(sessionId)) {
@@ -341,7 +345,7 @@ if (brain.type === "greeting" && message.trim().length < 10) {
     ? history
     : await memoryService.getRecentContext(sessionId) || [];
     const historyText = historyMessages
-  .slice(-5)
+  .slice(-3)
   .map((h: any) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`)
   .join("\n");
 
@@ -354,12 +358,42 @@ if (brain.type === "greeting" && message.trim().length < 10) {
 let detectedService: string | null = null;
     try { detectedService = detectService(message); } catch {}
 
-    /* ---------- VECTOR KNOWLEDGE ---------- */
-    const expandedQueries = await expandQueryNeural(message, historyMessages.map((h) => h.content));
-    const fusedChunks = await getFusedChunks(expandedQueries.join(" "), 4);
-    const mergedChunks = [...strategicChunks, ...(fusedChunks || [])].filter((c, i, arr) => arr.findIndex((x) => x.text === c.text) === i);
-    const vectorText = compressContext(mergedChunks);
-    const vectorCount = mergedChunks.length;
+/* ---------- VECTOR KNOWLEDGE ---------- */
+
+// Run query expansion and vector fetch in parallel (faster)
+const expandedQueriesPromise = expandQueryNeural(
+  message,
+  historyMessages.map((h) => h.content)
+);
+
+const fusedChunksPromise = expandedQueriesPromise.then((queries) =>
+  getFusedChunks(queries.join(" "), 4)
+);
+
+// Wait for both
+const [expandedQueries, fusedChunks] = await Promise.all([
+  expandedQueriesPromise,
+  fusedChunksPromise
+]);
+
+// Merge + dedupe
+const mergedChunks = [
+  ...strategicChunks,
+  ...(fusedChunks || [])
+].filter(
+  (c, i, arr) =>
+    c?.text &&
+    arr.findIndex((x) => x.text === c.text) === i
+);
+
+// Limit chunks for speed (IMPORTANT)
+const limitedChunks = mergedChunks.slice(0, 5);
+
+// Compress context
+const vectorText = compressContext(limitedChunks, 220);
+
+// Debug count (keep original meaning)
+const vectorCount = limitedChunks.length;
 
     /* ---------- PROMPT ---------- */
 const prompt = `
@@ -411,35 +445,30 @@ let response = "";
 let modelUsed = "none";
 
 // Run both models in parallel (fast timeouts)
-const qwenPromise = withTimeout(generateOpenRouter(prompt), 8000);
+const qwenPromise = withTimeout(generateOpenRouter(prompt), 6500);
+
 const geminiPromise = canUseGemini()
-  ? withTimeout(generateGemini(prompt), 6000)
+  ? withTimeout(generateGemini(prompt), 4500)
   : Promise.resolve(null);
 
 // ⚡ Wait for BOTH (ensures fallback safety + avoids undefined vars)
-const [qwenResp, geminiResp] = await Promise.all([
-  qwenPromise,
-  geminiPromise,
-]);
+const qwenResp = await qwenPromise;
+
+let geminiResp: string | null = null;
+
+if (!qwenResp && canUseGemini()) {
+  geminiResp = await geminiPromise;
+}
 
 // Priority: Qwen -> Gemini (controlled + stable)
-const candidates = [
-  { resp: qwenResp, name: "Qwen" },
-  { resp: geminiResp, name: "Gemini", mark: markGeminiUsed },
-];
 
-for (const c of candidates) {
-  if (c.resp) {
-    const cleaned = cleanResponse(c.resp);
-
-    if (!looksIncomplete(cleaned)) {
-      response = cleaned;
-      modelUsed = c.name;
-
-      if (c.mark) c.mark();
-      break;
-    }
-  }
+if (qwenResp && !looksIncomplete(qwenResp)) {
+  response = qwenResp;
+  modelUsed = "Qwen";
+} else if (geminiResp && !looksIncomplete(geminiResp)) {
+  response = geminiResp;
+  modelUsed = "Gemini";
+  markGeminiUsed();
 }
 
 // Final fallback (only if both fail OR response is weak)
@@ -450,16 +479,11 @@ if (!response) {
 
 /* ---------- CLEANUP (STABLE + NON-DESTRUCTIVE) ---------- */
 
-// ✅ Single source of truth cleanup (DO NOT duplicate elsewhere)
-response = cleanResponse(response);
-
-// ✅ Remove sensitive/contact artifacts only
 response = removeContactInfo(response);
 
-// ✅ Light normalization (safe only — no aggressive mutation)
 response = response
-  .replace(/\s+/g, " ")        // normalize spacing
-  .replace(/\s([.,!?])/g, "$1") // remove space before punctuation
+  .replace(/\s+/g, " ")
+  .replace(/\s([.,!?])/g, "$1")
   .trim();
 
 /* ---------- SAFE RETRY LOGIC (ONLY IF TRULY BAD) ---------- */
@@ -472,7 +496,7 @@ if (
 ) {
   console.log("⚠️ Low-quality response detected — retrying with Gemini");
 
-  const retry = await generateGemini(prompt);
+const retry = await withTimeout(generateGemini(prompt), 4000);
 
   if (retry) {
     let retryClean = cleanResponse(retry);
