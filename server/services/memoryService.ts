@@ -35,9 +35,10 @@ const MAX_CONTEXT_MESSAGES = 8;
 
 /* ================= SAFE JSON PARSE ================= */
 
-function safeParse(value: any) {
+function safeParse<T = any>(value: unknown): T | undefined {
+  if (!value || typeof value !== "string") return undefined;
   try {
-    return JSON.parse(value);
+    return JSON.parse(value) as T;
   } catch {
     return undefined;
   }
@@ -122,7 +123,9 @@ export async function initializeMemory(): Promise<void> {
 
 function normalizeContent(text: string): string {
   if (!text) return "";
-  return String(text).replace(/\s+/g, " ").trim().slice(0, 4000);
+  let normalized = String(text).normalize("NFKC"); // prevent hidden unicode issues
+  normalized = normalized.replace(/\s+/g, " ").trim();
+  return normalized.slice(0, 4000); // truncate last
 }
 
 /* ================= TYPES ================= */
@@ -184,17 +187,19 @@ export class MemoryService {
       const lastTime = new Date(last.timestamp).getTime();
       const nowTime = Date.now();
 
-      if (last.content === normalized && nowTime - lastTime < 3000) {
+if (last.content === normalized && nowTime - lastTime < 3000) {
+  if (process.env.DEBUG_MEMORY === "true") {
+    console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
+  }
+  return {
+    id: last.id, // reuse last id instead of generating new
+    sessionId,
+    role,
+    content: normalized,
+    timestamp: new Date(last.timestamp),
+  };
+}
 
-        return {
-          id: crypto.randomUUID(),
-          sessionId,
-          role,
-          content: normalized,
-          timestamp: new Date(),
-        };
-
-      }
     }
 
     const now = new Date();
@@ -242,9 +247,12 @@ export class MemoryService {
     return msg;
   }
 
-  saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
-    return this.addMessage(sessionId, role, content);
-  }
+
+/* -------- Optional wrapper to maintain backward compatibility -------- */
+saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
+  return this.addMessage(sessionId, role, content);
+}
+
 
   /* -------- Get Full History -------- */
 
@@ -343,14 +351,12 @@ export class MemoryService {
 
     let bant: StrategicMemory["bantSignals"] = undefined;
 
-    if (row.budget || row.decisionMaker || row.timeline || row.interestLevel) {
-      bant = {
-        budget: row.budget ?? undefined,
-        authority: row.decisionMaker ? 1 : undefined,
-        need: row.interestLevel ? 0.8 : undefined,
-        timeline: row.timeline ? 0.7 : undefined,
-      };
-    }
+bant = {
+  budget: row.budget ?? undefined,
+  authority: row.decisionMaker ? 1 : undefined,
+  need: row.interestLevel != null ? 0.8 : undefined,
+  timeline: row.timeline != null ? 0.7 : undefined,
+};
 
     return {
       industry: row.industry || undefined,
@@ -378,11 +384,13 @@ export class MemoryService {
 
     const existing = await this.getStrategicMemory(sessionId);
 
-    const merged: StrategicMemory = {
-      ...existing,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
+const merged: StrategicMemory = {
+  ...existing,
+  ...data,
+  goals: data.goals ?? existing.goals,
+  servicesDiscussed: data.servicesDiscussed ?? existing.servicesDiscussed,
+  updatedAt: new Date().toISOString(),
+};
 
     await db.run(
       `INSERT INTO strategic_memory
