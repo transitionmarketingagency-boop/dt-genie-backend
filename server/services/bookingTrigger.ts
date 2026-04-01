@@ -58,7 +58,7 @@ const MAX_CONTEXT_BOOST = 0.25;
 const BOOST_PER_KEYWORD = 0.05;
 
 /* ================= COOLDOWN ================= */
-const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 minutes
+const BOOKING_COOLDOWN_MS = 1000 * 60 * 5;
 const bookingCooldownMap = new Map<string, number>();
 
 /* ================= NORMALIZE ================= */
@@ -86,7 +86,8 @@ function applyRecentContextBoost(
     const matchedKeywords = new Set<string>();
 
     for (const kw of RECENT_CONTEXT_KEYWORDS) {
-      const regex = new RegExp(`\\b${normalize(kw)}\\b`, "i");
+      const safeKw = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex
+      const regex = new RegExp(`\\b${safeKw}\\b`, "i");
       if (regex.test(lower)) matchedKeywords.add(kw);
     }
 
@@ -146,6 +147,11 @@ export async function shouldTriggerBooking(
 
     const latestMessage = recentMessages[recentMessages.length - 1] ?? "";
 
+    /* ===== HARD GUARD: VERY SHORT INPUT ===== */
+    if (!latestMessage || latestMessage.length < 5) {
+      return false;
+    }
+
     /* ===== REJECTION GUARD ===== */
     if (containsKeyword(latestMessage, REJECTION_KEYWORDS)) {
       if (process.env.DEBUG_MEMORY === "true") {
@@ -162,8 +168,11 @@ export async function shouldTriggerBooking(
       return false;
     }
 
-    /* ===== STRONG INTENT OVERRIDE ===== */
-    if (containsKeyword(latestMessage, STRONG_INTENT_KEYWORDS)) {
+    /* ===== STRONG INTENT OVERRIDE (FIXED) ===== */
+    if (
+      containsKeyword(latestMessage, STRONG_INTENT_KEYWORDS) &&
+      latestMessage.length > 10
+    ) {
       markTriggered(sessionId);
       if (process.env.DEBUG_MEMORY === "true") {
         console.log(`[BookingTrigger] Strong intent detected`);
@@ -177,8 +186,10 @@ export async function shouldTriggerBooking(
 
     /* ===== DYNAMIC THRESHOLD ===== */
     let dynamicThreshold = SERVICE_STAGE_BASE_THRESHOLD;
+
     if (stage === "strategy") dynamicThreshold += 0.05;
     if (leadScore >= 0.8) dynamicThreshold -= 0.1;
+
     dynamicThreshold = Math.min(Math.max(dynamicThreshold, 0.3), 0.65);
 
     /* ===== DEBUG ===== */
@@ -209,6 +220,7 @@ export async function shouldTriggerBooking(
     }
 
     return false;
+
   } catch (err) {
     console.error("[BookingTrigger] Error:", err);
     return false;

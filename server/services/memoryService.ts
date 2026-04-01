@@ -31,7 +31,7 @@ const dbPromise = sqlite.open({
 /* ================= MEMORY LIMITS ================= */
 
 const MAX_HISTORY_MESSAGES = 50;
-const MAX_CONTEXT_MESSAGES = 8;
+const MAX_CONTEXT_MESSAGES = 5;
 
 /* ================= SAFE JSON PARSE ================= */
 

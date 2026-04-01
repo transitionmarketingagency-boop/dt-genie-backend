@@ -42,17 +42,18 @@ function smartFallback(message: string, context: string = ""): string {
     return "Tell me a bit more about what you're trying to achieve, and I’ll map out a clear direction for you.";
   }
 
-  // Dynamic fallback instead of generic loop
-return `You're likely facing a strategy misalignment rather than a single-channel issue.
+// Dynamic fallback (clean, non-repetitive, complete)
+return `Let’s break this down properly.
 
-The fastest way to fix this is to identify:
-- Where your funnel is breaking
-- Whether the issue is traffic quality or conversion
-- And how your messaging aligns with user intent
+Based on what you’re asking, the issue likely sits in one of these areas:
+- Traffic quality vs intent mismatch
+- Weak conversion structure (landing page or funnel)
+- Messaging not aligned with buyer stage
 
-If you want, I can break this down specifically for your business and map a clear execution plan.`;
+The fastest way forward is identifying exactly where users drop off and fixing that specific step.
+
+If you want, tell me a bit about your current setup and I’ll map out the exact fix for you.`;
 }
-
 
 
 function shouldIncludeCTA(
@@ -145,10 +146,20 @@ function looksIncomplete(text: string): boolean {
   // Accept shorter responses; only reject clearly too short
 
 
-if (trimmed.length < 25) return true;
+// Reject very short responses
+if (trimmed.length < 40) return true;
 
-// Allow incomplete punctuation if content is strong
-if (trimmed.length < 60 && !/[.!?]$/.test(trimmed)) return true;
+// Must end cleanly
+if (!/[.!?]$/.test(trimmed)) return true;
+
+// Detect cut-off patterns
+if (/[,$:]$/.test(trimmed)) return true;
+
+// Detect broken currency / sentences
+if (/\$\s*$/.test(trimmed)) return true;
+
+// Detect non-latin corruption (Chinese, etc.)
+if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(trimmed)) return true;
 
 // Reject only clearly broken responses
 if (
@@ -345,7 +356,7 @@ if (brain.type === "greeting" && message.trim().length < 10) {
     ? history
     : await memoryService.getRecentContext(sessionId) || [];
     const historyText = historyMessages
-  .slice(-3)
+  .slice(-2)
   .map((h: any) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`)
   .join("\n");
 
@@ -407,16 +418,20 @@ CRITICAL RULES:
 - If pricing is missing → explain value instead
 - Be natural, human, and strategic (not robotic)
 - Avoid repetition and generic answers
+- ALWAYS finish sentences completely
+- NEVER cut off mid-thought
+- NEVER output partial or corrupted text
 - Focus on solving the user's business problem
 - DO NOT over-focus on one service (like GEO)
 - Dynamically choose from ALL services:
-  (SEO, Performance Marketing, CGI Ads, Automation, Analytics, Content, Branding)
+  (SEO, GEO, Performance Marketing, CGI Ads, Automation, Analytics, Content, Branding, Web Development, Ai virtual 3d property tours, Voice Search Optimization, Music Production, Video & Audio Production, Ai Driven E-mail Marketing, Youtube Ads, Social media & Influencer Marketing
+)
 - Recommend combinations, not single solutions
 
 USER ANALYSIS:
 - Intent: ${detectedIntentNames.join(",")}
 - Service Interest: ${detectedService ?? "multi-service"}
-- Available Services: GEO, Performance Marketing, AI Automation, Content, Branding, Web Development, CGI Ads, Analytics
+- Available Services: GEO, Performance Marketing, AI Automation, Content, Branding, Web Development, CGI Ads, Analytics, Ai virtual 3d property tours, Voice Search Optimization, Music Production, Video & Audio Production, Ai Driven E-mail Marketing, Youtube Ads, Social media & Influencer Marketing
 - Do NOT over-focus on one service (like SEO/GEO); adapt based on user problem
 - Mention relevant services dynamically, not repeatedly
 - Funnel Stage: ${brainContext.stage}
@@ -445,10 +460,10 @@ let response = "";
 let modelUsed = "none";
 
 // Run both models in parallel (fast timeouts)
-const qwenPromise = withTimeout(generateOpenRouter(prompt), 6500);
+const qwenPromise = withTimeout(generateOpenRouter(prompt), 4800);
 
 const geminiPromise = canUseGemini()
-  ? withTimeout(generateGemini(prompt), 4500)
+  ? withTimeout(generateGemini(prompt), 3200)
   : Promise.resolve(null);
 
 // ⚡ Wait for BOTH (ensures fallback safety + avoids undefined vars)
@@ -456,8 +471,10 @@ const qwenResp = await qwenPromise;
 
 let geminiResp: string | null = null;
 
-if (!qwenResp && canUseGemini()) {
-  geminiResp = await geminiPromise;
+if (!qwenResp || looksIncomplete(qwenResp)) {
+  if (canUseGemini()) {
+    geminiResp = await geminiPromise;
+  }
 }
 
 // Priority: Qwen -> Gemini (controlled + stable)
@@ -480,6 +497,12 @@ if (!response) {
 /* ---------- CLEANUP (STABLE + NON-DESTRUCTIVE) ---------- */
 
 response = removeContactInfo(response);
+
+// remove non-latin garbage (Chinese, corrupted tokens)
+response = response.replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "");
+
+// remove weird symbols
+response = response.replace(/[^\x00-\x7F]+/g, "");
 
 response = response
   .replace(/\s+/g, " ")
@@ -546,6 +569,16 @@ console.log(
 );
 
 
+// 🚨 FINAL SAFETY CHECK (prevents broken outputs)
+if (looksIncomplete(response) || isLowQuality(response)) {
+  console.log("⚠️ Final response failed validation → using fallback");
+
+  const safeFallback = smartFallback(message);
+
+  if (!looksIncomplete(safeFallback)) {
+    response = safeFallback;
+  }
+}
 
 
 /* ---------- RETURN ---------- */
