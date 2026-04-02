@@ -350,6 +350,20 @@ if (brain.type === "greeting") {
   return "Hi — what are you looking to improve or grow right now?";
 }
 
+
+/* ---------- HIGH-INTENT OVERRIDE (SMART CONVERSION) ---------- */
+const lowerMsg = message.toLowerCase();
+
+if (
+  lowerMsg.includes("work with you") ||
+  lowerMsg.includes("hire you") ||
+  lowerMsg.includes("get started") ||
+  lowerMsg.includes("start working") ||
+  lowerMsg.includes("how do we start")
+) {
+  return "Great — the best next step is a quick strategy call so we can map this properly. I’ll guide you through the process.";
+}
+
     /* ---------- HISTORY ---------- */
     const historyMessages: any[] =
   Array.isArray(history) && history.length > 0
@@ -407,6 +421,19 @@ const vectorText = compressContext(limitedChunks, 220);
 const vectorCount = limitedChunks.length;
 
     /* ---------- PROMPT ---------- */
+
+const knownContext = `
+Known User Context:
+${historyText}
+
+Industry: ${brainContext.strategicMemory?.industry || "unknown"}
+Business Type: ${brainContext.strategicMemory?.businessType || "unknown"}
+
+IMPORTANT:
+- Do NOT ask for information already provided above
+- Use this context to move the conversation forward
+`;
+
 const prompt = `
 You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
 
@@ -424,40 +451,51 @@ CRITICAL RULES:
 - Focus on solving the user's business problem
 - DO NOT over-focus on one service (like GEO)
 - Dynamically choose from ALL services:
-  (SEO, GEO, Performance Marketing, CGI Ads, Automation, Analytics, Content, Branding, Web Development, Ai virtual 3d property tours, Voice Search Optimization, Music Production, Video & Audio Production, Ai Driven E-mail Marketing, Youtube Ads, Social media & Influencer Marketing
-)
+  (SEO, GEO, Performance Marketing, CGI Ads, Automation, Analytics, Content, Branding, Web Development, AI Virtual 3D Property Tours, Voice Search Optimization, Music Production, Video & Audio Production, AI Driven Email Marketing, YouTube Ads, Social Media & Influencer Marketing)
 - Recommend combinations, not single solutions
+
+🔥 BEHAVIOR FIXES (CRITICAL):
+
+- DO NOT ask unnecessary questions
+- Only ask a question if it directly improves the solution
+- Prefer giving solutions FIRST, then ask ONE focused question if needed
+- If user already provided context → DO NOT ask for it again
+- If user repeats → go deeper instead of repeating yourself
+- NEVER loop the same question again
+
+RESPONSE STRUCTURE (MANDATORY):
+
+1. Identify the real problem clearly
+2. Give a SPECIFIC actionable solution
+3. (Optional) Ask ONE sharp follow-up question
 
 USER ANALYSIS:
 - Intent: ${detectedIntentNames.join(",")}
 - Service Interest: ${detectedService ?? "multi-service"}
-- Available Services: GEO, Performance Marketing, AI Automation, Content, Branding, Web Development, CGI Ads, Analytics, Ai virtual 3d property tours, Voice Search Optimization, Music Production, Video & Audio Production, Ai Driven E-mail Marketing, Youtube Ads, Social media & Influencer Marketing
-- Do NOT over-focus on one service (like SEO/GEO); adapt based on user problem
-- Mention relevant services dynamically, not repeatedly
 - Funnel Stage: ${brainContext.stage}
 - Lead Score: ${brainContext.leadScore}
 - Strategy Insight: ${brainContext.reasoning}
+- Detected Services: ${brainContext.detectedServices?.join(", ") || "none"}
+
+${knownContext}
 
 KNOWLEDGE:
 ${vectorText}
-
-CONVERSATION:
-${historyText}
 
 USER MESSAGE:
 ${message}
 
 INSTRUCTIONS:
 - Think step-by-step before answering
-- Identify the real problem behind the user’s message
-- Give a SPECIFIC, actionable answer (not generic advice)
+- Identify the REAL problem behind the user message
+- Give SPECIFIC, actionable, non-generic advice
 - Adapt response based on funnel stage
 - Use reasoning: ${brainContext.reasoning}
-- Use detected services: ${brainContext.detectedServices?.join(", ") || "none"}
-- Avoid repeating structures
+- Use detected services intelligently (not repetitively)
 - Sound like a human strategist, not a template
-- If user repeats → go deeper, don’t repeat yourself
-
+- If enough context exists → MOVE FORWARD, don't ask basics again
+- Avoid repeating structures or phrases
+- Keep response concise but impactful
 `;
 
 /* ---------- HYBRID MODEL EXECUTION (FAST + RELIABLE) ---------- */
@@ -494,8 +532,10 @@ if (qwenResp && !isLowQuality(qwenResp)) {
   markGeminiUsed();
 }
 
-// Final fallback (ONLY if models completely fail)
-if (!response) {
+/* ---------- FINAL FALLBACK (SMART + CONTROLLED) ---------- */
+
+if (!response || (isLowQuality(response) && message.length < 15)) {
+
   const lastMessages = await memoryService.getRecentContext(sessionId);
 
   const lastAssistant = lastMessages
@@ -503,7 +543,25 @@ if (!response) {
     ?.reverse()
     ?.find((m: any) => m.role === "assistant")?.content || "";
 
-  const msg = message.toLowerCase();
+  const fallbackOptions = [
+    smartFallback(message),
+    "Give me a bit more detail so I can give you something precise.",
+    "Let’s narrow this down — what specific result are you aiming for?",
+  ];
+
+  // pick one randomly
+  let fallback =
+    fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+
+  // 🚫 prevent repetition of same fallback
+  if (lastAssistant && fallback && lastAssistant.slice(0, 80) === fallback.slice(0, 80)) {
+    fallback =
+      "Tell me a bit more about your situation so I can give you a more targeted answer.";
+  }
+
+  response = fallback;
+  modelUsed = "fallback";
+}
 
   /* ---------- CONTEXT-AWARE FALLBACK ---------- */
   let fallbackOptions: string[] = [];
@@ -600,17 +658,20 @@ const retry = await withTimeout(generateGemini(prompt), 4000);
 
 /* ---------- LENGTH CONTROL (SAFE) ---------- */
 
-if (response.length > 1200) {
+if (response && response.length > 1200) {
   response = compressResponse(response);
 }
 
 /* ---------- FINAL IDENTITY ENFORCEMENT ---------- */
 
-response = enforceBotName(response);
+if (response) {
+  response = enforceBotName(response);
+}
 
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
 if (
+  response &&
   shouldIncludeCTA(
     message,
     intentCategories,
@@ -629,33 +690,52 @@ if (
   response += "\n\n" + ctas[Math.floor(Math.random() * ctas.length)];
 }
 
-/* ---------- DEBUG LOG ---------- */
+/* ---------- FINAL SAFETY CHECK (SMART FALLBACK) ---------- */
 
-console.log(
-  `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(
-    ","
-  )} | Chunks=${vectorCount} | Service=${
-    detectedService ?? "none"
-  } | LeadScore=${brainContext.leadScore}`
-);
-
-/* ---------- FINAL SAFETY CHECK ---------- */
-
-if (
-  (!response || looksIncomplete(response) || isLowQuality(response)) &&
-  modelUsed !== "fallback"
-) {
+if (!response || looksIncomplete(response) || isLowQuality(response)) {
   console.log("⚠️ Final response failed validation → using fallback");
 
-  const fallbackOptions = [
-    "Let’s focus on your situation — what’s the main challenge right now?",
-    "Give me a bit more context so I can give you something precise.",
-    "What part of your setup feels like it's underperforming?",
+  const lastMessages = await memoryService.getRecentContext(sessionId);
+
+  const lastAssistant =
+    lastMessages
+      ?.slice()
+      ?.reverse()
+      ?.find((m: any) => m.role === "assistant")?.content || "";
+
+  const msg = message.toLowerCase();
+
+  let fallbackOptions = [
+    "Tell me a bit more about your situation so I can give you something specific.",
+    "Give me a bit more detail — I’ll refine this properly for you.",
+    "What’s the main bottleneck you're facing right now?",
   ];
 
-  response =
+  // 🔥 Context-aware fallback
+  if (msg.includes("ecommerce") || msg.includes("store")) {
+    fallbackOptions = [
+      "For e-commerce, issues usually come from traffic quality, conversion flow, or product positioning — which one feels off?",
+    ];
+  } else if (msg.includes("ads") || msg.includes("roas")) {
+    fallbackOptions = [
+      "Low ROAS usually comes from creative fatigue or audience mismatch — want me to break it down?",
+    ];
+  } else if (msg.includes("seo")) {
+    fallbackOptions = [
+      "SEO issues usually come from structure, content depth, or indexing — what are you currently doing?",
+    ];
+  }
+
+  let selected =
     fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
 
+  // 🚫 Prevent repetition
+  if (lastAssistant && lastAssistant.slice(0, 80) === selected.slice(0, 80)) {
+    selected =
+      "Let’s go deeper — what’s the biggest issue you're trying to solve right now?";
+  }
+
+  response = selected;
   modelUsed = "fallback";
 }
 
@@ -663,12 +743,17 @@ if (
 
 const lastMessages = await memoryService.getRecentContext(sessionId);
 
-const lastAssistant = lastMessages
-  ?.slice()
-  ?.reverse()
-  ?.find((m: any) => m.role === "assistant")?.content;
+const lastAssistant =
+  lastMessages
+    ?.slice()
+    ?.reverse()
+    ?.find((m: any) => m.role === "assistant")?.content || "";
 
-if (lastAssistant && lastAssistant.slice(0, 100) === response.slice(0, 100)) {
+if (
+  response &&
+  lastAssistant &&
+  lastAssistant.slice(0, 100) === response.slice(0, 100)
+) {
   const variationOptions = [
     "Let’s go deeper — what’s the main bottleneck you're facing?",
     "Tell me more about your current setup so I can refine this.",
@@ -683,7 +768,19 @@ if (lastAssistant && lastAssistant.slice(0, 100) === response.slice(0, 100)) {
 
 /* ---------- SAVE MEMORY ---------- */
 
-await memoryService.saveMessage(sessionId, "assistant", response);
+if (response) {
+  await memoryService.saveMessage(sessionId, "assistant", response);
+}
+
+/* ---------- DEBUG LOG ---------- */
+
+console.log(
+  `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(
+    ","
+  )} | Chunks=${vectorCount} | Service=${
+    detectedService ?? "none"
+  } | LeadScore=${brainContext.leadScore}`
+);
 
 /* ---------- RETURN ---------- */
 
