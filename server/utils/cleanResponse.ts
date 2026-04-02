@@ -33,12 +33,6 @@ export function cleanResponse(raw: string): string {
   // Fix: "businessespecially" → "business especially"
   text = text.replace(/([a-z])([A-Z])/g, "$1 $2");
 
-  // Fix: "businessespecially" (lowercase merges)
-  text = text.replace(/([a-z]{4,})([a-z]{4,})/g, (match) => {
-    // avoid breaking normal words
-    if (match.length < 10) return match;
-    return match.slice(0, Math.floor(match.length / 2)) + " " + match.slice(Math.floor(match.length / 2));
-  });
 
   /* ===== FIX MISSING SPACE AFTER PUNCTUATION ===== */
   text = text.replace(/([.!?])([A-Za-z])/g, "$1 $2");

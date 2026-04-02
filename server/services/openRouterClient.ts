@@ -221,6 +221,6 @@ export async function generateOpenRouter(
     console.warn("⚠️ OpenRouter failed:", err?.message);
 
     // ⚠️ NO MORE "DELAY" RESPONSES
-    return "";
+   return "Let me think through this properly — what’s your current setup?";
   }
 }

@@ -147,10 +147,11 @@ function looksIncomplete(text: string): boolean {
 
 
 // Reject very short responses
-if (trimmed.length < 40) return true;
+if (trimmed.length < 20) return true;
 
 // Must end cleanly
-if (!/[.!?]$/.test(trimmed)) return true;
+// allow conversational endings for shorter responses
+if (!/[.!?]$/.test(trimmed) && trimmed.length < 80) return true;
 
 // Detect cut-off patterns
 if (/[,$:]$/.test(trimmed)) return true;
@@ -341,18 +342,12 @@ const { brainContext, chunks: strategicChunks = [] } = brainData;
       return bookingResp.response;
     }
 
-if (
-  brain.type === "greeting" &&
-  message.trim().split(" ").length <= 2 &&
-  message.trim().length <= 12
-) {
-  const greetings = [
-    "What are you currently trying to grow or improve?",
-    "Tell me — what’s your main focus right now?",
-    "What kind of results are you aiming for?",
-  ];
-  // pick randomly
-  return greetings[Math.floor(Math.random() * greetings.length)];
+if (brain.type === "greeting") {
+  if (brainContext?.dynamicGreeting) {
+    return brainContext.dynamicGreeting;
+  }
+
+  return "Hi — what are you looking to improve or grow right now?";
 }
 
     /* ---------- HISTORY ---------- */
@@ -453,10 +448,16 @@ USER MESSAGE:
 ${message}
 
 INSTRUCTIONS:
-- Give a clear, useful, and tailored answer
-- If user shows intent → guide toward solution
-- If high intent → naturally move toward next step (no hard sell)
-- Keep it concise but impactful
+- Think step-by-step before answering
+- Identify the real problem behind the user’s message
+- Give a SPECIFIC, actionable answer (not generic advice)
+- Adapt response based on funnel stage
+- Use reasoning: ${brainContext.reasoning}
+- Use detected services: ${brainContext.detectedServices?.join(", ") || "none"}
+- Avoid repeating structures
+- Sound like a human strategist, not a template
+- If user repeats → go deeper, don’t repeat yourself
+
 `;
 
 /* ---------- HYBRID MODEL EXECUTION (FAST + RELIABLE) ---------- */
@@ -484,7 +485,7 @@ if (!qwenResp || looksIncomplete(qwenResp)) {
 
 // Priority: Qwen -> Gemini (controlled + stable)
 
-if (qwenResp && !looksIncomplete(qwenResp)) {
+if (qwenResp && !isLowQuality(qwenResp)) {
   response = qwenResp;
   modelUsed = "Qwen";
 } else if (geminiResp && !looksIncomplete(geminiResp)) {
@@ -493,24 +494,57 @@ if (qwenResp && !looksIncomplete(qwenResp)) {
   markGeminiUsed();
 }
 
-// Final fallback (only if both fail OR response is weak)
+// Final fallback (ONLY if models completely fail)
 if (!response) {
-  // prevent repeating same fallback again and again
   const lastMessages = await memoryService.getRecentContext(sessionId);
+
   const lastAssistant = lastMessages
+    ?.slice()
     ?.reverse()
     ?.find((m: any) => m.role === "assistant")?.content || "";
 
-  const fallback = smartFallback(message);
+  const msg = message.toLowerCase();
 
-  if (lastAssistant && lastAssistant.includes(fallback.slice(0, 60))) {
-    response = "Tell me a bit more about your situation so I can give you something specific to work with.";
+  /* ---------- CONTEXT-AWARE FALLBACK ---------- */
+  let fallbackOptions: string[] = [];
+
+  if (msg.includes("ecommerce") || msg.includes("store")) {
+    fallbackOptions = [
+      "If you're growing an e-commerce store, the fastest wins usually come from fixing conversion gaps rather than just adding traffic. What’s your current traffic source?",
+      "For e-commerce, growth usually comes down to product positioning, funnel flow, and retention. Which one do you think is weakest right now?",
+    ];
+  } else if (msg.includes("instagram") || msg.includes("social")) {
+    fallbackOptions = [
+      "If you're focused on Instagram growth, we should look at content structure and engagement loops. What kind of content are you posting right now?",
+      "Engagement usually drops when content isn’t aligned with audience intent. Are you focusing more on reach, engagement, or conversions?",
+    ];
+  } else if (msg.includes("ads") || msg.includes("roas")) {
+    fallbackOptions = [
+      "If your ads aren't performing, it's usually creative fatigue or audience mismatch. What platform are you running ads on?",
+      "Scaling ads isn’t just budget — it’s creative and targeting. What’s your current ROAS looking like?",
+    ];
   } else {
-    response = fallback;
+    fallbackOptions = [
+      "I want to give you something tailored — what does your current setup look like?",
+      "Let’s get specific. What’s the main problem you're facing right now?",
+      "Tell me a bit more about your business and I’ll map out a clear strategy for you.",
+    ];
   }
 
+  /* ---------- ANTI-REPEAT LOGIC ---------- */
+  let selected =
+    fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+
+  if (lastAssistant && lastAssistant === selected) {
+    selected =
+      fallbackOptions.find((opt) => opt !== lastAssistant) ||
+      fallbackOptions[0];
+  }
+
+  response = selected;
   modelUsed = "fallback";
 }
+
 
 /* ---------- CLEANUP (STABLE + NON-DESTRUCTIVE) ---------- */
 
@@ -519,8 +553,8 @@ response = removeContactInfo(response);
 // remove non-latin garbage (Chinese, corrupted tokens)
 response = response.replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "");
 
-// remove weird symbols
-response = response.replace(/[^\x00-\x7F]+/g, "");
+// remove only corrupted unicode, not valid punctuation
+response = response.replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "");
 
 response = response
   // normalize spaces
@@ -574,57 +608,82 @@ if (response.length > 1200) {
 
 response = enforceBotName(response);
 
-
 /* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
 
 if (
-  shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage)
+  shouldIncludeCTA(
+    message,
+    intentCategories,
+    brainContext.leadScore,
+    brainContext.stage
+  )
 ) {
   response = response.replace(/\.*$/, "");
-  response += ".\n\nIf you'd like, I can map this into a clear execution plan tailored to your business.";
+
+  const ctas = [
+    "If you want, I can map this into a step-by-step plan for your business.",
+    "I can break this down into an execution plan if you’d like.",
+    "Want me to turn this into a clear action plan for you?",
+  ];
+
+  response += "\n\n" + ctas[Math.floor(Math.random() * ctas.length)];
 }
 
-/* ---------- SAVE MEMORY ---------- */
-
-await memoryService.saveMessage(sessionId, "assistant", response);
-
-/* ---------- DEBUG LOG (FIXED) ---------- */
+/* ---------- DEBUG LOG ---------- */
 
 console.log(
-  `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(",")} | Chunks=${vectorCount} | Service=${detectedService ?? "none"} | LeadScore=${brainContext.leadScore}`
+  `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(
+    ","
+  )} | Chunks=${vectorCount} | Service=${
+    detectedService ?? "none"
+  } | LeadScore=${brainContext.leadScore}`
 );
 
+/* ---------- FINAL SAFETY CHECK ---------- */
 
-// 🚨 FINAL SAFETY CHECK (prevents broken outputs)
 if (
   (!response || looksIncomplete(response) || isLowQuality(response)) &&
   modelUsed !== "fallback"
 ) {
   console.log("⚠️ Final response failed validation → using fallback");
 
-  const safeFallback = smartFallback(message);
+  const fallbackOptions = [
+    "Let’s focus on your situation — what’s the main challenge right now?",
+    "Give me a bit more context so I can give you something precise.",
+    "What part of your setup feels like it's underperforming?",
+  ];
 
-  // Only switch if fallback is valid
-  if (safeFallback && !looksIncomplete(safeFallback) && !isLowQuality(safeFallback)) {
-    response = safeFallback;
-    modelUsed = "fallback";
-  }
+  response =
+    fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+
+  modelUsed = "fallback";
 }
 
-// Prevent repeating the same assistant message consecutively
+/* ---------- PREVENT REPETITION ---------- */
+
 const lastMessages = await memoryService.getRecentContext(sessionId);
+
 const lastAssistant = lastMessages
+  ?.slice()
   ?.reverse()
   ?.find((m: any) => m.role === "assistant")?.content;
 
-if (lastAssistant && lastAssistant === response) {
-  const repeatFallback = smartFallback(message);
-  if (repeatFallback && !looksIncomplete(repeatFallback) && !isLowQuality(repeatFallback)) {
-    response = repeatFallback;
-    modelUsed = "fallback";
-  }
+if (lastAssistant && lastAssistant.slice(0, 100) === response.slice(0, 100)) {
+  const variationOptions = [
+    "Let’s go deeper — what’s the main bottleneck you're facing?",
+    "Tell me more about your current setup so I can refine this.",
+    "What part of your funnel or growth strategy feels weakest?",
+  ];
+
+  response =
+    variationOptions[Math.floor(Math.random() * variationOptions.length)];
+
+  modelUsed = "fallback";
 }
 
+/* ---------- SAVE MEMORY ---------- */
+
+await memoryService.saveMessage(sessionId, "assistant", response);
 
 /* ---------- RETURN ---------- */
 
@@ -632,6 +691,6 @@ return response;
 
 } catch (err) {
   console.error("Hybrid RAG error:", err);
-  return "There was a temporary processing issue. Please try again shortly.";
+  return "Something went wrong on our side — try again in a moment.";
 }
 }
