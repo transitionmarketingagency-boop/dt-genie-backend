@@ -335,23 +335,16 @@ const { brainContext, chunks: strategicChunks = [] } = brainData;
 
 /* ---------- SMART BOOKING TRIGGER (FIXED) ---------- */
 
-const autoBooking =
-  (await shouldTriggerBooking(sessionId, brainContext.stage)) &&
-  brainContext.leadScore >= 6;
+const autoBooking = (await shouldTriggerBooking(sessionId, brainContext.stage)) && brainContext.leadScore >= 6;
 
 if (
   autoBooking &&
   !bookingFlow.isBookingActive(sessionId) &&
-  !detectBookingRejection(message)
+  !detectBookingRejection(message) &&
+  brain.type !== "booking"
 ) {
   const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-
-  await memoryService.saveMessage(
-    sessionId,
-    "assistant",
-    bookingResp.response
-  );
-
+  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
   return bookingResp.response;
 }
 
@@ -387,12 +380,19 @@ if (
 }
 
 /* ---------- HISTORY ---------- */
-// Use cached messages to avoid multiple DB calls
-const historyMessages: any[] = recentMessagesCache || [];
+// Use cached messages to avoid extra DB calls
+const historyMessages: any[] = recentMessagesCache?.length
+  ? recentMessagesCache
+  : Array.isArray(history) && history.length > 0
+  ? history
+  : [];
 
 const historyText = historyMessages
   .slice(-2) // only take last 2 messages for context
-  .map((h: any) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`)
+  .map(
+    (h: any) =>
+      `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`
+  )
   .join("\n");
 
     /* ---------- INTENT & SERVICE ---------- */
@@ -553,14 +553,10 @@ if (!qwenResp || looksIncomplete(qwenResp)) {
 }
 
 // Priority: Qwen -> Gemini (controlled + stable)
-
-// Accept Qwen unless clearly broken
-if (qwenResp && !looksIncomplete(qwenResp)) {
+if (qwenResp && !isLowQuality(qwenResp)) {
   response = qwenResp;
   modelUsed = "Qwen";
-}
-// Only fallback to Gemini if Qwen failed or is broken
-else if (geminiResp && !looksIncomplete(geminiResp)) {
+} else if (geminiResp && !looksIncomplete(geminiResp)) {
   response = geminiResp;
   modelUsed = "Gemini";
   markGeminiUsed();
