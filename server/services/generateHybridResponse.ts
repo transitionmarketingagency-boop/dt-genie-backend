@@ -262,15 +262,14 @@ async function expandQueryNeural(userMessage: string, history: string[] = []) {
   return Array.from(new Set(expansions));
 }
 
+
 /* ================= NEURAL BRAIN ================= */
 
 function neuralBrain(message: string) {
   const msg = message.trim().toLowerCase();
 
-  // Greeting regex (only trigger for short, standalone greetings)
   const greetingRegex = /^(hi|hello|hey|good morning|good afternoon|good evening)$/i;
 
-  // Booking / scheduling intent
   if (
     msg.includes("book") ||
     msg.includes("schedule") ||
@@ -281,19 +280,17 @@ function neuralBrain(message: string) {
     return { type: "booking" };
   }
 
-  // Identity query
   if (msg.includes("who are you")) {
     return { type: "identity" };
   }
 
-  // Greeting (only if message is very short)
-if (greetingRegex.test(msg) && msg.split(" ").length <= 3) {
+  if (greetingRegex.test(msg) && msg.split(" ").length <= 3) {
     return { type: "greeting" };
   }
 
-  // Default
   return { type: "normal" };
 }
+
 
 /* ================= MAIN HYBRID RESPONSE ================= */
 
@@ -308,62 +305,89 @@ export async function generateHybridResponse({
 }): Promise<string> {
   try {
 
-    // 🔥 CACHE RECENT MESSAGES (PREVENT MULTIPLE DB CALLS)
+    /* ---------- CACHE ---------- */
     const recentMessagesCache =
       history.length > 0
         ? history
         : await memoryService.getRecentContext(sessionId).catch(() => []);
 
+    /* ---------- NEURAL BRAIN (DECLARE ONCE ONLY) ---------- */
+    const brain = neuralBrain(message);
+
     /* ---------- STRATEGIC BRAIN ---------- */
-const [brainData] = await Promise.all([
-  strategicBrain(message, sessionId),
-  analyzeLeadSignals(message, sessionId) // fire in parallel
-]);
+    const [brainData] = await Promise.all([
+      strategicBrain(message, sessionId),
+      analyzeLeadSignals(message, sessionId),
+    ]);
 
-const { brainContext, chunks: strategicChunks = [] } = brainData;
+    const brainContext = brainData?.brainContext ?? {};
+    const strategicChunks = brainData?.chunks ?? [];
 
-    /* ---------- BOOKING FLOW ---------- */
+    const stage = brainContext.stage ?? "initial";
+    const leadScore = brainContext.leadScore ?? 0;
+
+    /* ---------- BOOKING FLOW (ACTIVE SESSION) ---------- */
     if (bookingFlow.isBookingActive(sessionId)) {
       if (detectBookingRejection(message)) {
         bookingFlow.reset(sessionId);
         return "No problem — we can continue here. What would you like to explore?";
       }
+
       const bookingResp = await bookingFlow.handleStep(sessionId, message);
       await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
       return bookingResp.response;
     }
 
-/* ---------- SMART BOOKING TRIGGER (FIXED) ---------- */
+    /* ---------- NEURAL ROUTING ---------- */
 
-const autoBooking = (await shouldTriggerBooking(sessionId, brainContext.stage)) && brainContext.leadScore >= 6;
+    if (brain.type === "identity") {
+      return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
+    }
 
-if (
-  autoBooking &&
-  !bookingFlow.isBookingActive(sessionId) &&
-  !detectBookingRejection(message) &&
-  brain.type !== "booking"
-) {
-  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-  return bookingResp.response;
-}
-
-    /* ---------- NEURAL BRAIN ---------- */
-    const brain = neuralBrain(message);
-    if (brain.type === "identity") return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
     if (brain.type === "booking") {
       const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
       await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
       return bookingResp.response;
     }
 
-if (brain.type === "greeting") {
-  if (brainContext?.dynamicGreeting) {
-    return brainContext.dynamicGreeting;
-  }
+    if (brain.type === "greeting") {
+      if (brainContext?.dynamicGreeting) {
+        return brainContext.dynamicGreeting;
+      }
 
-  return "Hi — what are you looking to improve or grow right now?";
-}
+      return "Hi — what are you looking to improve or grow right now?";
+    }
+
+    /* ---------- SMART AUTO BOOKING ---------- */
+    const autoBooking =
+      (await shouldTriggerBooking(sessionId, stage as any)) &&
+      leadScore >= 6;
+
+    if (
+      autoBooking &&
+      !bookingFlow.isBookingActive(sessionId) &&
+      !detectBookingRejection(message)
+    ) {
+      const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+      return bookingResp.response;
+    }
+
+    /* ---------- FALLBACK / NORMAL RESPONSE ---------- */
+    return `
+Context Ready: ${brainContext.hasSufficientContext ?? false}
+Stage: ${stage}
+Lead Score: ${leadScore}
+Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
+Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
+Strategy Insight: ${brainContext?.reasoning ?? "N/A"}
+Detected Services: ${brainContext?.detectedServices?.join(", ") ?? "none"}
+`;
+
+  } catch (err) {
+    console.error("Hybrid response error:", err);
+    return "Something went wrong — please try again later.";
+  }
 
 
 /* ---------- HIGH-INTENT OVERRIDE (SMART CONVERSION) ---------- */
