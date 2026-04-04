@@ -20,37 +20,19 @@ const BANT_WEIGHTS = {
 
 /* ================= CONTEXT KEYWORDS ================= */
 const RECENT_CONTEXT_KEYWORDS = [
-  "hire",
-  "book",
-  "schedule",
-  "call",
-  "urgent",
-  "as soon as possible",
-  "immediately",
-  "interested",
-  "ready",
+  "hire", "book", "schedule", "call", "urgent",
+  "as soon as possible", "immediately", "interested", "ready",
 ];
 
 /* ================= DIRECT INTENT KEYWORDS ================= */
 const STRONG_INTENT_KEYWORDS = [
-  "i want to hire",
-  "i want to work with you",
-  "how do we start",
-  "let's start",
-  "ready to begin",
-  "book a call",
-  "schedule a call",
-  "let's do this",
+  "i want to hire", "i want to work with you", "how do we start",
+  "let's start", "ready to begin", "book a call", "schedule a call", "let's do this",
 ];
 
 /* ================= REJECTION KEYWORDS ================= */
 const REJECTION_KEYWORDS = [
-  "not now",
-  "later",
-  "just exploring",
-  "no thanks",
-  "dont want",
-  "don't want",
+  "not now", "later", "just exploring", "no thanks", "dont want", "don't want",
 ];
 
 /* ================= BOOST SETTINGS ================= */
@@ -58,7 +40,7 @@ const MAX_CONTEXT_BOOST = 0.25;
 const BOOST_PER_KEYWORD = 0.05;
 
 /* ================= COOLDOWN ================= */
-const BOOKING_COOLDOWN_MS = 1000 * 60 * 5;
+const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 min
 const bookingCooldownMap = new Map<string, number>();
 
 /* ================= NORMALIZE ================= */
@@ -80,7 +62,6 @@ function applyRecentContextBoost(
   if (!recentMessages?.length) return baseConfidence;
 
   let keywordHits = 0;
-
   for (const msg of recentMessages) {
     const lower = normalize(msg);
     const matchedKeywords = new Set<string>();
@@ -90,7 +71,6 @@ function applyRecentContextBoost(
       const regex = new RegExp(`\\b${safeKw}\\b`, "i");
       if (regex.test(lower)) matchedKeywords.add(kw);
     }
-
     keywordHits += matchedKeywords.size;
   }
 
@@ -114,7 +94,7 @@ function calculateBantConfidence(bant: Partial<BANTSignals>): number {
   return Math.min(Math.max(confidence, 0), 1);
 }
 
-/* ================= COOLDOWN CHECK ================= */
+/* ================= COOLDOWN ================= */
 function isInCooldown(sessionId: string): boolean {
   const last = bookingCooldownMap.get(sessionId);
   return last ? Date.now() - last < BOOKING_COOLDOWN_MS : false;
@@ -147,10 +127,8 @@ export async function shouldTriggerBooking(
 
     const latestMessage = recentMessages[recentMessages.length - 1] ?? "";
 
-    /* ===== HARD GUARD: VERY SHORT INPUT ===== */
-    if (!latestMessage || latestMessage.length < 5) {
-      return false;
-    }
+    /* ===== GUARD: VERY SHORT INPUT ===== */
+    if (!latestMessage || latestMessage.length < 5) return false;
 
     /* ===== REJECTION GUARD ===== */
     if (containsKeyword(latestMessage, REJECTION_KEYWORDS)) {
@@ -168,7 +146,7 @@ export async function shouldTriggerBooking(
       return false;
     }
 
-    /* ===== STRONG INTENT OVERRIDE (FIXED) ===== */
+    /* ===== HIGH INTENT OVERRIDE ===== */
     if (
       containsKeyword(latestMessage, STRONG_INTENT_KEYWORDS) &&
       latestMessage.length > 10
@@ -180,19 +158,17 @@ export async function shouldTriggerBooking(
       return true;
     }
 
-    /* ===== CALCULATE BANT + APPLY BOOST ===== */
+    /* ===== CALCULATE BANT CONFIDENCE + BOOST ===== */
     let bantConfidence = calculateBantConfidence(bant);
     bantConfidence = applyRecentContextBoost(recentMessages, bantConfidence);
 
     /* ===== DYNAMIC THRESHOLD ===== */
     let dynamicThreshold = SERVICE_STAGE_BASE_THRESHOLD;
-
     if (stage === "strategy") dynamicThreshold += 0.05;
     if (leadScore >= 0.8) dynamicThreshold -= 0.1;
-
     dynamicThreshold = Math.min(Math.max(dynamicThreshold, 0.3), 0.65);
 
-    /* ===== DEBUG ===== */
+    /* ===== DEBUG LOG ===== */
     if (process.env.DEBUG_MEMORY === "true") {
       console.log(
         `[BookingTrigger] session=${sessionId} stage=${stage} leadScore=${leadScore.toFixed(

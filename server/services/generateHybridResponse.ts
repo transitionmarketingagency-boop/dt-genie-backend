@@ -563,45 +563,6 @@ if (!response || (isLowQuality(response) && message.length < 15)) {
   modelUsed = "fallback";
 }
 
-  /* ---------- CONTEXT-AWARE FALLBACK ---------- */
-  let fallbackOptions: string[] = [];
-
-  if (msg.includes("ecommerce") || msg.includes("store")) {
-    fallbackOptions = [
-      "If you're growing an e-commerce store, the fastest wins usually come from fixing conversion gaps rather than just adding traffic. What’s your current traffic source?",
-      "For e-commerce, growth usually comes down to product positioning, funnel flow, and retention. Which one do you think is weakest right now?",
-    ];
-  } else if (msg.includes("instagram") || msg.includes("social")) {
-    fallbackOptions = [
-      "If you're focused on Instagram growth, we should look at content structure and engagement loops. What kind of content are you posting right now?",
-      "Engagement usually drops when content isn’t aligned with audience intent. Are you focusing more on reach, engagement, or conversions?",
-    ];
-  } else if (msg.includes("ads") || msg.includes("roas")) {
-    fallbackOptions = [
-      "If your ads aren't performing, it's usually creative fatigue or audience mismatch. What platform are you running ads on?",
-      "Scaling ads isn’t just budget — it’s creative and targeting. What’s your current ROAS looking like?",
-    ];
-  } else {
-    fallbackOptions = [
-      "I want to give you something tailored — what does your current setup look like?",
-      "Let’s get specific. What’s the main problem you're facing right now?",
-      "Tell me a bit more about your business and I’ll map out a clear strategy for you.",
-    ];
-  }
-
-  /* ---------- ANTI-REPEAT LOGIC ---------- */
-  let selected =
-    fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
-
-  if (lastAssistant && lastAssistant === selected) {
-    selected =
-      fallbackOptions.find((opt) => opt !== lastAssistant) ||
-      fallbackOptions[0];
-  }
-
-  response = selected;
-  modelUsed = "fallback";
-}
 
 
 /* ---------- CLEANUP (STABLE + NON-DESTRUCTIVE) ---------- */
@@ -705,20 +666,20 @@ if (!response || looksIncomplete(response) || isLowQuality(response)) {
 
   const msg = message.toLowerCase();
 
-  let fallbackOptions = [
+  let fallbackOptions: string[] = [
     "Tell me a bit more about your situation so I can give you something specific.",
     "Give me a bit more detail — I’ll refine this properly for you.",
     "What’s the main bottleneck you're facing right now?",
   ];
 
-  // 🔥 Context-aware fallback
+  // ✅ Context-aware fallback (clean + minimal)
   if (msg.includes("ecommerce") || msg.includes("store")) {
     fallbackOptions = [
-      "For e-commerce, issues usually come from traffic quality, conversion flow, or product positioning — which one feels off?",
+      "For e-commerce, growth issues usually come from conversion flow, traffic quality, or product positioning — which one feels off right now?",
     ];
   } else if (msg.includes("ads") || msg.includes("roas")) {
     fallbackOptions = [
-      "Low ROAS usually comes from creative fatigue or audience mismatch — want me to break it down?",
+      "Low ROAS usually points to creative fatigue or audience mismatch — want me to break that down?",
     ];
   } else if (msg.includes("seo")) {
     fallbackOptions = [
@@ -729,8 +690,12 @@ if (!response || looksIncomplete(response) || isLowQuality(response)) {
   let selected =
     fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
 
-  // 🚫 Prevent repetition
-  if (lastAssistant && lastAssistant.slice(0, 80) === selected.slice(0, 80)) {
+  // 🚫 Prevent repetition (safe check)
+  if (
+    lastAssistant &&
+    selected &&
+    lastAssistant.slice(0, 80) === selected.slice(0, 80)
+  ) {
     selected =
       "Let’s go deeper — what’s the biggest issue you're trying to solve right now?";
   }
