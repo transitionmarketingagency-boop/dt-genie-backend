@@ -373,8 +373,11 @@ export async function generateHybridResponse({
       return bookingResp.response;
     }
 
-    /* ---------- FALLBACK / NORMAL RESPONSE ---------- */
-    return `
+
+/* ---------- CONTINUE FLOW (DO NOT RETURN HERE) ---------- */
+// Removed early return to keep variables in scope.
+// You can optionally log the fallback info without returning:
+console.log(`
 Context Ready: ${brainContext.hasSufficientContext ?? false}
 Stage: ${stage}
 Lead Score: ${leadScore}
@@ -382,13 +385,7 @@ Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
 Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
 Strategy Insight: ${brainContext?.reasoning ?? "N/A"}
 Detected Services: ${brainContext?.detectedServices?.join(", ") ?? "none"}
-`;
-
-  } catch (err) {
-    console.error("Hybrid response error:", err);
-    return "Something went wrong — please try again later.";
-  }
-
+`);
 
 /* ---------- HIGH-INTENT OVERRIDE (SMART CONVERSION) ---------- */
 const lowerMsg = message.toLowerCase();
@@ -570,7 +567,7 @@ const qwenResp = await qwenPromise;
 
 let geminiResp: string | null = null;
 
-if (!qwenResp || looksIncomplete(qwenResp)) {
+if (!qwenResp || (qwenResp && looksIncomplete(qwenResp))) {
   if (canUseGemini() && message.length > 15) {
     geminiResp = await geminiPromise;
   }
@@ -578,10 +575,10 @@ if (!qwenResp || looksIncomplete(qwenResp)) {
 
 // Priority: Qwen -> Gemini (controlled + stable)
 if (qwenResp && !isLowQuality(qwenResp)) {
-  response = qwenResp;
+  response = qwenResp as string;
   modelUsed = "Qwen";
 } else if (geminiResp && !looksIncomplete(geminiResp)) {
-  response = geminiResp;
+  response = geminiResp as string;
   modelUsed = "Gemini";
   markGeminiUsed();
 }
@@ -652,7 +649,7 @@ if (
 const retry = await withTimeout(generateGemini(prompt), 4000);
 
   if (retry) {
-    let retryClean = cleanResponse(retry);
+let retryClean = cleanResponse(retry as string);
     retryClean = removeContactInfo(retryClean);
 
     retryClean = retryClean
