@@ -8,12 +8,12 @@ import { reasoningEngine } from "./reasoningEngine.js";
 import { detectIntents } from "./serviceDetector.js";
 
 /* ================= TYPES ================= */
+
 export type StrategicMemory = {
   servicesDiscussed?: string[];
   businessMentioned?: boolean;
   greetingIndex?: number;
   cachedFusedChunks?: any[];
-  cachedReasoning?: string;
   industry?: string;
   [key: string]: any;
 };
@@ -32,10 +32,11 @@ export type BrainContext = {
   detectedServices?: string[];
   dynamicGreeting?: string;
   unifiedIntentRanking?: { intent: string; score: number }[];
-  hasSufficientContext?: boolean; // 🔥 NEW FIX
+  hasSufficientContext?: boolean;
 };
 
 /* ================= NORMALIZER ================= */
+
 function normalizeText(text: string) {
   let t = (text || "").toLowerCase();
 
@@ -47,45 +48,46 @@ function normalizeText(text: string) {
   };
 
   for (const wrong in corrections) {
-    const regex = new RegExp(`\\b${wrong}\\b`, "g");
-    t = t.replace(regex, corrections[wrong]);
+    t = t.replace(new RegExp(`\\b${wrong}\\b`, "g"), corrections[wrong]);
   }
 
   return t.replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
 /* ================= GREETING ================= */
+
 function isGreeting(text: string) {
   const greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
   return greetings.some((g) => text === g || text.startsWith(g + " "));
 }
 
 /* ================= DYNAMIC GREETING ================= */
-function generateDynamicGreeting(sessionMemory?: StrategicMemory) {
+
+function generateDynamicGreeting(memory?: StrategicMemory) {
   const hour = new Date().getHours();
 
-  let base =
+  const base =
     hour < 12 ? "Good morning" :
     hour < 17 ? "Good afternoon" :
     hour < 22 ? "Good evening" : "Hi";
 
   const variations = [
-    `${base}! How’s your day going?`,
-    `${base}! Ready to grow your business today?`,
     `${base}! What are you working on right now?`,
-    `${base}! Let’s talk strategy.`,
+    `${base}! What are you trying to improve in your business?`,
+    `${base}! Let’s focus on growth — what’s the goal?`,
   ];
 
-  const index = sessionMemory?.greetingIndex
-    ? (sessionMemory.greetingIndex + 1) % variations.length
+  const index = memory?.greetingIndex
+    ? (memory.greetingIndex + 1) % variations.length
     : 0;
 
-  if (sessionMemory) sessionMemory.greetingIndex = index;
+  if (memory) memory.greetingIndex = index;
 
   return variations[index];
 }
 
 /* ================= BUSINESS SIGNAL ================= */
+
 function detectBusinessSignals(text: string) {
   const keywords = [
     "company","business","startup","agency","brand","store",
@@ -96,6 +98,7 @@ function detectBusinessSignals(text: string) {
 }
 
 /* ================= STAGE ================= */
+
 function detectStage(message: string): BrainContext["stage"] {
   const text = message.toLowerCase();
 
@@ -111,6 +114,7 @@ function detectStage(message: string): BrainContext["stage"] {
 }
 
 /* ================= LEAD ================= */
+
 function scoreLead(message: string) {
   let score = detectBusinessSignals(message);
 
@@ -119,12 +123,13 @@ function scoreLead(message: string) {
   if (/\bautomation\b/.test(message)) score += 2;
   if (message.includes("hire")) score += 3;
   if (message.includes("price")) score += 3;
-  if (message.includes("need")) score += 2;
+  if (message.includes("need") || message.includes("looking")) score += 2;
 
   return Math.min(score, 10);
 }
 
 /* ================= DEAL ================= */
+
 function estimateDealProbability(stage: BrainContext["stage"], leadScore: number) {
   const base = {
     discovery: 0.25,
@@ -138,20 +143,23 @@ function estimateDealProbability(stage: BrainContext["stage"], leadScore: number
 }
 
 /* ================= REASONING ================= */
+
 function generateReasoning(message: string, services: any[]) {
   if (services?.length) return `User interested in ${services[0].value}`;
-  if (message.includes("roas")) return "User has performance issue";
-  if (message.includes("sales")) return "User has sales problem";
+  if (message.includes("roas")) return "User has performance marketing issue";
+  if (message.includes("sales")) return "User wants to increase sales";
   return "General marketing inquiry";
 }
 
 /* ================= SERVICE PICK ================= */
+
 function pickRecommendedService(services: any[]) {
   if (!services?.length) return null;
   return services.sort((a, b) => b.confidence - a.confidence)[0].value;
 }
 
 /* ================= MAIN ================= */
+
 export async function strategicBrain(userMessage: string, sessionId?: string) {
   const message = normalizeText(userMessage);
 
@@ -160,14 +168,9 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   /* ===== INTENT ===== */
   let primaryIntent = "general";
-  let primaryIntentScore = 0.6;
-
   try {
     const intents = getRelevantIntents(message, 1);
-    if (intents?.length) {
-      primaryIntent = intents[0].intent.name;
-      primaryIntentScore = intents[0].score ?? 0.6;
-    }
+    if (intents?.length) primaryIntent = intents[0].intent.name;
   } catch {}
 
   /* ===== MEMORY ===== */
@@ -179,37 +182,56 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   let detectedServices: any[] = [];
   try {
     detectedServices = detectIntents(message)
-      .filter((i: any) => i.type === "service" && i.confidence > 0.4); // 🔥 filter weak matches
+      .filter((i: any) => i.type === "service" && i.confidence > 0.4);
   } catch {}
 
-  /* ===== CONTEXT SUFFICIENCY (CRITICAL FIX) ===== */
-  const hasSufficientContext =
-    message.length > 20 &&
-    (message.includes("ads") ||
-     message.includes("business") ||
-     message.includes("store") ||
-     message.includes("roas"));
+  /* ===== CONTEXT FIX (CRITICAL) ===== */
+  const hasSufficientContext: boolean =
+    message.length > 15 &&
+    (
+      /(ads|roas|sales|store|ecommerce|business|clients|revenue)/i.test(message) ||
+      strategicMemory?.businessMentioned === true ||
+      (strategicMemory?.servicesDiscussed?.length ?? 0) > 0
+    );
 
-  /* ===== REASONING ===== */
-  let reasoning = strategicMemory.cachedReasoning ?? "";
+  if (hasSufficientContext) {
+    strategicMemory.businessMentioned = true;
+  }
 
-  if (!reasoning) {
-    try {
-      const data: any = sessionId
-        ? await reasoningEngine.analyze(sessionId, message)
-        : {};
+  /* ===== REASONING (NO CACHE) ===== */
+  let reasoning = "";
+  try {
+    const data: any = sessionId
+      ? await reasoningEngine.analyze(sessionId, message)
+      : {};
 
-      reasoning = data?.strategy ?? generateReasoning(message, detectedServices);
-    } catch {
-      reasoning = generateReasoning(message, detectedServices);
-    }
+    reasoning = data?.strategy || generateReasoning(message, detectedServices);
+  } catch {
+    reasoning = generateReasoning(message, detectedServices);
+  }
 
-    strategicMemory.cachedReasoning = reasoning;
+  /* ===== MEMORY EVOLUTION ===== */
+  if (detectedServices.length) {
+    const existing = new Set(strategicMemory.servicesDiscussed || []);
+    detectedServices.forEach((s: any) => existing.add(s.value));
+    strategicMemory.servicesDiscussed = Array.from(existing);
   }
 
   /* ===== LEAD BOOST ===== */
   if (strategicMemory.businessMentioned) leadScore += 1;
   leadScore = Math.min(leadScore, 10);
+
+  /* ===== TRACK LEAD ===== */
+  if (sessionId) {
+    try {
+      leadQualifier.scoreLead(sessionId, { need: leadScore / 10 });
+    } catch {}
+  }
+
+  /* ===== CONTEXT ===== */
+  const recentContext = sessionId
+    ? await memoryService.getRecentContext(sessionId).catch(() => [])
+    : [];
 
   /* ===== OUTPUT ===== */
   const brainContext: BrainContext = {
@@ -221,14 +243,14 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     recommendedService: pickRecommendedService(detectedServices),
     triggerBooking: stage === "conversion" || leadScore >= 8,
     reasoning,
-    recentContext: sessionId
-      ? (await memoryService.getRecentContext(sessionId).catch(() => []))
-      : [],
+    recentContext,
     strategicMemory,
     detectedServices: detectedServices.map((d: any) => d.value),
-    dynamicGreeting: stage === "greeting" ? generateDynamicGreeting(strategicMemory) : undefined,
+    dynamicGreeting: stage === "greeting"
+      ? generateDynamicGreeting(strategicMemory)
+      : undefined,
     unifiedIntentRanking: [],
-    hasSufficientContext, // 🔥 CRITICAL FIX
+    hasSufficientContext,
   };
 
   /* ===== CHUNKS ===== */

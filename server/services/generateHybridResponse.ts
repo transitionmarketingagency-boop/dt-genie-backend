@@ -69,10 +69,10 @@ function shouldIncludeCTA(
     lower.includes("schedule") ||
     lower.includes("consultation");
 
-    const highIntent =
-  leadScore >= 0.7 ||
-    stage === "service" ||
-    stage === "conversion";
+const highIntent =
+  leadScore >= 7 ||
+  stage === "service" ||
+  stage === "conversion";
 
   if (intentCategories.includes("general")) return false;
 
@@ -287,7 +287,7 @@ function neuralBrain(message: string) {
   }
 
   // Greeting (only if message is very short)
-  if (greetingRegex.test(msg) && msg.length < 5) {
+if (greetingRegex.test(msg) && msg.split(" ").length <= 3) {
     return { type: "greeting" };
   }
 
@@ -307,6 +307,13 @@ export async function generateHybridResponse({
   history?: any[];
 }): Promise<string> {
   try {
+
+    // 🔥 CACHE RECENT MESSAGES (PREVENT MULTIPLE DB CALLS)
+    const recentMessagesCache =
+      history.length > 0
+        ? history
+        : await memoryService.getRecentContext(sessionId).catch(() => []);
+
     /* ---------- STRATEGIC BRAIN ---------- */
 const [brainData] = await Promise.all([
   strategicBrain(message, sessionId),
@@ -326,12 +333,27 @@ const { brainContext, chunks: strategicChunks = [] } = brainData;
       return bookingResp.response;
     }
 
-    const autoBooking = await shouldTriggerBooking(sessionId, brainContext.stage);
-    if (autoBooking && !bookingFlow.isBookingActive(sessionId) && !detectBookingRejection(message)) {
-      const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-      return bookingResp.response;
-    }
+/* ---------- SMART BOOKING TRIGGER (FIXED) ---------- */
+
+const autoBooking =
+  (await shouldTriggerBooking(sessionId, brainContext.stage)) &&
+  brainContext.leadScore >= 6;
+
+if (
+  autoBooking &&
+  !bookingFlow.isBookingActive(sessionId) &&
+  !detectBookingRejection(message)
+) {
+  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+
+  await memoryService.saveMessage(
+    sessionId,
+    "assistant",
+    bookingResp.response
+  );
+
+  return bookingResp.response;
+}
 
     /* ---------- NEURAL BRAIN ---------- */
     const brain = neuralBrain(message);
@@ -364,13 +386,12 @@ if (
   return "Great — the best next step is a quick strategy call so we can map this properly. I’ll guide you through the process.";
 }
 
-    /* ---------- HISTORY ---------- */
-    const historyMessages: any[] =
-  Array.isArray(history) && history.length > 0
-    ? history
-    : await memoryService.getRecentContext(sessionId) || [];
-    const historyText = historyMessages
-  .slice(-2)
+/* ---------- HISTORY ---------- */
+// Use cached messages to avoid multiple DB calls
+const historyMessages: any[] = recentMessagesCache || [];
+
+const historyText = historyMessages
+  .slice(-2) // only take last 2 messages for context
   .map((h: any) => `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`)
   .join("\n");
 
@@ -422,6 +443,11 @@ const vectorCount = limitedChunks.length;
 
     /* ---------- PROMPT ---------- */
 
+const avoidQuestions =
+  brainContext.hasSufficientContext &&
+  brainContext.stage !== "discovery";
+
+
 const knownContext = `
 Known User Context:
 ${historyText}
@@ -457,6 +483,9 @@ CRITICAL RULES:
 🔥 BEHAVIOR FIXES (CRITICAL):
 
 - DO NOT ask unnecessary questions
+- If user already gave business context → DO NOT ask setup questions again
+- If context exists → give solution directly
+${avoidQuestions ? "- DO NOT ask ANY questions in this response" : ""}
 - Only ask a question if it directly improves the solution
 - Prefer giving solutions FIRST, then ask ONE focused question if needed
 - If user already provided context → DO NOT ask for it again
@@ -496,6 +525,8 @@ INSTRUCTIONS:
 - If enough context exists → MOVE FORWARD, don't ask basics again
 - Avoid repeating structures or phrases
 - Keep response concise but impactful
+- Prefer depth over generic brevity
+- Avoid surface-level answers
 `;
 
 /* ---------- HYBRID MODEL EXECUTION (FAST + RELIABLE) ---------- */
@@ -523,10 +554,13 @@ if (!qwenResp || looksIncomplete(qwenResp)) {
 
 // Priority: Qwen -> Gemini (controlled + stable)
 
-if (qwenResp && !isLowQuality(qwenResp)) {
+// Accept Qwen unless clearly broken
+if (qwenResp && !looksIncomplete(qwenResp)) {
   response = qwenResp;
   modelUsed = "Qwen";
-} else if (geminiResp && !looksIncomplete(geminiResp)) {
+}
+// Only fallback to Gemini if Qwen failed or is broken
+else if (geminiResp && !looksIncomplete(geminiResp)) {
   response = geminiResp;
   modelUsed = "Gemini";
   markGeminiUsed();
@@ -534,7 +568,7 @@ if (qwenResp && !isLowQuality(qwenResp)) {
 
 /* ---------- FINAL FALLBACK (SMART + CONTROLLED) ---------- */
 
-if (!response || (isLowQuality(response) && message.length < 15)) {
+if (!response) {
 
   const lastMessages = await memoryService.getRecentContext(sessionId);
 
@@ -569,10 +603,7 @@ if (!response || (isLowQuality(response) && message.length < 15)) {
 
 response = removeContactInfo(response);
 
-// remove non-latin garbage (Chinese, corrupted tokens)
-response = response.replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "");
-
-// remove only corrupted unicode, not valid punctuation
+// remove non-latin corruption once
 response = response.replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "");
 
 response = response
@@ -653,10 +684,10 @@ if (
 
 /* ---------- FINAL SAFETY CHECK (SMART FALLBACK) ---------- */
 
-if (!response || looksIncomplete(response) || isLowQuality(response)) {
+if (!response || looksIncomplete(response)) {
   console.log("⚠️ Final response failed validation → using fallback");
 
-  const lastMessages = await memoryService.getRecentContext(sessionId);
+  const lastMessages = recentMessagesCache;
 
   const lastAssistant =
     lastMessages
@@ -706,7 +737,7 @@ if (!response || looksIncomplete(response) || isLowQuality(response)) {
 
 /* ---------- PREVENT REPETITION ---------- */
 
-const lastMessages = await memoryService.getRecentContext(sessionId);
+const lastMessages = recentMessagesCache;
 
 const lastAssistant =
   lastMessages
