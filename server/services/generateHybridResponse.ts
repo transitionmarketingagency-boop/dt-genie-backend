@@ -29,32 +29,35 @@ function detectBookingRejection(message: string): boolean {
 function smartFallback(message: string, context: string = ""): string {
   const msg = message.toLowerCase();
 
-  // Context-aware dynamic fallback
   if (msg.includes("traffic") && msg.includes("sales")) {
-    return "You're likely dealing with a conversion gap, not a traffic problem. This usually comes down to messaging, offer clarity, or funnel friction. The fastest way to fix this is identifying where users drop off and optimizing that step.";
+    return "You're likely dealing with a conversion gap, not a traffic problem. This usually comes down to messaging, offer clarity, or funnel friction. The fastest fix is identifying where users drop off and optimizing that step.";
   }
 
   if (msg.includes("roas") || msg.includes("ads")) {
-    return "Dropping ROAS during scaling usually signals creative fatigue, audience saturation, or inefficient budget distribution. The fix is not scaling harder, but scaling smarter with better creative and targeting resets.";
+    return "Dropping ROAS during scaling usually signals creative fatigue, audience saturation, or inefficient budget distribution. The fix is scaling smarter with better creatives and targeting resets.";
   }
 
   if (msg.length < 10) {
-    return "Tell me a bit more about what you're trying to achieve, and I’ll map out a clear direction for you.";
+    return "Give me a bit more detail — I’ll map this out properly for you.";
   }
 
-// Dynamic fallback (clean, non-repetitive, complete)
-return `Let’s break this down properly.
+  if (context && context.length > 20) {
+    return `Based on your situation, the issue isn’t direction — it’s execution.
 
-Based on what you’re asking, the issue likely sits in one of these areas:
-- Traffic quality vs intent mismatch
-- Weak conversion structure (landing page or funnel)
-- Messaging not aligned with buyer stage
+${context}
 
-The fastest way forward is identifying exactly where users drop off and fixing that specific step.
+The next step is identifying the weakest point in your funnel and optimizing that directly.`;
+  }
 
-If you want, tell me a bit about your current setup and I’ll map out the exact fix for you.`;
+  return `The issue here isn’t random — it’s structural.
+
+You’re either losing performance at:
+- Traffic quality
+- Conversion system
+- Messaging alignment
+
+The fastest way forward is isolating the exact bottleneck and fixing that layer directly.`;
 }
-
 
 function shouldIncludeCTA(
   message: string,
@@ -82,7 +85,8 @@ const highIntent =
 /* ================= GEMINI CONFIG ================= */
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_ENABLED = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.length > 20);
+const GEMINI_ENABLED =
+  typeof GEMINI_API_KEY === "string" && GEMINI_API_KEY.length > 20;
 const GEMINI_DAILY_LIMIT = 20;
 
 let geminiUsage = { count: 0, lastReset: Date.now() };
@@ -320,6 +324,7 @@ export async function generateHybridResponse({
     /* ---------- NEURAL BRAIN (DECLARE ONCE ONLY) ---------- */
     const brain = neuralBrain(message);
 
+
 /* ---------- STRATEGIC BRAIN + LEAD INTELLIGENCE (FIXED) ---------- */
 const [brainData, leadData] = await Promise.all([
   strategicBrain(message, sessionId),
@@ -330,21 +335,29 @@ const [brainData, leadData] = await Promise.all([
 const brainContext = brainData?.brainContext ?? {};
 const strategicChunks = brainData?.chunks ?? [];
 
-// 🔥 Merge lead intelligence properly (CRITICAL FIX)
+/* ---------- NORMALIZE LEAD SCORE (CRITICAL FIX) ---------- */
+// ✅ Resolve leadScore to a clean 0–1 number
+const leadScoreValue =
+  typeof leadData?.score?.total === "number"
+    ? leadData.score.total
+    : typeof brainContext?.leadScore === "number"
+    ? brainContext.leadScore
+    : 0;
 
-const leadScore =
-  leadData?.score ??
-  brainContext?.leadScore ??
-  0;
-
+/* ---------- NORMALIZE STAGE ---------- */
 const stage =
-  brainContext?.stage ??
-  "initial";
+  typeof brainContext?.stage === "string" && brainContext.stage.length > 0
+    ? brainContext.stage
+    : "discovery";
 
-// 🔥 Ensure context always has unified values (prevents downstream inconsistency)
-brainContext.leadScore = leadScore.total ?? 0;
+/* ---------- ENFORCE CONSISTENT CONTEXT ---------- */
+brainContext.leadScore = leadScoreValue;
 brainContext.stage = stage;
 
+/* ---------- OPTIONAL: LOG FOR DEBUGGING ---------- */
+console.log(
+  `[STRATEGIC BRAIN] leadScore: ${brainContext.leadScore}, stage: ${brainContext.stage}`
+);
     /* ---------- BOOKING FLOW (ACTIVE SESSION) ---------- */
     if (bookingFlow.isBookingActive(sessionId)) {
       if (detectBookingRejection(message)) {
@@ -398,20 +411,57 @@ if (brain.type === "greeting") {
   // continue to full AI response instead
 }
 
-    /* ---------- SMART AUTO BOOKING ---------- */
-    const autoBooking =
-      (await shouldTriggerBooking(sessionId, stage as any)) &&
-(leadScore.total ?? 0) >= 0.6; // Use 0-1 scale if using normalized total
-    if (
-      autoBooking &&
-      !bookingFlow.isBookingActive(sessionId) &&
-      !detectBookingRejection(message)
-    ) {
-      const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-      return bookingResp.response;
-    }
 
+/* ---------- SMART AUTO BOOKING (INTELLIGENT — NO FALSE TRIGGERS) ---------- */
+
+// ⚠️ DO NOT redeclare lowerMsg if already declared above
+// const lowerMsg = message.toLowerCase(); ❌ REMOVE if duplicate
+
+const msg = lowerMsg; // reuse existing normalized message
+
+/* ---------- BLOCK LOW-INTENT / INFORMATIONAL ---------- */
+const isInformationalQuery =
+  msg.includes("can you") ||
+  msg.includes("do you") ||
+  msg.includes("how does") ||
+  msg.includes("what is") ||
+  msg.includes("how do you") ||
+  msg.includes("tell me about") ||
+  msg.includes("explain") ||
+  msg.includes("what") ||
+  msg.includes("why");
+
+/* ---------- STRONG BUYING SIGNALS ---------- */
+const hasStrongBuyingIntent =
+  msg.includes("hire") ||
+  msg.includes("work with you") ||
+  msg.includes("get started") ||
+  msg.includes("start working") ||
+  msg.includes("let's start") ||
+  msg.includes("i want to proceed") ||
+  msg.includes("i'm ready") ||
+  msg.includes("book") ||
+  msg.includes("schedule");
+
+/* ---------- FINAL AUTO BOOKING DECISION ---------- */
+const autoBooking =
+  (await shouldTriggerBooking(sessionId, stage as any)) &&
+  (brainContext.leadScore ?? 0) >= 0.6 &&
+  (
+    hasStrongBuyingIntent || // 🔥 override if clear intent
+    !isInformationalQuery    // otherwise block weak queries
+  );
+
+/* ---------- EXECUTION ---------- */
+if (
+  autoBooking &&
+  !bookingFlow.isBookingActive(sessionId) &&
+  !detectBookingRejection(message)
+) {
+  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+  return bookingResp.response;
+}
 
 /* ---------- CONTINUE FLOW (DO NOT RETURN HERE) ---------- */
 // Removed early return to keep variables in scope.
@@ -505,8 +555,29 @@ const vectorCount = limitedChunks.length;
 
 // 🔥 HARD ENFORCEMENT FLAG (DECISION LAYER)
 const forceNoQuestions =
-  brainContext?.hasSufficientContext &&
-  stage !== "discovery";
+  brainContext?.hasSufficientContext ||
+  brainContext?.leadScore > 0.5 ||
+  stage === "service" ||
+  stage === "conversion";
+
+/* ---------- HARD INTENT RESPONSES (BYPASS AI) ---------- */
+
+const lowerMsgDirect = message.toLowerCase();
+
+// Company info
+if (lowerMsgDirect.includes("your company") || lowerMsgDirect.includes("about you")) {
+  return "Digital Transition Marketing is an AI-powered growth agency focused on building high-performance marketing systems — from performance marketing and automation to predictive analytics and CGI-driven campaigns. We don’t just run ads — we engineer scalable growth systems.";
+}
+
+// Identity
+if (lowerMsgDirect === "who are you") {
+  return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
+}
+
+// Pricing intent
+if (lowerMsgDirect.includes("how much") || lowerMsgDirect.includes("cost")) {
+  return "Pricing depends on scope and growth targets — we structure it based on performance and ROI, not fixed packages. If you tell me your goal, I can break down what it would realistically cost.";
+}
 
     /* ---------- PROMPT ---------- */
 
@@ -617,7 +688,7 @@ if (!qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp)) {
 }
 
 // Priority: Qwen -> Gemini (controlled + stable)
-if (qwenResp && !isLowQuality(qwenResp)) {
+if (qwenResp && !isLowQuality(qwenResp) && !looksIncomplete(qwenResp)) {
   response = qwenResp as string;
   modelUsed = "Qwen";
 } else if (geminiResp && !looksIncomplete(geminiResp)) {
@@ -627,9 +698,19 @@ if (qwenResp && !isLowQuality(qwenResp)) {
 }
 
 
+// prevent downgrade to generic
+if (response && brainContext?.hasSufficientContext) {
+  if (response.toLowerCase().includes("tell me more")) {
+    response = response.replace(
+      /tell me more.*$/gi,
+      "Based on your context, the next step is execution refinement, not more input."
+    );
+  }
+}
+
 /* ---------- FINAL FALLBACK (SMART + CONTROLLED) ---------- */
 
-if (!response) {
+if (!response || isLowQuality(response) || looksIncomplete(response)) {
   const lastMessages = await memoryService.getRecentContext(sessionId);
 
   const lastAssistant =
@@ -638,48 +719,81 @@ if (!response) {
       ?.reverse()
       ?.find((m: any) => m.role === "assistant")?.content || "";
 
-  // 🔥 Base fallback (context-aware)
-  let fallback = smartFallback(
-    message,
-    brainContext?.reasoning || ""
-  );
+  const normalize = (text: string) =>
+    text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
 
-  // 🔥 Upgrade if strong context exists
+  const prev = normalize(lastAssistant || "").slice(0, 140);
+
+  /* ---------- CONTEXT-AWARE FALLBACK ---------- */
+
+  let fallback = "";
+
+  // ✅ STRONG CONTEXT → NO QUESTIONS, MOVE FORWARD
   if (brainContext?.hasSufficientContext) {
-    fallback = `Based on what you've already shared, the issue likely sits in execution rather than strategy.
+    fallback = `Let’s move this forward.
 
-${brainContext?.reasoning || "We need to refine what's already in place instead of restarting."}
+Based on everything you've already shared, the problem is not direction — it’s execution.
 
-The next step is identifying the weakest point in your funnel and optimizing that directly.`;
+${brainContext?.reasoning || "We need to optimize what's already in place instead of restarting."}
+
+The next step is identifying the weakest conversion point and fixing that layer directly.`;
   }
 
-  // 🔥 Add variation ONLY if weak context (prevents repetitive generic replies)
-  if (!brainContext?.hasSufficientContext) {
+  // ✅ MEDIUM CONTEXT → GUIDED BUT NOT DUMB
+  else if (brainContext?.leadScore > 0.3) {
+    fallback = `You're not far off — this looks like a structural bottleneck, not a complete strategy failure.
+
+The issue usually sits in one of three areas:
+- Conversion flow breakdown
+- Weak positioning or offer clarity
+- Traffic-intent mismatch
+
+Fixing the right layer will unlock growth much faster than changing everything.`;
+  }
+
+  // ✅ LOW CONTEXT → CONTROLLED VARIATIONS (NO GENERIC LOOPS)
+  else {
     const fallbackOptions = [
-      fallback,
-      "Tell me a bit more about your situation so I can give you something precise.",
-      "What’s the main outcome you're trying to improve right now?",
+      "Give me the exact outcome you're trying to achieve — I’ll map the fastest path.",
+      "Tell me your goal and biggest bottleneck — I’ll give you a precise fix.",
+      "What result are you trying to scale right now? I’ll break it down properly.",
     ];
 
     fallback =
       fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
   }
 
-  // 🔥 Prevent repetition (stronger check)
-  if (lastAssistant && fallback) {
-    const normalize = (text: string) =>
-      text.toLowerCase().replace(/[^\w\s]/g, "").trim();
+  /* ---------- ANTI-REPETITION (STRONG) ---------- */
 
-    const prev = normalize(lastAssistant).slice(0, 120);
-    const curr = normalize(fallback).slice(0, 120);
+  if (fallback && prev) {
+    const curr = normalize(fallback).slice(0, 140);
 
-    if (prev === curr || prev.includes(curr) || curr.includes(prev)) {
-      fallback =
-        "Let’s move this forward — what part of your funnel or performance feels weakest right now?";
+    const isSimilar =
+      prev === curr ||
+      prev.includes(curr.slice(0, 80)) ||
+      curr.includes(prev.slice(0, 80));
+
+    if (isSimilar) {
+      // 🔥 Force progression instead of repeating
+      fallback = brainContext?.hasSufficientContext
+        ? `Let’s take the next step.
+
+${brainContext?.reasoning || "We need to refine execution, not restart strategy."}
+
+Focus on fixing the weakest point in your funnel first — that’s where the fastest gains are.`
+        : "Let’s focus this properly — what result matters most right now?";
     }
   }
 
-  response = fallback;
+  /* ---------- FINAL SAFETY CLEANUP ---------- */
+
+  // remove weak phrases completely
+  fallback = fallback.replace(
+    /(tell me more|what’s your setup|tell me about your setup)/gi,
+    ""
+  );
+
+  response = fallback.trim();
   modelUsed = "fallback";
 }
 
@@ -703,6 +817,15 @@ response = response
   )
   // final trim
   .trim();
+
+
+// 🔥 HARD BLOCK: remove repeated question patterns
+if (response) {
+  response = response.replace(
+    /(what’s your current setup\??|tell me more about your setup\??)/gi,
+    ""
+  );
+}
 
 /* ---------- SAFE RETRY LOGIC (ONLY IF TRULY BAD) ---------- */
 
@@ -907,3 +1030,6 @@ return response;
   return "Something went wrong on our side — try again in a moment.";
 }
 }
+
+/* ---------- EXPORT (CRITICAL FIX) ---------- */
+export { generateHybridResponse };
