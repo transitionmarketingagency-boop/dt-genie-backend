@@ -6,10 +6,9 @@ export interface LeadScore {
   authority?: number;   // 0-1
   need?: number;        // 0-1
   timeline?: number;    // 0-1
-  total?: number;       // weighted total
+  total: number;        // 0-1 normalized, weighted
 }
 
-/* -------- Lead Qualifier -------- */
 export class LeadQualifier {
   private weights = {
     budget: 0.25,
@@ -19,12 +18,12 @@ export class LeadQualifier {
   };
 
   /**
-   * Score a lead based on provided BANT info
+   * Score a lead based on BANT info
    * @param sessionId User session identifier
-   * @param bantData Partial BANT data with values 0-1
+   * @param bantData Partial BANT data (0-1)
+   * @returns LeadScore with weighted total
    */
   scoreLead(sessionId: string, bantData: Partial<LeadScore>): LeadScore {
-    // Ensure all values are clamped between 0 and 1
     const clamp = (val?: number) => Math.max(0, Math.min(1, val ?? 0));
 
     const score: LeadScore = {
@@ -32,33 +31,43 @@ export class LeadQualifier {
       authority: clamp(bantData.authority),
       need: clamp(bantData.need),
       timeline: clamp(bantData.timeline),
+      total: 0, // initialize
     };
 
+    // Weighted total calculation (0-1 scale)
     score.total =
       (score.budget ?? 0) * this.weights.budget +
       (score.authority ?? 0) * this.weights.authority +
       (score.need ?? 0) * this.weights.need +
       (score.timeline ?? 0) * this.weights.timeline;
 
-    // Async update to memoryService, non-blocking
+    // Optional debug logging
+    if (process.env.DEBUG_MEMORY === "true") {
+      console.log(`[LeadQualifier] Session ${sessionId} -> Score:`, score);
+    }
+
+    // Fire-and-forget memory update (non-blocking)
     this.updateLeadScore(sessionId, score.total).catch((err) =>
-      console.warn(`⚠️ Failed to update lead score for session ${sessionId}:`, err)
+      console.warn(`[LeadQualifier] Failed to update leadScore for ${sessionId}:`, err)
     );
 
     return score;
   }
 
   /**
-   * Update total lead score in memoryService
-   * @param sessionId User session identifier
-   * @param score Total lead score
+   * Update only the leadScore in strategic memory
+   * @param sessionId
+   * @param score Weighted total (0-1)
    */
-  private async updateLeadScore(sessionId: string, score?: number) {
+  private async updateLeadScore(sessionId: string, score: number) {
     try {
-      const memory: StrategicMemory = (await memoryService.getStrategicMemory(sessionId)) || {};
-      await memoryService.updateStrategicMemory(sessionId, { ...memory, leadScore: score });
+      // Only update leadScore to avoid overwriting other memory fields
+      await memoryService.updateStrategicMemory(sessionId, { leadScore: score });
+      if (process.env.DEBUG_MEMORY === "true") {
+        console.log(`[LeadQualifier] Updated leadScore=${score} for session ${sessionId}`);
+      }
     } catch (err) {
-      console.error(`❌ Error updating strategic memory for session ${sessionId}:`, err);
+      console.error(`[LeadQualifier] Error updating memory for ${sessionId}:`, err);
     }
   }
 }

@@ -3,6 +3,7 @@
 import fetch from "node-fetch";
 import { strategicBrain } from "./strategicBrain.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
+import type { LeadScore } from "./leadQualifier.js";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -16,42 +17,35 @@ interface OpenRouterResponse {
 
 /* ================= MODEL & SETTINGS ================= */
 const MODEL = "qwen/qwen3-235b-a22b-2507";
-
 const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 4200;
 
 /* ================= PROMPT CLEANER ================= */
 function cleanPrompt(prompt: string): string {
-  return prompt
-    ?.replace(/\s+/g, " ")
-    .replace(/assistant:|system:/gi, "")
-    .trim()
-    .slice(0, MAX_PROMPT_LENGTH) || "";
+  return (
+    prompt
+      ?.replace(/\s+/g, " ")
+      .replace(/assistant:|system:/gi, "")
+      .trim()
+      .slice(0, MAX_PROMPT_LENGTH) || ""
+  );
 }
 
 /* ================= VALIDATION HELPERS ================= */
-
 function isValidResponse(text: string): boolean {
   if (!text || text.length < 15) return false;
-
   const lower = text.toLowerCase();
-
-  if (
+  return !(
     lower.includes("<|") ||
     lower.includes("|>") ||
     lower.includes("undefined") ||
     lower.includes("null") ||
     lower.includes("traceback")
-  ) {
-    return false;
-  }
-
-  return true;
+  );
 }
 
 function isFakeDelay(text: string): boolean {
   const t = text.toLowerCase();
-
   return (
     t.includes("temporary delay") ||
     t.includes("slight delay") ||
@@ -102,29 +96,19 @@ Tone: ${
         highIntent
           ? "direct, confident, decision-focused"
           : "clear, helpful, professional"
-      }`
+      }`,
     },
     {
       role: "user",
-      content: prompt
-    }
+      content: prompt,
+    },
   ];
 }
 
 /* ================= INTENT ================= */
 function detectHighIntent(message: string): boolean {
   const lower = message.toLowerCase();
-
-  return [
-    "hire",
-    "book",
-    "schedule",
-    "call",
-    "work with",
-    "i want",
-    "let's start",
-    "ready"
-  ].some((s) => lower.includes(s));
+  return /(hire|book|schedule|call|work with|i want|let's start|ready)/i.test(lower);
 }
 
 /* ================= CACHE ================= */
@@ -135,28 +119,38 @@ export async function generateOpenRouter(
   prompt: string,
   sessionId?: string
 ): Promise<string> {
-
   if (!OPENROUTER_API_KEY) {
     return "I can still guide you — tell me what you're trying to achieve.";
   }
 
   prompt = cleanPrompt(prompt);
-  const cacheKey = `${sessionId || "global"}:${prompt}`;
+  const cacheKey = `${sessionId || "global"}:${prompt.toLowerCase()}`;
 
   /* ---------- CACHE ---------- */
   if (recentCache.has(cacheKey)) {
     return recentCache.get(cacheKey)!;
   }
 
-  /* ---------- CONTEXT (NON-BLOCKING) ---------- */
+  /* ---------- CONTEXT (ASYNC) ---------- */
   let contextText = "";
 
   if (sessionId) {
-    strategicBrain(prompt.slice(0, 300), sessionId)
-      .then(({ brainContext }) => {
-        contextText = `Context: stage=${brainContext.stage}, score=${brainContext.leadScore}.`;
-      })
-      .catch(() => {});
+    try {
+      const { brainContext } = await strategicBrain(prompt.slice(0, 300), sessionId);
+      const leadScore: LeadScore | number | undefined = brainContext.leadScore;
+
+      const totalScore =
+        typeof leadScore === "number"
+          ? leadScore
+          : (leadScore as LeadScore)?.total ?? 0;
+
+      contextText = `Context: stage=${brainContext.stage || "unknown"}, score=${totalScore.toFixed(
+        2
+      )}.`;
+    } catch (err) {
+      console.warn("⚠️ Failed to fetch brainContext:", err);
+      contextText = "";
+    }
   }
 
   const highIntent = detectHighIntent(prompt);
@@ -167,25 +161,22 @@ export async function generateOpenRouter(
   try {
     console.log("⚡ OpenRouter call");
 
-    const res = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "X-Title": "Neon Vision AI"
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          temperature: highIntent ? 0.45 : 0.35,
-          top_p: 0.9,
-          max_tokens: 800,
-          messages: buildMessages(`${contextText} ${prompt}`, highIntent)
-        }),
-        signal: controller.signal
-      }
-    );
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        "X-Title": "Neon Vision AI",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: highIntent ? 0.45 : 0.35,
+        top_p: 0.9,
+        max_tokens: 800,
+        messages: buildMessages(`${contextText} ${prompt}`, highIntent),
+      }),
+      signal: controller.signal,
+    });
 
     clearTimeout(timeout);
 
@@ -193,15 +184,10 @@ export async function generateOpenRouter(
 
     const data = (await res.json()) as OpenRouterResponse;
 
-    let raw =
-      data?.choices?.[0]?.message?.content ||
-      data?.choices?.[0]?.text ||
-      "";
-
+    let raw = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || "";
     let text = cleanResponse(raw);
 
-    /* ---------- HARD VALIDATION PIPELINE ---------- */
-
+    /* ---------- VALIDATION ---------- */
     if (!isValidResponse(text) || isFakeDelay(text) || containsNonEnglish(text)) {
       throw new Error("Rejected bad model output");
     }
@@ -209,18 +195,14 @@ export async function generateOpenRouter(
     text = fixSpacing(text);
     text = ensureComplete(text);
 
-    /* ---------- CACHE ONLY CLEAN RESPONSES ---------- */
+    /* ---------- CACHE CLEAN RESPONSES ---------- */
     recentCache.set(cacheKey, text);
 
     console.log("✅ OpenRouter success");
     return text;
-
   } catch (err: any) {
     clearTimeout(timeout);
-
     console.warn("⚠️ OpenRouter failed:", err?.message);
-
-    // ⚠️ NO MORE "DELAY" RESPONSES
-   return "Let me think through this properly — what’s your current setup?";
+    return "Let me think through this properly — what’s your current setup?";
   }
 }

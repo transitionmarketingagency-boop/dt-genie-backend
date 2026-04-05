@@ -1,6 +1,6 @@
 // server/services/leadIntelligence.ts
 
-import { leadQualifier } from "./leadQualifier.js";
+import { leadQualifier, LeadScore } from "./leadQualifier.js";
 import { memoryService } from "./memoryService.js";
 
 /* ================= TYPES ================= */
@@ -24,7 +24,8 @@ function normalize(text: string): string {
 function includesAny(text: string, keywords: string[]): number {
   let score = 0;
   for (const kw of keywords) {
-    if (text.includes(kw)) score += 1;
+    const regex = new RegExp(`\\b${kw}\\b`, "i"); // word boundary check
+    if (regex.test(text)) score += 1;
   }
   return score;
 }
@@ -63,39 +64,36 @@ const buyingSignals = [
 /* ================= SIGNAL DETECTION ================= */
 function detectSignals(
   message: string,
-  memorySignals?: Partial<BANTSignals>
+  memorySignals: Partial<BANTSignals> = {}
 ): BANTSignals {
 
   const msg = normalize(message);
 
   const signals: BANTSignals = {
-    budget: memorySignals?.budget ?? 0,
-    authority: memorySignals?.authority ?? 0,
-    need: memorySignals?.need ?? 0,
-    timeline: memorySignals?.timeline ?? 0,
+    budget: memorySignals.budget ?? 0,
+    authority: memorySignals.authority ?? 0,
+    need: memorySignals.need ?? 0,
+    timeline: memorySignals.timeline ?? 0,
   };
 
   const add = (value: number | undefined, increment: number) =>
     Math.min((value ?? 0) + increment, 1);
 
   /* ---------- NEED ---------- */
-  const needHits = includesAny(msg, needSignals);
-  if (needHits) signals.need = add(signals.need, 0.25 * needHits);
+  signals.need = add(signals.need, 0.35 * includesAny(msg, needSignals));
 
   /* ---------- BUDGET ---------- */
-  const budgetHits = includesAny(msg, budgetSignals);
-  if (budgetHits) signals.budget = add(signals.budget, 0.2 * budgetHits);
+  signals.budget = add(signals.budget, 0.25 * includesAny(msg, budgetSignals));
 
   /* ---------- AUTHORITY ---------- */
-  const authorityHits = includesAny(msg, authoritySignals);
-  if (authorityHits) signals.authority = add(signals.authority, 0.3 * authorityHits);
+  signals.authority = add(signals.authority, 0.25 * includesAny(msg, authoritySignals));
 
   /* ---------- TIMELINE ---------- */
-  const timelineHits = includesAny(msg, timelineSignals);
-  if (timelineHits) signals.timeline = add(signals.timeline, 0.2 * timelineHits);
+  signals.timeline = add(signals.timeline, 0.15 * includesAny(msg, timelineSignals));
 
   /* ---------- BUYING BOOST ---------- */
-  if (includesAny(msg, buyingSignals)) {
+  const buyingHits = includesAny(msg, buyingSignals);
+  if (buyingHits) {
     signals.need = add(signals.need, 0.4);
     signals.timeline = add(signals.timeline, 0.3);
   }
@@ -103,18 +101,14 @@ function detectSignals(
   return signals;
 }
 
-/* ================= HELPERS (TYPE FIXES) ================= */
-
-// Convert authority score → string
+/* ================= HELPERS ================= */
 function mapDecisionMaker(authority?: number): string | undefined {
   if (!authority) return undefined;
   return authority > 0.6 ? "yes" : undefined;
 }
 
-// Convert timeline score → string
 function mapTimeline(timeline?: number): string | undefined {
   if (!timeline) return undefined;
-
   if (timeline > 0.7) return "immediate";
   if (timeline > 0.4) return "soon";
   return "later";
@@ -124,25 +118,22 @@ function mapTimeline(timeline?: number): string | undefined {
 export async function analyzeLeadSignals(
   message: string,
   sessionId: string
-): Promise<{ signals: BANTSignals; score: any } | null> {
+): Promise<{ signals: BANTSignals; score: LeadScore }> {
 
   let memorySignals: Partial<BANTSignals> = {};
 
   /* ---------- LOAD MEMORY ---------- */
   if (sessionId) {
     try {
-      const strategicMemory = await memoryService.getStrategicMemory(sessionId);
-
-      if (strategicMemory) {
-        memorySignals = {
-          budget: Math.min(strategicMemory.budget ?? 0, 1),
-          authority: strategicMemory.decisionMaker ? 0.8 : 0,
-          need: strategicMemory.goals?.length ? 0.6 : 0,
-          timeline: strategicMemory.timeline ? 0.6 : 0,
-        };
-      }
-    } catch {
-      memorySignals = {};
+      const mem = await memoryService.getStrategicMemory(sessionId);
+      memorySignals = {
+        budget: Math.min(mem.budget ?? 0, 1),
+        authority: mem.decisionMaker ? 0.8 : 0,
+        need: mem.goals?.length ? 0.6 : 0,
+        timeline: mem.timeline ? 0.6 : 0,
+      };
+    } catch (err) {
+      if (process.env.DEBUG_MEMORY === "true") console.warn("[Memory] Failed to load strategic memory:", err);
     }
   }
 
@@ -154,14 +145,14 @@ export async function analyzeLeadSignals(
   if (!hasSignal) {
     return {
       signals,
-      score: { total: 0, quality: "cold" },
+      score: { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 },
     };
   }
 
   /* ---------- SCORE ---------- */
   const score = leadQualifier.scoreLead(sessionId, signals);
 
-  /* ---------- SAVE MEMORY (FIXED TYPES) ---------- */
+  /* ---------- SAVE MEMORY ---------- */
   if (sessionId) {
     try {
       await memoryService.updateStrategicMemory(sessionId, {
@@ -170,8 +161,9 @@ export async function analyzeLeadSignals(
         goals: signals.need && signals.need > 0.5 ? ["growth"] : [],
         timeline: mapTimeline(signals.timeline),
       });
-    } catch {
-      // silent fail
+      if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Updated strategic memory for session ${sessionId}`);
+    } catch (err) {
+      if (process.env.DEBUG_MEMORY === "true") console.warn(`[Memory] Failed to update strategic memory:`, err);
     }
   }
 

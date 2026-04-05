@@ -193,9 +193,11 @@ export class MemoryService {
       const nowTime = Date.now();
 
 const lastTimestamp = new Date(last.timestamp);
+const lastNormalized = normalizeContent(last.content);
+
 if (!isNaN(lastTimestamp.getTime()) &&
-    last.content === normalized &&
-    nowTime - lastTimestamp.getTime() < 3000
+    lastNormalized === normalized &&
+    nowTime - lastTimestamp.getTime() < 5000 // slightly longer window
 ) {
   if (process.env.DEBUG_MEMORY === "true") {
     console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
@@ -362,9 +364,9 @@ saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
 
 bant = {
   budget: typeof row.budget === "number" ? row.budget : undefined,
-  authority: row.decisionMaker && row.decisionMaker.trim() ? 1 : undefined,
-  need: row.interestLevel && row.interestLevel.trim() ? 0.8 : undefined,
-  timeline: row.timeline && row.timeline.trim() ? 0.7 : undefined,
+  authority: row.bantSignals?.authority ?? (row.decisionMaker?.trim() ? 1 : undefined),
+  need: row.bantSignals?.need ?? (row.interestLevel?.trim() ? 0.6 : undefined),
+  timeline: row.bantSignals?.timeline ?? (row.timeline?.trim() ? 0.6 : undefined),
 };
 
     return {
@@ -398,6 +400,7 @@ const merged: StrategicMemory = {
   ...data,
   goals: data.goals !== undefined ? data.goals : existing.goals,
   servicesDiscussed: data.servicesDiscussed !== undefined ? data.servicesDiscussed : existing.servicesDiscussed,
+  bantSignals: { ...existing.bantSignals, ...data.bantSignals }, // ✅ Preserve BANT
   updatedAt: new Date().toISOString(),
 };
 

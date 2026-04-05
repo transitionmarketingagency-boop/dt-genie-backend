@@ -270,15 +270,21 @@ function neuralBrain(message: string) {
 
   const greetingRegex = /^(hi|hello|hey|good morning|good afternoon|good evening)$/i;
 
-  if (
-    msg.includes("book") ||
-    msg.includes("schedule") ||
-    msg.includes("meeting") ||
-    msg.includes("appointment") ||
-    msg.includes("call")
-  ) {
-    return { type: "booking" };
-  }
+if (
+  msg.includes("book") ||
+  msg.includes("schedule") ||
+  msg.includes("meeting") ||
+  msg.includes("appointment") ||
+  msg.includes("call") ||
+  msg.includes("consultation") ||
+  msg.includes("consult") ||
+  msg.includes("talk to you") ||
+  msg.includes("discuss") ||
+  msg.includes("get help") ||
+  msg.includes("work with you")
+) {
+  return { type: "booking" };
+}
 
   if (msg.includes("who are you")) {
     return { type: "identity" };
@@ -314,17 +320,30 @@ export async function generateHybridResponse({
     /* ---------- NEURAL BRAIN (DECLARE ONCE ONLY) ---------- */
     const brain = neuralBrain(message);
 
-    /* ---------- STRATEGIC BRAIN ---------- */
-    const [brainData] = await Promise.all([
-      strategicBrain(message, sessionId),
-      analyzeLeadSignals(message, sessionId),
-    ]);
+/* ---------- STRATEGIC BRAIN + LEAD INTELLIGENCE (FIXED) ---------- */
+const [brainData, leadData] = await Promise.all([
+  strategicBrain(message, sessionId),
+  analyzeLeadSignals(message, sessionId),
+]);
 
-    const brainContext = brainData?.brainContext ?? {};
-    const strategicChunks = brainData?.chunks ?? [];
+// Core brain data
+const brainContext = brainData?.brainContext ?? {};
+const strategicChunks = brainData?.chunks ?? [];
 
-    const stage = brainContext.stage ?? "initial";
-    const leadScore = brainContext.leadScore ?? 0;
+// 🔥 Merge lead intelligence properly (CRITICAL FIX)
+
+const leadScore =
+  leadData?.score ??
+  brainContext?.leadScore ??
+  0;
+
+const stage =
+  brainContext?.stage ??
+  "initial";
+
+// 🔥 Ensure context always has unified values (prevents downstream inconsistency)
+brainContext.leadScore = leadScore.total ?? 0;
+brainContext.stage = stage;
 
     /* ---------- BOOKING FLOW (ACTIVE SESSION) ---------- */
     if (bookingFlow.isBookingActive(sessionId)) {
@@ -350,19 +369,39 @@ export async function generateHybridResponse({
       return bookingResp.response;
     }
 
-    if (brain.type === "greeting") {
-      if (brainContext?.dynamicGreeting) {
-        return brainContext.dynamicGreeting;
-      }
+// 🔥 SMART GREETING (NON-BLOCKING + SESSION AWARE)
+if (brain.type === "greeting") {
+  const lastMessages = recentMessagesCache || [];
 
-      return "Hi — what are you looking to improve or grow right now?";
+  const hasAssistantSpoken = lastMessages.some(
+    (m: any) => m.role === "assistant"
+  );
+
+  // ✅ Only greet if it's FIRST interaction
+  if (!hasAssistantSpoken) {
+    if (brainContext?.dynamicGreeting) {
+      return brainContext.dynamicGreeting;
     }
+
+    // time-based fallback greeting
+    const hour = new Date().getHours();
+    let timeGreeting = "Hey";
+
+    if (hour < 12) timeGreeting = "Good morning";
+    else if (hour < 18) timeGreeting = "Good afternoon";
+    else timeGreeting = "Good evening";
+
+    return `${timeGreeting} — what are you working on right now?`;
+  }
+
+  // ✅ DO NOT break flow if already greeted
+  // continue to full AI response instead
+}
 
     /* ---------- SMART AUTO BOOKING ---------- */
     const autoBooking =
       (await shouldTriggerBooking(sessionId, stage as any)) &&
-      leadScore >= 6;
-
+(leadScore.total ?? 0) >= 0.6; // Use 0-1 scale if using normalized total
     if (
       autoBooking &&
       !bookingFlow.isBookingActive(sessionId) &&
@@ -397,7 +436,9 @@ if (
   lowerMsg.includes("start working") ||
   lowerMsg.includes("how do we start")
 ) {
-  return "Great — the best next step is a quick strategy call so we can map this properly. I’ll guide you through the process.";
+  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+  return bookingResp.response;
 }
 
 /* ---------- HISTORY ---------- */
@@ -461,6 +502,11 @@ const vectorText = compressContext(limitedChunks, 220);
 
 // Debug count (keep original meaning)
 const vectorCount = limitedChunks.length;
+
+// 🔥 HARD ENFORCEMENT FLAG (DECISION LAYER)
+const forceNoQuestions =
+  brainContext?.hasSufficientContext &&
+  stage !== "discovery";
 
     /* ---------- PROMPT ---------- */
 
@@ -556,20 +602,17 @@ let response = "";
 let modelUsed = "none";
 
 // Run both models in parallel (fast timeouts)
-const qwenPromise = withTimeout(generateOpenRouter(prompt), 6500);
 
-const geminiPromise = canUseGemini()
-  ? withTimeout(generateGemini(prompt), 3200)
-  : Promise.resolve(null);
+// 🔥 STRICT PRIMARY → FALLBACK MODEL FLOW
 
-// ⚡ Wait for BOTH (ensures fallback safety + avoids undefined vars)
-const qwenResp = await qwenPromise;
+const qwenResp = await withTimeout(generateOpenRouter(prompt), 6500);
 
 let geminiResp: string | null = null;
 
-if (!qwenResp || (qwenResp && looksIncomplete(qwenResp))) {
+// Only trigger Gemini if Qwen FAILS hard
+if (!qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp)) {
   if (canUseGemini() && message.length > 15) {
-    geminiResp = await geminiPromise;
+    geminiResp = await withTimeout(generateGemini(prompt), 4000);
   }
 }
 
@@ -583,37 +626,62 @@ if (qwenResp && !isLowQuality(qwenResp)) {
   markGeminiUsed();
 }
 
+
 /* ---------- FINAL FALLBACK (SMART + CONTROLLED) ---------- */
 
 if (!response) {
-
   const lastMessages = await memoryService.getRecentContext(sessionId);
 
-  const lastAssistant = lastMessages
-    ?.slice()
-    ?.reverse()
-    ?.find((m: any) => m.role === "assistant")?.content || "";
+  const lastAssistant =
+    lastMessages
+      ?.slice()
+      ?.reverse()
+      ?.find((m: any) => m.role === "assistant")?.content || "";
 
-  const fallbackOptions = [
-    smartFallback(message),
-    "Give me a bit more detail so I can give you something precise.",
-    "Let’s narrow this down — what specific result are you aiming for?",
-  ];
+  // 🔥 Base fallback (context-aware)
+  let fallback = smartFallback(
+    message,
+    brainContext?.reasoning || ""
+  );
 
-  // pick one randomly
-  let fallback =
-    fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+  // 🔥 Upgrade if strong context exists
+  if (brainContext?.hasSufficientContext) {
+    fallback = `Based on what you've already shared, the issue likely sits in execution rather than strategy.
 
-  // 🚫 prevent repetition of same fallback
-  if (lastAssistant && fallback && lastAssistant.slice(0, 80) === fallback.slice(0, 80)) {
+${brainContext?.reasoning || "We need to refine what's already in place instead of restarting."}
+
+The next step is identifying the weakest point in your funnel and optimizing that directly.`;
+  }
+
+  // 🔥 Add variation ONLY if weak context (prevents repetitive generic replies)
+  if (!brainContext?.hasSufficientContext) {
+    const fallbackOptions = [
+      fallback,
+      "Tell me a bit more about your situation so I can give you something precise.",
+      "What’s the main outcome you're trying to improve right now?",
+    ];
+
     fallback =
-      "Tell me a bit more about your situation so I can give you a more targeted answer.";
+      fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+  }
+
+  // 🔥 Prevent repetition (stronger check)
+  if (lastAssistant && fallback) {
+    const normalize = (text: string) =>
+      text.toLowerCase().replace(/[^\w\s]/g, "").trim();
+
+    const prev = normalize(lastAssistant).slice(0, 120);
+    const curr = normalize(fallback).slice(0, 120);
+
+    if (prev === curr || prev.includes(curr) || curr.includes(prev)) {
+      fallback =
+        "Let’s move this forward — what part of your funnel or performance feels weakest right now?";
+    }
   }
 
   response = fallback;
   modelUsed = "fallback";
 }
-
 
 
 /* ---------- CLEANUP (STABLE + NON-DESTRUCTIVE) ---------- */
@@ -663,6 +731,11 @@ let retryClean = cleanResponse(retry as string);
       modelUsed = "Gemini";
     }
   }
+}
+
+// 🔥 ENFORCE NO-QUESTION MODE (POST-PROCESSING)
+if (forceNoQuestions && response) {
+  response = response.replace(/\?/g, ".");
 }
 
 /* ---------- LENGTH CONTROL (SAFE) ---------- */
@@ -762,21 +835,51 @@ const lastAssistant =
     ?.reverse()
     ?.find((m: any) => m.role === "assistant")?.content || "";
 
-if (
-  response &&
-  lastAssistant &&
-  lastAssistant.slice(0, 100) === response.slice(0, 100)
-) {
-  const variationOptions = [
-    "Let’s go deeper — what’s the main bottleneck you're facing?",
-    "Tell me more about your current setup so I can refine this.",
-    "What part of your funnel or growth strategy feels weakest?",
-  ];
+// 🔥 ADVANCED ANTI-REPETITION SYSTEM (SMART + CONTEXT-AWARE)
 
-  response =
-    variationOptions[Math.floor(Math.random() * variationOptions.length)];
+if (response && lastAssistant) {
+  const normalize = (text: string) =>
+    text
+      .toLowerCase()
+      .replace(/[^\w\s]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-  modelUsed = "fallback";
+  const prev = normalize(lastAssistant).slice(0, 160);
+  const curr = normalize(response).slice(0, 160);
+
+  // 🔍 Detect strong similarity (not just exact match)
+  const isSimilar =
+    prev === curr ||
+    prev.includes(curr.slice(0, 80)) ||
+    curr.includes(prev.slice(0, 80));
+
+  if (isSimilar) {
+    // 🔥 Context-aware intelligent replacement (NO dumb questions)
+    if (brainContext?.hasSufficientContext) {
+      response = `Let’s move this forward.
+
+Based on everything you've shared, the issue isn’t direction — it’s execution.
+
+${brainContext?.reasoning || "We need to refine what's already in place instead of restarting."}
+
+The next step is identifying the weakest point in your funnel and optimizing that directly.`;
+
+      modelUsed = "anti-repeat-context";
+    } else {
+      // fallback ONLY if context is weak
+      const variationOptions = [
+        "Let’s focus this properly — what specific result are you trying to improve right now?",
+        "Tell me the main outcome you're aiming for so I can give you something precise.",
+        "What’s the biggest bottleneck you're facing at the moment?",
+      ];
+
+      response =
+        variationOptions[Math.floor(Math.random() * variationOptions.length)];
+
+      modelUsed = "anti-repeat-fallback";
+    }
+  }
 }
 
 /* ---------- SAVE MEMORY ---------- */
