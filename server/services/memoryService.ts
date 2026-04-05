@@ -130,7 +130,11 @@ function normalizeContent(text: unknown): string {
     .replace(/\s+/g, " ")
     .trim();
   // Truncate safely without breaking surrogate pairs
+// Truncate safely at 4000 chars including surrogate pairs
+if ([...normalized].length > 4000) {
   return [...normalized].slice(0, 4000).join("");
+}
+return normalized;
 }
 
 /* ================= TYPES ================= */
@@ -178,40 +182,34 @@ export class MemoryService {
       throw new Error("Attempted to store empty message");
     }
 
-    const last = await db.get(
-      `SELECT content, timestamp
-       FROM chat_messages
-       WHERE sessionId = ?
-       ORDER BY datetime(timestamp) DESC
-       LIMIT 1`,
-      sessionId
-    );
+const last = await db.get(
+  `SELECT id, content, timestamp
+   FROM chat_messages
+   WHERE sessionId = ?
+   ORDER BY datetime(timestamp) DESC
+   LIMIT 1`,
+  sessionId
+);
 
-    if (last) {
+if (last) {
+  const lastTimestamp = new Date(last.timestamp).getTime();
+  const nowTime = Date.now();
+  const lastNormalized = normalizeContent(last.content);
 
-      const lastTime = new Date(last.timestamp).getTime();
-      const nowTime = Date.now();
-
-const lastTimestamp = new Date(last.timestamp);
-const lastNormalized = normalizeContent(last.content);
-
-if (!isNaN(lastTimestamp.getTime()) &&
-    lastNormalized === normalized &&
-    nowTime - lastTimestamp.getTime() < 5000 // slightly longer window
-) {
-  if (process.env.DEBUG_MEMORY === "true") {
-    console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
-  }
-  return {
-    id: last.id,
-    sessionId,
-    role,
-    content: normalized,
-    timestamp: lastTimestamp,
-  };
-}
-
+  // Skip exact duplicate within 10s window
+  if (!isNaN(lastTimestamp) && lastNormalized === normalized && nowTime - lastTimestamp < 10000) {
+    if (process.env.DEBUG_MEMORY === "true") {
+      console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
     }
+    return {
+      id: last.id,
+      sessionId,
+      role,
+      content: normalized,
+      timestamp: new Date(last.timestamp),
+    };
+  }
+}
 
     const now = new Date();
 
@@ -364,9 +362,9 @@ saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
 
 bant = {
   budget: typeof row.budget === "number" ? row.budget : undefined,
-  authority: row.bantSignals?.authority ?? (row.decisionMaker?.trim() ? 1 : undefined),
-  need: row.bantSignals?.need ?? (row.interestLevel?.trim() ? 0.6 : undefined),
-  timeline: row.bantSignals?.timeline ?? (row.timeline?.trim() ? 0.6 : undefined),
+  authority: row.decisionMaker?.trim() ? 1 : undefined,
+  need: row.interestLevel?.trim() ? 0.6 : undefined,
+  timeline: row.timeline?.trim() ? 0.6 : undefined,
 };
 
     return {
@@ -400,7 +398,7 @@ const merged: StrategicMemory = {
   ...data,
   goals: data.goals !== undefined ? data.goals : existing.goals,
   servicesDiscussed: data.servicesDiscussed !== undefined ? data.servicesDiscussed : existing.servicesDiscussed,
-  bantSignals: { ...existing.bantSignals, ...data.bantSignals }, // ✅ Preserve BANT
+  bantSignals: { ...existing.bantSignals, ...(data.bantSignals || {}) }, // Safe merge
   updatedAt: new Date().toISOString(),
 };
 
@@ -436,72 +434,74 @@ const merged: StrategicMemory = {
 
   }
 
-  /* ================= BOOKINGS ================= */
+/* ================= BOOKINGS ================= */
 
-  async storeBooking(data: {
-    userId: string;
-    serviceType?: string;
-    preferredTime?: string;
-    email?: string;
-    calendlyLink?: string;
-    status?: string;
-  }) {
+async storeBooking(data: {
+  userId: string;
+  serviceType?: string;
+  preferredTime?: string;
+  email?: string;
+  calendlyLink?: string;
+  status?: string;
+}) {
+  const db = await this.db;
 
-    const db = await this.db;
+  const userId = data.userId?.trim();
+  if (!userId) throw new Error("Booking must include a valid userId");
 
-if (!data.userId || !data.userId.trim()) {
-  throw new Error("Booking must include a valid userId");
+  // Optional: normalize other fields
+  const preferredTime = data.preferredTime?.trim() || null;
+  const email = data.email?.trim() || null;
+  const serviceType = data.serviceType?.trim() || null;
+  const calendlyLink = data.calendlyLink?.trim() || null;
+  const status = data.status?.trim() || "pending";
+
+  // ✅ Generate unique ID and timestamp
+  const bookingId = crypto.randomUUID();
+  const createdAt = new Date().toISOString();
+
+  await db.run(
+    `INSERT INTO bookings
+     (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    bookingId,
+    userId,
+    serviceType,
+    preferredTime,
+    email,
+    calendlyLink,
+    status,
+    createdAt
+  );
+
+  if (process.env.DEBUG_MEMORY === "true") {
+    console.log(`[Memory] Booking stored for ${userId}`);
+  }
 }
 
-const bookingId = crypto.randomUUID();
-const createdAt = new Date().toISOString();
+async updateBookingStatus(userId: string, status: string) {
+  const db = await this.db;
 
-await db.run(
-  `INSERT INTO bookings
-   (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
-   VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-  bookingId,
-  data.userId,
-  data.serviceType ?? null,
-  data.preferredTime ?? null,
-  data.email ?? null,
-  data.calendlyLink ?? null,
-  data.status ?? "pending",
-  createdAt
-);
+  await db.run(
+    `UPDATE bookings
+     SET status = ?
+     WHERE id = (
+       SELECT id
+       FROM bookings
+       WHERE userId = ?
+       ORDER BY datetime(createdAt) DESC
+       LIMIT 1
+     )`,
+    status,
+    userId
+  );
 
-
-    if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[Memory] Booking stored for ${data.userId}`);
-    }
+  if (process.env.DEBUG_MEMORY === "true") {
+    console.log(`[Memory] Booking updated for ${userId} -> ${status}`);
   }
-
-  async updateBookingStatus(userId: string, status: string) {
-
-    const db = await this.db;
-
-    await db.run(
-      `UPDATE bookings
-       SET status = ?
-       WHERE id = (
-         SELECT id
-         FROM bookings
-         WHERE userId = ?
-         ORDER BY datetime(createdAt) DESC
-         LIMIT 1
-       )`,
-      status,
-      userId
-    );
-
-    if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[Memory] Booking updated for ${userId} -> ${status}`);
-    }
-
-  }
-
 }
 
 /* ================= SINGLETON ================= */
 
 export const memoryService = new MemoryService();
+export { MemoryService, initializeMemory };

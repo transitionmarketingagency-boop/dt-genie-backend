@@ -17,7 +17,7 @@ export type StrategicMemory = {
   industry?: string;
   lastUserProblem?: string;
   lastService?: string;
-  businessType?: string; // <-- ADDED
+  businessType?: string;
 };
 
 export type BrainContext = {
@@ -53,6 +53,7 @@ function normalizeText(text: string) {
     t = t.replace(new RegExp(`\\b${wrong}\\b`, "g"), corrections[wrong]);
   }
 
+  // Remove non-alphanumeric except spaces
   return t.replace(/[^\w\s]/g, " ").replace(/\s+/g, " ").trim();
 }
 
@@ -60,7 +61,7 @@ function normalizeText(text: string) {
 
 function isGreeting(text: string) {
   const greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
-  return greetings.includes(text);
+  return greetings.some(g => text.startsWith(g));
 }
 
 /* ================= GREETING ENGINE ================= */
@@ -79,7 +80,7 @@ function generateDynamicGreeting(memory?: StrategicMemory) {
     `${base} — what’s the main growth focus right now?`,
   ];
 
-  const index = memory?.greetingIndex
+  const index = memory?.greetingIndex !== undefined
     ? (memory.greetingIndex + 1) % variations.length
     : 0;
 
@@ -95,13 +96,13 @@ function detectStage(message: string): BrainContext["stage"] {
 
   if (isGreeting(text)) return "greeting";
 
-  if (/(hire|work with you|get started|book|schedule|consult|call)/.test(text))
+  if (/(hire|work with you|get started|book|schedule|consult|call)/i.test(text))
     return "conversion";
 
-  if (/(price|cost|package|services)/.test(text))
+  if (/(price|cost|package|services)/i.test(text))
     return "service";
 
-  if (/(strategy|plan|how to|how do i|improve|optimize)/.test(text))
+  if (/(strategy|plan|how to|how do i|improve|optimize)/i.test(text))
     return "strategy";
 
   return "discovery";
@@ -112,19 +113,19 @@ function detectStage(message: string): BrainContext["stage"] {
 function scoreLead(message: string) {
   let score = 0;
 
-  if (/(business|store|agency|company|clients|revenue)/.test(message)) score += 2;
-  if (/(ads|roas|conversion|sales)/.test(message)) score += 3;
-  if (/(seo|automation|marketing)/.test(message)) score += 2;
-  if (/(hire|work with you|get started)/.test(message)) score += 3;
-  if (/(price|cost)/.test(message)) score += 2;
+  if (/(business|store|agency|company|clients|revenue)/i.test(message)) score += 2;
+  if (/(ads|roas|conversion|sales)/i.test(message)) score += 3;
+  if (/(seo|automation|marketing)/i.test(message)) score += 2;
+  if (/(hire|work with you|get started)/i.test(message)) score += 3;
+  if (/(price|cost)/i.test(message)) score += 2;
 
   return Math.min(score, 10);
 }
 
-/* ================= DEAL ================= */
+/* ================= DEAL PROBABILITY ================= */
 
 function estimateDealProbability(stage: BrainContext["stage"], leadScore: number) {
-  const base = {
+  const base: Record<BrainContext["stage"], number> = {
     greeting: 0.1,
     discovery: 0.25,
     strategy: 0.45,
@@ -138,11 +139,11 @@ function estimateDealProbability(stage: BrainContext["stage"], leadScore: number
 /* ================= REASONING ================= */
 
 function fallbackReasoning(message: string, services: any[]) {
-  if (message.includes("roas")) {
+  if (/roas/i.test(message)) {
     return "User is facing a performance marketing efficiency issue — likely related to ads, funnel, or creative.";
   }
 
-  if (message.includes("sales")) {
+  if (/sales/i.test(message)) {
     return "User wants to improve revenue — focus should be on conversion optimization and offer positioning.";
   }
 
@@ -153,37 +154,40 @@ function fallbackReasoning(message: string, services: any[]) {
   return "User is exploring general marketing improvements.";
 }
 
-/* ================= MAIN ================= */
+/* ================= MAIN FUNCTION ================= */
 
 export async function strategicBrain(userMessage: string, sessionId?: string) {
   const message = normalizeText(userMessage);
 
+  // Load or initialize strategic memory
   const strategicMemory: StrategicMemory = sessionId
     ? await memoryService.getStrategicMemory(sessionId).catch(() => ({}))
     : {};
 
   const stage = detectStage(message);
 
+  // Detect primary intent
   let primaryIntent = "general";
   try {
     const intents = getRelevantIntents(message, 1);
     if (intents?.length) primaryIntent = intents[0].intent.name;
   } catch {}
 
+  // Detect services
   let detectedServices: any[] = [];
   try {
     detectedServices = detectIntents(message)
-      .filter((i: any) => i.type === "service" && i.confidence > 0.4);
+      .filter(i => i.type === "service" && i.confidence > 0.4);
   } catch {}
 
   let leadScore = scoreLead(message);
 
-  /* ===== CONTEXT FIX ===== */
-  const hasSufficientContext: boolean =
+  /* ===== CONTEXT CHECK ===== */
+  const hasSufficientContext =
     message.length > 12 &&
     (
-      /(roas|ads|sales|conversion|seo|store|business|revenue)/.test(message) ||
-      !!strategicMemory.businessMentioned ||
+      /(roas|ads|sales|conversion|seo|store|business|revenue)/i.test(message) ||
+      strategicMemory.businessMentioned ||
       (strategicMemory.servicesDiscussed?.length ?? 0) > 0 ||
       !!strategicMemory.lastUserProblem
     );
@@ -193,6 +197,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     strategicMemory.lastUserProblem = message;
   }
 
+  // Generate reasoning
   let reasoning = "";
   try {
     const data: any = sessionId
@@ -203,16 +208,19 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     reasoning = fallbackReasoning(message, detectedServices);
   }
 
+  // Update memory with detected services
   if (detectedServices.length) {
     const existing = new Set(strategicMemory.servicesDiscussed || []);
-    detectedServices.forEach((s: any) => existing.add(s.value));
+    detectedServices.forEach(s => existing.add(s.value));
     strategicMemory.servicesDiscussed = Array.from(existing);
     strategicMemory.lastService = detectedServices[0].value;
   }
 
+  // Boost lead score if business mentioned
   if (strategicMemory.businessMentioned) leadScore += 1;
   leadScore = Math.min(leadScore, 10);
 
+  // Update lead score in external system
   if (sessionId) {
     try {
       leadQualifier.scoreLead(sessionId, { need: leadScore / 10 });
@@ -223,6 +231,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     ? await memoryService.getRecentContext(sessionId).catch(() => [])
     : [];
 
+  // Brain context
   const brainContext: BrainContext = {
     message: userMessage,
     intent: primaryIntent,
@@ -236,7 +245,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     reasoning,
     recentContext,
     strategicMemory,
-    detectedServices: detectedServices.map((d: any) => d.value),
+    detectedServices: detectedServices.map(d => d.value),
     dynamicGreeting:
       stage === "greeting"
         ? generateDynamicGreeting(strategicMemory)
@@ -245,6 +254,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     hasSufficientContext,
   };
 
+  // Fused chunks
   let fusedChunks = strategicMemory.cachedFusedChunks ?? [];
   if (!fusedChunks.length) {
     fusedChunks = await getFusedChunks(message, 5).catch(() => []);
@@ -252,7 +262,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   }
 
   fusedChunks = fusedChunks.filter(
-    (c: any) => c?.text && !/(contact|email|phone|http)/i.test(c.text)
+    c => c?.text && !/(contact|email|phone|http)/i.test(c.text)
   );
 
   return { brainContext, chunks: fusedChunks };

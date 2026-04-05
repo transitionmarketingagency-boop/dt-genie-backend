@@ -336,7 +336,7 @@ const brainContext = brainData?.brainContext ?? {};
 const strategicChunks = brainData?.chunks ?? [];
 
 /* ---------- NORMALIZE LEAD SCORE (CRITICAL FIX) ---------- */
-// ✅ Resolve leadScore to a clean 0–1 number
+// ✅ Always resolve to 0–1
 const leadScoreValue =
   typeof leadData?.score?.total === "number"
     ? leadData.score.total
@@ -354,49 +354,45 @@ const stage =
 brainContext.leadScore = leadScoreValue;
 brainContext.stage = stage;
 
+/* ---------- NORMALIZE MESSAGE ONCE ---------- */
+const lowerMsg = message.toLowerCase(); // ✅ Declare once
+
 /* ---------- OPTIONAL: LOG FOR DEBUGGING ---------- */
 console.log(
-  `[STRATEGIC BRAIN] leadScore: ${brainContext.leadScore}, stage: ${brainContext.stage}`
+  `[STRATEGIC BRAIN] leadScore: ${leadScoreValue}, stage: ${stage}, message: ${lowerMsg}`
 );
-    /* ---------- BOOKING FLOW (ACTIVE SESSION) ---------- */
-    if (bookingFlow.isBookingActive(sessionId)) {
-      if (detectBookingRejection(message)) {
-        bookingFlow.reset(sessionId);
-        return "No problem — we can continue here. What would you like to explore?";
-      }
 
-      const bookingResp = await bookingFlow.handleStep(sessionId, message);
-      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-      return bookingResp.response;
-    }
+/* ---------- BOOKING FLOW (ACTIVE SESSION) ---------- */
+if (bookingFlow.isBookingActive(sessionId)) {
+  if (detectBookingRejection(message)) {
+    bookingFlow.reset(sessionId);
+    return "No problem — we can continue here. What would you like to explore?";
+  }
 
-    /* ---------- NEURAL ROUTING ---------- */
+  const bookingResp = await bookingFlow.handleStep(sessionId, message);
+  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+  return bookingResp.response;
+}
 
-    if (brain.type === "identity") {
-      return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
-    }
+/* ---------- NEURAL ROUTING ---------- */
+if (brain.type === "identity") {
+  return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
+}
 
-    if (brain.type === "booking") {
-      const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-      return bookingResp.response;
-    }
+if (brain.type === "booking") {
+  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+  return bookingResp.response;
+}
 
-// 🔥 SMART GREETING (NON-BLOCKING + SESSION AWARE)
+/* ---------- SMART GREETING (NON-BLOCKING + SESSION AWARE) ---------- */
 if (brain.type === "greeting") {
   const lastMessages = recentMessagesCache || [];
+  const hasAssistantSpoken = lastMessages.some((m: any) => m.role === "assistant");
 
-  const hasAssistantSpoken = lastMessages.some(
-    (m: any) => m.role === "assistant"
-  );
-
-  // ✅ Only greet if it's FIRST interaction
   if (!hasAssistantSpoken) {
-    if (brainContext?.dynamicGreeting) {
-      return brainContext.dynamicGreeting;
-    }
+    if (brainContext?.dynamicGreeting) return brainContext.dynamicGreeting;
 
-    // time-based fallback greeting
     const hour = new Date().getHours();
     let timeGreeting = "Hey";
 
@@ -406,18 +402,14 @@ if (brain.type === "greeting") {
 
     return `${timeGreeting} — what are you working on right now?`;
   }
-
-  // ✅ DO NOT break flow if already greeted
-  // continue to full AI response instead
 }
 
+/* ---------- USE LEAD SCORE FOR LOGGING / FEEDBACK ---------- */
+console.log(`Lead Score Value: ${leadScoreValue}`);
 
 /* ---------- SMART AUTO BOOKING (INTELLIGENT — NO FALSE TRIGGERS) ---------- */
 
-// ⚠️ DO NOT redeclare lowerMsg if already declared above
-// const lowerMsg = message.toLowerCase(); ❌ REMOVE if duplicate
-
-const msg = lowerMsg; // reuse existing normalized message
+const msg = lowerMsg; // now safe to use
 
 /* ---------- BLOCK LOW-INTENT / INFORMATIONAL ---------- */
 const isInformationalQuery =
@@ -469,7 +461,7 @@ if (
 console.log(`
 Context Ready: ${brainContext.hasSufficientContext ?? false}
 Stage: ${stage}
-Lead Score: ${leadScore}
+Lead Score: ${leadScoreValue}
 Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
 Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
 Strategy Insight: ${brainContext?.reasoning ?? "N/A"}
@@ -477,7 +469,6 @@ Detected Services: ${brainContext?.detectedServices?.join(", ") ?? "none"}
 `);
 
 /* ---------- HIGH-INTENT OVERRIDE (SMART CONVERSION) ---------- */
-const lowerMsg = message.toLowerCase();
 
 if (
   lowerMsg.includes("work with you") ||
@@ -1031,5 +1022,3 @@ return response;
 }
 }
 
-/* ---------- EXPORT (CRITICAL FIX) ---------- */
-export { generateHybridResponse };
