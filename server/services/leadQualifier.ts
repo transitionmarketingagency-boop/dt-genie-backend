@@ -10,6 +10,7 @@ export interface LeadScore {
   need?: number;        // 0-1
   timeline?: number;    // 0-1
   total: number;        // 0-1 normalized, weighted
+  stage?: string;       // optional conversation stage
 }
 
 /* ================= UTILS ================= */
@@ -21,7 +22,8 @@ function clamp(val?: number): number {
 /* ================= CLASS ================= */
 export class LeadQualifier {
 
-  private weights = {
+  // Weighted BANT components (dynamic per stage)
+  private defaultWeights = {
     budget: 0.25,
     authority: 0.25,
     need: 0.35,
@@ -29,7 +31,16 @@ export class LeadQualifier {
   };
 
   /* ================= SCORE LEAD ================= */
-  scoreLead(sessionId: string, bantData: Partial<LeadScore>): LeadScore {
+  scoreLead(
+    sessionId: string,
+    bantData: Partial<LeadScore>,
+    stage: string = "initial"
+  ): LeadScore {
+
+    // Adjust weights dynamically by stage if needed
+    const weights = { ...this.defaultWeights };
+    if (stage === "early") weights.need += 0.1; // focus on need in early stage
+    if (stage === "late") weights.budget += 0.1; // emphasize budget later
 
     const score: LeadScore = {
       budget: clamp(bantData.budget),
@@ -37,43 +48,50 @@ export class LeadQualifier {
       need: clamp(bantData.need),
       timeline: clamp(bantData.timeline),
       total: 0,
+      stage,
     };
 
-    /* ---------- SAFE WEIGHTED TOTAL ---------- */
+    // Weighted total
     score.total =
-      (score.budget || 0) * this.weights.budget +
-      (score.authority || 0) * this.weights.authority +
-      (score.need || 0) * this.weights.need +
-      (score.timeline || 0) * this.weights.timeline;
+      (score.budget || 0) * weights.budget +
+      (score.authority || 0) * weights.authority +
+      (score.need || 0) * weights.need +
+      (score.timeline || 0) * weights.timeline;
 
     score.total = clamp(score.total);
 
-    /* ---------- DEBUG ---------- */
+    // ---------- DEBUG ----------
     if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[LeadQualifier] ${sessionId} ->`, score);
+      console.log(`[LeadQualifier] ${sessionId} | stage=${stage} ->`, score);
     }
 
-    /* ---------- NON-BLOCKING MEMORY UPDATE ---------- */
+    // ---------- MEMORY UPDATE ----------
     if (sessionId && score.total > 0) {
-      this.safeUpdateLeadScore(sessionId, score.total);
+      this.safeUpdateLeadScore(sessionId, score);
     }
 
     return score;
   }
 
   /* ================= SAFE MEMORY UPDATE ================= */
-  private async safeUpdateLeadScore(sessionId: string, score: number) {
-
+  private async safeUpdateLeadScore(sessionId: string, score: LeadScore) {
     try {
-      // Prevent unnecessary DB writes
-      if (score <= 0) return;
+      // Skip zero scores
+      if (score.total <= 0) return;
 
       await memoryService.updateStrategicMemory(sessionId, {
-        leadScore: score,
-      });
+        leadScore: score.total,
+        lastLeadStage: score.stage,
+        lastLeadComponents: {
+          budget: score.budget,
+          authority: score.authority,
+          need: score.need,
+          timeline: score.timeline,
+        },
+      } as Partial<StrategicMemory>);
 
       if (process.env.DEBUG_MEMORY === "true") {
-        console.log(`[LeadQualifier] leadScore=${score} saved for ${sessionId}`);
+        console.log(`[LeadQualifier] leadScore=${score.total} saved for ${sessionId}`);
       }
 
     } catch (err) {

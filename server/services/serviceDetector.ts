@@ -16,7 +16,7 @@ export type DetectedIntent = {
 
 /* ================= NORMALIZATION ================= */
 function normalize(text: string): string {
-  return text
+  return (text || "")
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -32,14 +32,13 @@ function matchKeyword(text: string, keyword: string): number {
   const normalizedText = normalize(text);
   const kw = normalize(keyword);
 
-  // Strong exact phrase match
+  // Exact phrase match
   const exactRegex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
   if (exactRegex.test(normalizedText)) return 1;
 
-  // Token-based partial match
+  // Partial token match
   const words = kw.split(" ");
   let hits = 0;
-
   for (const w of words) {
     if (normalizedText.includes(w)) hits++;
   }
@@ -49,69 +48,24 @@ function matchKeyword(text: string, keyword: string): number {
 
 /* ================= SERVICES ================= */
 const services: Record<string, { keywords: string[]; weight: number }> = {
-  voice_search: {
-    keywords: ["voice search", "position zero", "featured snippets", "alexa", "siri"],
-    weight: 1
-  },
-  email_marketing: {
-    keywords: ["email marketing", "klaviyo", "email automation", "cold email"],
-    weight: 1
-  },
-  youtube_ads: {
-    keywords: ["youtube ads", "video marketing", "youtube campaigns"],
-    weight: 1
-  },
-  website_design: {
-    keywords: ["website design", "shopify", "woocommerce", "web development"],
-    weight: 1
-  },
-  virtual_tours: {
-    keywords: ["virtual tours", "360 tours", "cgi tours", "real estate renders"],
-    weight: 1
-  },
-  performance_marketing: {
-    keywords: ["ppc", "performance marketing", "ads", "increase roas", "lower cac"],
-    weight: 1.2
-  },
-  ai_automation: {
-    keywords: ["ai agents", "automation", "crm automation", "workflow"],
-    weight: 1
-  },
-  cgi_marketing: {
-    keywords: ["cgi", "3d ads", "cgi ads", "product renders"],
-    weight: 1.1
-  },
-  video_audio: {
-    keywords: ["video production", "audio production", "editing"],
-    weight: 1
-  },
-  content_marketing: {
-    keywords: ["content marketing", "copywriting", "blogs"],
-    weight: 1
-  },
-  social_media: {
-    keywords: ["instagram", "tiktok", "linkedin marketing"],
-    weight: 1
-  },
-  geo_ai_seo: {
-    keywords: ["geo", "ai seo", "chatgpt ranking", "gemini ranking"],
-    weight: 1
-  },
-  predictive_analytics: {
-    keywords: ["analytics", "forecasting", "data insights"],
-    weight: 1
-  }
+  voice_search: { keywords: ["voice search","position zero","featured snippets","alexa","siri"], weight: 1 },
+  email_marketing: { keywords: ["email marketing","klaviyo","email automation","cold email"], weight: 1 },
+  youtube_ads: { keywords: ["youtube ads","video marketing","youtube campaigns"], weight: 1 },
+  website_design: { keywords: ["website design","shopify","woocommerce","web development"], weight: 1 },
+  virtual_tours: { keywords: ["virtual tours","360 tours","cgi tours","real estate renders"], weight: 1 },
+  performance_marketing: { keywords: ["ppc","performance marketing","ads","increase roas","lower cac"], weight: 1.2 },
+  ai_automation: { keywords: ["ai agents","automation","crm automation","workflow"], weight: 1 },
+  cgi_marketing: { keywords: ["cgi","3d ads","cgi ads","product renders"], weight: 1.1 },
+  video_audio: { keywords: ["video production","audio production","editing"], weight: 1 },
+  content_marketing: { keywords: ["content marketing","copywriting","blogs"], weight: 1 },
+  social_media: { keywords: ["instagram","tiktok","linkedin marketing"], weight: 1 },
+  geo_ai_seo: { keywords: ["geo","ai seo","chatgpt ranking","gemini ranking"], weight: 1 },
+  predictive_analytics: { keywords: ["analytics","forecasting","data insights"], weight: 1 },
 };
 
 /* ================= PROBLEM SIGNALS ================= */
 const problemSignals = [
-  "low roas",
-  "bad roas",
-  "no sales",
-  "low conversion",
-  "ads not working",
-  "not getting results",
-  "traffic but no sales"
+  "low roas","bad roas","no sales","low conversion","ads not working","not getting results","traffic but no sales"
 ];
 
 /* ================= OTHER INTENTS ================= */
@@ -124,21 +78,12 @@ const industries = ["real estate","ecommerce","saas","travel"];
 /* ================= SERVICE SCORING ================= */
 function detectServiceScores(text: string): Record<string, number> {
   const scores: Record<string, number> = {};
-
   for (const [service, config] of Object.entries(services)) {
     let score = 0;
-
-    for (const kw of config.keywords) {
-      score += matchKeyword(text, kw);
-    }
-
+    for (const kw of config.keywords) score += matchKeyword(text, kw);
     score = (score / config.keywords.length) * config.weight;
-
-    if (score > 0.2) {
-      scores[service] = Math.min(score, 1);
-    }
+    if (score > 0.2) scores[service] = Math.min(score, 1);
   }
-
   return scores;
 }
 
@@ -158,7 +103,6 @@ export function detectIntents(message: string): DetectedIntent[] {
 
   // ---------- SERVICE DETECTION ----------
   const serviceScores = detectServiceScores(text);
-
   for (const [service, score] of Object.entries(serviceScores).sort((a,b)=>b[1]-a[1])) {
     if (!added.has(service)) {
       results.push({ type: "service", value: service, confidence: Number(score.toFixed(2)) });
@@ -183,7 +127,7 @@ export function detectIntents(message: string): DetectedIntent[] {
   addIntent(industries, "industry", 0.7);
 
   // ---------- SORT BY CONFIDENCE ----------
-  results.sort((a, b) => b.confidence - a.confidence);
+  results.sort((a,b)=>b.confidence - a.confidence);
 
   // ---------- FALLBACK ----------
   if (!results.length) {
@@ -201,6 +145,6 @@ export function detectService(message: string): string | null {
 
 export function detectMultipleServices(message: string): string[] {
   return detectIntents(message)
-    .filter((i) => i.type === "service")
-    .map((i) => i.value);
+    .filter(i => i.type === "service")
+    .map(i => i.value);
 }

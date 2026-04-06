@@ -23,7 +23,7 @@ export type StrategicMemory = {
 /* ================= UTILS ================= */
 function safeString(val: any): string {
   if (!val || typeof val !== "string") return "";
-  return val.toLowerCase();
+  return val.toLowerCase().trim();
 }
 
 /* ================= Reasoning Engine ================= */
@@ -53,8 +53,8 @@ export class ReasoningEngine {
 
     /* ---------- CONTEXT ---------- */
     const recentMessages = (recentContextRaw || []).map((m: any) => ({
-      role: m?.role || "user",
-      content: m?.content || "",
+      role: typeof m?.role === "string" ? m.role : "user",
+      content: safeString(m?.content),
     }));
 
     /* ---------- FINAL STRATEGY ---------- */
@@ -88,7 +88,7 @@ export class ReasoningEngine {
 
     /* ---------- MEMORY FALLBACK ---------- */
     if (Array.isArray(memory?.painPoints) && memory.painPoints.length > 0) {
-      return memory.painPoints[0];
+      return safeString(memory.painPoints[0]);
     }
 
     return "general";
@@ -96,7 +96,6 @@ export class ReasoningEngine {
 
   /* ================= INDUSTRY DETECTION ================= */
   private guessIndustry(question: string, context: any[]): string {
-
     const q = question;
 
     /* ---------- DIRECT ---------- */
@@ -107,12 +106,13 @@ export class ReasoningEngine {
 
     /* ---------- CONTEXT ---------- */
     const combined = (context || [])
-      .map((m) => (m?.content || "").toLowerCase())
+      .map((m) => safeString(m?.content))
       .join(" ");
 
     if (combined.includes("ecommerce")) return "ecommerce";
     if (combined.includes("real estate")) return "real_estate";
     if (combined.includes("travel")) return "travel";
+    if (combined.includes("marketing")) return "marketing";
 
     return "general";
   }
@@ -166,7 +166,7 @@ export class ReasoningEngine {
       }
     }
 
-    /* ---------- DEFAULT ---------- */
+    /* ---------- MARKETING & DEFAULT ---------- */
     return "Use a mix of content marketing, paid acquisition, and conversion optimization to improve results";
   }
 

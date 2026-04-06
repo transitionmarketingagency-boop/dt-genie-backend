@@ -14,10 +14,7 @@ const __dirname = path.dirname(__filename);
 /* ================= MEMORY PATH ================= */
 
 const memoryDir = path.join(__dirname, "../memory");
-
-if (!fs.existsSync(memoryDir)) {
-  fs.mkdirSync(memoryDir, { recursive: true });
-}
+if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
 
 const dbPath = path.join(memoryDir, "chat_memory.db");
 
@@ -54,8 +51,6 @@ export async function initializeMemory(): Promise<void> {
     await db.exec(`PRAGMA synchronous = NORMAL;`);
     await db.exec(`PRAGMA busy_timeout = 5000;`);
 
-    /* ================= CHAT TABLE ================= */
-
     await db.run(`
       CREATE TABLE IF NOT EXISTS chat_messages (
         id TEXT PRIMARY KEY,
@@ -66,12 +61,7 @@ export async function initializeMemory(): Promise<void> {
       )
     `);
 
-    await db.run(`
-      CREATE INDEX IF NOT EXISTS idx_sessionId
-      ON chat_messages (sessionId)
-    `);
-
-    /* ================= STRATEGIC MEMORY ================= */
+    await db.run(`CREATE INDEX IF NOT EXISTS idx_sessionId ON chat_messages (sessionId)`);
 
     await db.run(`
       CREATE TABLE IF NOT EXISTS strategic_memory (
@@ -86,11 +76,12 @@ export async function initializeMemory(): Promise<void> {
         timeline TEXT,
         decisionMaker TEXT,
         interestLevel TEXT,
+        lastUserProblem TEXT,
+        lastDetectedServices TEXT,
+        lastIntent TEXT,
         updatedAt TEXT
       )
     `);
-
-    /* ================= BOOKINGS TABLE ================= */
 
     await db.run(`
       CREATE TABLE IF NOT EXISTS bookings (
@@ -105,12 +96,7 @@ export async function initializeMemory(): Promise<void> {
       )
     `);
 
-    /* ================= BOOKING INDEX ================= */
-
-    await db.run(`
-      CREATE INDEX IF NOT EXISTS idx_booking_user
-      ON bookings (userId, createdAt)
-    `);
+    await db.run(`CREATE INDEX IF NOT EXISTS idx_booking_user ON bookings (userId, createdAt)`);
 
     console.log("✅ Memory DB initialized at:", dbPath);
 
@@ -123,19 +109,13 @@ export async function initializeMemory(): Promise<void> {
 
 function normalizeContent(text: unknown): string {
   if (typeof text !== "string" || !text.trim()) return "";
-
   let normalized = text
     .normalize("NFKC")
     .replace(/[\u0000-\u001F\u007F]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-
-  // Safe truncate (handles unicode properly)
   const chars = [...normalized];
-  if (chars.length > 4000) {
-    normalized = chars.slice(0, 4000).join("");
-  }
-
+  if (chars.length > 4000) normalized = chars.slice(0, 4000).join("");
   return normalized;
 }
 
@@ -152,6 +132,9 @@ export interface StrategicMemory {
   timeline?: string;
   decisionMaker?: string;
   interestLevel?: string;
+  lastUserProblem?: string;
+  lastDetectedServices?: string[];
+  lastIntent?: string;
   updatedAt?: string;
 
   bantSignals?: {
@@ -165,77 +148,44 @@ export interface StrategicMemory {
 /* ================= MEMORY SERVICE ================= */
 
 export class MemoryService {
-
   private db = dbPromise;
 
   /* -------- Add / Save Message -------- */
-
-  async addMessage(
-    sessionId: string,
-    role: "user" | "assistant",
-    content: string
-  ): Promise<ChatMessage> {
-
+  async addMessage(sessionId: string, role: "user" | "assistant", content: string): Promise<ChatMessage> {
     const db = await this.db;
-
     const normalized = normalizeContent(content);
+    if (!normalized) throw new Error("Attempted to store empty message");
 
-    if (!normalized) {
-      throw new Error("Attempted to store empty message");
-    }
-
-const last = await db.get(
-  `SELECT id, content, timestamp
-   FROM chat_messages
-   WHERE sessionId = ?
-   ORDER BY datetime(timestamp) DESC
-   LIMIT 1`,
-  sessionId
-);
-
-if (last) {
-  const lastTimestamp = new Date(last.timestamp).getTime();
-  const nowTime = Date.now();
-  const lastNormalized = normalizeContent(last.content);
-
-  // Skip exact duplicate within 10s window
-  if (!isNaN(lastTimestamp) && lastNormalized === normalized && nowTime - lastTimestamp < 10000) {
-    if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
-    }
-    return {
-      id: last.id,
-      sessionId,
-      role,
-      content: normalized,
-      timestamp: new Date(last.timestamp),
-    };
-  }
-}
-
-    const now = new Date();
-
-    const msg: ChatMessage = {
-      id: crypto.randomUUID(),
-      sessionId,
-      role,
-      content: normalized,
-      timestamp: now,
-    };
-
-    await db.run(
-      `INSERT INTO chat_messages
-      (id, sessionId, role, content, timestamp)
-      VALUES (?, ?, ?, ?, ?)`,
-      msg.id,
-      msg.sessionId,
-      msg.role,
-      msg.content,
-      now.toISOString()
+    const last = await db.get(
+      `SELECT id, content, role, timestamp
+       FROM chat_messages
+       WHERE sessionId = ?
+       ORDER BY datetime(timestamp) DESC
+       LIMIT 1`,
+      sessionId
     );
 
-    /* ===== PRUNE OLD MESSAGES ===== */
+    if (last) {
+      const lastTimestamp = new Date(last.timestamp).getTime();
+      const nowTime = Date.now();
+      const lastNormalized = normalizeContent(last.content);
+      // Skip exact duplicates from the same role within 10s
+      if (!isNaN(lastTimestamp) && lastNormalized === normalized && last.role === role && nowTime - lastTimestamp < 10000) {
+        if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
+        return { id: last.id, sessionId, role, content: normalized, timestamp: new Date(last.timestamp) };
+      }
+    }
 
+    const now = new Date();
+    const msg: ChatMessage = { id: crypto.randomUUID(), sessionId, role, content: normalized, timestamp: now };
+
+    await db.run(
+      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
+       VALUES (?, ?, ?, ?, ?)`,
+      msg.id, msg.sessionId, msg.role, msg.content, now.toISOString()
+    );
+
+    // Prune old messages
     await db.run(
       `DELETE FROM chat_messages
        WHERE sessionId = ?
@@ -246,127 +196,62 @@ if (last) {
          ORDER BY datetime(timestamp) DESC
          LIMIT ?
        )`,
-      sessionId,
-      sessionId,
-      MAX_HISTORY_MESSAGES
+      sessionId, sessionId, MAX_HISTORY_MESSAGES
     );
 
-    if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[Memory] Added (${role}) message for session ${sessionId}`);
-    }
-
+    if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Added (${role}) message for session ${sessionId}`);
     return msg;
   }
 
-
-/* -------- Optional wrapper to maintain backward compatibility -------- */
-saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
-  return this.addMessage(sessionId, role, content);
-}
-
+  saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
+    return this.addMessage(sessionId, role, content);
+  }
 
   /* -------- Get Full History -------- */
-
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
-
     try {
-
       const db = await this.db;
-
       const rows = await db.all(
-        `SELECT *
-         FROM chat_messages
-         WHERE sessionId = ?
-         ORDER BY datetime(timestamp) DESC
-         LIMIT ?`,
+        `SELECT * FROM chat_messages WHERE sessionId = ? ORDER BY datetime(timestamp) DESC LIMIT ?`,
         sessionId,
         MAX_HISTORY_MESSAGES
       );
-
-      return rows.reverse().map((r: any) => ({
-        id: r.id,
-        sessionId: r.sessionId,
-        role: r.role,
-        content: r.content ?? "",
-        timestamp: new Date(r.timestamp),
-      }));
-
+      return rows.reverse().map((r: any) => ({ id: r.id, sessionId: r.sessionId, role: r.role, content: r.content ?? "", timestamp: new Date(r.timestamp) }));
     } catch (err) {
-
       console.error(`❌ Failed to get history for session ${sessionId}:`, err);
       return [];
-
     }
-
   }
 
-  /* -------- Context Window -------- */
-
+  /* -------- Recent Context for RAG -------- */
   async getRecentContext(sessionId: string): Promise<ChatMessage[]> {
-
     try {
-
       const db = await this.db;
-
       const rows = await db.all(
-        `SELECT *
-         FROM chat_messages
-         WHERE sessionId = ?
-         ORDER BY datetime(timestamp) DESC
-         LIMIT ?`,
+        `SELECT * FROM chat_messages WHERE sessionId = ? ORDER BY datetime(timestamp) DESC LIMIT ?`,
         sessionId,
         MAX_CONTEXT_MESSAGES
       );
-
-      const messages: ChatMessage[] = rows.reverse().map((r: any) => ({
-        id: r.id,
-        sessionId: r.sessionId,
-        role: r.role,
-        content: r.content ?? "",
-        timestamp: new Date(r.timestamp),
-      }));
-
-      if (process.env.DEBUG_MEMORY === "true") {
-        console.log(
-          `[Memory] Retrieved ${messages.length} recent messages for session ${sessionId}`
-        );
-      }
-
+      const messages: ChatMessage[] = rows.reverse().map((r: any) => ({ id: r.id, sessionId: r.sessionId, role: r.role, content: r.content ?? "", timestamp: new Date(r.timestamp) }));
+      if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Retrieved ${messages.length} recent messages for session ${sessionId}`);
       return messages;
-
     } catch (err) {
-
-      console.error(
-        `❌ Failed to get recent context for session ${sessionId}:`,
-        err
-      );
-
+      console.error(`❌ Failed to get recent context for session ${sessionId}:`, err);
       return [];
-
     }
-
   }
 
   /* ================= STRATEGIC MEMORY ================= */
-
   async getStrategicMemory(sessionId: string): Promise<StrategicMemory> {
-
     const db = await this.db;
-
-    const row = await db.get(
-      `SELECT * FROM strategic_memory WHERE sessionId = ?`,
-      sessionId
-    );
-
+    const row = await db.get(`SELECT * FROM strategic_memory WHERE sessionId = ?`, sessionId);
     if (!row) return {};
-
-const bant: StrategicMemory["bantSignals"] = {
-  budget: typeof row.budget === "number" ? row.budget : undefined,
-  authority: row.decisionMaker?.trim() ? 1 : undefined,
-  need: row.interestLevel?.trim() ? 0.6 : undefined,
-  timeline: row.timeline?.trim() ? 0.6 : undefined,
-};
-
+    const bant: StrategicMemory["bantSignals"] = {
+      budget: typeof row.budget === "number" ? row.budget : undefined,
+      authority: row.decisionMaker?.trim() ? 1 : undefined,
+      need: row.interestLevel?.trim() ? 0.6 : undefined,
+      timeline: row.timeline?.trim() ? 0.6 : undefined,
+    };
     return {
       industry: row.industry || undefined,
       businessType: row.businessType || undefined,
@@ -378,37 +263,34 @@ const bant: StrategicMemory["bantSignals"] = {
       timeline: row.timeline ?? undefined,
       decisionMaker: row.decisionMaker ?? undefined,
       interestLevel: row.interestLevel ?? undefined,
+      lastUserProblem: row.lastUserProblem ?? undefined,
+      lastDetectedServices: row.lastDetectedServices ? safeParse(row.lastDetectedServices) : undefined,
+      lastIntent: row.lastIntent ?? undefined,
       updatedAt: row.updatedAt || undefined,
       bantSignals: bant,
     };
-
   }
 
-  async updateStrategicMemory(
-    sessionId: string,
-    data: Partial<StrategicMemory>
-  ) {
-
+  async updateStrategicMemory(sessionId: string, data: Partial<StrategicMemory>) {
     const db = await this.db;
-
     const existing = await this.getStrategicMemory(sessionId);
 
-const merged: StrategicMemory = {
-  ...existing,
-  ...data,
-  goals: data.goals !== undefined ? data.goals : existing.goals,
-  servicesDiscussed: data.servicesDiscussed !== undefined ? data.servicesDiscussed : existing.servicesDiscussed,
-  bantSignals: {
-  ...(existing.bantSignals || {}),
-  ...(data.bantSignals || {}),
-},
-  updatedAt: new Date().toISOString(),
-};
+    const merged: StrategicMemory = {
+      ...existing,
+      ...data,
+      goals: data.goals !== undefined ? data.goals : existing.goals,
+      servicesDiscussed: data.servicesDiscussed !== undefined ? data.servicesDiscussed : existing.servicesDiscussed,
+      lastDetectedServices: data.lastDetectedServices ?? existing.lastDetectedServices,
+      lastIntent: data.lastIntent ?? existing.lastIntent,
+      lastUserProblem: data.lastUserProblem ?? existing.lastUserProblem,
+      bantSignals: { ...(existing.bantSignals || {}), ...(data.bantSignals || {}) },
+      updatedAt: new Date().toISOString(),
+    };
 
     await db.run(
       `INSERT INTO strategic_memory
-       (sessionId, industry, businessType, goals, servicesDiscussed, leadScore, stage, budget, timeline, decisionMaker, interestLevel, updatedAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (sessionId, industry, businessType, goals, servicesDiscussed, leadScore, stage, budget, timeline, decisionMaker, interestLevel, lastUserProblem, lastDetectedServices, lastIntent, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(sessionId) DO UPDATE SET
          industry=excluded.industry,
          businessType=excluded.businessType,
@@ -420,98 +302,66 @@ const merged: StrategicMemory = {
          timeline=excluded.timeline,
          decisionMaker=excluded.decisionMaker,
          interestLevel=excluded.interestLevel,
+         lastUserProblem=excluded.lastUserProblem,
+         lastDetectedServices=excluded.lastDetectedServices,
+         lastIntent=excluded.lastIntent,
          updatedAt=excluded.updatedAt`,
       sessionId,
       merged.industry ?? null,
       merged.businessType ?? null,
       Array.isArray(merged.goals) ? JSON.stringify(merged.goals) : null,
-Array.isArray(merged.servicesDiscussed)
-  ? JSON.stringify(merged.servicesDiscussed)
-  : null,
+      Array.isArray(merged.servicesDiscussed) ? JSON.stringify(merged.servicesDiscussed) : null,
       merged.leadScore ?? null,
       merged.stage ?? null,
       merged.budget ?? null,
       merged.timeline ?? null,
       merged.decisionMaker ?? null,
       merged.interestLevel ?? null,
+      merged.lastUserProblem ?? null,
+      merged.lastDetectedServices ? JSON.stringify(merged.lastDetectedServices) : null,
+      merged.lastIntent ?? null,
       merged.updatedAt
     );
-
   }
 
-
-/* -------- BOOKINGS -------- */
-
-async storeBooking(data: {
-  userId: string;
-  serviceType?: string;
-  preferredTime?: string;
-  email?: string;
-  calendlyLink?: string;
-  status?: string;
-}) {
-  const db = await this.db;
-
-  // ✅ Validate and normalize input
-  const userId = data.userId?.trim();
-  if (!userId) throw new Error("Booking must include a valid userId");
-
-  const preferredTime = data.preferredTime?.trim() || null;
-  const email = data.email?.trim() || null;
-  const serviceType = data.serviceType?.trim() || null;
-  const calendlyLink = data.calendlyLink?.trim() || null;
-  const status = data.status?.trim() || "pending";
-
-  // ✅ Generate unique ID and timestamp
-  const bookingId = crypto.randomUUID();
-  const createdAt = new Date().toISOString();
-
-  // ✅ Insert into DB
-  await db.run(
-    `INSERT INTO bookings
-     (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    bookingId,
-    userId,
-    serviceType,
-    preferredTime,
-    email,
-    calendlyLink,
-    status,
-    createdAt
-  );
-
-  if (process.env.DEBUG_MEMORY === "true") {
-    console.log(`[Memory] Booking stored for ${userId}`);
-  }
-}
-
-  async updateBookingStatus(userId: string, status: string) {
-
+  /* -------- BOOKINGS -------- */
+  async storeBooking(data: {
+    userId: string;
+    serviceType?: string;
+    preferredTime?: string;
+    email?: string;
+    calendlyLink?: string;
+    status?: string;
+  }) {
     const db = await this.db;
+    const userId = data.userId?.trim();
+    if (!userId) throw new Error("Booking must include a valid userId");
+    const bookingId = crypto.randomUUID();
+    const createdAt = new Date().toISOString();
 
     await db.run(
-      `UPDATE bookings
-       SET status = ?
-       WHERE id = (
-         SELECT id
-         FROM bookings
-         WHERE userId = ?
-         ORDER BY createdAt DESC
-         LIMIT 1
-       )`,
-      status,
-      userId
+      `INSERT INTO bookings
+       (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      bookingId,
+      userId,
+      data.serviceType?.trim() || null,
+      data.preferredTime?.trim() || null,
+      data.email?.trim() || null,
+      data.calendlyLink?.trim() || null,
+      data.status?.trim() || "pending",
+      createdAt
     );
 
-    if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[Memory] Booking updated for ${userId} -> ${status}`);
-    }
-
+    if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Booking stored for ${userId}`);
   }
 
-} // ✅ THIS closes MemoryService class properly
-
+  async updateBookingStatus(bookingId: string, status: string) {
+    const db = await this.db;
+    await db.run(`UPDATE bookings SET status=? WHERE id=?`, status, bookingId);
+    if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Booking ${bookingId} updated -> ${status}`);
+  }
+}
 
 /* ================= SINGLETON ================= */
 

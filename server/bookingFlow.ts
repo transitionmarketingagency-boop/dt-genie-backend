@@ -131,19 +131,16 @@ const bookingFlow = {
       case 1: {
         booking.step = 2;
 
-        // --- FIXED: Use detectMultipleServices and fallback ---
+        // Detect services dynamically with fallback
         let detectedServices = detectMultipleServices(message);
-        if (!detectedServices.length) {
-          detectedServices = fallbackServiceDetection(message);
-        }
+        if (!detectedServices.length) detectedServices = fallbackServiceDetection(message);
 
         booking.serviceTypes = detectedServices;
 
-        // --- FIXED: Ensure executionPlan handles array ---
+        // Generate execution plan dynamically
         const plan = await generateExecutionPlan(detectedServices);
         booking.executionPlan = plan;
 
-        // --- DEBUG LOGGING ---
         console.log({ userId, message, detectedServices, executionPlan: plan });
 
         return {

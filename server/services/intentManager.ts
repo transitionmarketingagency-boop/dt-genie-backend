@@ -1,6 +1,6 @@
 /* =====================================================
-   INTENT MANAGER (ADVANCED PRODUCTION VERSION - FIXED)
-   Smart detection: keyword + phrase + intent types + scoring + problem awareness
+   INTENT MANAGER (PRODUCTION READY FIX)
+   Smart detection: keyword + phrase + intent types + scoring + service awareness
 ===================================================== */
 
 export interface Intent {
@@ -26,14 +26,13 @@ function escapeRegex(text: string): string {
 }
 
 function containsPhrase(text: string, phrase: string): boolean {
-  // Avoid double normalize overhead
   const normText = normalize(text);
   const phraseEscaped = escapeRegex(normalize(phrase));
   const regex = new RegExp(`\\b${phraseEscaped}\\b`, "i");
   return regex.test(normText);
 }
 
-/* ======================= STRONG INTENT SIGNALS ======================= */
+/* ======================= STRONG SIGNALS ======================= */
 const STRONG_BUYING_SIGNALS = [
   "i want to hire",
   "i want to work with you",
@@ -66,19 +65,19 @@ const PROBLEM_SIGNALS = [
 
 /* ======================= INTENTS DATABASE ======================= */
 export const intents: Intent[] = [
-  /* -------- GENERAL -------- */
-  { name: "greeting", category: "general", type: "general", keywords: ["hi", "hello", "hey"], description: "Greeting" },
-  { name: "about_company", category: "general", type: "general", keywords: ["who are you", "what do you do", "your company"], description: "Company info" },
+  // GENERAL
+  { name: "greeting", category: "general", type: "general", keywords: ["hi","hello","hey"], description: "Greeting" },
+  { name: "about_company", category: "general", type: "general", keywords: ["who are you","what do you do","your company"], description: "Company info" },
 
-  /* -------- GOALS -------- */
-  { name: "business_growth", category: "sales", type: "goal", keywords: ["grow", "scale", "increase sales", "more revenue"], description: "User wants growth" },
+  // GOALS
+  { name: "business_growth", category: "sales", type: "goal", keywords: ["grow","scale","increase sales","more revenue"], description: "User wants growth" },
 
-  /* -------- PROBLEMS -------- */
-  { name: "low_roas", category: "marketing", type: "problem", keywords: ["low roas", "bad roas", "roas is low"], description: "ROAS issue" },
-  { name: "no_sales", category: "sales", type: "problem", keywords: ["no sales", "not getting sales", "zero sales"], description: "Sales problem" },
-  { name: "conversion_problem", category: "marketing", type: "problem", keywords: ["low conversion", "conversion problem", "no conversions"], description: "Conversion issue" },
+  // PROBLEMS
+  { name: "low_roas", category: "marketing", type: "problem", keywords: ["low roas","bad roas","roas is low"], description: "ROAS issue" },
+  { name: "no_sales", category: "sales", type: "problem", keywords: ["no sales","not getting sales","zero sales"], description: "Sales problem" },
+  { name: "conversion_problem", category: "marketing", type: "problem", keywords: ["low conversion","conversion problem","no conversions"], description: "Conversion issue" },
 
-  /* -------------------- SERVICES -------------------- */
+  // SERVICES
   {
     name: "voice_search_optimization",
     category: "service",
@@ -164,31 +163,22 @@ export const intents: Intent[] = [
     description: "Data intelligence."
   },
 
-  /* -------- BUYING -------- */
-  { name: "hire_intent", category: "sales", type: "buying", keywords: ["hire", "work with you", "start project"], description: "User wants to hire" },
+  // BUYING
+  { name: "hire_intent", category: "sales", type: "buying", keywords: ["hire","work with you","start project"], description: "User wants to hire" },
 ];
 
 /* ======================= SCORING ======================= */
 function calculateIntentScore(text: string, intent: Intent): number {
   let score = 0;
-
   for (const keyword of intent.keywords) {
-    if (containsPhrase(text, keyword)) {
-      score += 0.5; // stronger signal per match
-    }
+    if (containsPhrase(text, keyword)) score += 0.5;
   }
-
-  if (intent.keywords.length) {
-    score /= intent.keywords.length;
-  }
-
-  // Mild short input penalty
-  if (text.length < 10) score *= 0.9;
-
+  if (intent.keywords.length) score /= intent.keywords.length;
+  if (text.length < 10) score *= 0.9; // mild short input penalty
   return Math.min(score, 1);
 }
 
-/* ======================= MAIN DETECTOR ======================= */
+/* ======================= DETECT INTENT ======================= */
 export function detectIntent(message: string, topN: number = 3): { intent: Intent; score: number }[] {
   const text = normalize(message);
   const results: { intent: Intent; score: number }[] = [];
@@ -199,8 +189,8 @@ export function detectIntent(message: string, topN: number = 3): { intent: Inten
     if (score > 0.05) results.push({ intent, score });
   }
 
-  // Boosters (creates new intents if none matched)
-  const boosters: { signals: string[]; type: "buying" | "goal" | "problem"; boost: number }[] = [
+  // Boosters for strong signals
+  const boosters: { signals: string[]; type: "buying"|"goal"|"problem"; boost: number }[] = [
     { signals: STRONG_BUYING_SIGNALS, type: "buying", boost: 0.5 },
     { signals: STRONG_GOAL_SIGNALS, type: "goal", boost: 0.4 },
     { signals: PROBLEM_SIGNALS, type: "problem", boost: 0.6 },
@@ -209,18 +199,16 @@ export function detectIntent(message: string, topN: number = 3): { intent: Inten
   for (const booster of boosters) {
     for (const phrase of booster.signals) {
       if (text.includes(normalize(phrase))) {
-        const matching = results.find(r => r.intent.type === booster.type);
-        if (matching) {
-          matching.score = Math.min(matching.score + booster.boost, 1);
-        } else {
-          // Add new booster intent if missing
+        const match = results.find(r => r.intent.type === booster.type);
+        if (match) match.score = Math.min(match.score + booster.boost, 1);
+        else {
           results.push({
             intent: {
               name: `${booster.type}_signal`,
               category: booster.type,
               type: booster.type,
               keywords: [phrase],
-              description: `Strong ${booster.type} signal detected.`,
+              description: `Strong ${booster.type} signal detected.`
             },
             score: booster.boost,
           });
@@ -229,10 +217,7 @@ export function detectIntent(message: string, topN: number = 3): { intent: Inten
     }
   }
 
-  // Clamp scores
-  results.forEach(r => (r.score = Math.min(r.score, 1)));
-
-  // Sort descending
+  results.forEach(r => r.score = Math.min(r.score, 1));
   results.sort((a, b) => b.score - a.score);
 
   // Fallback
@@ -243,16 +228,16 @@ export function detectIntent(message: string, topN: number = 3): { intent: Inten
         category: "general",
         type: "general",
         keywords: [],
-        description: "Fallback",
+        description: "Fallback"
       },
-      score: 0.3,
+      score: 0.3
     });
   }
 
   return results.slice(0, topN);
 }
 
-/* ======================= HELPERS ======================= */
+/* ======================= RELEVANT INTENTS ======================= */
 export function getRelevantIntents(message: string, limit: number = 3) {
   return detectIntent(message, limit);
 }

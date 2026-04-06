@@ -336,13 +336,16 @@ const brainContext = brainData?.brainContext ?? {};
 const strategicChunks = brainData?.chunks ?? [];
 
 /* ---------- NORMALIZE LEAD SCORE (CRITICAL FIX) ---------- */
-// ✅ Always resolve to 0–1
-const leadScoreValue =
+const rawLeadScore =
   typeof leadData?.score?.total === "number"
     ? leadData.score.total
     : typeof brainContext?.leadScore === "number"
     ? brainContext.leadScore
     : 0;
+
+// ✅ FORCE NORMALIZATION (0–1)
+const leadScoreValue =
+  rawLeadScore > 1 ? Math.min(rawLeadScore / 10, 1) : rawLeadScore;
 
 /* ---------- NORMALIZE STAGE ---------- */
 const stage =
@@ -353,6 +356,18 @@ const stage =
 /* ---------- ENFORCE CONSISTENT CONTEXT ---------- */
 brainContext.leadScore = leadScoreValue;
 brainContext.stage = stage;
+
+/* ---------- EXECUTION MODE (NEW - INTELLIGENCE CONTROL) ---------- */
+brainContext.executionMode =
+  leadScoreValue > 0.6 || stage === "service" || stage === "conversion"
+    ? "execution"
+    : "exploration";
+
+/* ---------- OPTIONAL DEBUG ---------- */
+console.log(
+  `[MODE] executionMode=${brainContext.executionMode} | leadScore=${leadScoreValue} | stage=${stage}`
+);
+
 
 /* ---------- NORMALIZE MESSAGE ONCE ---------- */
 const lowerMsg = message.toLowerCase(); // ✅ Declare once
@@ -385,13 +400,23 @@ if (brain.type === "booking") {
   return bookingResp.response;
 }
 
-/* ---------- SMART GREETING (NON-BLOCKING + SESSION AWARE) ---------- */
+/* ---------- SMART GREETING (NON-BLOCKING + CONTEXT-AWARE) ---------- */
 if (brain.type === "greeting") {
+  const hasContext =
+    brainContext?.hasSufficientContext ||
+    (brainContext?.leadScore ?? 0) > 0.3;
+
   const lastMessages = recentMessagesCache || [];
   const hasAssistantSpoken = lastMessages.some((m: any) => m.role === "assistant");
 
-  if (!hasAssistantSpoken) {
-    if (brainContext?.dynamicGreeting) return brainContext.dynamicGreeting;
+  // ❌ If conversation already has context → DO NOT greet again
+  if (hasContext || hasAssistantSpoken) {
+    // Let normal flow continue (no return)
+  } else {
+    // ✅ First interaction only → allow greeting
+    if (brainContext?.dynamicGreeting) {
+      return brainContext.dynamicGreeting;
+    }
 
     const hour = new Date().getHours();
     let timeGreeting = "Hey";
@@ -400,7 +425,7 @@ if (brain.type === "greeting") {
     else if (hour < 18) timeGreeting = "Good afternoon";
     else timeGreeting = "Good evening";
 
-    return `${timeGreeting} — what are you working on right now?`;
+    return `${timeGreeting} — what are you trying to improve right now?`;
   }
 }
 
@@ -423,26 +448,15 @@ const isInformationalQuery =
   msg.includes("what") ||
   msg.includes("why");
 
-/* ---------- STRONG BUYING SIGNALS ---------- */
-const hasStrongBuyingIntent =
-  msg.includes("hire") ||
-  msg.includes("work with you") ||
-  msg.includes("get started") ||
-  msg.includes("start working") ||
-  msg.includes("let's start") ||
-  msg.includes("i want to proceed") ||
-  msg.includes("i'm ready") ||
-  msg.includes("book") ||
-  msg.includes("schedule");
+/* ---------- CENTRALIZED AUTO BOOKING DECISION (FIXED) ---------- */
 
-/* ---------- FINAL AUTO BOOKING DECISION ---------- */
-const autoBooking =
-  (await shouldTriggerBooking(sessionId, stage as any)) &&
-  (brainContext.leadScore ?? 0) >= 0.6 &&
-  (
-    hasStrongBuyingIntent || // 🔥 override if clear intent
-    !isInformationalQuery    // otherwise block weak queries
-  );
+// ✅ Single source of truth for booking intelligence
+const autoBooking = await shouldTriggerBooking(
+  sessionId,
+  stage as any,
+  leadScoreValue,
+  message
+);
 
 /* ---------- EXECUTION ---------- */
 if (
@@ -525,15 +539,40 @@ const [expandedQueries, fusedChunks] = await Promise.all([
   fusedChunksPromise
 ]);
 
-// Merge + dedupe
-const mergedChunks = [
-  ...strategicChunks,
-  ...(fusedChunks || [])
-].filter(
-  (c, i, arr) =>
-    c?.text &&
-    arr.findIndex((x) => x.text === c.text) === i
-);
+/* ---------- MERGE + PRIORITIZE + DEDUPE (SMART RANKING) ---------- */
+
+// Assign priority:
+// strategicChunks → HIGH (brain knowledge)
+// fusedChunks → MEDIUM (vector search)
+const allChunks = [
+  ...strategicChunks.map((c: any) => ({ ...c, priority: 2, source: "strategic" })),
+  ...(fusedChunks || []).map((c: any) => ({ ...c, priority: 1, source: "vector" })),
+];
+
+/* ---------- DEDUPE (KEEP HIGHEST PRIORITY VERSION) ---------- */
+const dedupedMap = new Map<string, any>();
+
+for (const chunk of allChunks) {
+  if (!chunk?.text) continue;
+
+  const key = chunk.text.trim();
+
+  if (!dedupedMap.has(key)) {
+    dedupedMap.set(key, chunk);
+  } else {
+    const existing = dedupedMap.get(key);
+
+    // ✅ Keep higher priority chunk
+    if ((chunk.priority || 0) > (existing.priority || 0)) {
+      dedupedMap.set(key, chunk);
+    }
+  }
+}
+
+/* ---------- FINAL SORT (HIGHEST INTELLIGENCE FIRST) ---------- */
+const mergedChunks = Array.from(dedupedMap.values())
+  .sort((a, b) => (b.priority || 0) - (a.priority || 0))
+  .slice(0, 5); // 🔥 limit for performance
 
 // Limit chunks for speed (IMPORTANT)
 const limitedChunks = mergedChunks.slice(0, 5);
@@ -620,6 +659,15 @@ ${avoidQuestions ? "- DO NOT ask ANY questions in this response" : ""}
 - If user already provided context → DO NOT ask for it again
 - If user repeats → go deeper instead of repeating yourself
 - NEVER loop the same question again
+- If Execution Mode is "execution":
+  → Do NOT ask unnecessary questions
+  → Give direct, actionable solutions
+  → Move toward implementation or next step
+
+- If Execution Mode is "exploration":
+  → Diagnose the problem
+  → Ask at most ONE smart question if needed
+  → Guide the user strategically
 
 RESPONSE STRUCTURE (MANDATORY):
 
@@ -632,7 +680,17 @@ USER ANALYSIS:
 - Service Interest: ${detectedService ?? "multi-service"}
 - Funnel Stage: ${brainContext.stage}
 - Lead Score: ${brainContext.leadScore}
-- Strategy Insight: ${brainContext.reasoning}
+Strategy Insight: ${brainContext.reasoning}
+
+CRITICAL CONTEXT (HIGHEST PRIORITY):
+- This is NOT generic — use it directly
+- Problem Focus: ${brainContext.reasoning}
+- Services to prioritize: ${brainContext.detectedServices?.join(", ") || "adaptive"}
+- User maturity level: ${brainContext.leadScore > 0.6 ? "high intent" : "exploring"}
+
+YOU MUST:
+- Use this context as the PRIMARY thinking layer
+- Do NOT ignore it
 - Detected Services: ${brainContext.detectedServices?.join(", ") || "none"}
 
 ${knownContext}
@@ -648,6 +706,7 @@ INSTRUCTIONS:
 - Identify the REAL problem behind the user message
 - Give SPECIFIC, actionable, non-generic advice
 - Adapt response based on funnel stage
+- Execution Mode: ${brainContext.executionMode}
 - Use reasoning: ${brainContext.reasoning}
 - Use detected services intelligently (not repetitively)
 - Sound like a human strategist, not a template
@@ -672,7 +731,13 @@ const qwenResp = await withTimeout(generateOpenRouter(prompt), 6500);
 let geminiResp: string | null = null;
 
 // Only trigger Gemini if Qwen FAILS hard
-if (!qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp)) {
+const qwenBad =
+  !qwenResp ||
+  isLowQuality(qwenResp) ||
+  looksIncomplete(qwenResp);
+
+// ✅ Only escalate if REALLY bad
+if (qwenBad && message.length > 25 && brainContext.hasSufficientContext) {
   if (canUseGemini() && message.length > 15) {
     geminiResp = await withTimeout(generateGemini(prompt), 4000);
   }
@@ -849,7 +914,10 @@ let retryClean = cleanResponse(retry as string);
 
 // 🔥 ENFORCE NO-QUESTION MODE (POST-PROCESSING)
 if (forceNoQuestions && response) {
-  response = response.replace(/\?/g, ".");
+  response = response
+    .replace(/\?+/g, ".")
+    .replace(/(can you|would you|could you)[^\.]*\./gi, "")
+    .replace(/(what|why|how)[^\.]*\./gi, "");
 }
 
 /* ---------- LENGTH CONTROL (SAFE) ---------- */
@@ -864,7 +932,7 @@ if (response) {
   response = enforceBotName(response);
 }
 
-/* ---------- SMART CTA (DYNAMIC + CLEAN) ---------- */
+/* ---------- SMART CTA (DYNAMIC + CONTEXT-AWARE) ---------- */
 
 if (
   response &&
@@ -873,17 +941,55 @@ if (
     intentCategories,
     brainContext.leadScore,
     brainContext.stage
-  )
+  ) &&
+  brainContext.hasSufficientContext && // ✅ ONLY when enough context exists
+  !response.toLowerCase().includes("let’s move this forward") && // avoid stacking CTAs
+  !response.toLowerCase().includes("next step") // prevent duplication
 ) {
-  response = response.replace(/\.*$/, "");
+  // Clean ending punctuation
+  response = response.replace(/[.!\s]*$/, "");
 
-  const ctas = [
-    "If you want, I can map this into a step-by-step plan for your business.",
-    "I can break this down into an execution plan if you’d like.",
-    "Want me to turn this into a clear action plan for you?",
-  ];
+  let cta = "";
 
-  response += "\n\n" + ctas[Math.floor(Math.random() * ctas.length)];
+  /* ---------- HIGH INTENT (CONVERSION MODE) ---------- */
+  if (
+    brainContext.stage === "conversion" ||
+    brainContext.leadScore > 0.75
+  ) {
+    const strongCTAs = [
+      "The next step is execution — we can map this out together on a quick call.",
+      "At this point, the fastest way forward is to walk through this strategy together.",
+      "We can turn this into a live execution plan and start optimizing immediately."
+    ];
+
+    cta = strongCTAs[Math.floor(Math.random() * strongCTAs.length)];
+  }
+
+  /* ---------- MID INTENT (SERVICE MODE) ---------- */
+  else if (
+    brainContext.stage === "service" ||
+    brainContext.leadScore > 0.5
+  ) {
+    const midCTAs = [
+      "If you want, I can break this into a step-by-step execution plan tailored to your business.",
+      "I can map this into a structured growth plan based on your setup.",
+      "Want me to turn this into a clear action plan you can follow?"
+    ];
+
+    cta = midCTAs[Math.floor(Math.random() * midCTAs.length)];
+  }
+
+  /* ---------- FALLBACK (SAFE MODE — RARE) ---------- */
+  else {
+    const softCTAs = [
+      "I can break this down further if you want something more specific.",
+      "Let me know if you want a more detailed execution plan.",
+    ];
+
+    cta = softCTAs[Math.floor(Math.random() * softCTAs.length)];
+  }
+
+  response += "\n\n" + cta;
 }
 
 /* ---------- FINAL SAFETY CHECK (SMART FALLBACK) ---------- */

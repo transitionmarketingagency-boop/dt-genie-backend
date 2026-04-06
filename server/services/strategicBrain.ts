@@ -36,6 +36,8 @@ export type BrainContext = {
   dynamicGreeting?: string;
   unifiedIntentRanking?: { intent: string; score: number }[];
   hasSufficientContext?: boolean;
+
+  executionMode?: "execution" | "exploration"; // ← ADD THIS LINE
 };
 
 /* ================= NORMALIZER ================= */
@@ -129,16 +131,19 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     if (intents.length) primaryIntent = intents[0].intent.name;
   } catch {}
 
-  /* ---------- SERVICE DETECTION (MULTI) ---------- */
+  /* ---------- SERVICE DETECTION (MULTI, NEW ONLY) ---------- */
   let detectedServices: string[] = [];
 
   try {
-    detectedServices = detectIntents(message)
+    const allServices = detectIntents(message)
       .filter(i => i.type === "service" && i.confidence > 0.4)
       .map(i => i.value);
 
-    // Merge with memory and dedupe
+    // Filter only new services not yet discussed in session
     const existing = new Set(strategicMemory.servicesDiscussed || []);
+    detectedServices = allServices.filter(s => !existing.has(s));
+
+    // Update memory with newly detected services
     detectedServices.forEach(s => existing.add(s));
     strategicMemory.servicesDiscussed = Array.from(existing);
     strategicMemory.lastService = detectedServices[0] ?? strategicMemory.lastService ?? null;
@@ -164,12 +169,16 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   try {
     if (sessionId) {
       const result = await reasoningEngine.analyze(sessionId, message);
-      reasoning = result.strategy;
+      reasoning = result.strategy || "";
     }
   } catch {}
 
   if (!reasoning) {
-    reasoning = "Focus on improving acquisition, conversion, and retention systems.";
+    // Dynamic fallback using last service / detected services
+    const serviceFocus = detectedServices[0] || strategicMemory.lastService;
+    reasoning = serviceFocus
+      ? `Focus on optimizing ${serviceFocus} to maximize results.`
+      : "Focus on improving acquisition, conversion, and retention systems.";
   }
 
   /* ---------- LEAD SCORING ---------- */
@@ -177,14 +186,14 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   if (sessionId) {
     try {
       const result = leadQualifier.scoreLead(sessionId, { need: hasSufficientContext ? 0.7 : 0.2 });
-      leadScore = result.total * 10;
+      leadScore = Math.min(Math.max(result.total * 10, 0), 10); // clamp 0–10
     } catch {}
   }
 
   /* ---------- RECOMMENDED SERVICE ---------- */
   const recommendedService =
     detectedServices.length
-      ? detectedServices.sort(() => 0)[0] // Keep first with highest confidence
+      ? detectedServices[0] // highest confidence & new
       : strategicMemory.lastService ?? null;
 
   /* ---------- BOOKING TRIGGER ---------- */
@@ -205,7 +214,17 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     } catch {}
   }
 
-  /* ---------- FINAL CONTEXT ---------- */
+  /* ---------- FUSED CHUNKS ---------- */
+  let fusedChunks = strategicMemory.cachedFusedChunks ?? [];
+  if (!fusedChunks.length) {
+    fusedChunks = await getFusedChunks(message, 5).catch(() => []);
+    strategicMemory.cachedFusedChunks = fusedChunks;
+  }
+
+  // Filter irrelevant chunks
+  fusedChunks = fusedChunks.filter(c => c?.text && !/(contact|email|phone|http)/i.test(c.text));
+
+  /* ---------- FINAL BRAIN CONTEXT ---------- */
   const brainContext: BrainContext = {
     message: userMessage,
     intent: primaryIntent,
@@ -222,16 +241,6 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     unifiedIntentRanking,
     hasSufficientContext,
   };
-
-  /* ---------- FUSED CHUNKS ---------- */
-  let fusedChunks = strategicMemory.cachedFusedChunks ?? [];
-  if (!fusedChunks.length) {
-    fusedChunks = await getFusedChunks(message, 5).catch(() => []);
-    strategicMemory.cachedFusedChunks = fusedChunks;
-  }
-
-  // Filter out irrelevant chunks
-  fusedChunks = fusedChunks.filter(c => c?.text && !/(contact|email|phone|http)/i.test(c.text));
 
   return { brainContext, chunks: fusedChunks };
 }
