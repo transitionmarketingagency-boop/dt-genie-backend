@@ -1,12 +1,9 @@
-// server/bookingFlow.ts
-
 import { memoryService } from "./services/memoryService.js";
-import { detectService } from "./services/serviceDetector.js";
+import { detectMultipleServices } from "./services/serviceDetector.js";
 import { shouldTriggerBooking } from "./services/bookingTrigger.js";
 import { generateExecutionPlan } from "./services/executionPlanner.js";
 
 /* ================= TYPES ================= */
-
 type Stage = "greeting" | "discovery" | "strategy" | "service" | "conversion";
 
 type BookingState = {
@@ -31,14 +28,12 @@ interface BookingResponse {
 }
 
 /* ================= STORAGE ================= */
-
 const ongoingBookings: Record<string, BookingState> = {};
 const BOOKING_SESSION_TTL = 1000 * 60 * 30;
 const baseCalendlyLink =
   "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
 
 /* ================= LANGUAGE DETECTION ================= */
-
 function detectLanguage(text: string): "ur" | "en" {
   const urduRegex = /[\u0600-\u06FF]/;
   return urduRegex.test(text) ? "ur" : "en";
@@ -49,14 +44,12 @@ function t(lang: "ur" | "en", en: string, ur: string): string {
 }
 
 /* ================= VALIDATION ================= */
-
 function isValidEmail(email: string): boolean {
   const cleaned = email.trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned);
 }
 
 /* ================= CLEANUP ================= */
-
 function cleanupExpiredBookings() {
   const now = Date.now();
   for (const userId in ongoingBookings) {
@@ -68,7 +61,6 @@ function cleanupExpiredBookings() {
 }
 
 /* ================= HELPERS ================= */
-
 function normalize(text: string) {
   return (text || "").toLowerCase().trim();
 }
@@ -94,7 +86,6 @@ function fallbackServiceDetection(message: string): string[] {
 }
 
 /* ================= BOOKING FLOW ================= */
-
 const bookingFlow = {
   startBookingFlow: async (userId: string, userMessage: string): Promise<BookingResponse> => {
     cleanupExpiredBookings();
@@ -139,12 +130,21 @@ const bookingFlow = {
     switch (booking.step) {
       case 1: {
         booking.step = 2;
-        const detectedServices: string[] =
-          detectService(message) ? [detectService(message)!] : fallbackServiceDetection(message);
+
+        // --- FIXED: Use detectMultipleServices and fallback ---
+        let detectedServices = detectMultipleServices(message);
+        if (!detectedServices.length) {
+          detectedServices = fallbackServiceDetection(message);
+        }
+
         booking.serviceTypes = detectedServices;
 
+        // --- FIXED: Ensure executionPlan handles array ---
         const plan = await generateExecutionPlan(detectedServices);
         booking.executionPlan = plan;
+
+        // --- DEBUG LOGGING ---
+        console.log({ userId, message, detectedServices, executionPlan: plan });
 
         return {
           response: t(

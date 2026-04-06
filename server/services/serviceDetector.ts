@@ -1,5 +1,3 @@
-// server/services/serviceDetector.ts
-
 export type DetectedIntent = {
   type:
     | "service"
@@ -73,7 +71,7 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
   },
   performance_marketing: {
     keywords: ["ppc", "performance marketing", "ads", "increase roas", "lower cac"],
-    weight: 1.2 // slight priority boost
+    weight: 1.2
   },
   ai_automation: {
     keywords: ["ai agents", "automation", "crm automation", "workflow"],
@@ -105,7 +103,7 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
   }
 };
 
-/* ================= PROBLEM SIGNALS (CRITICAL FIX) ================= */
+/* ================= PROBLEM SIGNALS ================= */
 const problemSignals = [
   "low roas",
   "bad roas",
@@ -150,35 +148,25 @@ export function detectIntents(message: string): DetectedIntent[] {
   const results: DetectedIntent[] = [];
   const added = new Set<string>();
 
-  /* ---------- PROBLEM DETECTION (HIGH PRIORITY) ---------- */
+  // ---------- PROBLEM DETECTION ----------
   for (const p of problemSignals) {
     if (text.includes(p)) {
-      results.push({
-        type: "problem",
-        value: p,
-        confidence: 0.9
-      });
+      results.push({ type: "problem", value: p, confidence: 0.9 });
       added.add(p);
     }
   }
 
-  /* ---------- SERVICE DETECTION ---------- */
+  // ---------- SERVICE DETECTION ----------
   const serviceScores = detectServiceScores(text);
 
-  const sortedServices = Object.entries(serviceScores)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 2);
-
-  for (const [service, score] of sortedServices) {
-    results.push({
-      type: "service",
-      value: service,
-      confidence: Number(score.toFixed(2))
-    });
-    added.add(service);
+  for (const [service, score] of Object.entries(serviceScores).sort((a,b)=>b[1]-a[1])) {
+    if (!added.has(service)) {
+      results.push({ type: "service", value: service, confidence: Number(score.toFixed(2)) });
+      added.add(service);
+    }
   }
 
-  /* ---------- GENERIC INTENTS ---------- */
+  // ---------- GENERIC INTENTS ----------
   const addIntent = (kws: string[], type: DetectedIntent["type"], conf: number) => {
     for (const kw of kws) {
       if (matchKeyword(text, kw) > 0.7 && !added.has(kw)) {
@@ -194,33 +182,25 @@ export function detectIntents(message: string): DetectedIntent[] {
   addIntent(marketingGoals, "marketing_goal", 0.75);
   addIntent(industries, "industry", 0.7);
 
-  /* ---------- SORT BY PRIORITY ---------- */
+  // ---------- SORT BY CONFIDENCE ----------
   results.sort((a, b) => b.confidence - a.confidence);
 
-  /* ---------- FALLBACK ---------- */
+  // ---------- FALLBACK ----------
   if (!results.length) {
-    return [
-      {
-        type: "general",
-        value: "general",
-        confidence: 0.3
-      }
-    ];
+    return [{ type: "general", value: "general", confidence: 0.3 }];
   }
 
-  return results.slice(0, 4);
+  return results;
 }
 
 /* ================= HELPERS ================= */
 export function detectService(message: string): string | null {
-  const intents = detectIntents(message);
-  const service = intents.find((i) => i.type === "service");
-  return service ? service.value : null;
+  const services = detectMultipleServices(message);
+  return services.length ? services[0] : null;
 }
 
 export function detectMultipleServices(message: string): string[] {
-  const intents = detectIntents(message);
-  return intents
+  return detectIntents(message)
     .filter((i) => i.type === "service")
     .map((i) => i.value);
 }

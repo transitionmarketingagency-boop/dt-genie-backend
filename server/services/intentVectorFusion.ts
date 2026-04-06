@@ -61,7 +61,7 @@ function intentKeywordScore(
   for (const kw of relevantKeywords) {
     if (chunkText.includes(kw) && message.includes(kw)) {
       score += 0.03;
-      if (score >= 0.12) break;
+      if (score >= 0.12) break; // cap per chunk
     }
   }
 
@@ -94,15 +94,14 @@ function dedupeChunks(chunks: VectorChunk[]) {
   });
 }
 
-/* ======================= MAIN ======================= */
+/* ======================= MAIN FUSION ======================= */
 async function getFusedChunksInternal(
   userMessage: string,
-  baseTopN: number = 4
+  baseTopN: number = MAX_CHUNKS
 ): Promise<{ text: string; source: string; fusionScore: number; intent: string }[]> {
 
   const normalizedMessage = normalize(userMessage);
 
-  // 🚀 smarter early exit
   if (normalizedMessage.length < 3) return [];
 
   const messageTokens = new Set(tokenize(normalizedMessage));
@@ -124,18 +123,22 @@ async function getFusedChunksInternal(
   let detectedIntents: { intent: Intent; score?: number }[] = [];
 
   try {
-    const detected = detectIntent(userMessage, 2);
-    if (Array.isArray(detected)) detectedIntents = detected;
+    detectedIntents = detectIntent(userMessage, 5); // detect top 5 intents
   } catch {}
 
-  const primaryIntent = detectedIntents[0]?.intent?.name ?? "general";
-  const intentScore = detectedIntents[0]?.score ?? 0.3;
+  // normalize detected intents to preserve multi-intent
+  const detectedIntentNames = detectedIntents.map((d) => d.intent.name);
+  const detectedIntentScores = detectedIntents.reduce((acc, d) => {
+    acc[d.intent.name] = d.score ?? 0.3;
+    return acc;
+  }, {} as Record<string, number>);
 
-  /* ---------- RELEVANT KEYWORDS ONLY ---------- */
-  const relevantKeywords =
-    intents
-      .find((i) => i.name === primaryIntent)
-      ?.keywords?.map((k) => normalize(k)) || [];
+  /* ---------- RELEVANT KEYWORDS BY INTENT ---------- */
+  const intentKeywordMap: Record<string, string[]> = {};
+  for (const intentName of detectedIntentNames) {
+    intentKeywordMap[intentName] =
+      intents.find((i) => i.name === intentName)?.keywords.map(normalize) || [];
+  }
 
   /* ---------- FUSION ---------- */
   const fused = vectorChunks.map((chunk) => {
@@ -146,15 +149,23 @@ async function getFusedChunksInternal(
 
     const keywordScore = keywordOverlap(messageTokens, chunkTokens);
 
-    // ✅ FIXED: only boost if matches intent
-    const intentBoost =
-      chunk.intent === primaryIntent ? intentScore : 0;
+    // ✅ Multi-intent aware boost: sum all detected intents
+    const intentBoost = detectedIntentNames.reduce((sum, intentName) => {
+      return chunk.intent === intentName
+        ? sum + (detectedIntentScores[intentName] || 0)
+        : sum;
+    }, 0);
+
+    // per-chunk intent keyword score: sum across all detected intents
+    const keywordIntentScore = detectedIntentNames.reduce((sum, intentName) => {
+      return sum + intentKeywordScore(normalizedMessage, chunkText, intentKeywordMap[intentName]);
+    }, 0);
 
     const fusionScore =
       VECTOR_WEIGHT * vectorScore +
       INTENT_WEIGHT * intentBoost +
       KEYWORD_WEIGHT * keywordScore +
-      intentKeywordScore(normalizedMessage, chunkText, relevantKeywords) +
+      keywordIntentScore +
       serviceBoost(chunkText) +
       pricingBoost(chunkText, normalizedMessage) +
       bookingBoost(chunkText, normalizedMessage);
@@ -170,13 +181,9 @@ async function getFusedChunksInternal(
 
   /* ---------- DIVERSITY CONTROL ---------- */
   const usedSources = new Set<string>();
-
   const finalChunks = fused.filter((c) => {
     if (c.fusionScore < MIN_SCORE_THRESHOLD) return false;
-
-    // limit same source repetition
     if (usedSources.has(c.source)) return false;
-
     usedSources.add(c.source);
     return true;
   });

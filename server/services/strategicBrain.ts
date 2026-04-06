@@ -51,7 +51,7 @@ function normalizeText(text: string) {
 /* ================= GREETING ================= */
 
 function isGreeting(text: string) {
-  return /^(hi|hello|hey|good morning|good afternoon|good evening)\b/.test(text);
+  return /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i.test(text);
 }
 
 function generateDynamicGreeting(memory?: StrategicMemory) {
@@ -77,7 +77,7 @@ function generateDynamicGreeting(memory?: StrategicMemory) {
   return variations[index];
 }
 
-/* ================= STAGE ================= */
+/* ================= STAGE DETECTION ================= */
 
 function detectStage(message: string): BrainContext["stage"] {
   if (isGreeting(message)) return "greeting";
@@ -104,41 +104,44 @@ function estimateDealProbability(stage: BrainContext["stage"], leadScore: number
     service: 0.75,
     conversion: 0.9,
   };
-
   return Math.min(base[stage] + leadScore * 0.04, 0.98);
 }
 
-/* ================= MAIN ================= */
+/* ================= MAIN STRATEGIC BRAIN ================= */
 
 export async function strategicBrain(userMessage: string, sessionId?: string) {
   const message = normalizeText(userMessage);
 
-  /* ---------- MEMORY LOAD ---------- */
+  /* ---------- LOAD MEMORY ---------- */
   const strategicMemory: StrategicMemory = sessionId
     ? await memoryService.getStrategicMemory(sessionId).catch(() => ({}))
     : {};
 
   const stage = detectStage(message);
 
-  /* ---------- INTENTS ---------- */
+  /* ---------- INTENT DETECTION ---------- */
   let unifiedIntentRanking: { intent: string; score: number }[] = [];
   let primaryIntent = "general";
 
   try {
     const intents = getRelevantIntents(message, 3);
-    unifiedIntentRanking = intents.map(i => ({
-      intent: i.intent.name,
-      score: i.score
-    }));
-
+    unifiedIntentRanking = intents.map(i => ({ intent: i.intent.name, score: i.score }));
     if (intents.length) primaryIntent = intents[0].intent.name;
   } catch {}
 
-  /* ---------- SERVICES ---------- */
-  let detectedServices: any[] = [];
+  /* ---------- SERVICE DETECTION (MULTI) ---------- */
+  let detectedServices: string[] = [];
+
   try {
     detectedServices = detectIntents(message)
-      .filter(i => i.type === "service" && i.confidence > 0.4);
+      .filter(i => i.type === "service" && i.confidence > 0.4)
+      .map(i => i.value);
+
+    // Merge with memory and dedupe
+    const existing = new Set(strategicMemory.servicesDiscussed || []);
+    detectedServices.forEach(s => existing.add(s));
+    strategicMemory.servicesDiscussed = Array.from(existing);
+    strategicMemory.lastService = detectedServices[0] ?? strategicMemory.lastService ?? null;
   } catch {}
 
   /* ---------- CONTEXT CHECK ---------- */
@@ -169,39 +172,28 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     reasoning = "Focus on improving acquisition, conversion, and retention systems.";
   }
 
-  /* ---------- LEAD SCORING (REAL) ---------- */
+  /* ---------- LEAD SCORING ---------- */
   let leadScore = 0;
-
   if (sessionId) {
     try {
-      const result = leadQualifier.scoreLead(sessionId, {
-        need: hasSufficientContext ? 0.7 : 0.2
-      });
+      const result = leadQualifier.scoreLead(sessionId, { need: hasSufficientContext ? 0.7 : 0.2 });
       leadScore = result.total * 10;
     } catch {}
   }
 
-  /* ---------- SERVICE MEMORY ---------- */
-  if (detectedServices.length) {
-    const existing = new Set(strategicMemory.servicesDiscussed || []);
-    detectedServices.forEach(s => existing.add(s.value));
-    strategicMemory.servicesDiscussed = Array.from(existing);
-    strategicMemory.lastService = detectedServices[0].value;
-  }
-
-  /* ---------- RECOMMENDATION ---------- */
+  /* ---------- RECOMMENDED SERVICE ---------- */
   const recommendedService =
     detectedServices.length
-      ? detectedServices.sort((a, b) => b.confidence - a.confidence)[0].value
-      : strategicMemory.lastService || null;
+      ? detectedServices.sort(() => 0)[0] // Keep first with highest confidence
+      : strategicMemory.lastService ?? null;
 
-  /* ---------- BOOKING TRIGGER (SMART) ---------- */
+  /* ---------- BOOKING TRIGGER ---------- */
   const triggerBooking =
     stage === "conversion" ||
     leadScore >= 7 ||
     (leadScore >= 5 && stage === "service");
 
-  /* ---------- CONTEXT ---------- */
+  /* ---------- CONTEXT HISTORY ---------- */
   const recentContext = sessionId
     ? await memoryService.getRecentContext(sessionId).catch(() => [])
     : [];
@@ -225,26 +217,21 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     reasoning,
     recentContext,
     strategicMemory,
-    detectedServices: detectedServices.map(d => d.value),
-    dynamicGreeting:
-      stage === "greeting"
-        ? generateDynamicGreeting(strategicMemory)
-        : undefined,
+    detectedServices,
+    dynamicGreeting: stage === "greeting" ? generateDynamicGreeting(strategicMemory) : undefined,
     unifiedIntentRanking,
     hasSufficientContext,
   };
 
-  /* ---------- CHUNKS ---------- */
+  /* ---------- FUSED CHUNKS ---------- */
   let fusedChunks = strategicMemory.cachedFusedChunks ?? [];
-
   if (!fusedChunks.length) {
     fusedChunks = await getFusedChunks(message, 5).catch(() => []);
     strategicMemory.cachedFusedChunks = fusedChunks;
   }
 
-  fusedChunks = fusedChunks.filter(
-    c => c?.text && !/(contact|email|phone|http)/i.test(c.text)
-  );
+  // Filter out irrelevant chunks
+  fusedChunks = fusedChunks.filter(c => c?.text && !/(contact|email|phone|http)/i.test(c.text));
 
   return { brainContext, chunks: fusedChunks };
 }
