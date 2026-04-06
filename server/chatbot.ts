@@ -4,6 +4,7 @@ import readline from "readline";
 import { generateHybridResponse } from "./services/generateHybridResponse.js";
 import { memoryService } from "./services/memoryService.js";
 import bookingFlow from "./bookingFlow.js";
+import { shouldTriggerBooking } from "./services/bookingTrigger.js";
 
 /* ================= CLI SETUP ================= */
 
@@ -19,22 +20,12 @@ console.log("Type a message or type 'exit' to quit.\n");
 
 const SESSION_ID = "cli-session";
 
-/* ================= BOOKING KEYWORDS ================= */
-
-const BOOKING_KEYWORDS = [
-  "book a call",
-  "schedule a meeting",
-  "schedule meeting",
-  "schedule call",
-  "book meeting",
-  "book strategy session",
-];
-
 /* ================= SAFE HISTORY FETCH ================= */
 
 async function getSafeHistory() {
   try {
-    return await memoryService.getRecentContext(SESSION_ID);
+    const history = await memoryService.getRecentContext(SESSION_ID);
+    return history ?? [];
   } catch {
     return [];
   }
@@ -61,44 +52,34 @@ async function ask(): Promise<void> {
     }
 
     try {
-      /* ================= SAVE USER MESSAGE ================= */
+      /* ---------- SAVE USER MESSAGE ---------- */
       await memoryService.saveMessage(SESSION_ID, "user", message);
 
-      /* ================= BOOKING DETECTION ================= */
-      const isBookingKeyword = BOOKING_KEYWORDS.some((kw) =>
-        lower.includes(kw)
-      );
+      /* ---------- SMART BOOKING DETECTION ---------- */
+      const triggerBooking = await shouldTriggerBooking(SESSION_ID, "service");
 
-      const isBookingActive = bookingFlow.isBookingActive(SESSION_ID);
-
-      if (isBookingKeyword || isBookingActive) {
+      if (triggerBooking) {
         let bookingResponse;
+
+        const isBookingActive = await bookingFlow.isBookingActive(SESSION_ID);
 
         if (isBookingActive) {
           bookingResponse = await bookingFlow.handleStep(SESSION_ID, message);
         } else {
-          bookingResponse = await bookingFlow.startBookingFlow(
-            SESSION_ID,
-            message
-          );
+          bookingResponse = await bookingFlow.startBookingFlow(SESSION_ID, message);
         }
 
-        /* ---------- PRINT RESPONSE ---------- */
         console.log("\n ~V AI:", bookingResponse.response, "\n");
 
-        /* ---------- CLI SAFE LINK ---------- */
         if (bookingResponse.frontendScript && bookingResponse.calendlyLink) {
-          console.log(
-            "⚡ Safe booking link (open in browser):",
-            bookingResponse.calendlyLink
-          );
+          console.log("⚡ Safe booking link (open in browser):", bookingResponse.calendlyLink);
         }
 
         ask();
         return;
       }
 
-      /* ================= GENERATE HYBRID AI RESPONSE ================= */
+      /* ---------- GENERATE HYBRID AI RESPONSE ---------- */
       const response = await generateHybridResponse({
         message,
         sessionId: SESSION_ID,

@@ -15,7 +15,7 @@ interface OpenRouterResponse {
   }[];
 }
 
-/* ================= MODEL & SETTINGS ================= */
+/* ================= MODEL ================= */
 const MODEL = "qwen/qwen3-235b-a22b-2507";
 const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 4200;
@@ -31,32 +31,27 @@ function cleanPrompt(prompt: string): string {
   );
 }
 
-/* ================= VALIDATION HELPERS ================= */
+/* ================= VALIDATION ================= */
 function isValidResponse(text: string): boolean {
-  if (!text || text.length < 15) return false;
+  if (!text || text.length < 25) return false;
+
   const lower = text.toLowerCase();
+
   return !(
     lower.includes("<|") ||
     lower.includes("|>") ||
     lower.includes("undefined") ||
-    lower.includes("null") ||
     lower.includes("traceback")
   );
 }
 
-function isFakeDelay(text: string): boolean {
+function isBadFallback(text: string): boolean {
   const t = text.toLowerCase();
   return (
-    t.includes("temporary delay") ||
-    t.includes("slight delay") ||
-    t.includes("having trouble") ||
-    t.includes("try again shortly") ||
-    t.includes("i can still guide you")
+    t.includes("try again") ||
+    t.includes("temporary issue") ||
+    t.includes("slight delay")
   );
-}
-
-function containsNonEnglish(text: string): boolean {
-  return /[^\x00-\x7F]/.test(text);
 }
 
 function ensureComplete(text: string): string {
@@ -67,48 +62,17 @@ function ensureComplete(text: string): string {
 function fixSpacing(text: string): string {
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/([a-zA-Z])(\d)/g, "$1 $2")
-    .replace(/(\d)([a-zA-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-/* ================= SYSTEM PROMPT ================= */
-function buildMessages(prompt: string, highIntent: boolean = false) {
-  return [
-    {
-      role: "system",
-      content: `You are Neon Vision, AI strategist for Digital Transition Marketing.
-
-Your job:
-Give clear, specific, and practical marketing advice.
-
-Rules:
-- Answer exactly what the user asked
-- Be concise but complete
-- Avoid generic responses
-- Do NOT mention delays, errors, or system limitations
-- Do NOT output broken or incomplete sentences
-- Use natural human tone
-- Focus on solving real business problems
-
-Tone: ${
-        highIntent
-          ? "direct, confident, decision-focused"
-          : "clear, helpful, professional"
-      }`,
-    },
-    {
-      role: "user",
-      content: prompt,
-    },
-  ];
 }
 
 /* ================= INTENT ================= */
 function detectHighIntent(message: string): boolean {
   const lower = message.toLowerCase();
-  return /(hire|book|schedule|call|work with|i want|let's start|ready)/i.test(lower);
+
+  return /(book|schedule|call|hire|start now|let's start|ready to proceed)/i.test(
+    lower
+  );
 }
 
 /* ================= CACHE ================= */
@@ -120,10 +84,11 @@ export async function generateOpenRouter(
   sessionId?: string
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
-    return "I can still guide you — tell me what you're trying to achieve.";
+    return "Tell me your goal — I’ll map out the exact strategy for you.";
   }
 
   prompt = cleanPrompt(prompt);
+
   const cacheKey = `${sessionId || "global"}:${prompt.toLowerCase()}`;
 
   /* ---------- CACHE ---------- */
@@ -131,25 +96,41 @@ export async function generateOpenRouter(
     return recentCache.get(cacheKey)!;
   }
 
-  /* ---------- CONTEXT (ASYNC) ---------- */
+  /* ---------- CONTEXT ---------- */
   let contextText = "";
 
   if (sessionId) {
     try {
-      const { brainContext } = await strategicBrain(prompt.slice(0, 300), sessionId);
-      const leadScore: LeadScore | number | undefined = brainContext.leadScore;
+      const { brainContext } = await strategicBrain(
+        prompt.slice(0, 300),
+        sessionId
+      );
+
+      const leadScore: LeadScore | number | undefined =
+        brainContext.leadScore;
 
       const totalScore =
         typeof leadScore === "number"
           ? leadScore
           : (leadScore as LeadScore)?.total ?? 0;
 
-      contextText = `Context: stage=${brainContext.stage || "unknown"}, score=${totalScore.toFixed(
-        2
-      )}.`;
+      // ✅ SAFE ACCESS (no TS errors)
+      const ctx = brainContext as any;
+
+      const industry = ctx?.industry || "unknown";
+      const businessType = ctx?.businessType || "";
+      const goals = Array.isArray(ctx?.goals)
+        ? ctx.goals.join(", ")
+        : "unknown";
+
+      contextText = `
+User Stage: ${brainContext.stage || "unknown"}
+Lead Score: ${totalScore.toFixed(2)}
+Business Context: ${industry} ${businessType}
+Goal: ${goals}
+`;
     } catch (err) {
-      console.warn("⚠️ Failed to fetch brainContext:", err);
-      contextText = "";
+      console.warn("⚠️ brainContext failed:", err);
     }
   }
 
@@ -161,22 +142,49 @@ export async function generateOpenRouter(
   try {
     console.log("⚡ OpenRouter call");
 
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "X-Title": "Neon Vision AI",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: highIntent ? 0.45 : 0.35,
-        top_p: 0.9,
-        max_tokens: 800,
-        messages: buildMessages(`${contextText} ${prompt}`, highIntent),
-      }),
-      signal: controller.signal,
-    });
+    const res = await fetch(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "X-Title": "Neon Vision AI",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          temperature: highIntent ? 0.5 : 0.4,
+          top_p: 0.9,
+          max_tokens: 900,
+          messages: [
+            {
+              role: "system",
+              content: `You are Neon Vision, an elite AI marketing strategist.
+
+You think like a senior consultant.
+
+Rules:
+- Give actionable strategies (not generic advice)
+- Break into steps if needed
+- Tie answers to business outcomes
+- Be confident and clear
+- No filler, no fluff
+
+Tone: ${
+                highIntent
+                  ? "decisive, conversion-focused"
+                  : "strategic, helpful"
+              }`,
+            },
+            {
+              role: "user",
+              content: `${contextText}\nUser Request: ${prompt}`,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      }
+    );
 
     clearTimeout(timeout);
 
@@ -184,25 +192,40 @@ export async function generateOpenRouter(
 
     const data = (await res.json()) as OpenRouterResponse;
 
-    let raw = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || "";
+    let raw =
+      data?.choices?.[0]?.message?.content ||
+      data?.choices?.[0]?.text ||
+      "";
+
     let text = cleanResponse(raw);
 
     /* ---------- VALIDATION ---------- */
-    if (!isValidResponse(text) || isFakeDelay(text) || containsNonEnglish(text)) {
-      throw new Error("Rejected bad model output");
+    if (!isValidResponse(text) || isBadFallback(text)) {
+      throw new Error("Bad response");
     }
 
     text = fixSpacing(text);
     text = ensureComplete(text);
 
-    /* ---------- CACHE CLEAN RESPONSES ---------- */
-    recentCache.set(cacheKey, text);
+    /* ---------- CACHE ONLY GOOD RESPONSES ---------- */
+    if (text.length > 40) {
+      recentCache.set(cacheKey, text);
+    }
 
     console.log("✅ OpenRouter success");
     return text;
+
   } catch (err: any) {
     clearTimeout(timeout);
     console.warn("⚠️ OpenRouter failed:", err?.message);
-    return "Let me think through this properly — what’s your current setup?";
+
+    /* ---------- SMART FALLBACK ---------- */
+    return `Here’s the right way to approach this:
+
+1. Define your exact goal (traffic, leads, or sales)
+2. Identify your current bottleneck
+3. Apply a targeted strategy based on that
+
+Tell me your current setup and I’ll map this out precisely for you.`;
   }
 }

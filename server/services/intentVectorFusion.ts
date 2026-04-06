@@ -12,7 +12,7 @@ type VectorChunk = {
 };
 
 /* ======================= CONFIG ======================= */
-const VECTOR_WEIGHT = 0.7;   // ⬆ prioritize vector (faster + reliable)
+const VECTOR_WEIGHT = 0.7;
 const INTENT_WEIGHT = 0.2;
 const KEYWORD_WEIGHT = 0.1;
 
@@ -20,16 +20,16 @@ const SERVICE_BOOST = 0.05;
 const PRICING_BOOST = 0.08;
 const BOOKING_BOOST = 0.06;
 
-const MAX_CHUNKS = 4; // ⬇ reduced for speed
-const MIN_SCORE_THRESHOLD = 0.18;
+const MAX_CHUNKS = 4;
+const MIN_SCORE_THRESHOLD = 0.2;
 
-/* ======================= FAST NORMALIZE ======================= */
+/* ======================= NORMALIZE ======================= */
 function normalize(text: string): string {
-  return text
-    ?.toLowerCase()
+  return (text || "")
+    .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
-    .trim() ?? "";
+    .trim();
 }
 
 /* ======================= TOKENIZE ======================= */
@@ -37,11 +37,12 @@ function tokenize(text: string): string[] {
   return text.split(" ").filter(Boolean);
 }
 
-/* ======================= KEYWORD OVERLAP (FAST) ======================= */
+/* ======================= KEYWORD OVERLAP ======================= */
 function keywordOverlap(aTokens: Set<string>, bTokens: Set<string>) {
   if (!aTokens.size || !bTokens.size) return 0;
 
   let overlap = 0;
+
   for (const word of aTokens) {
     if (bTokens.has(word)) overlap++;
   }
@@ -49,21 +50,18 @@ function keywordOverlap(aTokens: Set<string>, bTokens: Set<string>) {
   return overlap / Math.max(aTokens.size, bTokens.size);
 }
 
-/* ======================= PRECOMPUTE INTENT KEYWORDS ======================= */
-const intentKeywordMap: string[] = intents
-  .flatMap((i) => i.keywords || [])
-  .map((k) => normalize(k))
-  .filter(Boolean);
-
-/* ======================= FAST INTENT KEYWORD SCORE ======================= */
-function intentKeywordScore(message: string, chunkText: string) {
+/* ======================= INTENT KEYWORD SCORE ======================= */
+function intentKeywordScore(
+  message: string,
+  chunkText: string,
+  relevantKeywords: string[]
+) {
   let score = 0;
 
-  for (let i = 0; i < intentKeywordMap.length; i++) {
-    const kw = intentKeywordMap[i];
+  for (const kw of relevantKeywords) {
     if (chunkText.includes(kw) && message.includes(kw)) {
-      score += 0.02;
-      if (score >= 0.1) break; // ⬅ early exit
+      score += 0.03;
+      if (score >= 0.12) break;
     }
   }
 
@@ -76,13 +74,24 @@ function serviceBoost(chunkText: string) {
 }
 
 function pricingBoost(chunkText: string, message: string) {
-  if (!message.includes("price") && !message.includes("cost")) return 0;
+  if (!/(price|cost|pricing)/i.test(message)) return 0;
   return chunkText.includes("price") ? PRICING_BOOST : 0;
 }
 
 function bookingBoost(chunkText: string, message: string) {
-  if (!message.includes("book") && !message.includes("call")) return 0;
+  if (!/(book|schedule|call)/i.test(message)) return 0;
   return chunkText.includes("book") ? BOOKING_BOOST : 0;
+}
+
+/* ======================= DEDUPE ======================= */
+function dedupeChunks(chunks: VectorChunk[]) {
+  const seen = new Set<string>();
+  return chunks.filter((c) => {
+    const key = c.text.slice(0, 120);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /* ======================= MAIN ======================= */
@@ -93,27 +102,40 @@ async function getFusedChunksInternal(
 
   const normalizedMessage = normalize(userMessage);
 
-  // 🚀 Early exit for weak queries
-  if (normalizedMessage.length < 5) return [];
+  // 🚀 smarter early exit
+  if (normalizedMessage.length < 3) return [];
 
   const messageTokens = new Set(tokenize(normalizedMessage));
 
-  /* ---------- VECTOR FETCH (OPTIMIZED) ---------- */
-  const vectorChunks: VectorChunk[] = await getTopChunks(userMessage, baseTopN + 2, 0.55);
+  /* ---------- VECTOR FETCH ---------- */
+  let vectorChunks: VectorChunk[] = [];
+
+  try {
+    vectorChunks = await getTopChunks(userMessage, baseTopN + 3, 0.5);
+  } catch {
+    return [];
+  }
+
   if (!vectorChunks?.length) return [];
+
+  vectorChunks = dedupeChunks(vectorChunks);
 
   /* ---------- INTENT DETECTION ---------- */
   let detectedIntents: { intent: Intent; score?: number }[] = [];
 
   try {
-    const detected = detectIntent(userMessage, 2); // ⬇ reduced
+    const detected = detectIntent(userMessage, 2);
     if (Array.isArray(detected)) detectedIntents = detected;
-  } catch {
-    detectedIntents = [];
-  }
+  } catch {}
 
   const primaryIntent = detectedIntents[0]?.intent?.name ?? "general";
-  const intentScore = detectedIntents[0]?.score ?? 0.2;
+  const intentScore = detectedIntents[0]?.score ?? 0.3;
+
+  /* ---------- RELEVANT KEYWORDS ONLY ---------- */
+  const relevantKeywords =
+    intents
+      .find((i) => i.name === primaryIntent)
+      ?.keywords?.map((k) => normalize(k)) || [];
 
   /* ---------- FUSION ---------- */
   const fused = vectorChunks.map((chunk) => {
@@ -123,13 +145,16 @@ async function getFusedChunksInternal(
     const vectorScore = chunk.score || 0;
 
     const keywordScore = keywordOverlap(messageTokens, chunkTokens);
-    const intentBoost = chunk.intent === primaryIntent ? intentScore : 0.1;
+
+    // ✅ FIXED: only boost if matches intent
+    const intentBoost =
+      chunk.intent === primaryIntent ? intentScore : 0;
 
     const fusionScore =
       VECTOR_WEIGHT * vectorScore +
       INTENT_WEIGHT * intentBoost +
       KEYWORD_WEIGHT * keywordScore +
-      intentKeywordScore(normalizedMessage, chunkText) +
+      intentKeywordScore(normalizedMessage, chunkText, relevantKeywords) +
       serviceBoost(chunkText) +
       pricingBoost(chunkText, normalizedMessage) +
       bookingBoost(chunkText, normalizedMessage);
@@ -140,14 +165,23 @@ async function getFusedChunksInternal(
     };
   });
 
-  /* ---------- SORT + FILTER ---------- */
+  /* ---------- SORT ---------- */
   fused.sort((a, b) => b.fusionScore - a.fusionScore);
 
-  const finalChunks = fused
-    .filter((c) => c.fusionScore >= MIN_SCORE_THRESHOLD)
-    .slice(0, baseTopN);
+  /* ---------- DIVERSITY CONTROL ---------- */
+  const usedSources = new Set<string>();
 
-  return finalChunks.map((c) => ({
+  const finalChunks = fused.filter((c) => {
+    if (c.fusionScore < MIN_SCORE_THRESHOLD) return false;
+
+    // limit same source repetition
+    if (usedSources.has(c.source)) return false;
+
+    usedSources.add(c.source);
+    return true;
+  });
+
+  return finalChunks.slice(0, baseTopN).map((c) => ({
     text: c.text,
     source: c.source,
     fusionScore: Number(c.fusionScore.toFixed(4)),

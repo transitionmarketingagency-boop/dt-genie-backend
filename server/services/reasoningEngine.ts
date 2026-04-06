@@ -1,4 +1,5 @@
 // server/services/reasoningEngine.ts
+
 import { memoryService } from "./memoryService.js";
 
 /* ================= TYPES ================= */
@@ -19,17 +20,25 @@ export type StrategicMemory = {
   [key: string]: any;
 };
 
+/* ================= UTILS ================= */
+function safeString(val: any): string {
+  if (!val || typeof val !== "string") return "";
+  return val.toLowerCase();
+}
+
 /* ================= Reasoning Engine ================= */
 export class ReasoningEngine {
-  /* -------------------- Main analyze -------------------- */
+
+  /* -------------------- MAIN -------------------- */
   async analyze(sessionId: string, userQuestion: string): Promise<ReasoningData> {
+
     const [recentContextRaw, strategicMemoryRaw] = await Promise.all([
       memoryService.getRecentContext(sessionId).catch(() => []),
-      memoryService.getStrategicMemory(sessionId).catch(() => ({} as StrategicMemory)),
+      memoryService.getStrategicMemory(sessionId).catch(() => ({})),
     ]);
 
     const strategicMemory: StrategicMemory = strategicMemoryRaw || {};
-    const question = userQuestion.toLowerCase();
+    const question = safeString(userQuestion);
 
     /* ---------- PROBLEM ---------- */
     const problem = this.extractProblem(question, strategicMemory);
@@ -39,16 +48,16 @@ export class ReasoningEngine {
       strategicMemory.industry ||
       this.guessIndustry(question, recentContextRaw);
 
-    /* ---------- STRATEGY ---------- */
+    /* ---------- BASE STRATEGY ---------- */
     const baseStrategy = this.suggestStrategy(question, industry, problem);
 
-    /* ---------- CONTEXT PROCESSING ---------- */
-    const recentMessages = recentContextRaw.map((m: any) => ({
-      role: m.role,
-      content: m.content,
+    /* ---------- CONTEXT ---------- */
+    const recentMessages = (recentContextRaw || []).map((m: any) => ({
+      role: m?.role || "user",
+      content: m?.content || "",
     }));
 
-    /* ---------- DYNAMIC OUTPUT ---------- */
+    /* ---------- FINAL STRATEGY ---------- */
     const strategy = this.dynamicStrategy(baseStrategy, {
       problem,
       industry,
@@ -65,41 +74,45 @@ export class ReasoningEngine {
 
   /* ================= PROBLEM DETECTION ================= */
   private extractProblem(question: string, memory: StrategicMemory): string {
-    const q = question;
 
-    // Strong signals first
-    if (q.includes("low roas") || q.includes("bad roas")) return "low_roas";
-    if (q.includes("no sales") || q.includes("not getting sales")) return "no_sales";
-    if (q.includes("conversion") || q.includes("not converting")) return "conversion";
-    if (q.includes("traffic") || q.includes("visitors")) return "traffic";
+    if (!question) return "general";
 
-    // Goal-based fallback
-    if (q.includes("grow") || q.includes("scale") || q.includes("increase")) return "growth";
+    /* ---------- STRONG SIGNALS ---------- */
+    if (/low\s*roas|bad\s*roas/.test(question)) return "low_roas";
+    if (/no\s*sales|not\s*getting\s*sales/.test(question)) return "no_sales";
+    if (/conversion|not\s*converting/.test(question)) return "conversion";
+    if (/traffic|visitors/.test(question)) return "traffic";
 
-    // Memory fallback
-    if (memory?.painPoints?.length) return memory.painPoints[0];
+    /* ---------- GOALS ---------- */
+    if (/grow|scale|increase|expand/.test(question)) return "growth";
+
+    /* ---------- MEMORY FALLBACK ---------- */
+    if (Array.isArray(memory?.painPoints) && memory.painPoints.length > 0) {
+      return memory.painPoints[0];
+    }
 
     return "general";
   }
 
   /* ================= INDUSTRY DETECTION ================= */
   private guessIndustry(question: string, context: any[]): string {
+
     const q = question;
 
-    if (q.includes("ecommerce") || q.includes("store") || q.includes("shop"))
-      return "ecommerce";
+    /* ---------- DIRECT ---------- */
+    if (/ecommerce|store|shop/.test(q)) return "ecommerce";
+    if (/real\s*estate|property/.test(q)) return "real_estate";
+    if (/travel|tourism/.test(q)) return "travel";
+    if (/agency|marketing/.test(q)) return "marketing";
 
-    if (q.includes("real estate") || q.includes("property"))
-      return "real_estate";
-
-    if (q.includes("travel") || q.includes("tourism"))
-      return "travel";
-
-    // Look into past messages (VERY IMPORTANT)
-    const combined = context.map((m) => m.content.toLowerCase()).join(" ");
+    /* ---------- CONTEXT ---------- */
+    const combined = (context || [])
+      .map((m) => (m?.content || "").toLowerCase())
+      .join(" ");
 
     if (combined.includes("ecommerce")) return "ecommerce";
     if (combined.includes("real estate")) return "real_estate";
+    if (combined.includes("travel")) return "travel";
 
     return "general";
   }
@@ -110,50 +123,51 @@ export class ReasoningEngine {
     industry: string,
     problem: string
   ): string {
+
     /* ---------- ECOMMERCE ---------- */
     if (industry === "ecommerce") {
       if (problem === "low_roas") {
-        return "Fix creative fatigue, improve targeting, and optimize product-page conversion flow";
+        return "Fix creative fatigue, improve audience targeting, and optimize product page conversion flow";
       }
       if (problem === "no_sales") {
-        return "Audit funnel, fix trust signals, and align offer with audience intent";
+        return "Audit the funnel, fix trust gaps, and align your offer with customer intent";
       }
       if (problem === "conversion") {
-        return "Optimize landing pages, improve UX, and run A/B testing on key elements";
+        return "Improve landing page UX, optimize checkout flow, and run A/B testing";
       }
       if (problem === "traffic") {
-        return "Scale paid ads + SEO + short-form content distribution";
+        return "Scale paid ads, SEO, and short-form content distribution";
       }
       if (problem === "growth") {
-        return "Combine paid acquisition, CRO, and retention systems for scalable growth";
+        return "Combine paid acquisition, CRO, and retention systems to scale efficiently";
       }
     }
 
     /* ---------- REAL ESTATE ---------- */
     if (industry === "real_estate") {
       if (problem === "low_roas") {
-        return "Improve ad creatives using high-end CGI and refine luxury audience targeting";
+        return "Upgrade ad creatives with high-end visuals and refine luxury audience targeting";
       }
       if (problem === "conversion") {
-        return "Use virtual tours + lead qualification funnels to increase buyer intent";
+        return "Use virtual tours and lead qualification funnels to increase buyer intent";
       }
       if (problem === "growth") {
-        return "Leverage high-ticket funnels, CGI experiences, and targeted ad campaigns";
+        return "Deploy high-ticket funnels with premium visuals and targeted campaigns";
       }
     }
 
     /* ---------- TRAVEL ---------- */
     if (industry === "travel") {
       if (problem === "traffic") {
-        return "Focus on SEO + destination content + social distribution";
+        return "Focus on SEO, destination content, and social media distribution";
       }
       if (problem === "conversion") {
-        return "Optimize booking flow + retargeting campaigns";
+        return "Optimize booking flow and implement retargeting campaigns";
       }
     }
 
     /* ---------- DEFAULT ---------- */
-    return "Use a combination of content, paid marketing, and conversion optimization to improve performance";
+    return "Use a mix of content marketing, paid acquisition, and conversion optimization to improve results";
   }
 
   /* ================= DYNAMIC STRATEGY ================= */
@@ -161,18 +175,19 @@ export class ReasoningEngine {
     base: string,
     context: { problem: string; industry: string; contextLength: number }
   ): string {
+
     const { problem, industry, contextLength } = context;
 
     const templates = [
       `${base}.`,
-      `Based on your ${industry} setup, the focus should be: ${base}.`,
-      `The core issue seems to be ${problem}. Best move: ${base}.`,
-      `Right now, the highest-impact move is: ${base}.`,
+      `For your ${industry} setup, focus on this: ${base}.`,
+      `The main issue is ${problem}. The best move is: ${base}.`,
+      `Right now, the highest-impact action is: ${base}.`,
     ];
 
     return templates[contextLength % templates.length];
   }
 }
 
-/* ================= Singleton ================= */
+/* ================= SINGLETON ================= */
 export const reasoningEngine = new ReasoningEngine();

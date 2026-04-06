@@ -13,7 +13,7 @@ export interface Intent {
 
 /* ======================= NORMALIZATION ======================= */
 export function normalize(text: string): string {
-  return text
+  return (text || "")
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -26,10 +26,9 @@ function escapeRegex(text: string): string {
 }
 
 function containsPhrase(text: string, phrase: string): boolean {
-  const normalizedText = normalize(text);
-  const normalizedPhrase = normalize(phrase);
-
-  return new RegExp(`\\b${escapeRegex(normalizedPhrase)}\\b`, "i").test(normalizedText);
+  // Avoid double normalize overhead
+  const phraseEscaped = escapeRegex(normalize(phrase));
+  return new RegExp(`\\b${phraseEscaped}\\b`, "i").test(text);
 }
 
 /* ======================= STRONG INTENT ======================= */
@@ -210,15 +209,21 @@ export const intents: Intent[] = [
 ];
 
 /* ======================= SCORING ======================= */
-function calculateIntentScore(text: string, intent: Intent) {
+function calculateIntentScore(text: string, intent: Intent): number {
   let score = 0;
 
   for (const keyword of intent.keywords) {
     if (containsPhrase(text, keyword)) {
-      score += 0.4;
+      score += 0.45; // ⬆ stronger signal
     }
   }
 
+  // Normalize by keyword count (prevents large keyword lists dominating)
+  if (intent.keywords.length) {
+    score = score / intent.keywords.length;
+  }
+
+  // Penalize very short inputs
   if (text.length < 15) score *= 0.8;
 
   return Math.min(score, 1);
@@ -229,6 +234,7 @@ export function detectIntent(
   message: string,
   topN: number = 3
 ): { intent: Intent; score: number }[] {
+
   const text = normalize(message);
 
   const results: { intent: Intent; score: number }[] = [];
@@ -236,45 +242,47 @@ export function detectIntent(
   /* ---------- BASE SCORING ---------- */
   for (const intent of intents) {
     const score = calculateIntentScore(text, intent);
-    if (score > 0) {
+    if (score > 0.05) {
       results.push({ intent, score });
     }
   }
 
   /* ---------- BOOSTERS ---------- */
 
-  // Buying boost
-  if (STRONG_BUYING_SIGNALS.some((p) => text.includes(normalize(p)))) {
-    results.forEach((r) => {
+  if (STRONG_BUYING_SIGNALS.some(p => text.includes(normalize(p)))) {
+    results.forEach(r => {
       if (r.intent.type === "buying") r.score += 0.5;
     });
   }
 
-  // Goal boost
-  if (STRONG_GOAL_SIGNALS.some((p) => text.includes(normalize(p)))) {
-    results.forEach((r) => {
+  if (STRONG_GOAL_SIGNALS.some(p => text.includes(normalize(p)))) {
+    results.forEach(r => {
       if (r.intent.type === "goal") r.score += 0.4;
     });
   }
 
-  // Problem boost (VERY IMPORTANT)
-  if (PROBLEM_SIGNALS.some((p) => text.includes(normalize(p)))) {
-    results.forEach((r) => {
+  if (PROBLEM_SIGNALS.some(p => text.includes(normalize(p)))) {
+    results.forEach(r => {
       if (r.intent.type === "problem") r.score += 0.6;
     });
   }
 
+  /* ---------- CLAMP AFTER BOOST ---------- */
+  results.forEach(r => {
+    r.score = Math.min(r.score, 1);
+  });
+
   /* ---------- SORT ---------- */
   results.sort((a, b) => b.score - a.score);
 
-  /* ---------- FALLBACK (FIXED TYPE) ---------- */
-  if (results.length === 0) {
+  /* ---------- FALLBACK ---------- */
+  if (!results.length) {
     return [
       {
         intent: {
           name: "general_fallback",
           category: "general",
-          type: "general" as const,
+          type: "general",
           keywords: [],
           description: "Fallback",
         },

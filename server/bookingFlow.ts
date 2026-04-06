@@ -2,6 +2,8 @@
 
 import { memoryService } from "./services/memoryService.js";
 import { detectService } from "./services/serviceDetector.js";
+import { shouldTriggerBooking } from "./services/bookingTrigger.js";
+import { generateExecutionPlan } from "./services/executionPlanner.js";
 
 /* ================= TYPES ================= */
 
@@ -9,7 +11,7 @@ type Stage = "greeting" | "discovery" | "strategy" | "service" | "conversion";
 
 type BookingState = {
   step: number;
-  serviceType?: string;
+  serviceTypes?: string[];
   preferredTime?: string;
   email?: string;
   calendlyLink?: string;
@@ -18,19 +20,20 @@ type BookingState = {
   dealProbability?: number;
   triggerBooking?: boolean;
   stage?: Stage;
+  executionPlan?: string;
 };
 
 interface BookingResponse {
   response: string;
   nextStep?: number;
   frontendScript?: string;
+  calendlyLink?: string;
 }
 
 /* ================= STORAGE ================= */
 
 const ongoingBookings: Record<string, BookingState> = {};
 const BOOKING_SESSION_TTL = 1000 * 60 * 30;
-
 const baseCalendlyLink =
   "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
 
@@ -74,41 +77,35 @@ function isQuestion(text: string): boolean {
   return text.includes("?") || text.split(" ").length > 8;
 }
 
-function fallbackServiceDetection(message: string): string | null {
+function fallbackServiceDetection(message: string): string[] {
   const msg = normalize(message);
+  const services: string[] = [];
 
-  if (msg.includes("seo")) return "SEO Optimization";
-  if (msg.includes("ads")) return "Performance Marketing";
-  if (msg.includes("automation") || msg.includes("ai")) return "AI Marketing Automation";
-  if (msg.includes("content")) return "Content Marketing";
-  if (msg.includes("brand")) return "Brand Development";
-  if (msg.includes("ecommerce")) return "Ecommerce Growth Systems";
+  if (msg.includes("seo")) services.push("SEO Optimization");
+  if (msg.includes("ads")) services.push("Performance Marketing");
+  if (msg.includes("automation") || msg.includes("ai")) services.push("AI Marketing Automation");
+  if (msg.includes("content")) services.push("Content Marketing");
+  if (msg.includes("brand")) services.push("Brand Development");
+  if (msg.includes("ecommerce")) services.push("Ecommerce Growth Systems");
 
-  return null;
+  if (!services.length) services.push("Strategy Session");
+
+  return services;
 }
 
 /* ================= BOOKING FLOW ================= */
 
 const bookingFlow = {
-
   startBookingFlow: async (userId: string, userMessage: string): Promise<BookingResponse> => {
     cleanupExpiredBookings();
-
     if (!ongoingBookings[userId]) {
-      ongoingBookings[userId] = {
-        step: 1,
-        createdAt: Date.now(),
-      };
+      ongoingBookings[userId] = { step: 1, createdAt: Date.now() };
     }
-
     return bookingFlow.handleStep(userId, userMessage);
   },
 
   forceStart: async (userId: string, userMessage: string): Promise<BookingResponse> => {
-    ongoingBookings[userId] = {
-      step: 1,
-      createdAt: Date.now(),
-    };
+    ongoingBookings[userId] = { step: 1, createdAt: Date.now() };
     return bookingFlow.handleStep(userId, userMessage);
   },
 
@@ -137,66 +134,39 @@ const bookingFlow = {
       };
     }
 
+    const highIntent = await shouldTriggerBooking(userId, "service");
+
     switch (booking.step) {
-
-      /* ================= STEP 1 ================= */
-
       case 1: {
         booking.step = 2;
+        const detectedServices: string[] =
+          detectService(message) ? [detectService(message)!] : fallbackServiceDetection(message);
+        booking.serviceTypes = detectedServices;
 
-        let detectedService = detectService(message) || fallbackServiceDetection(message);
-
-        if (detectedService) {
-          booking.serviceType = detectedService;
-
-          return {
-            response: t(
-              lang,
-              `Great — we’ll focus on ${detectedService}. When would you like to schedule?`,
-              `بہترین — ہم ${detectedService} پر فوکس کریں گے۔ آپ کب وقت لینا چاہتے ہیں؟`
-            ),
-            nextStep: 3,
-          };
-        }
+        const plan = await generateExecutionPlan(detectedServices);
+        booking.executionPlan = plan;
 
         return {
           response: t(
             lang,
-            "What would you like to focus on? (SEO, ads, automation, etc.)",
-            "آپ کس چیز پر فوکس کرنا چاہتے ہیں؟ (SEO، ads، automation وغیرہ)"
-          ),
-          nextStep: 2,
-        };
-      }
-
-      /* ================= STEP 2 ================= */
-
-      case 2: {
-        const detected = detectService(message) || fallbackServiceDetection(message);
-
-        booking.serviceType = detected || "Strategy Session";
-        booking.step = 3;
-
-        return {
-          response: t(
-            lang,
-            `Got it — ${booking.serviceType}. When should we schedule?`,
-            `ٹھیک ہے — ${booking.serviceType}۔ کب وقت رکھیں؟`
+            `I suggest focusing on:\n- ${detectedServices.join(
+              "\n- "
+            )}\n\nExecution plan:\n${plan}\n\nWhen would you like to schedule?`,
+            `میں تجویز کرتا ہوں کہ آپ یہ خدمات منتخب کریں:\n- ${detectedServices.join(
+              "\n- "
+            )}\n\nعملدرآمد کا منصوبہ:\n${plan}\n\nآپ کب وقت لینا چاہتے ہیں؟`
           ),
           nextStep: 3,
         };
       }
 
-      /* ================= STEP 3 (FIXED INTERRUPTION) ================= */
-
       case 3: {
-        // 🔥 Interrupt booking if user asks a question
-        if (isQuestion(message)) {
+        if (isQuestion(message) && !highIntent) {
           return {
             response: t(
               lang,
-              "Got it — we can pause booking for a moment. Let me answer that first.",
-              "ٹھیک ہے — ہم بکنگ کو تھوڑی دیر روک دیتے ہیں، پہلے میں آپ کا سوال جواب دیتا ہوں۔"
+              "We can pause booking for a moment. Let me answer your question first.",
+              "ہم بکنگ کو تھوڑی دیر روک دیتے ہیں، پہلے میں آپ کا سوال جواب دیتا ہوں۔"
             ),
           };
         }
@@ -207,23 +177,17 @@ const bookingFlow = {
         return {
           response: t(
             lang,
-            "Please share your email to confirm booking.",
+            "Please provide your email to confirm booking.",
             "براہ کرم اپنا ای میل دیں تاکہ بکنگ کنفرم ہو سکے۔"
           ),
           nextStep: 4,
         };
       }
 
-      /* ================= STEP 4 ================= */
-
       case 4: {
         if (!isValidEmail(message)) {
           return {
-            response: t(
-              lang,
-              "Please enter a valid email.",
-              "براہ کرم درست ای میل درج کریں۔"
-            ),
+            response: t(lang, "Please enter a valid email.", "براہ کرم درست ای میل درج کریں۔"),
             nextStep: 4,
           };
         }
@@ -233,10 +197,11 @@ const bookingFlow = {
 
         await memoryService.storeBooking({
           userId,
-          serviceType: booking.serviceType,
+          serviceTypes: booking.serviceTypes,
           preferredTime: booking.preferredTime,
           email: booking.email,
           calendlyLink: booking.calendlyLink,
+          executionPlan: booking.executionPlan,
           status: "pending",
         } as any);
 
@@ -249,10 +214,9 @@ const bookingFlow = {
             `آپ کی بکنگ تیار ہے:\n${booking.calendlyLink}`
           ),
           nextStep: 5,
+          calendlyLink: booking.calendlyLink,
         };
       }
-
-      /* ================= STEP 5 ================= */
 
       case 5: {
         if (normalize(message).includes("i booked")) {
@@ -279,7 +243,6 @@ const bookingFlow = {
 
       default:
         delete ongoingBookings[userId];
-
         return {
           response: t(
             lang,

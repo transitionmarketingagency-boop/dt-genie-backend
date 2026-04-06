@@ -1,6 +1,7 @@
 // server/services/leadIntelligence.ts
 
-import { leadQualifier, LeadScore } from "./leadQualifier.js";
+import { leadQualifier } from "./leadQualifier.js";
+import type { LeadScore } from "./leadQualifier.js";
 import { memoryService } from "./memoryService.js";
 
 /* ================= TYPES ================= */
@@ -20,11 +21,17 @@ function normalize(text: string): string {
     .trim();
 }
 
+/* ================= SAFE CLAMP ================= */
+function clamp(value: number | undefined): number {
+  if (!value || isNaN(value)) return 0;
+  return Math.max(0, Math.min(1, value));
+}
+
 /* ================= FLEXIBLE MATCH ================= */
 function includesAny(text: string, keywords: string[]): number {
   let score = 0;
   for (const kw of keywords) {
-    const regex = new RegExp(`\\b${kw}\\b`, "i"); // word boundary check
+    const regex = new RegExp(`\\b${kw}\\b`, "i");
     if (regex.test(text)) score += 1;
   }
   return score;
@@ -70,14 +77,14 @@ function detectSignals(
   const msg = normalize(message);
 
   const signals: BANTSignals = {
-    budget: memorySignals.budget ?? 0,
-    authority: memorySignals.authority ?? 0,
-    need: memorySignals.need ?? 0,
-    timeline: memorySignals.timeline ?? 0,
+    budget: clamp(memorySignals.budget),
+    authority: clamp(memorySignals.authority),
+    need: clamp(memorySignals.need),
+    timeline: clamp(memorySignals.timeline),
   };
 
   const add = (value: number | undefined, increment: number) =>
-    Math.min((value ?? 0) + increment, 1);
+    clamp((value ?? 0) + increment);
 
   /* ---------- NEED ---------- */
   signals.need = add(signals.need, 0.35 * includesAny(msg, needSignals));
@@ -126,14 +133,18 @@ export async function analyzeLeadSignals(
   if (sessionId) {
     try {
       const mem = await memoryService.getStrategicMemory(sessionId);
+
       memorySignals = {
-        budget: Math.min(mem.budget ?? 0, 1),
+        budget: clamp(mem.budget),
         authority: mem.decisionMaker ? 0.8 : 0,
-        need: mem.goals?.length ? 0.6 : 0,
+        need: Array.isArray(mem.goals) && mem.goals.length ? 0.6 : 0,
         timeline: mem.timeline ? 0.6 : 0,
       };
+
     } catch (err) {
-      if (process.env.DEBUG_MEMORY === "true") console.warn("[Memory] Failed to load strategic memory:", err);
+      if (process.env.DEBUG_MEMORY === "true") {
+        console.warn("[Memory] Failed to load strategic memory:", err);
+      }
     }
   }
 
@@ -161,9 +172,15 @@ export async function analyzeLeadSignals(
         goals: signals.need && signals.need > 0.5 ? ["growth"] : [],
         timeline: mapTimeline(signals.timeline),
       });
-      if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Updated strategic memory for session ${sessionId}`);
+
+      if (process.env.DEBUG_MEMORY === "true") {
+        console.log(`[Memory] Updated strategic memory for session ${sessionId}`);
+      }
+
     } catch (err) {
-      if (process.env.DEBUG_MEMORY === "true") console.warn(`[Memory] Failed to update strategic memory:`, err);
+      if (process.env.DEBUG_MEMORY === "true") {
+        console.warn("[Memory] Failed to update strategic memory:", err);
+      }
     }
   }
 

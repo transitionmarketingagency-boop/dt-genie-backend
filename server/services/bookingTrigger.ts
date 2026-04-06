@@ -40,7 +40,7 @@ const MAX_CONTEXT_BOOST = 0.25;
 const BOOST_PER_KEYWORD = 0.05;
 
 /* ================= COOLDOWN ================= */
-const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 min
+const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 minutes
 const bookingCooldownMap = new Map<string, number>();
 
 /* ================= NORMALIZE ================= */
@@ -65,9 +65,8 @@ function applyRecentContextBoost(
   for (const msg of recentMessages) {
     const lower = normalize(msg);
     const matchedKeywords = new Set<string>();
-
     for (const kw of RECENT_CONTEXT_KEYWORDS) {
-      const safeKw = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // escape regex
+      const safeKw = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
       const regex = new RegExp(`\\b${safeKw}\\b`, "i");
       if (regex.test(lower)) matchedKeywords.add(kw);
     }
@@ -79,7 +78,7 @@ function applyRecentContextBoost(
 }
 
 /* ================= BANT CONFIDENCE ================= */
-function calculateBantConfidence(bant: Partial<BANTSignals>): number {
+function calculateBantConfidence(bant: Partial<BANTSignals> = {}): number {
   const budget = bant.budget ?? 0;
   const authority = bant.authority ?? 0;
   const need = bant.need ?? 0;
@@ -123,7 +122,9 @@ export async function shouldTriggerBooking(
     try {
       const recentContext = await memoryService.getRecentContext(sessionId);
       recentMessages = recentContext?.map((m) => m.content) ?? [];
-    } catch {}
+    } catch (err) {
+      console.warn(`[BookingTrigger] Failed fetching recent context: ${err}`);
+    }
 
     const latestMessage = recentMessages[recentMessages.length - 1] ?? "";
 
@@ -147,10 +148,7 @@ export async function shouldTriggerBooking(
     }
 
     /* ===== HIGH INTENT OVERRIDE ===== */
-    if (
-      containsKeyword(latestMessage, STRONG_INTENT_KEYWORDS) &&
-      latestMessage.length > 10
-    ) {
+    if (containsKeyword(latestMessage, STRONG_INTENT_KEYWORDS) && latestMessage.length > 10) {
       markTriggered(sessionId);
       if (process.env.DEBUG_MEMORY === "true") {
         console.log(`[BookingTrigger] Strong intent detected`);
@@ -186,17 +184,14 @@ export async function shouldTriggerBooking(
     }
 
     /* ===== CONDITION 2: SERVICE/STRATEGY STAGE ===== */
-    if (
-      (stage === "service" || stage === "strategy") &&
-      leadScore >= 0.5 &&
-      bantConfidence >= dynamicThreshold
-    ) {
+    if ((stage === "service" || stage === "strategy") &&
+        leadScore >= 0.5 &&
+        bantConfidence >= dynamicThreshold) {
       markTriggered(sessionId);
       return true;
     }
 
     return false;
-
   } catch (err) {
     console.error("[BookingTrigger] Error:", err);
     return false;

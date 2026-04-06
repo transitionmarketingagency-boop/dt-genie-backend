@@ -123,18 +123,20 @@ export async function initializeMemory(): Promise<void> {
 
 function normalizeContent(text: unknown): string {
   if (typeof text !== "string" || !text.trim()) return "";
-  // Normalize and remove control characters
+
   let normalized = text
     .normalize("NFKC")
     .replace(/[\u0000-\u001F\u007F]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  // Truncate safely without breaking surrogate pairs
-// Truncate safely at 4000 chars including surrogate pairs
-if ([...normalized].length > 4000) {
-  return [...normalized].slice(0, 4000).join("");
-}
-return normalized;
+
+  // Safe truncate (handles unicode properly)
+  const chars = [...normalized];
+  if (chars.length > 4000) {
+    normalized = chars.slice(0, 4000).join("");
+  }
+
+  return normalized;
 }
 
 /* ================= TYPES ================= */
@@ -358,9 +360,7 @@ saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
 
     if (!row) return {};
 
-    let bant: StrategicMemory["bantSignals"] = undefined;
-
-bant = {
+const bant: StrategicMemory["bantSignals"] = {
   budget: typeof row.budget === "number" ? row.budget : undefined,
   authority: row.decisionMaker?.trim() ? 1 : undefined,
   need: row.interestLevel?.trim() ? 0.6 : undefined,
@@ -398,7 +398,10 @@ const merged: StrategicMemory = {
   ...data,
   goals: data.goals !== undefined ? data.goals : existing.goals,
   servicesDiscussed: data.servicesDiscussed !== undefined ? data.servicesDiscussed : existing.servicesDiscussed,
-  bantSignals: { ...existing.bantSignals, ...(data.bantSignals || {}) }, // Safe merge
+  bantSignals: {
+  ...(existing.bantSignals || {}),
+  ...(data.bantSignals || {}),
+},
   updatedAt: new Date().toISOString(),
 };
 
@@ -421,8 +424,10 @@ const merged: StrategicMemory = {
       sessionId,
       merged.industry ?? null,
       merged.businessType ?? null,
-      merged.goals ? JSON.stringify(merged.goals) : null,
-      merged.servicesDiscussed ? JSON.stringify(merged.servicesDiscussed) : null,
+      Array.isArray(merged.goals) ? JSON.stringify(merged.goals) : null,
+Array.isArray(merged.servicesDiscussed)
+  ? JSON.stringify(merged.servicesDiscussed)
+  : null,
       merged.leadScore ?? null,
       merged.stage ?? null,
       merged.budget ?? null,
@@ -434,7 +439,8 @@ const merged: StrategicMemory = {
 
   }
 
-/* ================= BOOKINGS ================= */
+
+/* -------- BOOKINGS -------- */
 
 async storeBooking(data: {
   userId: string;
@@ -446,10 +452,10 @@ async storeBooking(data: {
 }) {
   const db = await this.db;
 
+  // ✅ Validate and normalize input
   const userId = data.userId?.trim();
   if (!userId) throw new Error("Booking must include a valid userId");
 
-  // Optional: normalize other fields
   const preferredTime = data.preferredTime?.trim() || null;
   const email = data.email?.trim() || null;
   const serviceType = data.serviceType?.trim() || null;
@@ -460,6 +466,7 @@ async storeBooking(data: {
   const bookingId = crypto.randomUUID();
   const createdAt = new Date().toISOString();
 
+  // ✅ Insert into DB
   await db.run(
     `INSERT INTO bookings
      (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt)
@@ -479,29 +486,33 @@ async storeBooking(data: {
   }
 }
 
-async updateBookingStatus(userId: string, status: string) {
-  const db = await this.db;
+  async updateBookingStatus(userId: string, status: string) {
 
-  await db.run(
-    `UPDATE bookings
-     SET status = ?
-     WHERE id = (
-       SELECT id
-       FROM bookings
-       WHERE userId = ?
-       ORDER BY datetime(createdAt) DESC
-       LIMIT 1
-     )`,
-    status,
-    userId
-  );
+    const db = await this.db;
 
-  if (process.env.DEBUG_MEMORY === "true") {
-    console.log(`[Memory] Booking updated for ${userId} -> ${status}`);
+    await db.run(
+      `UPDATE bookings
+       SET status = ?
+       WHERE id = (
+         SELECT id
+         FROM bookings
+         WHERE userId = ?
+         ORDER BY createdAt DESC
+         LIMIT 1
+       )`,
+      status,
+      userId
+    );
+
+    if (process.env.DEBUG_MEMORY === "true") {
+      console.log(`[Memory] Booking updated for ${userId} -> ${status}`);
+    }
+
   }
-}
+
+} // ✅ THIS closes MemoryService class properly
+
 
 /* ================= SINGLETON ================= */
 
 export const memoryService = new MemoryService();
-export { MemoryService, initializeMemory };
