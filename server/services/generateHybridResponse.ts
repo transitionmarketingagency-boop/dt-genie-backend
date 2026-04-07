@@ -199,20 +199,24 @@ export async function executeHybridResponse({
   vectorCount?: number;
 }) {
   try {
-    // --- Detect Services & Intents ---
+    // ----------------- Detect Services & Intents ----------------- //
     brainContext.detectedServices = detectService(message);
     brainContext.detectedIntents = detectIntent(message);
 
-    // --- Expand vector query and fuse chunks ---
-    const expandedQuery = expandQueryNeural(message);
+// ----------------- Expand Vector & Fuse Chunks ----------------- //
+const expandedQuery = expandQueryNeural(message);
 
-    // Await the Promise to get fused chunk strings
-    const fusedChunksArray: string[] = await getFusedChunks(expandedQuery);
+// Get FusedChunk[]
+const fusedChunksResult: FusedChunk[] = await getFusedChunks(expandedQuery);
 
-    // Join into a single string for prompt
-    const fusedChunksText: string = fusedChunksArray.join("\n\n");
+// Convert to string[] using only valid properties
+const fusedChunksArray: string[] = fusedChunksResult
+  .map((c) => c.text)   // <-- use only `text`, remove `.content`
+  .filter(Boolean);
 
-    // --- Build Prompt ---
+const fusedChunksText: string = fusedChunksArray.join("\n\n");
+
+    // ----------------- Build Prompt ----------------- //
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
@@ -222,21 +226,21 @@ export async function executeHybridResponse({
       message,
     });
 
-    // --- Initialize response and model tracking ---
-    let response: string = "";
-    let modelUsed: string = "none";
+    // ----------------- Model Execution ----------------- //
+    let response = "";
+    let modelUsed = "none";
 
-    // --- PRIMARY MODEL: QWEN ---
+    // Primary model: QWEN
     const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
     const qwenBad = !qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp);
 
-    // --- SECONDARY MODEL: GEMINI ---
+    // Secondary model: Gemini (conditional)
     let geminiResp: string | null = null;
     if (qwenBad && brainContext.hasSufficientContext && message.length > 20 && canUseGemini()) {
       geminiResp = await withTimeout(generateGemini(prompt), 4500);
     }
 
-    // --- MODEL SELECTION LOGIC ---
+    // Model selection
     if (qwenResp && !qwenBad) {
       response = qwenResp;
       modelUsed = "Qwen";
@@ -246,21 +250,19 @@ export async function executeHybridResponse({
       markGeminiUsed();
     }
 
-    // --- FALLBACK ---
+    // Fallback
     if (!response || isLowQuality(response) || looksIncomplete(response)) {
-      response = smartFallbackHelper(
-        brainContext?.reasoning || "Let's focus on the main bottleneck."
-      );
+      response = smartFallbackHelper(brainContext?.reasoning || "Let's focus on the main bottleneck.");
       modelUsed = "fallback";
     }
 
-    // --- CLEANUP & ENFORCEMENTS ---
+    // ----------------- Cleanup & Enforcements ----------------- //
     response = cleanHybridResponse(response);
     if (forceNoQuestions) response = response.replace(/\?+/g, ".");
     if (response.length > 1200) response = compressResponse(response);
     response = enforceBotName(response);
 
-    // --- SMART CTA ---
+    // ----------------- Smart CTA ----------------- //
     if (
       response &&
       shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage) &&
@@ -275,10 +277,9 @@ export async function executeHybridResponse({
       response += "\n\n" + ctas[Math.floor(Math.random() * ctas.length)];
     }
 
-    // --- ANTI-REPETITION ---
+    // ----------------- Anti-Repetition ----------------- //
     const lastAssistant =
-      recentMessagesCache?.slice()?.reverse()?.find((m) => m.role === "assistant")
-        ?.content || "";
+      recentMessagesCache?.slice()?.reverse()?.find((m) => m.role === "assistant")?.content || "";
     if (response && lastAssistant) {
       const normalize = (text: string) =>
         text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
@@ -289,18 +290,17 @@ export async function executeHybridResponse({
       if (isSimilar) {
         response = brainContext.hasSufficientContext
           ? `Let’s take this further.\n\n${
-              brainContext.reasoning ||
-              "We now need to refine execution instead of rethinking strategy."
+              brainContext.reasoning || "We now need to refine execution instead of rethinking strategy."
             }\n\nFocus on fixing the highest-impact bottleneck first.`
           : "Let’s focus this properly — what’s the main result you're trying to achieve?";
         modelUsed = "anti-repeat";
       }
     }
 
-    // --- SAVE TO MEMORY ---
+    // ----------------- Save to Memory ----------------- //
     if (response) await memoryService.saveMessage(sessionId, "assistant", response);
 
-    // --- DEBUG ---
+    // ----------------- Debug Logging ----------------- //
     console.log(
       `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Chunks=${vectorCount} | LeadScore=${leadScoreValue}`
     );
