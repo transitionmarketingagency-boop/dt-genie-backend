@@ -1,6 +1,6 @@
 // ===================== IMPORTS ===================== //
 // Core AI services
-import { getFusedChunks } from "./intentVectorFusion.js";
+import { getFusedChunks, type FusedChunk } from "./intentVectorFusion.js"; // ✅ Fixed type import
 import { generateOpenRouter } from "./openRouterClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
@@ -27,7 +27,6 @@ import {
 } from "./responseDecision.js";
 import { compressContext } from "./responseUtilities.js";
 import { GEMINI_ENABLED, canUseGemini, markGeminiUsed } from "./geminiManager.js";
-import { expandQueryNeural } from "./queryExpansion.js";
 import { withTimeout } from "./timeoutHelper.js";
 
 import { neuralBrain } from "./neuralBrain.js";
@@ -203,18 +202,10 @@ export async function executeHybridResponse({
     brainContext.detectedServices = detectService(message);
     brainContext.detectedIntents = detectIntent(message);
 
-// ----------------- Expand Vector & Fuse Chunks ----------------- //
-const expandedQuery = expandQueryNeural(message);
-
-// Get FusedChunk[]
-const fusedChunksResult: FusedChunk[] = await getFusedChunks(expandedQuery);
-
-// Convert to string[] using only valid properties
-const fusedChunksArray: string[] = fusedChunksResult
-  .map((c) => c.text)   // <-- use only `text`, remove `.content`
-  .filter(Boolean);
-
-const fusedChunksText: string = fusedChunksArray.join("\n\n");
+    // ----------------- Fuse Chunks ----------------- //
+    const fusedChunksResult: FusedChunk[] = await getFusedChunks(message); // ✅ Use raw message
+    const fusedChunksArray: string[] = fusedChunksResult.map((c) => c.text).filter(Boolean);
+    const fusedChunksText: string = fusedChunksArray.join("\n\n");
 
     // ----------------- Build Prompt ----------------- //
     const prompt = buildHybridPrompt({
@@ -230,17 +221,14 @@ const fusedChunksText: string = fusedChunksArray.join("\n\n");
     let response = "";
     let modelUsed = "none";
 
-    // Primary model: QWEN
     const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
     const qwenBad = !qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp);
 
-    // Secondary model: Gemini (conditional)
     let geminiResp: string | null = null;
     if (qwenBad && brainContext.hasSufficientContext && message.length > 20 && canUseGemini()) {
       geminiResp = await withTimeout(generateGemini(prompt), 4500);
     }
 
-    // Model selection
     if (qwenResp && !qwenBad) {
       response = qwenResp;
       modelUsed = "Qwen";
@@ -250,7 +238,6 @@ const fusedChunksText: string = fusedChunksArray.join("\n\n");
       markGeminiUsed();
     }
 
-    // Fallback
     if (!response || isLowQuality(response) || looksIncomplete(response)) {
       response = smartFallbackHelper(brainContext?.reasoning || "Let's focus on the main bottleneck.");
       modelUsed = "fallback";
@@ -281,10 +268,10 @@ const fusedChunksText: string = fusedChunksArray.join("\n\n");
     const lastAssistant =
       recentMessagesCache?.slice()?.reverse()?.find((m) => m.role === "assistant")?.content || "";
     if (response && lastAssistant) {
-      const normalize = (text: string) =>
+      const normalizeText = (text: string) =>
         text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
-      const prev = normalize(lastAssistant).slice(0, 140);
-      const curr = normalize(response).slice(0, 140);
+      const prev = normalizeText(lastAssistant).slice(0, 140);
+      const curr = normalizeText(response).slice(0, 140);
       const isSimilar =
         prev === curr || prev.includes(curr.slice(0, 80)) || curr.includes(prev.slice(0, 80));
       if (isSimilar) {
@@ -300,7 +287,6 @@ const fusedChunksText: string = fusedChunksArray.join("\n\n");
     // ----------------- Save to Memory ----------------- //
     if (response) await memoryService.saveMessage(sessionId, "assistant", response);
 
-    // ----------------- Debug Logging ----------------- //
     console.log(
       `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Chunks=${vectorCount} | LeadScore=${leadScoreValue}`
     );

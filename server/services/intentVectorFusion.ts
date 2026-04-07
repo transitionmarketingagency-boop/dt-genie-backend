@@ -1,5 +1,4 @@
-// server/services/intentVectorFusion.ts
-
+// ===================== IMPORTS ===================== //
 import { getTopChunks } from "../queryChunks.js";
 import { detectIntent, Intent, intents } from "./intentManager.js";
 
@@ -94,18 +93,16 @@ function bookingBoost(chunkText: string, message: string) {
 /* ======================= DEDUPE ======================= */
 function dedupeChunks(chunks: VectorChunk[]) {
   const seen = new Set<string>();
-
   return chunks.filter((c) => {
     const key = (c.text || "").slice(0, 120);
     if (seen.has(key)) return false;
-
     seen.add(key);
     return true;
   });
 }
 
 /* ======================= MAIN FUSION ======================= */
-async function getFusedChunksInternal(
+export async function getFusedChunks(
   userMessage: string,
   baseTopN: number = MAX_CHUNKS
 ): Promise<FusedChunk[]> {
@@ -116,7 +113,6 @@ async function getFusedChunksInternal(
 
   /* ---------- VECTOR FETCH ---------- */
   let vectorChunks: VectorChunk[] = [];
-
   try {
     vectorChunks = await getTopChunks(userMessage, baseTopN + 5, 0.5);
   } catch (err) {
@@ -125,12 +121,10 @@ async function getFusedChunksInternal(
   }
 
   if (!vectorChunks?.length) return [];
-
   vectorChunks = dedupeChunks(vectorChunks);
 
   /* ---------- INTENT DETECTION ---------- */
   let detectedIntents: { intent: Intent; score?: number }[] = [];
-
   try {
     detectedIntents = detectIntent(userMessage, [], 5);
   } catch (err) {
@@ -138,25 +132,21 @@ async function getFusedChunksInternal(
   }
 
   const detectedIntentNames = detectedIntents.map((d) => d.intent.name);
-
   const detectedIntentScores = detectedIntents.reduce((acc, d) => {
     acc[d.intent.name] = d.score ?? 0.3;
     return acc;
   }, {} as Record<string, number>);
 
-  /* ---------- INTENT KEYWORDS ---------- */
   const intentKeywordMap: Record<string, string[]> = {};
-
   for (const intentName of detectedIntentNames) {
     const foundIntent = intents.find((i) => i.name === intentName);
-
     intentKeywordMap[intentName] = (foundIntent?.keywords || [])
-      .map((kw) => normalize(kw))
+      .map(normalize)
       .filter(Boolean);
   }
 
   /* ---------- FUSION SCORING ---------- */
-  const fused = vectorChunks.map((chunk) => {
+  const fused: FusedChunk[] = vectorChunks.map((chunk) => {
     const chunkText = normalize(chunk.text || "");
     const chunkTokens = new Set(tokenize(chunkText));
 
@@ -185,7 +175,9 @@ async function getFusedChunksInternal(
       bookingBoost(chunkText, normalizedMessage);
 
     return {
-      ...chunk,
+      text: chunk.text,
+      source: chunk.source,
+      intent: chunk.intent ?? "general",
       fusionScore: Number((fusionScore || 0).toFixed(4)),
     };
   });
@@ -194,7 +186,6 @@ async function getFusedChunksInternal(
   fused.sort((a, b) => b.fusionScore - a.fusionScore);
 
   const usedSources = new Set<string>();
-
   const finalChunks = fused.filter((c) => {
     if (!c.text) return false;
     if (c.fusionScore < MIN_SCORE_THRESHOLD) return false;
@@ -204,14 +195,5 @@ async function getFusedChunksInternal(
     return true;
   });
 
-  /* ---------- FINAL OUTPUT ---------- */
-  return finalChunks.slice(0, baseTopN).map((c) => ({
-    text: c.text,
-    source: c.source,
-    fusionScore: c.fusionScore,
-    intent: c.intent ?? "general",
-  }));
+  return finalChunks.slice(0, baseTopN);
 }
-
-/* ======================= EXPORT ======================= */
-export const getFusedChunks = getFusedChunksInternal;
