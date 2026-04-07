@@ -7,7 +7,7 @@ import { memoryService } from "./memoryService.js";
 
 // System utilities
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
-import { cleanResponse } from "../utils/cleanResponse.js"; // only existing function
+import { cleanResponse } from "../utils/cleanResponse.js";
 
 // Intent & Service detection
 import { detectIntent } from "./intentManager.js";
@@ -20,7 +20,11 @@ import { analyzeLeadSignals } from "./leadIntelligence.js";
 import { shouldTriggerBooking } from "./bookingTrigger.js";
 
 // Modular helpers
-import { detectBookingRejection, smartFallback as smartFallbackHelper, shouldIncludeCTA } from "./responseDecision.js";
+import {
+  detectBookingRejection,
+  smartFallback as smartFallbackHelper,
+  shouldIncludeCTA,
+} from "./responseDecision.js";
 import { compressContext } from "./responseUtilities.js";
 import { GEMINI_ENABLED, canUseGemini, markGeminiUsed } from "./geminiManager.js";
 import { expandQueryNeural } from "./queryExpansion.js";
@@ -31,8 +35,7 @@ import { normalizeLeadScore, determineExecutionMode } from "./leadScoreHelper.js
 import { smartGreeting } from "./greetingHelper.js";
 import { checkHardResponses } from "./hardResponses.js";
 
-// ===================== UTILITY FALLBACKS ===================== //
-// Replacement for missing helpers
+// ===================== UTILITY HELPERS ===================== //
 function isLowQuality(text: string): boolean {
   if (!text) return true;
   return text.split(" ").length < 3 || text.trim().length < 20;
@@ -51,7 +54,7 @@ function cleanHybridResponse(text: string): string {
   return cleanResponse(text);
 }
 
-// ===================== PROMPT BUILDER ===================== //
+// ===================== HYBRID PROMPT BUILDER ===================== //
 export function buildHybridPrompt({
   brainContext,
   leadScoreValue,
@@ -142,23 +145,23 @@ ${message}
 🧠 THINKING INSTRUCTIONS
 Before answering:
 
-1. What is the REAL underlying problem?
-2. What is the fastest path to measurable improvement?
-3. What exact actions will move results?
+1. Identify the REAL underlying problem.
+2. Determine the fastest path to measurable improvement.
+3. Give exact, actionable steps tied to outcomes.
 
 ✍️ RESPONSE STRUCTURE
 
 1. Identify the REAL problem (specific, not generic)
-2. Give a CLEAR, EXECUTABLE solution
-   - steps
-   - tactics
-   - strategy tied to outcome
-3. (Optional) ONE sharp follow-up question ONLY if needed
+2. Provide a CLEAR, EXECUTABLE solution
+   - Steps
+   - Tactics
+   - Strategy tied to outcome
+3. Optional: ONE sharp follow-up question ONLY if necessary
 
 🚫 ANTI-GENERIC ENFORCEMENT
 
 ❌ BAD: "Use SEO, ads, and content marketing"
-✅ GOOD: "Your YouTube ads are underperforming because your hook fails in the first 3 seconds — fix this by testing 5 new opening angles targeting [specific audience]"
+✅ GOOD: "Your YouTube ads are underperforming because the first 3 seconds fail — test 5 new hooks targeting [specific audience]"
 
 🎯 FINAL RULES
 - Be sharp, direct, and strategic
@@ -196,29 +199,44 @@ export async function executeHybridResponse({
   vectorCount?: number;
 }) {
   try {
+    // --- Detect Services & Intents ---
+    brainContext.detectedServices = detectService(message);
+    brainContext.detectedIntents = detectIntent(message);
+
+    // --- Expand vector query and fuse chunks ---
+    const expandedQuery = expandQueryNeural(message);
+
+    // Await the Promise to get fused chunk strings
+    const fusedChunksArray: string[] = await getFusedChunks(expandedQuery);
+
+    // Join into a single string for prompt
+    const fusedChunksText: string = fusedChunksArray.join("\n\n");
+
+    // --- Build Prompt ---
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
       detectedIntentNames,
-      vectorText,
+      vectorText: fusedChunksText,
       historyText,
       message,
     });
 
-    let response = "";
-    let modelUsed = "none";
+    // --- Initialize response and model tracking ---
+    let response: string = "";
+    let modelUsed: string = "none";
 
-    // ---------- PRIMARY MODEL (QWEN) ----------
+    // --- PRIMARY MODEL: QWEN ---
     const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
     const qwenBad = !qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp);
 
-    // ---------- SECONDARY MODEL (GEMINI) ----------
+    // --- SECONDARY MODEL: GEMINI ---
     let geminiResp: string | null = null;
     if (qwenBad && brainContext.hasSufficientContext && message.length > 20 && canUseGemini()) {
       geminiResp = await withTimeout(generateGemini(prompt), 4500);
     }
 
-    // ---------- MODEL SELECTION ----------
+    // --- MODEL SELECTION LOGIC ---
     if (qwenResp && !qwenBad) {
       response = qwenResp;
       modelUsed = "Qwen";
@@ -228,47 +246,24 @@ export async function executeHybridResponse({
       markGeminiUsed();
     }
 
-    // ---------- HARD GUARD ----------
-    if (!response) response = "";
-
-    // ---------- PREVENT GENERIC DOWNGRADE ----------
-    if (response && brainContext.hasSufficientContext) {
-      response = response.replace(/(tell me more|let me know more|share more details).*$/gi, "");
+    // --- FALLBACK ---
+    if (!response || isLowQuality(response) || looksIncomplete(response)) {
+      response = smartFallbackHelper(
+        brainContext?.reasoning || "Let's focus on the main bottleneck."
+      );
+      modelUsed = "fallback";
     }
 
-// ---------- FINAL FALLBACK ----------
-if (!response || isLowQuality(response) || looksIncomplete(response)) {
-  // Use the original smartFallbackHelper with a safe string
-  response = smartFallbackHelper(brainContext?.reasoning || "Let's focus on the main bottleneck."); 
-  modelUsed = "fallback";
-}
-
-    // ---------- CLEANUP ----------
+    // --- CLEANUP & ENFORCEMENTS ---
     response = cleanHybridResponse(response);
-
-    // ---------- SAFE RETRY ----------
-    if (modelUsed === "Qwen" && (isLowQuality(response) || looksIncomplete(response)) && canUseGemini()) {
-      console.log("⚠️ Retrying with Gemini (quality fail)");
-      const retry = await withTimeout(generateGemini(prompt), 4000);
-      if (retry && !isLowQuality(retry)) {
-        response = cleanResponse(retry);
-        modelUsed = "Gemini-retry";
-      }
-    }
-
-    // ---------- NO-QUESTION ENFORCEMENT ----------
-    if (forceNoQuestions && response) response = response.replace(/\?+/g, ".");
-
-    // ---------- LENGTH CONTROL ----------
+    if (forceNoQuestions) response = response.replace(/\?+/g, ".");
     if (response.length > 1200) response = compressResponse(response);
-
-    // ---------- IDENTITY ENFORCEMENT ----------
     response = enforceBotName(response);
 
-    // ---------- SMART CTA ----------
+    // --- SMART CTA ---
     if (
       response &&
-      shouldIncludeCTA(message, intentCategories, brainContext.leadScore, brainContext.stage) &&
+      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage) &&
       brainContext.hasSufficientContext
     ) {
       const ctas = [
@@ -280,9 +275,10 @@ if (!response || isLowQuality(response) || looksIncomplete(response)) {
       response += "\n\n" + ctas[Math.floor(Math.random() * ctas.length)];
     }
 
-    // ---------- ANTI-REPETITION ----------
+    // --- ANTI-REPETITION ---
     const lastAssistant =
-      recentMessagesCache?.slice()?.reverse()?.find((m: any) => m.role === "assistant")?.content || "";
+      recentMessagesCache?.slice()?.reverse()?.find((m) => m.role === "assistant")
+        ?.content || "";
     if (response && lastAssistant) {
       const normalize = (text: string) =>
         text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
@@ -292,19 +288,21 @@ if (!response || isLowQuality(response) || looksIncomplete(response)) {
         prev === curr || prev.includes(curr.slice(0, 80)) || curr.includes(prev.slice(0, 80));
       if (isSimilar) {
         response = brainContext.hasSufficientContext
-          ? `Let’s take this further.\n\n${brainContext.reasoning ||
-              "We now need to refine execution instead of rethinking strategy."}\n\nFocus on fixing the highest-impact bottleneck first.`
+          ? `Let’s take this further.\n\n${
+              brainContext.reasoning ||
+              "We now need to refine execution instead of rethinking strategy."
+            }\n\nFocus on fixing the highest-impact bottleneck first.`
           : "Let’s focus this properly — what’s the main result you're trying to achieve?";
         modelUsed = "anti-repeat";
       }
     }
 
-    // ---------- SAVE MEMORY ----------
+    // --- SAVE TO MEMORY ---
     if (response) await memoryService.saveMessage(sessionId, "assistant", response);
 
-    // ---------- DEBUG ----------
+    // --- DEBUG ---
     console.log(
-      `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Chunks=${vectorCount} | LeadScore=${brainContext.leadScore}`
+      `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Chunks=${vectorCount} | LeadScore=${leadScoreValue}`
     );
 
     return response;
