@@ -8,6 +8,19 @@ import type { LeadScore } from "./leadQualifier.js";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
+/* ================= SAFE BRAIN TYPE ================= */
+type SafeBrainContext = {
+  stage?: string;
+  executionMode?: string;
+  leadScore?: LeadScore | number;
+  detectedServices?: string[];
+  goals?: string[];
+  recentMessages?: string[];
+  dynamicGreeting?: string;
+  industry?: string;
+  businessType?: string;
+};
+
 /* ================= RESPONSE TYPE ================= */
 interface OpenRouterResponse {
   choices?: {
@@ -16,12 +29,12 @@ interface OpenRouterResponse {
   }[];
 }
 
-/* ================= MODEL ================= */
+/* ================= CONFIG ================= */
 const MODEL = "qwen/qwen3-235b-a22b-2507";
 const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 4200;
 
-/* ================= PROMPT CLEANER ================= */
+/* ================= CLEAN PROMPT ================= */
 function cleanPrompt(prompt: string): string {
   return (
     prompt
@@ -32,10 +45,12 @@ function cleanPrompt(prompt: string): string {
   );
 }
 
-/* ================= VALIDATION ================= */
+/* ================= RESPONSE CHECK ================= */
 function isValidResponse(text: string): boolean {
-  if (!text || text.length < 25) return false;
+  if (!text || text.length < 20) return false;
+
   const lower = text.toLowerCase();
+
   return !(
     lower.includes("<|") ||
     lower.includes("|>") ||
@@ -53,30 +68,23 @@ function isBadFallback(text: string): boolean {
   );
 }
 
-function ensureComplete(text: string): string {
-  if (!/[.!?]$/.test(text)) return text + ".";
-  return text;
-}
-
-function fixSpacing(text: string): string {
+function finalize(text: string): string {
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    .replace(/[^\.\!\?]$/, (m) => m + ".");
 }
 
 /* ================= INTENT ================= */
 function detectHighIntent(message: string): boolean {
-  const lower = message.toLowerCase();
-  return /(book|schedule|call|hire|start now|let's start|ready to proceed)/i.test(
-    lower
-  );
+  return /(book|schedule|call|hire|start now|let's start|ready)/i.test(message);
 }
 
 /* ================= CACHE ================= */
-const recentCache: Map<string, string> = new Map();
+const cache = new Map<string, string>();
 
-/* ================= MAIN FUNCTION ================= */
+/* ================= MAIN ================= */
 export async function generateOpenRouter(
   prompt: string,
   sessionId?: string
@@ -88,54 +96,60 @@ export async function generateOpenRouter(
   prompt = cleanPrompt(prompt);
   const cacheKey = `${sessionId || "global"}:${prompt.toLowerCase()}`;
 
-  /* ---------- CACHE ---------- */
-  if (recentCache.has(cacheKey)) {
-    return recentCache.get(cacheKey)!;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey)!;
   }
 
-  /* ---------- CONTEXT + BRAIN ---------- */
+  /* ---------- CONTEXT ---------- */
   let contextText = "";
   let executionMode = "exploration";
-  let highIntent = detectHighIntent(prompt);
+  const highIntent = detectHighIntent(prompt);
+
+  let detectedServices: string[] = [];
+  let goalsText = "unknown";
 
   if (sessionId) {
     try {
-      const { brainContext } = await strategicBrain(prompt.slice(0, 300), sessionId);
+      const { brainContext } = await strategicBrain(prompt, sessionId);
 
-      const leadScore: LeadScore | number | undefined = brainContext.leadScore;
-      const totalScore = typeof leadScore === "number"
-        ? leadScore
-        : (leadScore as LeadScore)?.total ?? 0;
+      const ctx = (brainContext || {}) as SafeBrainContext;
 
-      // Pre-process strong intent: force execution mode
-      if (highIntent) {
-        (brainContext as any).executionMode = "execution";
-        executionMode = "execution";
-        await shouldTriggerBooking(sessionId, brainContext.stage);
-      } else {
-        executionMode = (brainContext as any).executionMode || "exploration";
-      }
+      const leadScore = ctx.leadScore;
+      const totalScore =
+        typeof leadScore === "number"
+          ? leadScore
+          : leadScore?.total ?? 0;
 
-      const industry = (brainContext as any)?.industry || "unknown";
-      const businessType = (brainContext as any)?.businessType || "";
-      const goals = Array.isArray((brainContext as any)?.goals)
-        ? (brainContext as any).goals.join(", ")
+      detectedServices = ctx.detectedServices || [];
+      goalsText = Array.isArray(ctx.goals)
+        ? ctx.goals.join(", ")
         : "unknown";
 
-      const recentMessages = (brainContext as any)?.recentMessages || [];
-      const dynamicGreeting = (brainContext as any)?.dynamicGreeting || "";
+      const recentMessages = ctx.recentMessages || [];
+      const industry = ctx.industry || "unknown";
+      const businessType = ctx.businessType || "";
+
+      /* ---------- EXECUTION MODE ---------- */
+      if (highIntent) {
+        executionMode = "execution";
+      const safeStage = (ctx.stage ?? "awareness") as any;
+await shouldTriggerBooking(sessionId, safeStage);
+      } else {
+        executionMode = ctx.executionMode || "exploration";
+      }
 
       contextText = `
-User Stage: ${brainContext.stage || "unknown"}
-Execution Mode: ${executionMode}
+Stage: ${ctx.stage || "unknown"}
+Mode: ${executionMode}
 Lead Score: ${totalScore.toFixed(2)}
-Business Context: ${industry} ${businessType}
-Goal: ${goals}
-Recent Messages: ${recentMessages.join("\n")}
-Dynamic Greeting: ${dynamicGreeting}
-`;
+Industry: ${industry} ${businessType}
+Services: ${detectedServices.join(", ") || "none"}
+Goals: ${goalsText}
+Recent: ${recentMessages.slice(-3).join(" | ")}
+      `.trim();
+
     } catch (err) {
-      console.warn("⚠️ brainContext failed:", err);
+      console.warn("⚠️ brain failed:", err);
     }
   }
 
@@ -154,28 +168,36 @@ Dynamic Greeting: ${dynamicGreeting}
       },
       body: JSON.stringify({
         model: MODEL,
-        temperature: highIntent ? 0.5 : 0.4,
+        temperature: highIntent ? 0.6 : 0.45,
         top_p: 0.9,
         max_tokens: 900,
         messages: [
           {
             role: "system",
-            content: `You are Neon Vision, an elite AI marketing strategist.
+            content: `
+You are Neon Vision — a senior AI marketing strategist.
 
-You think like a senior consultant.
+RULES:
+- Always give actionable, step-by-step strategies
+- Use detected services: ${detectedServices.join(", ") || "none"}
+- Use goals: ${goalsText}
+- Use business context
+- No generic advice
+- No repetition
+- No asking same question again
 
-Rules:
-- Give actionable strategies (not generic advice)
-- Break into steps if needed
-- Tie answers to business outcomes
-- Be confident and clear
-- No filler, no fluff
+MODE:
+${executionMode === "execution"
+  ? "Give decisive, conversion-focused actions."
+  : "Give strategic insights with next steps."}
 
-Tone: ${highIntent ? "decisive, conversion-focused" : "strategic, helpful"}`,
+CRITICAL:
+If context exists, you MUST use it.
+            `.trim(),
           },
           {
             role: "user",
-            content: `${contextText}\nUser Request: ${prompt}`,
+            content: `${contextText}\nUser: ${prompt}`,
           },
         ],
       }),
@@ -188,35 +210,39 @@ Tone: ${highIntent ? "decisive, conversion-focused" : "strategic, helpful"}`,
 
     const data = (await res.json()) as OpenRouterResponse;
 
-    let raw = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || "";
+    let raw =
+      data?.choices?.[0]?.message?.content ||
+      data?.choices?.[0]?.text ||
+      "";
+
     let text = cleanResponse(raw);
 
     /* ---------- VALIDATION ---------- */
-    if (!isValidResponse(text) || isBadFallback(text)) {
-      throw new Error("Bad response");
+    if (!isValidResponse(text)) {
+      throw new Error("Invalid response");
     }
 
-    text = fixSpacing(text);
-    text = ensureComplete(text);
+    text = finalize(text);
 
-    /* ---------- CACHE ONLY GOOD RESPONSES ---------- */
-    if (text.length > 40) {
-      recentCache.set(cacheKey, text);
+    /* ---------- CACHE GOOD ONLY ---------- */
+    if (text.length > 30 && !isBadFallback(text)) {
+      cache.set(cacheKey, text);
     }
 
     console.log("✅ OpenRouter success");
     return text;
+
   } catch (err: any) {
     clearTimeout(timeout);
     console.warn("⚠️ OpenRouter failed:", err?.message);
 
-    /* ---------- SMART FALLBACK ---------- */
-    return `Here’s the right way to approach this:
+    /* ---------- SMART FALLBACK (NO LOOP) ---------- */
+    return `Here’s a strong starting strategy:
 
-1. Define your exact goal (traffic, leads, or sales)
-2. Identify your current bottleneck
-3. Apply a targeted strategy based on that
+1. Identify your biggest bottleneck (traffic, conversion, or retention)
+2. Focus on 1–2 core channels first (ads, content, or email)
+3. Optimize based on real user behavior and data
 
-Tell me your current setup and I’ll map this out precisely for you.`;
+If you want, tell me your niche and I’ll map a precise execution plan.`;
   }
 }

@@ -1,6 +1,7 @@
-// server/services/reasoningEngine.ts
-
 import { memoryService } from "./memoryService.js";
+import { hybridResponseService } from "./generateHybridResponse.js";
+import { getFusedChunks } from "./intentVectorFusion.js";
+import { detectIntents } from "./serviceDetector.js";
 
 /* ================= TYPES ================= */
 export type ReasoningData = {
@@ -8,15 +9,18 @@ export type ReasoningData = {
   industry: string;
   strategy: string;
   recentMessages: { role: string; content: string }[];
+  services: string[];
+  fusedChunks: { text: string; source: string; fusionScore: number; intent: string }[];
 };
 
 /* ================= STRATEGIC MEMORY TYPE ================= */
 export type StrategicMemory = {
   industry?: string;
   servicesDiscussed?: string[];
-  businessMentioned?: boolean;
   painPoints?: string[];
   goals?: string[];
+  lastUserProblem?: string;
+  lastDetectedServices?: string[];
   [key: string]: any;
 };
 
@@ -26,13 +30,11 @@ function safeString(val: any): string {
   return val.toLowerCase().trim();
 }
 
-/* ================= Reasoning Engine ================= */
+/* ================= REASONING ENGINE ================= */
 export class ReasoningEngine {
-
-  /* -------------------- MAIN -------------------- */
+  /* -------------------- MAIN ANALYSIS -------------------- */
   async analyze(sessionId: string, userQuestion: string): Promise<ReasoningData> {
-
-    const [recentContextRaw, strategicMemoryRaw] = await Promise.all([
+    const [recentMessagesRaw, strategicMemoryRaw] = await Promise.all([
       memoryService.getRecentContext(sessionId).catch(() => []),
       memoryService.getStrategicMemory(sessionId).catch(() => ({})),
     ]);
@@ -40,53 +42,78 @@ export class ReasoningEngine {
     const strategicMemory: StrategicMemory = strategicMemoryRaw || {};
     const question = safeString(userQuestion);
 
-    /* ---------- PROBLEM ---------- */
+    // ---------- PROBLEM ----------
     const problem = this.extractProblem(question, strategicMemory);
 
-    /* ---------- INDUSTRY ---------- */
-    const industry =
-      strategicMemory.industry ||
-      this.guessIndustry(question, recentContextRaw);
+    // ---------- INDUSTRY ----------
+    const industry = strategicMemory.industry || this.guessIndustry(question, recentMessagesRaw);
 
-    /* ---------- BASE STRATEGY ---------- */
-    const baseStrategy = this.suggestStrategy(question, industry, problem);
+    // ---------- SERVICES DETECTION ----------
+    let detectedServices: string[] = [];
+    try {
+      const hybridServices = await hybridResponseService.detectServices(userQuestion);
+      detectedServices =
+        hybridServices && hybridServices.length
+          ? hybridServices
+          : strategicMemory.servicesDiscussed || [];
+    } catch (err) {
+      detectedServices = strategicMemory.servicesDiscussed || [];
+    }
 
-    /* ---------- CONTEXT ---------- */
-    const recentMessages = (recentContextRaw || []).map((m: any) => ({
+    // ---------- FUSED VECTOR CHUNKS ----------
+    const fusedChunks = (await getFusedChunks(userQuestion, 5).catch(() => [])) || [];
+
+    // ---------- CONTEXT ----------
+    const recentMessages = (recentMessagesRaw || []).map((m: any) => ({
       role: typeof m?.role === "string" ? m.role : "user",
       content: safeString(m?.content),
     }));
 
-    /* ---------- FINAL STRATEGY ---------- */
+    // ---------- BASE STRATEGY ----------
+    const baseStrategy = this.suggestStrategy(question, industry, problem, detectedServices, fusedChunks);
+
+    // ---------- DYNAMIC STRATEGY ----------
     const strategy = this.dynamicStrategy(baseStrategy, {
       problem,
       industry,
       contextLength: recentMessages.length,
+      services: detectedServices,
+      fusedChunks,
     });
 
-    return {
-      problem,
-      industry,
-      strategy,
-      recentMessages,
-    };
+    // ---------- MEMORY UPDATE ----------
+    await memoryService.updateStrategicMemory(sessionId, {
+      lastUserProblem: problem,
+      lastDetectedServices: detectedServices,
+    });
+
+    return { problem, industry, strategy, recentMessages, services: detectedServices, fusedChunks };
   }
 
   /* ================= PROBLEM DETECTION ================= */
   private extractProblem(question: string, memory: StrategicMemory): string {
-
     if (!question) return "general";
 
-    /* ---------- STRONG SIGNALS ---------- */
-    if (/low\s*roas|bad\s*roas/.test(question)) return "low_roas";
-    if (/no\s*sales|not\s*getting\s*sales/.test(question)) return "no_sales";
-    if (/conversion|not\s*converting/.test(question)) return "conversion";
-    if (/traffic|visitors/.test(question)) return "traffic";
+    const problemMap: Record<string, string> = {
+      "low roas": "low_roas",
+      "bad roas": "low_roas",
+      "no sales": "no_sales",
+      "not getting sales": "no_sales",
+      conversion: "conversion",
+      "not converting": "conversion",
+      traffic: "traffic",
+      visitors: "traffic",
+      grow: "growth",
+      scale: "growth",
+      increase: "growth",
+      expand: "growth",
+    };
 
-    /* ---------- GOALS ---------- */
-    if (/grow|scale|increase|expand/.test(question)) return "growth";
+    for (const pattern in problemMap) {
+      if (new RegExp(pattern, "i").test(question)) return problemMap[pattern];
+    }
 
-    /* ---------- MEMORY FALLBACK ---------- */
+    // Fallback to memory
     if (Array.isArray(memory?.painPoints) && memory.painPoints.length > 0) {
       return safeString(memory.painPoints[0]);
     }
@@ -98,21 +125,26 @@ export class ReasoningEngine {
   private guessIndustry(question: string, context: any[]): string {
     const q = question;
 
-    /* ---------- DIRECT ---------- */
-    if (/ecommerce|store|shop/.test(q)) return "ecommerce";
-    if (/real\s*estate|property/.test(q)) return "real_estate";
-    if (/travel|tourism/.test(q)) return "travel";
-    if (/agency|marketing/.test(q)) return "marketing";
+    const industryMap: Record<string, string> = {
+      ecommerce: "ecommerce",
+      store: "ecommerce",
+      shop: "ecommerce",
+      "real estate": "real_estate",
+      property: "real_estate",
+      travel: "travel",
+      tourism: "travel",
+      agency: "marketing",
+      marketing: "marketing",
+    };
 
-    /* ---------- CONTEXT ---------- */
-    const combined = (context || [])
-      .map((m) => safeString(m?.content))
-      .join(" ");
+    for (const keyword in industryMap) {
+      if (q.includes(keyword)) return industryMap[keyword];
+    }
 
-    if (combined.includes("ecommerce")) return "ecommerce";
-    if (combined.includes("real estate")) return "real_estate";
-    if (combined.includes("travel")) return "travel";
-    if (combined.includes("marketing")) return "marketing";
+    const combined = (context || []).map((m) => safeString(m?.content)).join(" ");
+    for (const keyword in industryMap) {
+      if (combined.includes(keyword)) return industryMap[keyword];
+    }
 
     return "general";
   }
@@ -121,67 +153,57 @@ export class ReasoningEngine {
   private suggestStrategy(
     question: string,
     industry: string,
-    problem: string
+    problem: string,
+    services: string[],
+    fusedChunks: { text: string; source: string; fusionScore: number; intent: string }[]
   ): string {
+    const serviceList = services.length ? services.join(", ") : "[detected services]";
 
-    /* ---------- ECOMMERCE ---------- */
-    if (industry === "ecommerce") {
-      if (problem === "low_roas") {
-        return "Fix creative fatigue, improve audience targeting, and optimize product page conversion flow";
-      }
-      if (problem === "no_sales") {
-        return "Audit the funnel, fix trust gaps, and align your offer with customer intent";
-      }
-      if (problem === "conversion") {
-        return "Improve landing page UX, optimize checkout flow, and run A/B testing";
-      }
-      if (problem === "traffic") {
-        return "Scale paid ads, SEO, and short-form content distribution";
-      }
-      if (problem === "growth") {
-        return "Combine paid acquisition, CRO, and retention systems to scale efficiently";
-      }
-    }
+    const chunkInsights = fusedChunks?.length
+      ? fusedChunks.slice(0, 3).map((c) => `${c.intent}: ${c.text}`).join(" | ")
+      : "";
 
-    /* ---------- REAL ESTATE ---------- */
-    if (industry === "real_estate") {
-      if (problem === "low_roas") {
-        return "Upgrade ad creatives with high-end visuals and refine luxury audience targeting";
-      }
-      if (problem === "conversion") {
-        return "Use virtual tours and lead qualification funnels to increase buyer intent";
-      }
-      if (problem === "growth") {
-        return "Deploy high-ticket funnels with premium visuals and targeted campaigns";
-      }
-    }
+    const templates: Record<string, Record<string, string>> = {
+      ecommerce: {
+        low_roas: `Refresh creative assets, optimize product pages, and improve targeting for ${serviceList}. Insights: ${chunkInsights}`,
+        no_sales: `Audit your funnel and align offers to customer intent for ${serviceList}. Insights: ${chunkInsights}`,
+        conversion: `Optimize checkout and run A/B tests to boost ${serviceList}. Insights: ${chunkInsights}`,
+        traffic: `Scale paid ads, SEO, and short-form content for ${serviceList}. Insights: ${chunkInsights}`,
+        growth: `Combine paid acquisition, CRO, and retention systems for ${serviceList}. Insights: ${chunkInsights}`,
+      },
+      real_estate: {
+        low_roas: `Upgrade ad creatives with premium visuals and refine audience targeting for ${serviceList}. Insights: ${chunkInsights}`,
+        no_sales: `Implement virtual tours, lead scoring, and qualification funnels for ${serviceList}. Insights: ${chunkInsights}`,
+        conversion: `Enhance buyer intent with 360 tours and retargeting funnels for ${serviceList}. Insights: ${chunkInsights}`,
+        growth: `Deploy high-ticket funnels with premium visuals and targeted campaigns for ${serviceList}. Insights: ${chunkInsights}`,
+      },
+      travel: {
+        traffic: `Focus on SEO, destination content, and social media distribution for ${serviceList}. Insights: ${chunkInsights}`,
+        conversion: `Optimize booking flows and implement retargeting campaigns for ${serviceList}. Insights: ${chunkInsights}`,
+        growth: `Use multi-channel campaigns with personalized offers to increase bookings for ${serviceList}. Insights: ${chunkInsights}`,
+      },
+      marketing: {
+        growth: `Improve acquisition, retention, and automation systems for ${serviceList}. Insights: ${chunkInsights}`,
+      },
+      general: {
+        growth: `Focus on high-impact bottlenecks and optimize your ${serviceList} workflow. Insights: ${chunkInsights}`,
+      },
+    };
 
-    /* ---------- TRAVEL ---------- */
-    if (industry === "travel") {
-      if (problem === "traffic") {
-        return "Focus on SEO, destination content, and social media distribution";
-      }
-      if (problem === "conversion") {
-        return "Optimize booking flow and implement retargeting campaigns";
-      }
-    }
-
-    /* ---------- MARKETING & DEFAULT ---------- */
-    return "Use a mix of content marketing, paid acquisition, and conversion optimization to improve results";
+    return templates[industry]?.[problem] || templates[industry]?.growth || templates.general.growth;
   }
 
   /* ================= DYNAMIC STRATEGY ================= */
   private dynamicStrategy(
     base: string,
-    context: { problem: string; industry: string; contextLength: number }
+    context: { problem: string; industry: string; contextLength: number; services: string[]; fusedChunks: any[] }
   ): string {
-
-    const { problem, industry, contextLength } = context;
+    const { problem, industry, contextLength, services, fusedChunks } = context;
 
     const templates = [
       `${base}.`,
-      `For your ${industry} setup, focus on this: ${base}.`,
-      `The main issue is ${problem}. The best move is: ${base}.`,
+      `For your ${industry} setup with services (${services.join(", ")}), focus on this: ${base}.`,
+      `The main issue is ${problem}. Key insights: ${fusedChunks?.slice(0, 2).map((c) => c.text).join(" | ")}. Recommended move: ${base}.`,
       `Right now, the highest-impact action is: ${base}.`,
     ];
 

@@ -12,16 +12,16 @@ type VectorChunk = {
 };
 
 /* ======================= CONFIG ======================= */
-const VECTOR_WEIGHT = 0.65;
-const INTENT_WEIGHT = 0.25;
-const KEYWORD_WEIGHT = 0.1;
+const VECTOR_WEIGHT = 0.65; // vector semantic importance
+const INTENT_WEIGHT = 0.25; // detected intent relevance
+const KEYWORD_WEIGHT = 0.1; // direct keyword overlap
 
 const SERVICE_BOOST = 0.05;
 const PRICING_BOOST = 0.08;
 const BOOKING_BOOST = 0.06;
 
 const MAX_CHUNKS = 5;
-const MIN_SCORE_THRESHOLD = 0.05; // lower to avoid dropping relevant chunks
+const MIN_SCORE_THRESHOLD = 0.05; // don't drop too aggressively
 
 /* ======================= NORMALIZE ======================= */
 function normalize(text: string): string {
@@ -105,7 +105,7 @@ async function getFusedChunksInternal(
   /* ---------- VECTOR FETCH ---------- */
   let vectorChunks: VectorChunk[] = [];
   try {
-    vectorChunks = await getTopChunks(userMessage, baseTopN + 3, 0.5);
+    vectorChunks = await getTopChunks(userMessage, baseTopN + 5, 0.5);
   } catch {
     return [];
   }
@@ -115,7 +115,7 @@ async function getFusedChunksInternal(
   /* ---------- INTENT DETECTION ---------- */
   let detectedIntents: { intent: Intent; score?: number }[] = [];
   try {
-    detectedIntents = detectIntent(userMessage, 5); // top 5
+  detectedIntents = detectIntent(userMessage, [], 5); 
   } catch {}
 
   const detectedIntentNames = detectedIntents.map((d) => d.intent.name);

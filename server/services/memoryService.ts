@@ -7,31 +7,26 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 /* ================= PATH RESOLUTION ================= */
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ================= MEMORY PATH ================= */
-
 const memoryDir = path.join(__dirname, "../memory");
 if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
 
 const dbPath = path.join(memoryDir, "chat_memory.db");
 
 /* ================= SQLITE CONNECTION ================= */
-
 const dbPromise = sqlite.open({
   filename: dbPath,
   driver: sqlite3.Database,
 });
 
 /* ================= MEMORY LIMITS ================= */
-
 const MAX_HISTORY_MESSAGES = 50;
 const MAX_CONTEXT_MESSAGES = 5;
 
 /* ================= SAFE JSON PARSE ================= */
-
 function safeParse<T = any>(value: unknown): T | undefined {
   if (!value || typeof value !== "string") return undefined;
   try {
@@ -42,7 +37,6 @@ function safeParse<T = any>(value: unknown): T | undefined {
 }
 
 /* ================= INITIALIZATION ================= */
-
 export async function initializeMemory(): Promise<void> {
   try {
     const db = await dbPromise;
@@ -60,7 +54,6 @@ export async function initializeMemory(): Promise<void> {
         timestamp TEXT NOT NULL
       )
     `);
-
     await db.run(`CREATE INDEX IF NOT EXISTS idx_sessionId ON chat_messages (sessionId)`);
 
     await db.run(`
@@ -95,18 +88,15 @@ export async function initializeMemory(): Promise<void> {
         createdAt TEXT
       )
     `);
-
     await db.run(`CREATE INDEX IF NOT EXISTS idx_booking_user ON bookings (userId, createdAt)`);
 
     console.log("✅ Memory DB initialized at:", dbPath);
-
   } catch (err) {
     console.error("❌ Failed to initialize memory DB:", err);
   }
 }
 
 /* ================= NORMALIZE CONTENT ================= */
-
 function normalizeContent(text: unknown): string {
   if (typeof text !== "string" || !text.trim()) return "";
   let normalized = text
@@ -120,7 +110,6 @@ function normalizeContent(text: unknown): string {
 }
 
 /* ================= TYPES ================= */
-
 export interface StrategicMemory {
   industry?: string;
   businessType?: string;
@@ -146,7 +135,6 @@ export interface StrategicMemory {
 }
 
 /* ================= MEMORY SERVICE ================= */
-
 export class MemoryService {
   private db = dbPromise;
 
@@ -169,7 +157,7 @@ export class MemoryService {
       const lastTimestamp = new Date(last.timestamp).getTime();
       const nowTime = Date.now();
       const lastNormalized = normalizeContent(last.content);
-      // Skip exact duplicates from the same role within 10s
+      // Skip duplicates within 10s
       if (!isNaN(lastTimestamp) && lastNormalized === normalized && last.role === role && nowTime - lastTimestamp < 10000) {
         if (process.env.DEBUG_MEMORY === "true") console.log(`[Memory] Skipped duplicate message for session ${sessionId}`);
         return { id: last.id, sessionId, role, content: normalized, timestamp: new Date(last.timestamp) };
@@ -180,8 +168,7 @@ export class MemoryService {
     const msg: ChatMessage = { id: crypto.randomUUID(), sessionId, role, content: normalized, timestamp: now };
 
     await db.run(
-      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp)
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp) VALUES (?, ?, ?, ?, ?)`,
       msg.id, msg.sessionId, msg.role, msg.content, now.toISOString()
     );
 
@@ -190,8 +177,7 @@ export class MemoryService {
       `DELETE FROM chat_messages
        WHERE sessionId = ?
        AND id NOT IN (
-         SELECT id
-         FROM chat_messages
+         SELECT id FROM chat_messages
          WHERE sessionId = ?
          ORDER BY datetime(timestamp) DESC
          LIMIT ?
@@ -246,12 +232,14 @@ export class MemoryService {
     const db = await this.db;
     const row = await db.get(`SELECT * FROM strategic_memory WHERE sessionId = ?`, sessionId);
     if (!row) return {};
+
     const bant: StrategicMemory["bantSignals"] = {
       budget: typeof row.budget === "number" ? row.budget : undefined,
       authority: row.decisionMaker?.trim() ? 1 : undefined,
       need: row.interestLevel?.trim() ? 0.6 : undefined,
       timeline: row.timeline?.trim() ? 0.6 : undefined,
     };
+
     return {
       industry: row.industry || undefined,
       businessType: row.businessType || undefined,
@@ -336,6 +324,7 @@ export class MemoryService {
     const db = await this.db;
     const userId = data.userId?.trim();
     if (!userId) throw new Error("Booking must include a valid userId");
+
     const bookingId = crypto.randomUUID();
     const createdAt = new Date().toISOString();
 
@@ -364,5 +353,4 @@ export class MemoryService {
 }
 
 /* ================= SINGLETON ================= */
-
 export const memoryService = new MemoryService();

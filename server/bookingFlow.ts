@@ -131,8 +131,8 @@ const bookingFlow = {
       case 1: {
         booking.step = 2;
 
-        // Detect services dynamically with fallback
-        let detectedServices = detectMultipleServices(message);
+        // Detect services dynamically with async await
+        let detectedServices = await detectMultipleServices(message);
         if (!detectedServices.length) detectedServices = fallbackServiceDetection(message);
 
         booking.serviceTypes = detectedServices;

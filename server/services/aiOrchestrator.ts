@@ -46,7 +46,7 @@ export function detectServicesFromIntents(intentsDetected: { intent: Intent; sco
 /* ======================= ORCHESTRATION ======================= */
 export async function processUserMessage(sessionId: string, message: string): Promise<OrchestratorResult> {
   // 1️⃣ Detect intents
-  const detectedIntents = getRelevantIntents(message, 5);
+const detectedIntents = getRelevantIntents(message, [], 5); 
 
   // 2️⃣ Detect services
   const recommendedServices = detectServicesFromIntents(detectedIntents);
