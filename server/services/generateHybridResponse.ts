@@ -1,6 +1,6 @@
 // ===================== IMPORTS ===================== //
 // Core AI services
-import { getFusedChunks, type FusedChunk } from "./intentVectorFusion.js"; // ✅ Fixed type import
+import { getFusedChunks, type FusedChunk } from "./intentVectorFusion.js";
 import { generateOpenRouter } from "./openRouterClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
@@ -203,7 +203,7 @@ export async function executeHybridResponse({
     brainContext.detectedIntents = detectIntent(message);
 
     // ----------------- Fuse Chunks ----------------- //
-    const fusedChunksResult: FusedChunk[] = await getFusedChunks(message); // ✅ Use raw message
+    const fusedChunksResult: FusedChunk[] = await getFusedChunks(message);
     const fusedChunksArray: string[] = fusedChunksResult.map((c) => c.text).filter(Boolean);
     const fusedChunksText: string = fusedChunksArray.join("\n\n");
 

@@ -34,8 +34,6 @@ export type BrainContext = {
   unifiedIntentRanking?: { intent: string; score: number }[];
   executionMode?: "execution" | "exploration" | "action";
   highIntent?: boolean;
-
-  // ✅ REQUIRED FOR HYBRID SYSTEM
   hasSufficientContext?: boolean;
 };
 
@@ -52,8 +50,8 @@ function isGreeting(text: string) {
   return /^(hi|hello|hey)\b/i.test(text);
 }
 
-function detectStage(message: string): BrainContext["stage"] {
-  if (isGreeting(message)) return "greeting";
+function detectStage(message: string, leadScore: number): BrainContext["stage"] {
+  if (isGreeting(message) && leadScore < 0.5) return "greeting";
   if (/(hire|book|schedule|call|start|work with)/i.test(message)) return "conversion";
   if (/(price|cost|services|package)/i.test(message)) return "service";
   if (/(how|improve|optimize|strategy|fix)/i.test(message)) return "strategy";
@@ -83,9 +81,17 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     ? await memoryService.getStrategicMemory(sessionId).catch(() => ({}))
     : {};
 
-  /* ---------- STAGE ---------- */
-  const stage = detectStage(message);
+  /* ---------- LEAD SCORE ---------- */
+  let leadScore = 0;
+  if (sessionId) {
+    try {
+      const result = leadQualifier.scoreLead(sessionId, { need: 0.5 });
+      leadScore = Math.min(result.total * 10, 10);
+    } catch {}
+  }
 
+  /* ---------- STAGE ---------- */
+  const stage = detectStage(message, leadScore);
   let executionMode: BrainContext["executionMode"] =
     stage === "greeting" ? "exploration" : "execution";
 
@@ -94,43 +100,31 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   let primaryIntent = "general";
 
   try {
-    const intents = getRelevantIntents(message, [], 3);
-    unifiedIntentRanking = intents.map(i => ({
-      intent: i.intent.name,
-      score: i.score,
-    }));
+    const intents = getRelevantIntents(message, [], 5);
+    unifiedIntentRanking = intents.map((i) => ({ intent: i.intent.name, score: i.score }));
     if (intents.length) primaryIntent = intents[0].intent.name;
   } catch {}
 
   /* ---------- SERVICES ---------- */
   let detectedServices: string[] = [];
-
   try {
     const detected = await detectIntents(message);
-
     detectedServices = detected
-      .filter(i => i.type === "service" && i.confidence > 0.5)
-      .map(i => i.value);
+      .filter((i) => i.type === "service" && i.confidence > 0.5)
+      .map((i) => i.value);
 
     const existing = new Set(strategicMemory.servicesDiscussed || []);
-    detectedServices.forEach(s => existing.add(s));
-
+    detectedServices.forEach((s) => existing.add(s));
     strategicMemory.servicesDiscussed = Array.from(existing);
 
-    // ✅ FIXED (no null)
-    strategicMemory.lastService =
-      detectedServices[0] || strategicMemory.lastService;
-
+    strategicMemory.lastService = detectedServices[0] || strategicMemory.lastService;
   } catch {}
 
   /* ---------- CONTEXT ---------- */
   const hasBusinessContext =
     /(roas|ads|sales|conversion|seo|revenue|store|business)/i.test(message);
-
   const hasSufficientContext =
-    message.length > 8 &&
-    (hasBusinessContext ||
-      (strategicMemory.servicesDiscussed?.length ?? 0) > 0);
+    message.length > 8 || (strategicMemory.servicesDiscussed?.length ?? 0) > 0;
 
   if (hasBusinessContext) {
     strategicMemory.businessMentioned = true;
@@ -139,43 +133,26 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   /* ---------- REASONING ---------- */
   let reasoning = "";
-
   try {
     if (sessionId) {
+      // ✅ FIXED: Only 2 arguments
       const result = await reasoningEngine.analyze(sessionId, message);
-      reasoning = result.strategy;
+      reasoning = result.strategy || "";
     }
   } catch {}
 
   if (!reasoning || reasoning.length < 20) {
     reasoning =
-      "Focus on identifying the exact bottleneck in your funnel and optimizing that layer first — whether it's traffic quality, conversion, or offer alignment.";
-  }
-
-  /* ---------- LEAD SCORE ---------- */
-  let leadScore = 0;
-
-  if (sessionId) {
-    try {
-      const result = leadQualifier.scoreLead(sessionId, {
-        need: hasBusinessContext ? 0.7 : 0.3,
-      });
-
-      leadScore = Math.min(result.total * 10, 10);
-    } catch {}
+      "Focus on identifying the exact bottleneck per service and optimize each layer: traffic, conversion, and offer alignment.";
   }
 
   /* ---------- INTENT LEVEL ---------- */
   const highIntent = isHighIntent(message, stage, leadScore);
-
   if (highIntent) executionMode = "action";
 
   /* ---------- SERVICE ---------- */
-  const recommendedService =
-    detectedServices[0] || strategicMemory.lastService || null;
-
-  const triggerBooking =
-    highIntent || (leadScore >= 6 && stage === "service");
+  const recommendedService = detectedServices[0] || strategicMemory.lastService || null;
+  const triggerBooking = highIntent || (leadScore >= 6 && stage === "service");
 
   /* ---------- RECENT CONTEXT ---------- */
   const recentContext = sessionId
@@ -184,14 +161,10 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   /* ---------- VECTOR CHUNKS ---------- */
   let fusedChunks: any[] = [];
-
   try {
     fusedChunks = await getFusedChunks(message, 3);
+    fusedChunks = fusedChunks.filter((c) => c?.text && !/(contact|email|phone|http)/i.test(c.text));
   } catch {}
-
-  fusedChunks = fusedChunks.filter(
-    c => c?.text && !/(contact|email|phone|http)/i.test(c.text)
-  );
 
   /* ---------- SAVE MEMORY ---------- */
   if (sessionId) {
@@ -200,7 +173,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     } catch {}
   }
 
-  /* ---------- FINAL ---------- */
+  /* ---------- FINAL CONTEXT ---------- */
   const brainContext: BrainContext = {
     message: userMessage,
     intent: primaryIntent,
@@ -216,9 +189,9 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     unifiedIntentRanking,
     executionMode,
     highIntent,
-    hasSufficientContext, // ✅ CRITICAL FIX
+    hasSufficientContext,
     dynamicGreeting:
-      stage === "greeting"
+      stage === "greeting" && leadScore < 0.5
         ? "Hey — what are you trying to improve right now?"
         : undefined,
   };

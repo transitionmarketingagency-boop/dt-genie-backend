@@ -1,3 +1,4 @@
+// server/services/intentManager.ts
 /* =====================================================
    INTENT MANAGER (PRODUCTION READY FIX)
    Smart detection: keyword + phrase + intent types + scoring + service awareness
@@ -131,6 +132,7 @@ export function detectIntent(
   for (const booster of boosters) {
     for (const phrase of booster.signals) {
       if (text.includes(normalize(phrase))) {
+        // Either boost existing intent or create new
         const match = results.find(r => r.intent.type === booster.type);
         if (match) match.score = Math.min(match.score + booster.boost, 1);
         else {
@@ -149,8 +151,10 @@ export function detectIntent(
     }
   }
 
-  // Clamp scores and sort
+  // Clamp scores
   results.forEach(r => r.score = Math.min(r.score, 1));
+
+  // Sort by score
   results.sort((a, b) => b.score - a.score);
 
   // Fallback only if no strong intent
@@ -161,6 +165,7 @@ export function detectIntent(
     });
   }
 
+  // Return top N
   return results.slice(0, topN);
 }
 
