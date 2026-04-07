@@ -1,5 +1,3 @@
-// server/app.ts
-
 import "dotenv/config";
 import fs from "fs";
 import path from "path";
@@ -10,20 +8,16 @@ import { createServer, type Server } from "node:http";
 // Local modules
 import { memoryService } from "./services/memoryService.js";
 import { populateChunks } from "./populate-chunks.js";
-import { generateHybridResponse } from "./services/generateHybridResponse.js";
+import { executeHybridResponse } from "./services/generateHybridResponse.js"; // ✅ FIXED
 import { CALENDLY_LINK } from "./config/constants.js";
 
 /* ================= GOOGLE SERVICE ACCOUNT ================= */
 
 if (process.env.SERVICE_ACCOUNT_BASE64) {
   const json = Buffer.from(process.env.SERVICE_ACCOUNT_BASE64, "base64").toString("utf8");
-
   const keyPath = path.join(process.cwd(), "sa-key.json");
-
   fs.writeFileSync(keyPath, json);
-
   process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
-
   console.log("✅ Google service account initialized");
 }
 
@@ -73,9 +67,7 @@ export const setupApp = async (app: Application) => {
   /* ================= CHAT HANDLER ================= */
 
   const chatHandler = async (req: Request, res: Response) => {
-
     try {
-
       let { message, sessionId } = req.body as {
         message?: string;
         sessionId?: string;
@@ -99,27 +91,27 @@ export const setupApp = async (app: Application) => {
       let reply = "";
 
       try {
-
-        reply = await generateHybridResponse({
+        reply = await executeHybridResponse({ // ✅ FIXED
           message,
           sessionId,
+          brainContext: {},          // temporary empty context
+          leadScoreValue: 0,         // default lead score
+          detectedIntentNames: [],
+          vectorText: "",
+          historyText: "",
+          recentMessagesCache: [],
+          intentCategories: [],
         });
-
       } catch (err) {
-
         console.warn("⚠️ Hybrid response failed:", err);
-
         reply = "";
-
       }
 
       /* -------- Safe Fallback -------- */
 
       if (!reply || reply.trim().length === 0) {
-
         reply =
           "I'm here to help with AI marketing strategy, automation, SEO, and CGI advertising. What would you like to explore?";
-
       }
 
       /* -------- Save Assistant Message -------- */
@@ -137,16 +129,12 @@ export const setupApp = async (app: Application) => {
         reply,
         history,
       });
-
     } catch (err) {
-
       console.error("❌ Chat error:", err);
-
       res.status(500).json({
         ok: false,
         error: "Chat failed",
       });
-
     }
   };
 
@@ -160,7 +148,6 @@ export default async function runApp(
 ): Promise<Server> {
 
   const app: Application = express();
-
   const httpServer = createServer(app);
 
   if (setupFn) {
@@ -175,19 +162,13 @@ export default async function runApp(
 /* ================= DIRECT RUN ================= */
 
 if (process.argv[1]?.endsWith("app.ts")) {
-
   const PORT = Number(process.env.PORT) || 5000;
-
   const app = express();
-
   const server = createServer(app);
 
   setupApp(app).then(() => {
-
     server.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
     });
-
   });
-
 }

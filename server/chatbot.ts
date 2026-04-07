@@ -1,7 +1,5 @@
-// server/chatbot.ts
-
 import readline from "readline";
-import { generateHybridResponse } from "./services/generateHybridResponse.js";
+import { executeHybridResponse } from "./services/generateHybridResponse.js"; // ✅ FIXED
 import { memoryService } from "./services/memoryService.js";
 import bookingFlow from "./bookingFlow.js";
 import { shouldTriggerBooking } from "./services/bookingTrigger.js";
@@ -60,7 +58,6 @@ async function ask(): Promise<void> {
 
       if (triggerBooking) {
         let bookingResponse;
-
         const isBookingActive = await bookingFlow.isBookingActive(SESSION_ID);
 
         if (isBookingActive) {
@@ -80,10 +77,18 @@ async function ask(): Promise<void> {
       }
 
       /* ---------- GENERATE HYBRID AI RESPONSE ---------- */
-      const response = await generateHybridResponse({
-        message,
+      const history = await getSafeHistory();
+
+      const response = await executeHybridResponse({ // ✅ FIXED
         sessionId: SESSION_ID,
-        history: await getSafeHistory(),
+        message,
+        brainContext: {},          // empty default context
+        leadScoreValue: 0,         // default score
+        detectedIntentNames: [],
+        vectorText: "",
+        historyText: history.map(h => h.content).join("\n") || "",
+        recentMessagesCache: history,
+        intentCategories: [],
       });
 
       /* ---------- SANITIZE CONTACT DETAILS ---------- */

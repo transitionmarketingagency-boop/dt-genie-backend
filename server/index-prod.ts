@@ -1,5 +1,3 @@
-// server/index-prod.ts
-
 import "dotenv/config";
 import fs from "fs";
 import path from "path";
@@ -8,7 +6,7 @@ import express, { type Application, type Request, type Response } from "express"
 import { type Server } from "node:http";
 
 import runApp, { setupApp } from "./app.js";
-import { generateHybridResponse } from "./services/generateHybridResponse.js";
+import { executeHybridResponse } from "./services/generateHybridResponse.js"; // ✅ FIXED
 import { strategicBrain } from "./services/strategicBrain.js";
 import { initializeMemory, memoryService } from "./services/memoryService.js";
 import { initializeAIIntents } from "./services/json_loader.js";
@@ -37,21 +35,17 @@ async function initializeSystem() {
   try {
     console.log(" ~@ Initializing Neon Vision AI system...");
 
-    /* ---- Vector Store Check ---- */
     if (!fs.existsSync(VECTOR_DIR)) {
       console.error("❌ Vector store directory missing:", VECTOR_DIR);
       process.exit(1);
     }
     console.log("✅ Vector store found:", VECTOR_DIR);
 
-    /* ---- Memory Init ---- */
     await initializeMemory();
     console.log("✅ Memory database initialized");
 
-    /* ---- Load AI Intent JSON ---- */
     initializeAIIntents();
     console.log("✅ AI intents loaded");
-
   } catch (err) {
     console.error("❌ System initialization failed:", err);
     process.exit(1);
@@ -60,17 +54,13 @@ async function initializeSystem() {
 
 /* ================= SERVER START ================= */
 async function startServer() {
-
   await initializeSystem();
 
   await runApp(async (app: Application, httpServer: Server) => {
-
-    /* -------- Middleware -------- */
     app.use(cors({ origin: "*", credentials: true }));
     app.use(express.json({ limit: "10mb" }));
     app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-    /* -------- Static Files -------- */
     if (fs.existsSync(PUBLIC_DIR)) {
       app.use(express.static(PUBLIC_DIR));
       console.log("✅ Public folder served:", PUBLIC_DIR);
@@ -92,21 +82,27 @@ async function startServer() {
           sessionId = "default-session";
         }
 
-        /* -------- Save user message to memory -------- */
         await memoryService.saveMessage(sessionId, "user", message);
 
-        /* -------- Strategic Brain Analysis -------- */
         const { brainContext } = await strategicBrain(message, sessionId);
 
         console.log(
           `[Brain] Stage: ${brainContext.stage} | Intent: ${brainContext.intent} | LeadScore: ${brainContext.leadScore} | Reasoning: ${brainContext.reasoning}`
         );
 
-        /* -------- Generate AI Response -------- */
-        const reply = await generateHybridResponse({
-          message,
+        const history = await memoryService.getRecentContext(sessionId);
+        const historyText = history.map(h => h.content).join("\n") || "";
+
+        const reply = await executeHybridResponse({ // ✅ FIXED
           sessionId,
-          history: await memoryService.getRecentContext(sessionId),
+          message,
+          brainContext: brainContext || {},
+          leadScoreValue: brainContext?.leadScore || 0,
+          detectedIntentNames: brainContext?.intent ? [brainContext.intent] : [],
+          vectorText: "",
+          historyText,
+          recentMessagesCache: history || [],
+          intentCategories: [],
         });
 
         const finalReply =
@@ -114,11 +110,9 @@ async function startServer() {
             ? reply
             : "I'm here to help with AI marketing strategy, automation, SEO, and CGI advertising. What would you like to explore?";
 
-        /* -------- Save assistant response to memory -------- */
         await memoryService.saveMessage(sessionId, "assistant", finalReply);
 
         return res.json({ reply: finalReply });
-
       } catch (err) {
         console.error("❌ Chat route error:", err);
         return res.status(500).json({ error: "Internal server error" });
@@ -127,15 +121,12 @@ async function startServer() {
 
     console.log("✅ Hybrid chat route initialized");
 
-    /* -------- Additional Routes -------- */
     await setupApp(app);
 
-    /* -------- Start Server -------- */
     const PORT = Number(process.env.PORT) || 10000;
     httpServer.listen(PORT, () => {
       console.log(` ~@ Neon Vision server running on port ${PORT}`);
     });
-
   });
 }
 
