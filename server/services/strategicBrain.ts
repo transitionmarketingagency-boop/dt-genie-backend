@@ -37,7 +37,8 @@ export type BrainContext = {
   unifiedIntentRanking?: { intent: string; score: number }[];
   hasSufficientContext?: boolean;
 
-  executionMode?: "execution" | "exploration"; // ← ADD THIS LINE
+  executionMode?: "execution" | "exploration" | "action"; // upgraded
+  highIntent?: boolean; // NEW: propagate high-intent flag
 };
 
 /* ================= NORMALIZER ================= */
@@ -109,6 +110,13 @@ function estimateDealProbability(stage: BrainContext["stage"], leadScore: number
   return Math.min(base[stage] + leadScore * 0.04, 0.98);
 }
 
+/* ================= HIGH-INTENT DETECTION ================= */
+
+function isHighIntent(message: string, stage: BrainContext["stage"], leadScore: number) {
+  const conversionKeywords = /(hire|book|schedule|call|start|work with|immediately|urgent)/i;
+  return conversionKeywords.test(message) || stage === "conversion" || leadScore >= 7;
+}
+
 /* ================= MAIN STRATEGIC BRAIN ================= */
 
 export async function strategicBrain(userMessage: string, sessionId?: string) {
@@ -119,7 +127,10 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     ? await memoryService.getStrategicMemory(sessionId).catch(() => ({}))
     : {};
 
+  /* ---------- STAGE & EXECUTION MODE ---------- */
   const stage = detectStage(message);
+  let executionMode: BrainContext["executionMode"] =
+    stage === "greeting" ? "exploration" : "execution";
 
   /* ---------- INTENT DETECTION ---------- */
   let unifiedIntentRanking: { intent: string; score: number }[] = [];
@@ -133,17 +144,14 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   /* ---------- SERVICE DETECTION (MULTI, NEW ONLY) ---------- */
   let detectedServices: string[] = [];
-
   try {
     const allServices = detectIntents(message)
       .filter(i => i.type === "service" && i.confidence > 0.4)
       .map(i => i.value);
 
-    // Filter only new services not yet discussed in session
     const existing = new Set(strategicMemory.servicesDiscussed || []);
     detectedServices = allServices.filter(s => !existing.has(s));
 
-    // Update memory with newly detected services
     detectedServices.forEach(s => existing.add(s));
     strategicMemory.servicesDiscussed = Array.from(existing);
     strategicMemory.lastService = detectedServices[0] ?? strategicMemory.lastService ?? null;
@@ -165,7 +173,6 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   /* ---------- REASONING ---------- */
   let reasoning = "";
-
   try {
     if (sessionId) {
       const result = await reasoningEngine.analyze(sessionId, message);
@@ -174,7 +181,6 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   } catch {}
 
   if (!reasoning) {
-    // Dynamic fallback using last service / detected services
     const serviceFocus = detectedServices[0] || strategicMemory.lastService;
     reasoning = serviceFocus
       ? `Focus on optimizing ${serviceFocus} to maximize results.`
@@ -186,20 +192,23 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   if (sessionId) {
     try {
       const result = leadQualifier.scoreLead(sessionId, { need: hasSufficientContext ? 0.7 : 0.2 });
-      leadScore = Math.min(Math.max(result.total * 10, 0), 10); // clamp 0–10
+      leadScore = Math.min(Math.max(result.total * 10, 0), 10);
     } catch {}
   }
+
+  /* ---------- HIGH-INTENT FLAG ---------- */
+  const highIntent = isHighIntent(message, stage, leadScore);
+  if (highIntent) executionMode = "action"; // propagate executionMode for high-intent
 
   /* ---------- RECOMMENDED SERVICE ---------- */
   const recommendedService =
     detectedServices.length
-      ? detectedServices[0] // highest confidence & new
+      ? detectedServices[0]
       : strategicMemory.lastService ?? null;
 
   /* ---------- BOOKING TRIGGER ---------- */
   const triggerBooking =
-    stage === "conversion" ||
-    leadScore >= 7 ||
+    highIntent ||
     (leadScore >= 5 && stage === "service");
 
   /* ---------- CONTEXT HISTORY ---------- */
@@ -240,6 +249,8 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     dynamicGreeting: stage === "greeting" ? generateDynamicGreeting(strategicMemory) : undefined,
     unifiedIntentRanking,
     hasSufficientContext,
+    executionMode,
+    highIntent,
   };
 
   return { brainContext, chunks: fusedChunks };

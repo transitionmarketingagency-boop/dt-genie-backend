@@ -16,48 +16,56 @@ import { shouldTriggerBooking } from "./bookingTrigger.js";
 
 function detectBookingRejection(message: string): boolean {
   const msg = message.toLowerCase();
+
   return (
     msg.includes("not now") ||
     msg.includes("don't want") ||
     msg.includes("dont want") ||
     msg.includes("later") ||
     msg.includes("no thanks") ||
-    msg.includes("stop")
+    msg.includes("stop") ||
+    msg.includes("just exploring") ||
+    msg.includes("not interested")
   );
 }
+
+/* ================= SMART FALLBACK (UPGRADED) ================= */
 
 function smartFallback(message: string, context: string = ""): string {
   const msg = message.toLowerCase();
 
-  if (msg.includes("traffic") && msg.includes("sales")) {
-    return "You're likely dealing with a conversion gap, not a traffic problem. This usually comes down to messaging, offer clarity, or funnel friction. The fastest fix is identifying where users drop off and optimizing that step.";
-  }
-
-  if (msg.includes("roas") || msg.includes("ads")) {
-    return "Dropping ROAS during scaling usually signals creative fatigue, audience saturation, or inefficient budget distribution. The fix is scaling smarter with better creatives and targeting resets.";
-  }
-
-  if (msg.length < 10) {
-    return "Give me a bit more detail — I’ll map this out properly for you.";
-  }
-
-  if (context && context.length > 20) {
-    return `Based on your situation, the issue isn’t direction — it’s execution.
+  // ❌ avoid generic repeated pattern (CORE BUG FIX)
+  if (context && context.length > 40) {
+    return `Here’s what’s actually happening in your case:
 
 ${context}
 
-The next step is identifying the weakest point in your funnel and optimizing that directly.`;
+The fastest way forward is identifying the exact bottleneck and fixing that layer directly.`;
   }
 
-  return `The issue here isn’t random — it’s structural.
+  if (msg.includes("traffic") && msg.includes("sales")) {
+    return "You don’t have a traffic problem — you have a conversion leak. This usually comes from weak messaging, poor offer clarity, or funnel friction. Fix the drop-off point first.";
+  }
 
-You’re either losing performance at:
-- Traffic quality
-- Conversion system
-- Messaging alignment
+  if (msg.includes("roas") || msg.includes("ads")) {
+    return "ROAS drops during scaling usually mean creative fatigue or audience saturation. The fix is refreshing creatives and restructuring targeting — not just increasing budget.";
+  }
 
-The fastest way forward is isolating the exact bottleneck and fixing that layer directly.`;
+  if (msg.length < 10) {
+    return "Give me a bit more context — I’ll map a precise strategy for you.";
+  }
+
+  // ❌ REMOVE GENERIC TEMPLATE LOOP (major issue in your logs)
+  return `The issue isn’t random — it’s coming from one of three layers:
+
+1. Traffic quality
+2. Conversion system
+3. Messaging alignment
+
+Tell me your current setup — I’ll pinpoint the exact bottleneck.`;
 }
+
+/* ================= CTA LOGIC (UPGRADED) ================= */
 
 function shouldIncludeCTA(
   message: string,
@@ -70,14 +78,17 @@ function shouldIncludeCTA(
   const explicitIntent =
     lower.includes("call") ||
     lower.includes("schedule") ||
-    lower.includes("consultation");
+    lower.includes("consultation") ||
+    lower.includes("hire") ||
+    lower.includes("start");
 
-const highIntent =
-  leadScore >= 7 ||
-  stage === "service" ||
-  stage === "conversion";
+  const highIntent =
+    leadScore >= 6 || // lowered slightly for better triggering
+    stage === "service" ||
+    stage === "conversion";
 
-  if (intentCategories.includes("general")) return false;
+  // ❌ prevent CTA spam on weak/general queries
+  if (intentCategories.includes("general") && leadScore < 5) return false;
 
   return explicitIntent || highIntent;
 }
@@ -87,18 +98,22 @@ const highIntent =
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_ENABLED =
   typeof GEMINI_API_KEY === "string" && GEMINI_API_KEY.length > 20;
+
 const GEMINI_DAILY_LIMIT = 20;
 
 let geminiUsage = { count: 0, lastReset: Date.now() };
 
 function canUseGemini(): boolean {
   if (!GEMINI_ENABLED) return false;
+
   const now = Date.now();
   const ONE_DAY = 86400000;
+
   if (now - geminiUsage.lastReset > ONE_DAY) {
     geminiUsage.count = 0;
     geminiUsage.lastReset = now;
   }
+
   return geminiUsage.count < GEMINI_DAILY_LIMIT;
 }
 
@@ -111,6 +126,7 @@ function markGeminiUsed() {
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   return new Promise((resolve) => {
     const timer = setTimeout(() => resolve(null), ms);
+
     promise
       .then((res) => {
         clearTimeout(timer);
@@ -125,11 +141,13 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
 
 /* ================= RESPONSE HELPERS ================= */
 
-const MAX_CONTEXT_CHARS = 1200;
+const MAX_CONTEXT_CHARS = 1400; // increased slightly for better intelligence
 
-function compressContext(chunks: any[], maxLength: number = 300): string {
+function compressContext(chunks: any[], maxLength: number = 320): string {
   if (!chunks?.length) return "";
+
   const seen = new Set<string>();
+
   return chunks
     .map((c, i) => {
       const txt = c?.text?.replace(/\s+/g, " ").trim().slice(0, maxLength);
@@ -142,47 +160,41 @@ function compressContext(chunks: any[], maxLength: number = 300): string {
     .slice(0, MAX_CONTEXT_CHARS);
 }
 
+/* ================= RESPONSE VALIDATION (CRITICAL FIX) ================= */
+
 function looksIncomplete(text: string): boolean {
   if (!text) return true;
 
   const trimmed = text.trim();
 
-  // Accept shorter responses; only reject clearly too short
+  // ❌ previous logic was rejecting too aggressively (causing fallback spam)
 
+  if (trimmed.length < 15) return true;
 
-// Reject very short responses
-if (trimmed.length < 20) return true;
+  // allow conversational endings
+  if (!/[.!?]$/.test(trimmed) && trimmed.length < 60) return false;
 
-// Must end cleanly
-// allow conversational endings for shorter responses
-if (!/[.!?]$/.test(trimmed) && trimmed.length < 80) return true;
+  // detect cut-off
+  if (/[,$:]$/.test(trimmed)) return true;
 
-// Detect cut-off patterns
-if (/[,$:]$/.test(trimmed)) return true;
+  if (/\$\s*$/.test(trimmed)) return true;
 
-// Detect broken currency / sentences
-if (/\$\s*$/.test(trimmed)) return true;
+  // detect corrupted output
+  if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(trimmed)) return true;
 
-// Detect non-latin corruption (Chinese, etc.)
-if (/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/.test(trimmed)) return true;
+  if (
+    trimmed.toLowerCase().includes("couldn't generate") ||
+    trimmed.toLowerCase().includes("something went wrong")
+  ) {
+    return true;
+  }
 
-// Reject only clearly broken responses
-if (
-  trimmed.includes("I'm having trouble") ||
-  trimmed.toLowerCase().includes("couldn't generate") ||
-  trimmed.toLowerCase().includes("something went wrong")
-) {
-  return true;
+  if (!/[a-zA-Z]/.test(trimmed)) return true;
+
+  return false;
 }
 
-// Reject garbage only
-if (!/[a-zA-Z]/.test(trimmed)) return true;
-
-// Detect extreme repetition only
-if (/(.{20,})\1{2,}/i.test(trimmed)) return true;
-
-return false;
-}
+/* ================= SANITIZATION ================= */
 
 function sanitizeTools(text: string): string {
   const toolMap: Record<string, string> = {
@@ -193,28 +205,30 @@ function sanitizeTools(text: string): string {
     OpenAI: "proprietary AI systems",
     Midjourney: "proprietary AI systems",
   };
+
   for (const [tool, replacement] of Object.entries(toolMap)) {
     text = text.replace(new RegExp(`\\b${tool}\\b`, "gi"), replacement);
   }
+
   return text;
 }
 
 function removeContactInfo(text: string): string {
   if (!text) return "";
+
   text = text.replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "");
   text = text.replace(/\+?\d[\d\s-]{7,}\d/g, "");
   text = text.replace(/\d{1,5}\s\w+(\s\w+){0,5},?\s\w{2,20}/gi, "");
   text = text.replace(/(contact us at|reach us at|email us at|call us at)[^.]*\./gi, "");
+
   return text;
 }
 
 function cleanHybridResponse(text: string): string {
   if (!text) return "";
 
-  // basic sanitization
   text = sanitizeTools(text);
   text = removeContactInfo(text);
-
 
   // normalize spacing
   text = text.replace(/\s+/g, " ");
@@ -222,15 +236,25 @@ function cleanHybridResponse(text: string): string {
   return text.trim();
 }
 
+/* ================= QUALITY FILTER ================= */
 
 function isLowQuality(text: string): boolean {
   if (!text) return true;
-  if (text.length < 25) return true;
-if (text.split(" ").length < 8) return true;
-  if (text.includes("I'm having trouble")) return true;
-  if (/^[^a-zA-Z0-9]+$/.test(text)) return true;
+
+  if (text.length < 20) return true;
+  if (text.split(" ").length < 6) return true;
+
+  if (
+    text.includes("I'm having trouble") ||
+    text.includes("something went wrong")
+  ) {
+    return true;
+  }
+
   return false;
 }
+
+/* ================= RESPONSE COMPRESSION ================= */
 
 function compressResponse(text: string): string {
   if (text.length < 1200) return text;
@@ -238,31 +262,30 @@ function compressResponse(text: string): string {
   const sentences = text.match(/[^.!?]+[.!?]+/g);
   if (!sentences) return text;
 
-const selected = sentences.slice(0, 6).join(" ").trim();
+  const selected = sentences.slice(0, 6).join(" ").trim();
 
-// Ensure last sentence is complete
-if (!/[.!?]$/.test(selected)) {
-  return selected + ".";
+  return /[.!?]$/.test(selected) ? selected : selected + ".";
 }
 
-return selected;
-}
-
-/* ================= QUERY EXPANSION ================= */
+/* ================= QUERY EXPANSION (IMPROVED) ================= */
 
 async function expandQueryNeural(userMessage: string, history: string[] = []) {
   const normalized = userMessage.trim().toLowerCase();
   const expansions = [normalized];
-  const words = normalized.split(" ").slice(0, 5);
+
+  const words = normalized.split(" ").slice(0, 6);
 
   if (words.length > 1) {
-    expansions.push(`${words.join(" ")} marketing`);
-    expansions.push(`${words.join(" ")} service`);
-    expansions.push(`${words.join(" ")} strategy`);
-    expansions.push(`${words.join(" ")} implementation`);
+    const base = words.join(" ");
+
+    expansions.push(`${base} marketing strategy`);
+    expansions.push(`${base} service solution`);
+    expansions.push(`${base} business growth`);
+    expansions.push(`${base} conversion optimization`);
   }
 
   history.slice(-2).forEach((h) => expansions.push(h.toLowerCase()));
+
   return Array.from(new Set(expansions));
 }
 
@@ -274,26 +297,18 @@ function neuralBrain(message: string) {
 
   const greetingRegex = /^(hi|hello|hey|good morning|good afternoon|good evening)$/i;
 
-if (
-  msg.includes("book") ||
-  msg.includes("schedule") ||
-  msg.includes("meeting") ||
-  msg.includes("appointment") ||
-  msg.includes("call") ||
-  msg.includes("consultation") ||
-  msg.includes("consult") ||
-  msg.includes("talk to you") ||
-  msg.includes("discuss") ||
-  msg.includes("get help") ||
-  msg.includes("work with you")
-) {
-  return { type: "booking" };
-}
+  // ✅ STRONG BOOKING INTENT (tightened)
+  if (
+    /(book|schedule|appointment|consultation|call|hire|work with you|start now|let's start|ready to proceed)/i.test(msg)
+  ) {
+    return { type: "booking" };
+  }
 
   if (msg.includes("who are you")) {
     return { type: "identity" };
   }
 
+  // ✅ GREETING ONLY IF VERY SHORT (prevents spam)
   if (greetingRegex.test(msg) && msg.split(" ").length <= 3) {
     return { type: "greeting" };
   }
@@ -321,300 +336,269 @@ export async function generateHybridResponse({
         ? history
         : await memoryService.getRecentContext(sessionId).catch(() => []);
 
-    /* ---------- NEURAL BRAIN (DECLARE ONCE ONLY) ---------- */
     const brain = neuralBrain(message);
 
+    /* ---------- STRATEGIC BRAIN + LEAD ---------- */
+    const [brainData, leadData] = await Promise.all([
+      strategicBrain(message, sessionId),
+      analyzeLeadSignals(message, sessionId),
+    ]);
 
-/* ---------- STRATEGIC BRAIN + LEAD INTELLIGENCE (FIXED) ---------- */
-const [brainData, leadData] = await Promise.all([
-  strategicBrain(message, sessionId),
-  analyzeLeadSignals(message, sessionId),
-]);
+    const brainContext = brainData?.brainContext ?? {};
+    const strategicChunks = brainData?.chunks ?? [];
 
-// Core brain data
-const brainContext = brainData?.brainContext ?? {};
-const strategicChunks = brainData?.chunks ?? [];
+    /* ---------- FIX: LEAD SCORE NORMALIZATION ---------- */
+    let leadScoreValue = 0;
 
-/* ---------- NORMALIZE LEAD SCORE (CRITICAL FIX) ---------- */
-const rawLeadScore =
-  typeof leadData?.score?.total === "number"
-    ? leadData.score.total
-    : typeof brainContext?.leadScore === "number"
-    ? brainContext.leadScore
-    : 0;
-
-// ✅ FORCE NORMALIZATION (0–1)
-const leadScoreValue =
-  rawLeadScore > 1 ? Math.min(rawLeadScore / 10, 1) : rawLeadScore;
-
-/* ---------- NORMALIZE STAGE ---------- */
-const stage =
-  typeof brainContext?.stage === "string" && brainContext.stage.length > 0
-    ? brainContext.stage
-    : "discovery";
-
-/* ---------- ENFORCE CONSISTENT CONTEXT ---------- */
-brainContext.leadScore = leadScoreValue;
-brainContext.stage = stage;
-
-/* ---------- EXECUTION MODE (NEW - INTELLIGENCE CONTROL) ---------- */
-brainContext.executionMode =
-  leadScoreValue > 0.6 || stage === "service" || stage === "conversion"
-    ? "execution"
-    : "exploration";
-
-/* ---------- OPTIONAL DEBUG ---------- */
-console.log(
-  `[MODE] executionMode=${brainContext.executionMode} | leadScore=${leadScoreValue} | stage=${stage}`
-);
-
-
-/* ---------- NORMALIZE MESSAGE ONCE ---------- */
-const lowerMsg = message.toLowerCase(); // ✅ Declare once
-
-/* ---------- OPTIONAL: LOG FOR DEBUGGING ---------- */
-console.log(
-  `[STRATEGIC BRAIN] leadScore: ${leadScoreValue}, stage: ${stage}, message: ${lowerMsg}`
-);
-
-/* ---------- BOOKING FLOW (ACTIVE SESSION) ---------- */
-if (bookingFlow.isBookingActive(sessionId)) {
-  if (detectBookingRejection(message)) {
-    bookingFlow.reset(sessionId);
-    return "No problem — we can continue here. What would you like to explore?";
-  }
-
-  const bookingResp = await bookingFlow.handleStep(sessionId, message);
-  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-  return bookingResp.response;
-}
-
-/* ---------- NEURAL ROUTING ---------- */
-if (brain.type === "identity") {
-  return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
-}
-
-if (brain.type === "booking") {
-  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-  return bookingResp.response;
-}
-
-/* ---------- SMART GREETING (NON-BLOCKING + CONTEXT-AWARE) ---------- */
-if (brain.type === "greeting") {
-  const hasContext =
-    brainContext?.hasSufficientContext ||
-    (brainContext?.leadScore ?? 0) > 0.3;
-
-  const lastMessages = recentMessagesCache || [];
-  const hasAssistantSpoken = lastMessages.some((m: any) => m.role === "assistant");
-
-  // ❌ If conversation already has context → DO NOT greet again
-  if (hasContext || hasAssistantSpoken) {
-    // Let normal flow continue (no return)
-  } else {
-    // ✅ First interaction only → allow greeting
-    if (brainContext?.dynamicGreeting) {
-      return brainContext.dynamicGreeting;
+    if (typeof leadData?.score?.total === "number") {
+      leadScoreValue = leadData.score.total;
+    } else if (typeof brainContext?.leadScore === "number") {
+      leadScoreValue = brainContext.leadScore;
     }
 
-    const hour = new Date().getHours();
-    let timeGreeting = "Hey";
+    // ✅ FORCE 0–1 RANGE (CRITICAL FIX)
+    if (leadScoreValue > 1) {
+      leadScoreValue = Math.min(leadScoreValue / 10, 1);
+    }
 
-    if (hour < 12) timeGreeting = "Good morning";
-    else if (hour < 18) timeGreeting = "Good afternoon";
-    else timeGreeting = "Good evening";
+    /* ---------- FIX: STAGE ---------- */
+    const stage =
+      typeof brainContext?.stage === "string"
+        ? brainContext.stage
+        : "discovery";
 
-    return `${timeGreeting} — what are you trying to improve right now?`;
-  }
-}
+    brainContext.leadScore = leadScoreValue;
+    brainContext.stage = stage;
 
-/* ---------- USE LEAD SCORE FOR LOGGING / FEEDBACK ---------- */
-console.log(`Lead Score Value: ${leadScoreValue}`);
-
-/* ---------- SMART AUTO BOOKING (INTELLIGENT — NO FALSE TRIGGERS) ---------- */
-
-const msg = lowerMsg; // now safe to use
-
-/* ---------- BLOCK LOW-INTENT / INFORMATIONAL ---------- */
-const isInformationalQuery =
-  msg.includes("can you") ||
-  msg.includes("do you") ||
-  msg.includes("how does") ||
-  msg.includes("what is") ||
-  msg.includes("how do you") ||
-  msg.includes("tell me about") ||
-  msg.includes("explain") ||
-  msg.includes("what") ||
-  msg.includes("why");
-
-/* ---------- CENTRALIZED AUTO BOOKING DECISION (FIXED) ---------- */
-
-// ✅ Single source of truth for booking intelligence
-const autoBooking = await shouldTriggerBooking(
-  sessionId,
-  stage as any,
-  leadScoreValue,
-  message
-);
-
-/* ---------- EXECUTION ---------- */
-if (
-  autoBooking &&
-  !bookingFlow.isBookingActive(sessionId) &&
-  !detectBookingRejection(message)
-) {
-  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-  return bookingResp.response;
-}
-
-/* ---------- CONTINUE FLOW (DO NOT RETURN HERE) ---------- */
-// Removed early return to keep variables in scope.
-// You can optionally log the fallback info without returning:
-console.log(`
-Context Ready: ${brainContext.hasSufficientContext ?? false}
-Stage: ${stage}
-Lead Score: ${leadScoreValue}
-Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
-Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
-Strategy Insight: ${brainContext?.reasoning ?? "N/A"}
-Detected Services: ${brainContext?.detectedServices?.join(", ") ?? "none"}
-`);
-
-/* ---------- HIGH-INTENT OVERRIDE (SMART CONVERSION) ---------- */
-
-if (
-  lowerMsg.includes("work with you") ||
-  lowerMsg.includes("hire you") ||
-  lowerMsg.includes("get started") ||
-  lowerMsg.includes("start working") ||
-  lowerMsg.includes("how do we start")
-) {
-  const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
-  await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
-  return bookingResp.response;
-}
-
-/* ---------- HISTORY ---------- */
-// Use cached messages to avoid extra DB calls
-const historyMessages: any[] = recentMessagesCache?.length
-  ? recentMessagesCache
-  : Array.isArray(history) && history.length > 0
-  ? history
-  : [];
-
-const historyText = historyMessages
-  .slice(-2) // only take last 2 messages for context
-  .map(
-    (h: any) =>
-      `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`
-  )
-  .join("\n");
-
-    /* ---------- INTENT & SERVICE ---------- */
-    let intentMatches: { intent: Intent; score?: number }[] = [];
-    try { const detected = detectIntent(message); if (Array.isArray(detected)) intentMatches = detected; } catch {}
-    const detectedIntentNames = intentMatches.length > 0 ? intentMatches.slice(0, 3).map((i) => i.intent.name) : ["general"];
-    const intentCategories = intentMatches.map((i) => i.intent.category);
-
+/* ---------- GLOBAL SAFE VARIABLES (CRITICAL FIX) ---------- */
+let detectedIntentNames: string[] = ["general"];
+let intentCategories: string[] = [];
 let detectedService: string | null = null;
-    try { detectedService = detectService(message); } catch {}
+let vectorCount = 0;
+let forceNoQuestions = false;
 
-/* ---------- VECTOR KNOWLEDGE ---------- */
+    /* ---------- 🔥 EXECUTION MODE (FIXED ROOT ISSUE) ---------- */
+    brainContext.executionMode =
+      leadScoreValue >= 0.6 ||
+      stage === "service" ||
+      stage === "conversion"
+        ? "execution"
+        : "exploration";
 
-// Run query expansion and vector fetch in parallel (faster)
-const expandedQueriesPromise = expandQueryNeural(
+    console.log(
+      `[MODE] executionMode=${brainContext.executionMode} | leadScore=${leadScoreValue} | stage=${stage}`
+    );
+
+    const lowerMsg = message.toLowerCase();
+
+    /* ---------- BOOKING FLOW ACTIVE ---------- */
+    if (bookingFlow.isBookingActive(sessionId)) {
+
+      if (detectBookingRejection(message)) {
+        bookingFlow.reset(sessionId);
+        return "No problem — we can continue here. What would you like to explore?";
+      }
+
+      const bookingResp = await bookingFlow.handleStep(sessionId, message);
+
+      // ✅ FIX: prevent crash loop
+      if (!bookingResp || !bookingResp.response) {
+        bookingFlow.reset(sessionId);
+        return "Something broke in scheduling — let’s restart. Just say 'book a call'.";
+      }
+
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+      return bookingResp.response;
+    }
+
+    /* ---------- NEURAL ROUTING ---------- */
+
+    if (brain.type === "identity") {
+      return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
+    }
+
+    if (brain.type === "booking") {
+      const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+      return bookingResp.response;
+    }
+
+    /* ---------- SMART GREETING (FIXED HARD BUG) ---------- */
+
+    if (brain.type === "greeting") {
+      const hasContext =
+        brainContext?.hasSufficientContext ||
+        leadScoreValue > 0.3;
+
+      const hasAssistantSpoken = recentMessagesCache.some(
+        (m: any) => m.role === "assistant"
+      );
+
+      // ❌ BLOCK greeting if convo already started
+      if (!hasContext && !hasAssistantSpoken) {
+
+        if (brainContext?.dynamicGreeting) {
+          return brainContext.dynamicGreeting;
+        }
+
+        const hour = new Date().getHours();
+        const greeting =
+          hour < 12 ? "Good morning" :
+          hour < 18 ? "Good afternoon" :
+          "Good evening";
+
+        return `${greeting} — what are you trying to improve right now?`;
+      }
+    }
+
+    console.log(`Lead Score Value: ${leadScoreValue}`);
+
+    /* ---------- 🔥 SMART AUTO BOOKING (FIXED ROOT LOGIC) ---------- */
+
+    const isInformationalQuery =
+      /(what|how|why|explain|tell me|can you|do you)/i.test(lowerMsg);
+
+    const hasStrongBuyingIntent =
+      /(hire|start|work with you|ready|book|schedule)/i.test(lowerMsg);
+
+    const autoBooking =
+      (await shouldTriggerBooking(sessionId, stage as any)) &&
+      leadScoreValue >= 0.6 &&
+      (hasStrongBuyingIntent || !isInformationalQuery);
+
+    if (
+      autoBooking &&
+      !bookingFlow.isBookingActive(sessionId)
+    ) {
+      const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+      return bookingResp.response;
+    }
+
+    /* ---------- HIGH INTENT OVERRIDE ---------- */
+
+    if (
+      /(hire you|work with you|get started|start working)/i.test(lowerMsg)
+    ) {
+      const bookingResp = await bookingFlow.startBookingFlow(sessionId, message);
+      await memoryService.saveMessage(sessionId, "assistant", bookingResp.response);
+      return bookingResp.response;
+    }
+
+    /* ---------- HISTORY ---------- */
+
+    const historyMessages =
+      recentMessagesCache?.length
+        ? recentMessagesCache
+        : Array.isArray(history)
+        ? history
+        : [];
+
+    const historyText = historyMessages
+      .slice(-2)
+      .map(
+        (h: any) =>
+          `${h.role === "user" ? "User" : "Assistant"}: ${h.content || ""}`
+      )
+      .join("\n");
+
+    /* ---------- INTENT ---------- */
+
+let intentMatches: { intent: Intent; score?: number }[] = [];
+
+try {
+  const detected = detectIntent(message);
+  if (Array.isArray(detected)) intentMatches = detected;
+} catch {}
+
+detectedIntentNames =
+  intentMatches.length > 0
+    ? intentMatches.slice(0, 3).map((i) => i.intent.name)
+    : ["general"];
+
+intentCategories =
+  intentMatches.length > 0
+    ? intentMatches.map((i) => i.intent.category)
+    : [];
+
+/* ---------- VECTOR SEARCH (FIXED QUALITY) ---------- */
+
+// Expand query (multi-angle retrieval)
+const expandedQueries = await expandQueryNeural(
   message,
   historyMessages.map((h) => h.content)
 );
 
-const fusedChunksPromise = expandedQueriesPromise.then((queries) =>
-  getFusedChunks(queries.join(" "), 4)
+// Fetch fused chunks
+const fusedChunks = await getFusedChunks(
+  expandedQueries.join(" "),
+  4
 );
 
-// Wait for both
-const [expandedQueries, fusedChunks] = await Promise.all([
-  expandedQueriesPromise,
-  fusedChunksPromise
-]);
+/* ---------- MERGE + PRIORITIZE + DEDUPE (INTELLIGENT) ---------- */
 
-/* ---------- MERGE + PRIORITIZE + DEDUPE (SMART RANKING) ---------- */
-
-// Assign priority:
-// strategicChunks → HIGH (brain knowledge)
-// fusedChunks → MEDIUM (vector search)
 const allChunks = [
-  ...strategicChunks.map((c: any) => ({ ...c, priority: 2, source: "strategic" })),
-  ...(fusedChunks || []).map((c: any) => ({ ...c, priority: 1, source: "vector" })),
+  ...strategicChunks.map((c: any) => ({
+    ...c,
+    priority: 2,
+    source: "strategic",
+  })),
+  ...(fusedChunks || []).map((c: any) => ({
+    ...c,
+    priority: 1,
+    source: "vector",
+  })),
 ];
 
-/* ---------- DEDUPE (KEEP HIGHEST PRIORITY VERSION) ---------- */
-const dedupedMap = new Map<string, any>();
+const deduped = new Map<string, any>();
 
-for (const chunk of allChunks) {
-  if (!chunk?.text) continue;
+for (const c of allChunks) {
+  if (!c?.text) continue;
 
-  const key = chunk.text.trim();
+  const key = c.text.trim();
 
-  if (!dedupedMap.has(key)) {
-    dedupedMap.set(key, chunk);
+  if (!deduped.has(key)) {
+    deduped.set(key, c);
   } else {
-    const existing = dedupedMap.get(key);
+    const existing = deduped.get(key);
 
     // ✅ Keep higher priority chunk
-    if ((chunk.priority || 0) > (existing.priority || 0)) {
-      dedupedMap.set(key, chunk);
+    if ((c.priority || 0) > (existing.priority || 0)) {
+      deduped.set(key, c);
     }
   }
 }
 
-/* ---------- FINAL SORT (HIGHEST INTELLIGENCE FIRST) ---------- */
-const mergedChunks = Array.from(dedupedMap.values())
+/* ---------- FINAL SORT (BEST FIRST) ---------- */
+
+const mergedChunks = Array.from(deduped.values())
   .sort((a, b) => (b.priority || 0) - (a.priority || 0))
-  .slice(0, 5); // 🔥 limit for performance
+  .slice(0, 5);
 
-// Limit chunks for speed (IMPORTANT)
-const limitedChunks = mergedChunks.slice(0, 5);
+/* ---------- CONTEXT BUILD ---------- */
 
-// Compress context
-const vectorText = compressContext(limitedChunks, 220);
+const vectorText = compressContext(mergedChunks, 220);
 
-// Debug count (keep original meaning)
-const vectorCount = limitedChunks.length;
+// ✅ FIX: REQUIRED GLOBAL VARIABLE
+vectorCount = mergedChunks.length;
 
-// 🔥 HARD ENFORCEMENT FLAG (DECISION LAYER)
-const forceNoQuestions =
-  brainContext?.hasSufficientContext ||
-  brainContext?.leadScore > 0.5 ||
-  stage === "service" ||
-  stage === "conversion";
+/* ---------- HARD RESPONSES (FAST PATH) ---------- */
 
-/* ---------- HARD INTENT RESPONSES (BYPASS AI) ---------- */
-
-const lowerMsgDirect = message.toLowerCase();
-
-// Company info
-if (lowerMsgDirect.includes("your company") || lowerMsgDirect.includes("about you")) {
+if (lowerMsg.includes("your company") || lowerMsg.includes("about you")) {
   return "Digital Transition Marketing is an AI-powered growth agency focused on building high-performance marketing systems — from performance marketing and automation to predictive analytics and CGI-driven campaigns. We don’t just run ads — we engineer scalable growth systems.";
 }
 
-// Identity
-if (lowerMsgDirect === "who are you") {
-  return `I am ${BOT_NAME}, AI strategist for Digital Transition Marketing.`;
+if (lowerMsg.includes("cost") || lowerMsg.includes("price")) {
+  return "Pricing depends on scope and ROI targets — we structure it based on performance and outcomes, not fixed packages. Tell me your goal and I’ll break down what it would realistically cost.";
 }
 
-// Pricing intent
-if (lowerMsgDirect.includes("how much") || lowerMsgDirect.includes("cost")) {
-  return "Pricing depends on scope and growth targets — we structure it based on performance and ROI, not fixed packages. If you tell me your goal, I can break down what it would realistically cost.";
-}
-
-    /* ---------- PROMPT ---------- */
+/* ---------- PROMPT (ELITE FIXED VERSION) ---------- */
 
 const avoidQuestions =
   brainContext.hasSufficientContext &&
   brainContext.stage !== "discovery";
 
+/* ---------- CONTEXT BLOCK ---------- */
 
 const knownContext = `
 Known User Context:
@@ -624,315 +608,262 @@ Industry: ${brainContext.strategicMemory?.industry || "unknown"}
 Business Type: ${brainContext.strategicMemory?.businessType || "unknown"}
 
 IMPORTANT:
-- Do NOT ask for information already provided above
-- Use this context to move the conversation forward
+- Do NOT ask for information already provided
+- Use this context to MOVE FORWARD (not repeat questions)
 `;
+
+/* ---------- PROMPT ---------- */
 
 const prompt = `
-You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
+You are ${BOT_NAME}, a senior AI growth strategist from Digital Transition Marketing.
 
-ROLE:
-You help businesses grow using AI-powered marketing systems, focusing on results, strategy, and conversion.
+You think like a top 1% consultant — not a chatbot.
 
-CRITICAL RULES:
-- Only use provided context (no guessing pricing or services)
-- If pricing is missing → explain value instead
-- Be natural, human, and strategic (not robotic)
-- Avoid repetition and generic answers
-- ALWAYS finish sentences completely
-- NEVER cut off mid-thought
-- NEVER output partial or corrupted text
-- Focus on solving the user's business problem
-- DO NOT over-focus on one service (like GEO)
-- Dynamically choose from ALL services:
-  (SEO, GEO, Performance Marketing, CGI Ads, Automation, Analytics, Content, Branding, Web Development, AI Virtual 3D Property Tours, Voice Search Optimization, Music Production, Video & Audio Production, AI Driven Email Marketing, YouTube Ads, Social Media & Influencer Marketing)
-- Recommend combinations, not single solutions
+=====================================
+🔥 CORE OBJECTIVE
+=====================================
+Solve the user's REAL business problem using strategy, not generic advice.
 
-🔥 BEHAVIOR FIXES (CRITICAL):
+=====================================
+🚨 HARD RULES (NON-NEGOTIABLE)
+=====================================
+- NEVER give generic advice like:
+  "use content marketing + ads + optimization"
+- NEVER repeat previous responses
+- NEVER ignore provided context
+- NEVER ask the same question again
+- NEVER reset the conversation direction
+- NEVER output vague frameworks without specificity
 
+- ALWAYS:
+  → Diagnose the ROOT problem
+  → Give SPECIFIC, EXECUTABLE actions
+  → Tie everything to RESULTS (revenue, leads, ROAS)
+
+=====================================
+🧠 INTELLIGENCE MODE
+=====================================
+Execution Mode: ${brainContext.executionMode}
+
+IF executionMode = "execution":
 - DO NOT ask unnecessary questions
-- If user already gave business context → DO NOT ask setup questions again
-- If context exists → give solution directly
-${avoidQuestions ? "- DO NOT ask ANY questions in this response" : ""}
-- Only ask a question if it directly improves the solution
-- Prefer giving solutions FIRST, then ask ONE focused question if needed
-- If user already provided context → DO NOT ask for it again
-- If user repeats → go deeper instead of repeating yourself
-- NEVER loop the same question again
-- If Execution Mode is "execution":
-  → Do NOT ask unnecessary questions
-  → Give direct, actionable solutions
-  → Move toward implementation or next step
+- Give DIRECT implementation steps
+- Move toward action, plan, or next step
 
-- If Execution Mode is "exploration":
-  → Diagnose the problem
-  → Ask at most ONE smart question if needed
-  → Guide the user strategically
+IF executionMode = "exploration":
+- Diagnose deeply
+- Ask MAX 1 high-value question (only if needed)
 
-RESPONSE STRUCTURE (MANDATORY):
+${avoidQuestions ? "CRITICAL: DO NOT ASK ANY QUESTIONS." : ""}
 
-1. Identify the real problem clearly
-2. Give a SPECIFIC actionable solution
-3. (Optional) Ask ONE sharp follow-up question
+=====================================
+📊 USER CONTEXT (HIGHEST PRIORITY)
+=====================================
+Stage: ${brainContext.stage}
+Lead Score: ${brainContext.leadScore}
+Intent: ${detectedIntentNames.join(",")}
+Services: ${brainContext.detectedServices?.join(", ") || "adaptive"}
 
-USER ANALYSIS:
-- Intent: ${detectedIntentNames.join(",")}
-- Service Interest: ${detectedService ?? "multi-service"}
-- Funnel Stage: ${brainContext.stage}
-- Lead Score: ${brainContext.leadScore}
-Strategy Insight: ${brainContext.reasoning}
+Strategic Insight:
+${brainContext.reasoning}
 
-CRITICAL CONTEXT (HIGHEST PRIORITY):
-- This is NOT generic — use it directly
-- Problem Focus: ${brainContext.reasoning}
-- Services to prioritize: ${brainContext.detectedServices?.join(", ") || "adaptive"}
-- User maturity level: ${brainContext.leadScore > 0.6 ? "high intent" : "exploring"}
+User Maturity:
+${brainContext.leadScore > 0.6 ? "HIGH INTENT (ready to act)" : "EXPLORING"}
 
-YOU MUST:
-- Use this context as the PRIMARY thinking layer
-- Do NOT ignore it
-- Detected Services: ${brainContext.detectedServices?.join(", ") || "none"}
-
+=====================================
+🧩 KNOWN CONTEXT
+=====================================
 ${knownContext}
 
-KNOWLEDGE:
+=====================================
+📚 KNOWLEDGE (USE THIS, NOT GENERIC MEMORY)
+=====================================
 ${vectorText}
 
-USER MESSAGE:
+=====================================
+👤 USER MESSAGE
+=====================================
 ${message}
 
-INSTRUCTIONS:
-- Think step-by-step before answering
-- Identify the REAL problem behind the user message
-- Give SPECIFIC, actionable, non-generic advice
-- Adapt response based on funnel stage
-- Execution Mode: ${brainContext.executionMode}
-- Use reasoning: ${brainContext.reasoning}
-- Use detected services intelligently (not repetitively)
-- Sound like a human strategist, not a template
-- If enough context exists → MOVE FORWARD, don't ask basics again
-- Avoid repeating structures or phrases
-- Keep response concise but impactful
-- Prefer depth over generic brevity
-- Avoid surface-level answers
+=====================================
+🧠 THINKING INSTRUCTIONS (CRITICAL)
+=====================================
+Before answering:
+
+1. What is the REAL underlying problem?
+2. What is the fastest path to measurable improvement?
+3. What exact actions will move results?
+
+=====================================
+✍️ RESPONSE STRUCTURE (MANDATORY)
+=====================================
+
+1. Identify the REAL problem (specific, not generic)
+2. Give a CLEAR, EXECUTABLE solution
+   - steps
+   - tactics
+   - strategy tied to outcome
+3. (Optional) ONE sharp follow-up question ONLY if needed
+
+=====================================
+🚫 ANTI-GENERIC ENFORCEMENT
+=====================================
+
+❌ BAD:
+"Use SEO, ads, and content marketing"
+
+✅ GOOD:
+"Your YouTube ads are underperforming because your hook fails in the first 3 seconds — fix this by testing 5 new opening angles targeting [specific audience]"
+
+=====================================
+🎯 FINAL RULES
+=====================================
+
+- Be sharp, direct, and strategic
+- Sound like a human expert
+- Avoid fluff, filler, repetition
+- Prefer depth over surface-level advice
+- If context exists → MOVE FORWARD, don’t reset
 `;
 
-/* ---------- HYBRID MODEL EXECUTION (FAST + RELIABLE) ---------- */
+
+/* ---------- HYBRID MODEL EXECUTION (STABLE + INTELLIGENT) ---------- */
 
 let response = "";
 let modelUsed = "none";
 
-// Run both models in parallel (fast timeouts)
+/* ---------- PRIMARY MODEL (QWEN) ---------- */
+const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
 
-// 🔥 STRICT PRIMARY → FALLBACK MODEL FLOW
-
-const qwenResp = await withTimeout(generateOpenRouter(prompt), 6500);
-
-let geminiResp: string | null = null;
-
-// Only trigger Gemini if Qwen FAILS hard
+/* ---------- QUALITY CHECK ---------- */
 const qwenBad =
   !qwenResp ||
   isLowQuality(qwenResp) ||
   looksIncomplete(qwenResp);
 
-// ✅ Only escalate if REALLY bad
-if (qwenBad && message.length > 25 && brainContext.hasSufficientContext) {
-  if (canUseGemini() && message.length > 15) {
-    geminiResp = await withTimeout(generateGemini(prompt), 4000);
-  }
+/* ---------- SECONDARY MODEL (GEMINI) ---------- */
+let geminiResp: string | null = null;
+
+// 🔥 STRICT ESCALATION (FIXED)
+if (
+  qwenBad &&
+  brainContext.hasSufficientContext &&
+  message.length > 20 &&
+  canUseGemini()
+) {
+  geminiResp = await withTimeout(generateGemini(prompt), 4500);
 }
 
-// Priority: Qwen -> Gemini (controlled + stable)
-if (qwenResp && !isLowQuality(qwenResp) && !looksIncomplete(qwenResp)) {
-  response = qwenResp as string;
+/* ---------- MODEL SELECTION ---------- */
+
+// ✅ Prefer STRONG response only
+if (qwenResp && !qwenBad) {
+  response = qwenResp;
   modelUsed = "Qwen";
 } else if (geminiResp && !looksIncomplete(geminiResp)) {
-  response = geminiResp as string;
+  response = geminiResp;
   modelUsed = "Gemini";
   markGeminiUsed();
 }
 
-
-// prevent downgrade to generic
-if (response && brainContext?.hasSufficientContext) {
-  if (response.toLowerCase().includes("tell me more")) {
-    response = response.replace(
-      /tell me more.*$/gi,
-      "Based on your context, the next step is execution refinement, not more input."
-    );
-  }
+/* ---------- HARD GUARD: EMPTY RESPONSE ---------- */
+if (!response) {
+  response = "";
 }
 
-/* ---------- FINAL FALLBACK (SMART + CONTROLLED) ---------- */
+/* ---------- PREVENT GENERIC DOWNGRADE ---------- */
+if (response && brainContext.hasSufficientContext) {
+  response = response.replace(
+    /(tell me more|let me know more|share more details).*$/gi,
+    ""
+  );
+}
+
+/* ---------- FINAL FALLBACK (SMART — NON GENERIC) ---------- */
 
 if (!response || isLowQuality(response) || looksIncomplete(response)) {
-  const lastMessages = await memoryService.getRecentContext(sessionId);
-
-  const lastAssistant =
-    lastMessages
-      ?.slice()
-      ?.reverse()
-      ?.find((m: any) => m.role === "assistant")?.content || "";
-
-  const normalize = (text: string) =>
-    text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
-
-  const prev = normalize(lastAssistant || "").slice(0, 140);
-
-  /* ---------- CONTEXT-AWARE FALLBACK ---------- */
 
   let fallback = "";
 
-  // ✅ STRONG CONTEXT → NO QUESTIONS, MOVE FORWARD
-  if (brainContext?.hasSufficientContext) {
+  if (brainContext.hasSufficientContext) {
     fallback = `Let’s move this forward.
 
-Based on everything you've already shared, the problem is not direction — it’s execution.
+Based on what you've shared, the issue isn’t strategy — it’s execution.
 
-${brainContext?.reasoning || "We need to optimize what's already in place instead of restarting."}
+${brainContext.reasoning || "We need to refine what's already working instead of restarting."}
 
-The next step is identifying the weakest conversion point and fixing that layer directly.`;
+The next step is identifying the weakest point in your funnel and optimizing that directly.`;
   }
 
-  // ✅ MEDIUM CONTEXT → GUIDED BUT NOT DUMB
-  else if (brainContext?.leadScore > 0.3) {
-    fallback = `You're not far off — this looks like a structural bottleneck, not a complete strategy failure.
+  else if (brainContext.leadScore > 0.3) {
+    fallback = `This looks like a structural bottleneck rather than a strategy issue.
 
-The issue usually sits in one of three areas:
-- Conversion flow breakdown
-- Weak positioning or offer clarity
-- Traffic-intent mismatch
+You’re likely losing performance at one of these layers:
+- Conversion flow
+- Offer positioning
+- Traffic quality
 
-Fixing the right layer will unlock growth much faster than changing everything.`;
+Fixing the right layer will unlock growth much faster.`;
   }
 
-  // ✅ LOW CONTEXT → CONTROLLED VARIATIONS (NO GENERIC LOOPS)
   else {
-    const fallbackOptions = [
-      "Give me the exact outcome you're trying to achieve — I’ll map the fastest path.",
-      "Tell me your goal and biggest bottleneck — I’ll give you a precise fix.",
-      "What result are you trying to scale right now? I’ll break it down properly.",
+    const options = [
+      "Tell me the exact result you're trying to achieve — I’ll map the fastest path.",
+      "What’s the main bottleneck you're facing right now?",
+      "Give me your goal and I’ll break it down properly."
     ];
 
-    fallback =
-      fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+    fallback = options[Math.floor(Math.random() * options.length)];
   }
-
-  /* ---------- ANTI-REPETITION (STRONG) ---------- */
-
-  if (fallback && prev) {
-    const curr = normalize(fallback).slice(0, 140);
-
-    const isSimilar =
-      prev === curr ||
-      prev.includes(curr.slice(0, 80)) ||
-      curr.includes(prev.slice(0, 80));
-
-    if (isSimilar) {
-      // 🔥 Force progression instead of repeating
-      fallback = brainContext?.hasSufficientContext
-        ? `Let’s take the next step.
-
-${brainContext?.reasoning || "We need to refine execution, not restart strategy."}
-
-Focus on fixing the weakest point in your funnel first — that’s where the fastest gains are.`
-        : "Let’s focus this properly — what result matters most right now?";
-    }
-  }
-
-  /* ---------- FINAL SAFETY CLEANUP ---------- */
-
-  // remove weak phrases completely
-  fallback = fallback.replace(
-    /(tell me more|what’s your setup|tell me about your setup)/gi,
-    ""
-  );
 
   response = fallback.trim();
   modelUsed = "fallback";
 }
 
-
-/* ---------- CLEANUP (STABLE + NON-DESTRUCTIVE) ---------- */
+/* ---------- CLEANUP (NON-DESTRUCTIVE) ---------- */
 
 response = removeContactInfo(response);
 
-// remove non-latin corruption once
-response = response.replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "");
-
 response = response
-  // normalize spaces
   .replace(/\s+/g, " ")
-  // remove spaces before punctuation
   .replace(/\s([.,!?])/g, "$1")
-  // remove common LLM fallback phrases that should never reach user
-  .replace(
-    /(i'?m having (a )?(temporary )?delay.*|there'?s a slight delay.*|i can still help you strategically.*)/gi,
-    ""
-  )
-  // final trim
+  .replace(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff]/g, "")
   .trim();
 
-
-// 🔥 HARD BLOCK: remove repeated question patterns
-if (response) {
-  response = response.replace(
-    /(what’s your current setup\??|tell me more about your setup\??)/gi,
-    ""
-  );
-}
-
-/* ---------- SAFE RETRY LOGIC (ONLY IF TRULY BAD) ---------- */
+/* ---------- SAFE RETRY (ONLY IF CRITICAL FAILURE) ---------- */
 
 if (
   modelUsed === "Qwen" &&
-  (isLowQuality(response) ||
-    response.toLowerCase().includes("i'm having trouble") ||
-    response.toLowerCase().includes("couldn't generate"))
+  (isLowQuality(response) || looksIncomplete(response)) &&
+  canUseGemini()
 ) {
-  console.log("⚠️ Low-quality response detected — retrying with Gemini");
+  console.log("⚠️ Retrying with Gemini (quality fail)");
 
-const retry = await withTimeout(generateGemini(prompt), 4000);
+  const retry = await withTimeout(generateGemini(prompt), 4000);
 
-  if (retry) {
-let retryClean = cleanResponse(retry as string);
-    retryClean = removeContactInfo(retryClean);
-
-    retryClean = retryClean
-      .replace(/\s+/g, " ")
-      .replace(/\s([.,!?])/g, "$1")
-      .trim();
-
-    // ✅ Only switch if actually better
-    if (!isLowQuality(retryClean)) {
-      response = retryClean;
-      modelUsed = "Gemini";
-    }
+  if (retry && !isLowQuality(retry)) {
+    response = cleanResponse(retry);
+    modelUsed = "Gemini-retry";
   }
 }
 
-// 🔥 ENFORCE NO-QUESTION MODE (POST-PROCESSING)
+/* ---------- NO-QUESTION ENFORCEMENT (SOFT — NOT DESTRUCTIVE) ---------- */
+
 if (forceNoQuestions && response) {
-  response = response
-    .replace(/\?+/g, ".")
-    .replace(/(can you|would you|could you)[^\.]*\./gi, "")
-    .replace(/(what|why|how)[^\.]*\./gi, "");
+  response = response.replace(/\?+/g, ".");
 }
 
-/* ---------- LENGTH CONTROL (SAFE) ---------- */
+/* ---------- LENGTH CONTROL ---------- */
 
-if (response && response.length > 1200) {
+if (response.length > 1200) {
   response = compressResponse(response);
 }
 
-/* ---------- FINAL IDENTITY ENFORCEMENT ---------- */
+/* ---------- IDENTITY ENFORCEMENT ---------- */
 
-if (response) {
-  response = enforceBotName(response);
-}
+response = enforceBotName(response);
 
-/* ---------- SMART CTA (DYNAMIC + CONTEXT-AWARE) ---------- */
+/* ---------- SMART CTA (CONTROLLED) ---------- */
 
 if (
   response &&
@@ -942,110 +873,19 @@ if (
     brainContext.leadScore,
     brainContext.stage
   ) &&
-  brainContext.hasSufficientContext && // ✅ ONLY when enough context exists
-  !response.toLowerCase().includes("let’s move this forward") && // avoid stacking CTAs
-  !response.toLowerCase().includes("next step") // prevent duplication
+  brainContext.hasSufficientContext
 ) {
-  // Clean ending punctuation
-  response = response.replace(/[.!\s]*$/, "");
-
-  let cta = "";
-
-  /* ---------- HIGH INTENT (CONVERSION MODE) ---------- */
-  if (
-    brainContext.stage === "conversion" ||
-    brainContext.leadScore > 0.75
-  ) {
-    const strongCTAs = [
-      "The next step is execution — we can map this out together on a quick call.",
-      "At this point, the fastest way forward is to walk through this strategy together.",
-      "We can turn this into a live execution plan and start optimizing immediately."
-    ];
-
-    cta = strongCTAs[Math.floor(Math.random() * strongCTAs.length)];
-  }
-
-  /* ---------- MID INTENT (SERVICE MODE) ---------- */
-  else if (
-    brainContext.stage === "service" ||
-    brainContext.leadScore > 0.5
-  ) {
-    const midCTAs = [
-      "If you want, I can break this into a step-by-step execution plan tailored to your business.",
-      "I can map this into a structured growth plan based on your setup.",
-      "Want me to turn this into a clear action plan you can follow?"
-    ];
-
-    cta = midCTAs[Math.floor(Math.random() * midCTAs.length)];
-  }
-
-  /* ---------- FALLBACK (SAFE MODE — RARE) ---------- */
-  else {
-    const softCTAs = [
-      "I can break this down further if you want something more specific.",
-      "Let me know if you want a more detailed execution plan.",
-    ];
-
-    cta = softCTAs[Math.floor(Math.random() * softCTAs.length)];
-  }
-
-  response += "\n\n" + cta;
-}
-
-/* ---------- FINAL SAFETY CHECK (SMART FALLBACK) ---------- */
-
-if (!response || looksIncomplete(response)) {
-  console.log("⚠️ Final response failed validation → using fallback");
-
-  const lastMessages = recentMessagesCache;
-
-  const lastAssistant =
-    lastMessages
-      ?.slice()
-      ?.reverse()
-      ?.find((m: any) => m.role === "assistant")?.content || "";
-
-  const msg = message.toLowerCase();
-
-  let fallbackOptions: string[] = [
-    "Tell me a bit more about your situation so I can give you something specific.",
-    "Give me a bit more detail — I’ll refine this properly for you.",
-    "What’s the main bottleneck you're facing right now?",
+  const ctas = [
+    "We can turn this into a structured execution plan if you want.",
+    "I can map this into a step-by-step growth plan for your setup.",
+    "Want me to break this into an actionable plan tailored to your business?"
   ];
 
-  // ✅ Context-aware fallback (clean + minimal)
-  if (msg.includes("ecommerce") || msg.includes("store")) {
-    fallbackOptions = [
-      "For e-commerce, growth issues usually come from conversion flow, traffic quality, or product positioning — which one feels off right now?",
-    ];
-  } else if (msg.includes("ads") || msg.includes("roas")) {
-    fallbackOptions = [
-      "Low ROAS usually points to creative fatigue or audience mismatch — want me to break that down?",
-    ];
-  } else if (msg.includes("seo")) {
-    fallbackOptions = [
-      "SEO issues usually come from structure, content depth, or indexing — what are you currently doing?",
-    ];
-  }
-
-  let selected =
-    fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
-
-  // 🚫 Prevent repetition (safe check)
-  if (
-    lastAssistant &&
-    selected &&
-    lastAssistant.slice(0, 80) === selected.slice(0, 80)
-  ) {
-    selected =
-      "Let’s go deeper — what’s the biggest issue you're trying to solve right now?";
-  }
-
-  response = selected;
-  modelUsed = "fallback";
+  response = response.replace(/[.!\s]*$/, "");
+  response += "\n\n" + ctas[Math.floor(Math.random() * ctas.length)];
 }
 
-/* ---------- PREVENT REPETITION ---------- */
+/* ---------- ANTI-REPETITION (FIXED SMART VERSION) ---------- */
 
 const lastMessages = recentMessagesCache;
 
@@ -1055,50 +895,31 @@ const lastAssistant =
     ?.reverse()
     ?.find((m: any) => m.role === "assistant")?.content || "";
 
-// 🔥 ADVANCED ANTI-REPETITION SYSTEM (SMART + CONTEXT-AWARE)
-
 if (response && lastAssistant) {
+
   const normalize = (text: string) =>
-    text
-      .toLowerCase()
-      .replace(/[^\w\s]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
+    text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
 
-  const prev = normalize(lastAssistant).slice(0, 160);
-  const curr = normalize(response).slice(0, 160);
+  const prev = normalize(lastAssistant).slice(0, 140);
+  const curr = normalize(response).slice(0, 140);
 
-  // 🔍 Detect strong similarity (not just exact match)
   const isSimilar =
     prev === curr ||
     prev.includes(curr.slice(0, 80)) ||
     curr.includes(prev.slice(0, 80));
 
   if (isSimilar) {
-    // 🔥 Context-aware intelligent replacement (NO dumb questions)
-    if (brainContext?.hasSufficientContext) {
-      response = `Let’s move this forward.
+    if (brainContext.hasSufficientContext) {
+      response = `Let’s take this further.
 
-Based on everything you've shared, the issue isn’t direction — it’s execution.
+${brainContext.reasoning || "We now need to refine execution instead of rethinking strategy."}
 
-${brainContext?.reasoning || "We need to refine what's already in place instead of restarting."}
-
-The next step is identifying the weakest point in your funnel and optimizing that directly.`;
-
-      modelUsed = "anti-repeat-context";
+Focus on fixing the highest-impact bottleneck first.`;
     } else {
-      // fallback ONLY if context is weak
-      const variationOptions = [
-        "Let’s focus this properly — what specific result are you trying to improve right now?",
-        "Tell me the main outcome you're aiming for so I can give you something precise.",
-        "What’s the biggest bottleneck you're facing at the moment?",
-      ];
-
-      response =
-        variationOptions[Math.floor(Math.random() * variationOptions.length)];
-
-      modelUsed = "anti-repeat-fallback";
+      response = "Let’s focus this properly — what’s the main result you're trying to achieve?";
     }
+
+    modelUsed = "anti-repeat";
   }
 }
 
@@ -1108,14 +929,10 @@ if (response) {
   await memoryService.saveMessage(sessionId, "assistant", response);
 }
 
-/* ---------- DEBUG LOG ---------- */
+/* ---------- DEBUG ---------- */
 
 console.log(
-  `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Intents=${detectedIntentNames.join(
-    ","
-  )} | Chunks=${vectorCount} | Service=${
-    detectedService ?? "none"
-  } | LeadScore=${brainContext.leadScore}`
+  `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Chunks=${vectorCount} | LeadScore=${brainContext.leadScore}`
 );
 
 /* ---------- RETURN ---------- */
@@ -1127,4 +944,3 @@ return response;
   return "Something went wrong on our side — try again in a moment.";
 }
 }
-
