@@ -1,4 +1,3 @@
-// server/services/geminiManager.ts
 export const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 export const GEMINI_ENABLED = typeof GEMINI_API_KEY === "string" && GEMINI_API_KEY.length > 20;
 export const GEMINI_DAILY_LIMIT = 20;

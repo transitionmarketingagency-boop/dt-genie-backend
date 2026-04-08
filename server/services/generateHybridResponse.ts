@@ -67,7 +67,7 @@ function compressResponse(text: string): string {
 }
 
 function cleanHybridResponse(text: string): string {
-  return cleanResponse(text);
+  return cleanResponse(text).trim();
 }
 
 // ===================== HYBRID PROMPT BUILDER ===================== //
@@ -187,7 +187,6 @@ Before answering:
 `.trim();
 }
 
-
 // ===================== HYBRID EXECUTION ===================== //
 export async function executeHybridResponse({
   sessionId,
@@ -213,21 +212,21 @@ export async function executeHybridResponse({
   forceNoQuestions?: boolean;
 }) {
   try {
-    // 1️⃣ Hard responses (override)
+    // 1️⃣ Check for hard overrides
     const hardResponse = checkHardResponses(message);
     if (hardResponse) {
       await memoryService.saveMessage(sessionId, "assistant", hardResponse);
       return hardResponse;
     }
 
-    // 2️⃣ Greetings
+    // 2️⃣ Smart greeting (dynamic)
     const greetingResp = await smartGreeting(brainContext, recentMessagesCache);
     if (greetingResp) {
       await memoryService.saveMessage(sessionId, "assistant", greetingResp);
       return greetingResp;
     }
 
-    // 3️⃣ Detect services and intents
+    // 3️⃣ Detect services & intents
     brainContext.detectedServices = [];
     brainContext.detectedIntents = [];
 
@@ -241,7 +240,7 @@ export async function executeHybridResponse({
       ? detectedIntentsRaw.map((i) => (i && typeof i.intent === "string" ? i.intent : "unknown"))
       : [];
 
-    // 4️⃣ Vector fusion (safe)
+    // 4️⃣ Vector fusion
     let fusedChunksText = "";
     try {
       const chunks = await getFusedChunks(message, 3);
@@ -264,13 +263,10 @@ export async function executeHybridResponse({
     let response = "";
     try {
       const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
-      console.log("[Hybrid Debug] OpenRouter response:", qwenResp);
-
       if (qwenResp && !isLowQuality(qwenResp) && !looksIncomplete(qwenResp)) {
         response = qwenResp;
       } else if (canUseGemini()) {
         const geminiResp = await withTimeout(generateGemini(prompt), 4500);
-        console.log("[Hybrid Debug] Gemini response:", geminiResp);
         if (geminiResp && !looksIncomplete(geminiResp)) {
           response = geminiResp;
           markGeminiUsed();
@@ -280,17 +276,17 @@ export async function executeHybridResponse({
       console.warn("AI model execution failed:", err);
     }
 
-    // 7️⃣ Fixed fallback only if truly empty or extremely low-quality
+    // 7️⃣ Fallback only if empty or low quality
     if (!response || (isLowQuality(response) && response.trim().length < 20)) {
       response = smartFallbackHelper();
     }
 
-    // 8️⃣ Cleanup & formatting
+    // 8️⃣ Cleanup & enforce rules
     response = cleanHybridResponse(response);
     if (forceNoQuestions) response = response.replace(/\?+/g, ".");
     response = enforceBotName(response);
 
-    // 9️⃣ Smart CTA (append only if dynamic response)
+    // 9️⃣ Append CTA intelligently
     if (
       response &&
       !response.includes("Tell me your goal") &&
@@ -300,7 +296,7 @@ export async function executeHybridResponse({
         "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
     }
 
-    // 🔟 Save response to memory
+    // 🔟 Save to memory
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;

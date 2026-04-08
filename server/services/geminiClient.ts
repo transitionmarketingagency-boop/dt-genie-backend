@@ -16,7 +16,6 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 /* ---------------- CONFIG ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
-
 const TIMEOUT = 12000;
 
 /* ---------------- IDENTITY ---------------- */
@@ -36,38 +35,30 @@ function cleanPrompt(prompt: string) {
 }
 
 /* ---------------- VALIDATION ---------------- */
-
 function isValidResponse(text: string) {
   if (!text || text.length < 15) return false;
-
   const lower = text.toLowerCase();
-
-  if (
-    lower.includes("```") ||
-    lower.includes("<|") ||
-    lower.includes("|>") ||
-    lower.includes("assistant:") ||
-    lower.includes("system:") ||
-    lower.includes("undefined") ||
-    lower.includes("null") ||
-    lower.includes("error")
-  ) {
-    return false;
-  }
-
-  return true;
+  return ![
+    "```",
+    "<|",
+    "|>",
+    "assistant:",
+    "system:",
+    "undefined",
+    "null",
+    "error",
+  ].some((s) => lower.includes(s));
 }
 
 function isFakeDelay(text: string): boolean {
   const t = text.toLowerCase();
-
-  return (
-    t.includes("temporary delay") ||
-    t.includes("slight delay") ||
-    t.includes("having trouble") ||
-    t.includes("try again shortly") ||
-    t.includes("i can still guide you")
-  );
+  return [
+    "temporary delay",
+    "slight delay",
+    "having trouble",
+    "try again shortly",
+    "i can still guide you",
+  ].some((s) => t.includes(s));
 }
 
 function containsNonEnglish(text: string): boolean {
@@ -88,7 +79,6 @@ function fixSpacing(text: string): string {
     .trim();
 }
 
-/* ---------------- CLEAN RESPONSE ---------------- */
 function cleanResponse(text: string) {
   return text
     ?.replace(/assistant:|system:/gi, "")
@@ -100,17 +90,7 @@ function cleanResponse(text: string) {
 /* ---------------- INTENT ---------------- */
 function detectHighIntent(prompt: string): boolean {
   const text = prompt.toLowerCase();
-
-  return [
-    "hire",
-    "book",
-    "schedule",
-    "call",
-    "work with",
-    "i want",
-    "let's start",
-    "ready"
-  ].some((s) => text.includes(s));
+  return ["hire","book","schedule","call","work with","i want","let's start","ready"].some((s) => text.includes(s));
 }
 
 /* ---------------- MAIN FUNCTION ---------------- */
@@ -120,22 +100,16 @@ export async function generateGemini(
 ): Promise<string> {
 
   const API_KEY = process.env.GEMINI_API_KEY;
-
-  if (!API_KEY) {
-    return "";
-  }
+  if (!API_KEY) return "";
 
   prompt = cleanPrompt(prompt);
   const cacheKey = `${sessionId || "global"}:${prompt}`;
 
   /* ---------- CACHE ---------- */
-  if (recentCache.has(cacheKey)) {
-    return recentCache.get(cacheKey)!;
-  }
+  if (recentCache.has(cacheKey)) return recentCache.get(cacheKey)!;
 
   /* ---------- CONTEXT (NON-BLOCKING) ---------- */
   let contextText = "";
-
   if (sessionId) {
     strategicBrain(prompt.slice(0, 300), sessionId)
       .then(({ brainContext }) => {
@@ -182,7 +156,7 @@ Response:
         contents: [{ parts: [{ text: finalPrompt }] }],
         generationConfig: {
           temperature: highIntent ? 0.45 : 0.35,
-          maxOutputTokens: 800,
+          maxOutputTokens: 1000,
           topP: 0.9
         }
       }),
@@ -190,29 +164,23 @@ Response:
     });
 
     clearTimeout(timeout);
-
     if (!res.ok) throw new Error(await res.text());
 
+    // ⚡ FIX: assign API response to data
     const data: any = await res.json();
 
-    let content =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
-
+    let content = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
     content = cleanResponse(content);
 
     /* ---------- HARD VALIDATION ---------- */
-    if (
-      !isValidResponse(content) ||
-      isFakeDelay(content) ||
-      containsNonEnglish(content)
-    ) {
+    if (!isValidResponse(content) || isFakeDelay(content) || containsNonEnglish(content)) {
       throw new Error("Rejected bad Gemini output");
     }
 
     content = fixSpacing(content);
     content = ensureComplete(content);
 
-    /* ---------- CACHE CLEAN ONLY ---------- */
+    /* ---------- CACHE ---------- */
     recentCache.set(cacheKey, content);
 
     console.log("✅ Gemini success");
@@ -220,10 +188,7 @@ Response:
 
   } catch (err: any) {
     clearTimeout(timeout);
-
     console.warn("⚠️ Gemini failed:", err?.message || err);
-
-    // ⚠️ NO MORE FAKE FALLBACKS
     return "";
   }
 }
