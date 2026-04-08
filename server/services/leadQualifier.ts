@@ -25,7 +25,7 @@ function clamp(val?: number): number {
 }
 
 function normalizeStage(stage?: string): Stage {
-  const allowed: Stage[] = ["greeting","discovery","strategy","service","conversion"];
+  const allowed: Stage[] = ["greeting", "discovery", "strategy", "service", "conversion"];
   if (stage && allowed.includes(stage as Stage)) return stage as Stage;
   return "discovery";
 }
@@ -40,11 +40,15 @@ export class LeadQualifier {
   };
 
   /* ================= SCORE LEAD ================= */
-  scoreLead(sessionId: string, bantData: Partial<LeadScore>, stageInput: string = "discovery"): LeadScore {
+  scoreLead(
+    sessionId: string,
+    bantData: Partial<LeadScore>,
+    stageInput: string = "discovery"
+  ): LeadScore {
     const stage = normalizeStage(stageInput);
     const weights = { ...this.defaultWeights };
 
-    // Dynamic weighting
+    // Dynamic weighting per stage
     if (stage === "discovery") weights.need += 0.1;
     if (stage === "conversion") weights.budget += 0.1;
 
@@ -88,7 +92,7 @@ export class LeadQualifier {
 
       const memoryUpdate: Partial<StrategicMemory> = {
         leadScore: score.total,
-        updatedAt: new Date().toISOString(), // FIXED: store as string
+        updatedAt: new Date().toISOString(), // Fixed format for storage
       };
 
       await memoryService.updateStrategicMemory(sessionId, memoryUpdate);

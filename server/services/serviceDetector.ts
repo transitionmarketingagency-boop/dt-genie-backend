@@ -17,8 +17,9 @@ export type DetectedIntent = {
 };
 
 /* ================= NORMALIZATION ================= */
-function normalize(text: string): string {
-  return (text || "")
+function normalize(text: string | undefined | null): string {
+  if (!text) return "";
+  return text
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -33,13 +34,16 @@ function escapeRegex(text: string): string {
 function matchKeyword(text: string, keyword: string): number {
   const normalizedText = normalize(text);
   const kw = normalize(keyword);
+  if (!kw) return 0;
 
   // Exact match
   const exactRegex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
   if (exactRegex.test(normalizedText)) return 1;
 
   // Partial word match
-  const words = kw.split(" ");
+  const words = kw.split(" ").filter(Boolean);
+  if (!words.length) return 0;
+
   let hits = 0;
   for (const w of words) if (normalizedText.includes(w)) hits++;
   return (hits / words.length) * 0.6;
@@ -86,7 +90,7 @@ export async function detectServiceScores(
 
     // Keyword-based scoring
     for (const kw of config.keywords) score += matchKeyword(text, kw);
-    score = (score / config.keywords.length) * config.weight;
+    score = config.keywords.length ? (score / config.keywords.length) * config.weight : 0;
 
     // Hybrid vector-aware scoring
     if (hybridResponseService?.detectServices) {
@@ -115,7 +119,7 @@ export async function detectIntents(
 
   // Problem signals first
   for (const p of problemSignals) {
-    if (text.includes(p)) {
+    if (text.includes(normalize(p))) {
       results.push({ type: "problem", value: p, confidence: 0.9 });
       added.add(p);
     }

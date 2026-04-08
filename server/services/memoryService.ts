@@ -62,7 +62,7 @@ export interface StrategicMemory {
   lastDetectedServices?: string[];
   lastIntent?: string;
   updatedAt?: string;
-  lastInteraction?: number; // FIXED: store as timestamp
+  lastInteraction?: number; // timestamp
   bantSignals?: {
     budget?: number;
     authority?: number;
@@ -169,7 +169,7 @@ export class MemoryService {
     };
 
     await db.run(
-      `INSERT INTO chat_messages VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO chat_messages (id, sessionId, role, content, timestamp) VALUES (?, ?, ?, ?, ?)`,
       msg.id,
       sessionId,
       role,
@@ -189,16 +189,10 @@ export class MemoryService {
     return msg;
   }
 
-  /* -------- SAVE MESSAGE (BACKWARD COMPAT) -------- */
-  async saveMessage(
-    sessionId: string,
-    role: "user" | "assistant",
-    content: string
-  ) {
+  async saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
     return this.addMessage(sessionId, role, content);
   }
 
-  /* -------- HISTORY -------- */
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
     const db = await this.db;
     const rows = await db.all(
@@ -215,7 +209,6 @@ export class MemoryService {
     }));
   }
 
-  /* -------- CONTEXT -------- */
   async getRecentContext(sessionId: string): Promise<ChatMessage[]> {
     const db = await this.db;
     const rows = await db.all(
@@ -236,11 +229,9 @@ export class MemoryService {
   async getStrategicMemory(sessionId: string): Promise<StrategicMemory> {
     const db = await this.db;
     const row = await db.get(`SELECT * FROM strategic_memory WHERE sessionId=?`, sessionId);
-
     if (!row) return {};
 
-    // Reset stale sessions (>1 day)
-    const last = row.lastInteraction ? new Date(row.lastInteraction).getTime() : null;
+    const last = row.lastInteraction ? Number(row.lastInteraction) : null;
     const isStale = last && Date.now() - last > 24 * 60 * 60 * 1000;
     if (isStale) return {};
 
@@ -283,24 +274,27 @@ export class MemoryService {
     };
 
     await db.run(
-      `INSERT INTO strategic_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(sessionId) DO UPDATE SET
-       industry=excluded.industry,
-       businessType=excluded.businessType,
-       goals=excluded.goals,
-       servicesDiscussed=excluded.servicesDiscussed,
-       leadScore=excluded.leadScore,
-       stage=excluded.stage,
-       budget=excluded.budget,
-       timeline=excluded.timeline,
-       decisionMaker=excluded.decisionMaker,
-       interestLevel=excluded.interestLevel,
-       lastUserProblem=excluded.lastUserProblem,
-       lastDetectedServices=excluded.lastDetectedServices,
-       lastIntent=excluded.lastIntent,
-       bantSignals=excluded.bantSignals,
-       updatedAt=excluded.updatedAt,
-       lastInteraction=excluded.lastInteraction`,
+      `INSERT INTO strategic_memory (
+        sessionId, industry, businessType, goals, servicesDiscussed, leadScore, stage, budget, timeline,
+        decisionMaker, interestLevel, lastUserProblem, lastDetectedServices, lastIntent, bantSignals, updatedAt, lastInteraction
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(sessionId) DO UPDATE SET
+        industry=excluded.industry,
+        businessType=excluded.businessType,
+        goals=excluded.goals,
+        servicesDiscussed=excluded.servicesDiscussed,
+        leadScore=excluded.leadScore,
+        stage=excluded.stage,
+        budget=excluded.budget,
+        timeline=excluded.timeline,
+        decisionMaker=excluded.decisionMaker,
+        interestLevel=excluded.interestLevel,
+        lastUserProblem=excluded.lastUserProblem,
+        lastDetectedServices=excluded.lastDetectedServices,
+        lastIntent=excluded.lastIntent,
+        bantSignals=excluded.bantSignals,
+        updatedAt=excluded.updatedAt,
+        lastInteraction=excluded.lastInteraction`,
       sessionId,
       merged.industry ?? null,
       merged.businessType ?? null,
@@ -333,7 +327,7 @@ export class MemoryService {
     const db = await this.db;
     const id = crypto.randomUUID();
     await db.run(
-      `INSERT INTO bookings VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO bookings (id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       id,
       data.userId,
       data.serviceType ?? null,

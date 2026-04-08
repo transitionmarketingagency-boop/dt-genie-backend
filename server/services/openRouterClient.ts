@@ -4,6 +4,7 @@ import fetch from "node-fetch";
 import { strategicBrain } from "./strategicBrain.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { shouldTriggerBooking, type Stage } from "./bookingTrigger.js";
+import { smartFallback } from "./responseDecision.js";
 import type { LeadScore } from "./leadQualifier.js";
 import crypto from "crypto";
 
@@ -79,7 +80,7 @@ function finalize(text: string): string {
 
 /* ================= INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
-  return /(book|schedule|call|hire|start now|let's start|ready)/i.test(message);
+  return /(book|schedule|call|hire|start now|let's start|ready|help with|assist me)/i.test(message);
 }
 
 /* ================= CACHE ================= */
@@ -165,7 +166,7 @@ Recent: ${recentMessages.slice(-3).join(" | ")}`.trim();
   }
 
   /* ---------- GREETING OVERRIDE ---------- */
-  const greetingTriggers = ["hi", "hello", "hey", "good morning", "good evening"];
+  const greetingTriggers = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
   if (greetingTriggers.some((g) => prompt.toLowerCase().includes(g)) && dynamicGreeting) {
     return dynamicGreeting;
   }
@@ -246,18 +247,10 @@ If context exists, you MUST use it.
       lastError = err;
       console.warn(`⚠️ OpenRouter attempt ${attempt} failed:`, err?.message);
 
-      // If last retry, break and use fallback
       if (attempt > MAX_RETRIES) break;
     }
   }
 
-  /* ---------- DYNAMIC FALLBACK ---------- */
-  const fallbackOptions = [
-    `Let's start by identifying your biggest bottleneck — is it traffic, conversion, or retention?`,
-    `Focus on 1–2 core channels first (ads, content, or email) and optimize them based on real data.`,
-    `Provide me your niche and I’ll map a precise execution plan for you.`,
-  ];
-
-  const fallback = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
-  return fallback;
+  /* ---------- CONTEXT-AWARE FALLBACK ---------- */
+  return smartFallback(detectedServices, goalsText ? [goalsText] : []);
 }

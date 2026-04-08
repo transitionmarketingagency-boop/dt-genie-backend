@@ -1,29 +1,29 @@
-// server/services/smartGreeting.ts
-
 /**
- * Lightweight greeting — only triggers for very short messages
- * and never overrides meaningful queries.
+ * Improved greeting — triggers on greetings with optional text,
+ * avoids repeating same greeting in session, and combines with recent messages.
  */
 export async function smartGreeting(
   brainContext: any,
-  recentMessages: any[]
+  recentMessages: string[] = []
 ): Promise<string | null> {
-
   const message = brainContext?.message?.toLowerCase?.() || "";
 
-  // ✅ ONLY trigger on pure greetings
-  const isGreeting = /^(hi|hello|hey|yo|whats up|what's up)$/.test(message);
-
+  // ✅ Trigger on greetings + optional extra text
+  const isGreeting = /^(hi|hello|hey|yo|good morning|good afternoon|good evening)[\s,!]?.*/i.test(message);
   if (!isGreeting) return null;
 
-  // ❌ DO NOT depend on recentMessages (unstable)
-  // ❌ DO NOT depend on leadScore (can be noisy)
+  // ✅ Avoid repeating same greeting if recently used
+  const lastGreeting = recentMessages?.slice(-3).find((m) =>
+    /hi|hello|hey|yo|good morning|good afternoon|good evening/i.test(m)
+  );
+  if (lastGreeting) return null;
 
+  // ✅ Time-based greeting
   const hour = new Date().getHours();
   const greeting =
     hour < 12 ? "Good morning"
     : hour < 18 ? "Good afternoon"
     : "Good evening";
 
-  return `${greeting} — what are you trying to improve right now?`;
+  return `${greeting} — what’s the main improvement you’re looking for today?`;
 }

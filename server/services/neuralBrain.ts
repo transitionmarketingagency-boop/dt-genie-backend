@@ -1,28 +1,30 @@
-// server/services/neuralBrain.ts
-
 /**
- * Quick neural-like brain for intent classification.
- * Handles booking, identity queries, greetings, and normal inputs.
+ * Neural-like brain for intent classification.
+ * Detects booking, identity, greetings, service inquiries, and normal inputs.
  */
 export function neuralBrain(message: string) {
   const msg = message.trim().toLowerCase();
-  const greetingRegex = /^(hi|hello|hey|good morning|good afternoon|good evening)$/i;
 
-  // Strong booking intent detection
+  // Booking intent detection
   if (/(book|schedule|appointment|consultation|call|hire|work with you|start now|let's start|ready to proceed)/i.test(msg)) {
-    return { type: "booking" };
+    return { type: "booking", highIntent: true };
   }
 
-  // Identity / company info queries
-  if (msg.includes("who are you") || msg.includes("what do you do")) {
+  // Identity / company info
+  if (/who are you|what do you do/i.test(msg)) {
     return { type: "identity" };
   }
 
-  // Greeting only if very short (prevents spam on long service queries)
-  if (greetingRegex.test(msg) && msg.split(" ").length <= 3) {
+  // Greeting detection
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening)/i.test(msg)) {
     return { type: "greeting" };
   }
 
-  // Default normal classification
-  return { type: "normal" };
+  // Service inquiry detection
+  if (/.*(help with|assist me|recommend services|services|offerings|solutions|SEO|AI marketing).*/i.test(msg)) {
+    return { type: "service_inquiry", highIntent: false };
+  }
+
+  // Default
+  return { type: "normal", highIntent: false };
 }

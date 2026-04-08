@@ -1,5 +1,3 @@
-// server/services/responseDecision.ts
-
 /* ================= BOOKING REJECTION ================= */
 export function detectBookingRejection(message: string): boolean {
   const msg = message.toLowerCase();
@@ -15,9 +13,20 @@ export function detectBookingRejection(message: string): boolean {
   );
 }
 
-/* ================= SAFE FALLBACK ================= */
-export function smartFallback(): string {
-  return "Tell me your goal and I’ll map a precise strategy for you.";
+/* ================= CONTEXT-AWARE FALLBACK ================= */
+export function smartFallback(detectedServices?: string[], goals?: string[]): string {
+  if (detectedServices?.length) {
+    return `I see you're interested in ${detectedServices.join(", ")}. Tell me your main goal and I’ll create a precise strategy.`;
+  }
+  if (goals?.length) {
+    return `Thanks for sharing your goals: ${goals.join(", ")}. Let’s map out the best next steps.`;
+  }
+  const fallbackOptions = [
+    "Let's start by identifying your biggest bottleneck — is it traffic, conversion, or retention?",
+    "Focus on 1–2 core channels first (ads, content, or email) and optimize them based on real data.",
+    "Provide me your niche and I’ll map a precise execution plan for you.",
+  ];
+  return fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
 }
 
 /* ================= CTA LOGIC ================= */
@@ -34,10 +43,12 @@ export function shouldIncludeCTA(
     lower.includes("schedule") ||
     lower.includes("consultation") ||
     lower.includes("hire") ||
-    lower.includes("start");
+    lower.includes("start") ||
+    lower.includes("help with") ||
+    lower.includes("assist me") ||
+    lower.includes("recommend services");
 
-  const highIntent =
-    leadScore >= 6 || stage === "service" || stage === "conversion";
+  const highIntent = leadScore >= 5 || ["service", "conversion"].includes(stage);
 
   if (intentCategories.includes("general") && leadScore < 5) return false;
 
