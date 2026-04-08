@@ -17,7 +17,6 @@ type SafeBrainContext = {
   detectedServices?: string[];
   goals?: string[];
   recentMessages?: string[];
-  dynamicGreeting?: string;
   industry?: string;
   businessType?: string;
   isFresh?: boolean;
@@ -35,7 +34,6 @@ interface OpenRouterResponse {
 const MODEL = "qwen/qwen3-235b-a22b-2507";
 const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 4200;
-const MAX_RETRIES = 1;
 
 /* ================= CLEAN PROMPT ================= */
 function cleanPrompt(prompt: string): string {
@@ -50,8 +48,10 @@ function cleanPrompt(prompt: string): string {
 
 /* ================= RESPONSE VALIDATION ================= */
 function isValidResponse(text: string): boolean {
-  if (!text || text.length < 20) return false;
+  if (!text || text.length < 25) return false;
+
   const lower = text.toLowerCase();
+
   return !(
     lower.includes("<|") ||
     lower.includes("|>") ||
@@ -60,6 +60,7 @@ function isValidResponse(text: string): boolean {
   );
 }
 
+/* ================= FINAL CLEAN ================= */
 function finalize(text: string): string {
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -68,51 +69,55 @@ function finalize(text: string): string {
     .replace(/[^\.\!\?]$/, (m) => m + ".");
 }
 
-/* ================= 🔥 NEW SMART FALLBACK ================= */
+/* ================= SMART FALLBACK ================= */
 function smartFallback(detectedServices: string[], goalsText: string): string {
   if (detectedServices.length > 0) {
-    return `You're focusing on ${detectedServices.join(
+    return `You're dealing with ${detectedServices.join(
       ", "
-    )}. Here's the fastest way to improve results:
+    )}. The real issue is likely not the channel — it's execution.
 
-1. Fix conversion bottlenecks first (landing page, offer clarity)
-2. Align traffic source with intent (ads vs organic mismatch is common)
-3. Optimize one channel deeply before scaling
+Focus on:
+1. Fixing conversion leaks first (landing page, offer clarity)
+2. Matching traffic intent with funnel stage
+3. Scaling only what already converts
 
-If you want, I can break this into a step-by-step execution plan.`;
+If you want, I can break this into a step-by-step execution plan based on your setup.`;
   }
 
   if (goalsText && goalsText !== "unknown") {
-    return `To achieve "${goalsText}", you need to focus on:
+    return `To achieve "${goalsText}", the bottleneck is usually in execution — not strategy.
 
-1. Identifying the highest ROI acquisition channel
-2. Fixing conversion leaks before scaling traffic
-3. Building a simple but optimized funnel
+You should:
+1. Identify your highest ROI channel
+2. Fix conversion before scaling traffic
+3. Simplify your funnel before optimizing
 
-Tell me your current setup and I’ll refine this into a precise plan.`;
+Tell me your current setup and I’ll map exact next steps.`;
   }
 
-  return `To improve results, focus on this sequence:
+  return `There’s a bottleneck in your current system.
 
-1. Identify your biggest bottleneck (traffic vs conversion vs retention)
-2. Fix that layer completely before adding complexity
-3. Scale only what is already working
+Before scaling anything:
+1. Identify if the issue is traffic, conversion, or retention
+2. Fix that layer completely
+3. Then scale what works
 
-If you share your current setup, I’ll give you exact next steps.`;
+Tell me what you're currently doing and I’ll pinpoint the exact issue.`;
 }
 
 /* ================= INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
-  return /(book|schedule|call|hire|start now|ready|help with)/i.test(message);
+  return /(book|schedule|call|hire|start now|ready|help with|assist me)/i.test(message);
 }
 
 /* ================= CACHE ================= */
 const cache = new Map<string, string>();
+
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-/* ================= HELPER ================= */
+/* ================= SAFE STAGE ================= */
 function toSafeStage(stage?: string): Stage {
   const allowed: Stage[] = ["greeting", "discovery", "strategy", "service", "conversion"];
   return allowed.includes(stage as Stage) ? (stage as Stage) : "greeting";
@@ -124,10 +129,11 @@ export async function generateOpenRouter(
   sessionId?: string
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
-    return "Tell me your goal — I’ll map out the exact strategy for you.";
+    return `Tell me what you're trying to improve — I’ll map out the exact strategy.`;
   }
 
   prompt = cleanPrompt(prompt);
+
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
@@ -137,8 +143,8 @@ export async function generateOpenRouter(
 
   let detectedServices: string[] = [];
   let goalsText = "unknown";
-  let dynamicGreeting: string | undefined;
 
+  /* ---------- CONTEXT ---------- */
   if (sessionId) {
     try {
       const { brainContext } = await strategicBrain(prompt, sessionId);
@@ -151,8 +157,6 @@ export async function generateOpenRouter(
 
       detectedServices = ctx.detectedServices || [];
       goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
-
-      dynamicGreeting = ctx.dynamicGreeting;
 
       if (highIntent) {
         executionMode = "execution";
@@ -171,13 +175,11 @@ Goals: ${goalsText}`.trim();
     }
   }
 
-  /* ---------- GREETING FIX ---------- */
-  if (/^(hi|hello|hey)$/i.test(prompt.trim()) && dynamicGreeting) {
-    return dynamicGreeting;
-  }
-
-  /* ---------- OPENROUTER ---------- */
+  /* ---------- OPENROUTER CALL ---------- */
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -191,7 +193,16 @@ Goals: ${goalsText}`.trim();
         messages: [
           {
             role: "system",
-            content: `You are a senior AI marketing strategist. Give direct, actionable strategies. No fluff.`,
+            content: `
+You are a senior AI marketing strategist.
+
+Rules:
+- Be direct and actionable
+- Diagnose the real problem
+- Give execution steps
+- No generic advice
+- No repeating questions
+            `.trim(),
           },
           {
             role: "user",
@@ -199,9 +210,13 @@ Goals: ${goalsText}`.trim();
           },
         ],
       }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeout);
+
     const data = (await res.json()) as OpenRouterResponse;
+
     let text = cleanResponse(
       data?.choices?.[0]?.message?.content ||
         data?.choices?.[0]?.text ||
@@ -211,13 +226,16 @@ Goals: ${goalsText}`.trim();
     if (!isValidResponse(text)) throw new Error("Invalid AI response");
 
     text = finalize(text);
-    cache.set(cacheKey, text);
+
+    if (text.length > 30) {
+      cache.set(cacheKey, text);
+    }
 
     return text;
   } catch (err) {
     console.warn("⚠️ OpenRouter failed:", err);
   }
 
-  /* ---------- ✅ FINAL FALLBACK ---------- */
+  /* ---------- FINAL FALLBACK ---------- */
   return smartFallback(detectedServices, goalsText);
 }

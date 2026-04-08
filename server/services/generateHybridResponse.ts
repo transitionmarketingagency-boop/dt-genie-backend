@@ -27,7 +27,6 @@ import { withTimeout } from "./timeoutHelper.js";
 
 import { neuralBrain } from "./neuralBrain.js";
 import { normalizeLeadScore, determineExecutionMode } from "./leadScoreHelper.js";
-import { smartGreeting } from "./greetingHelper.js";
 import { checkHardResponses } from "./hardResponses.js";
 
 // ===================== TYPES ===================== //
@@ -215,12 +214,6 @@ export async function executeHybridResponse({
       return hardResponse;
     }
 
-    // 2️⃣ Dynamic greeting
-const greetingResp = await smartGreeting(message, recentMessagesCache);
-    if (greetingResp) {
-      await memoryService.saveMessage(sessionId, "assistant", greetingResp);
-      return greetingResp;
-    }
 
     // 3️⃣ Detect services & intents
     brainContext.detectedServices = [];
