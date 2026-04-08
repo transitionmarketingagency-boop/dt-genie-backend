@@ -4,13 +4,20 @@ import { memoryService } from "./memoryService.js";
 import type { StrategicMemory } from "./memoryService.js";
 
 /* ================= TYPES ================= */
+export type Stage =
+  | "greeting"
+  | "discovery"
+  | "strategy"
+  | "service"
+  | "conversion";
+
 export interface LeadScore {
   budget?: number;      // 0-1
   authority?: number;   // 0-1
   need?: number;        // 0-1
   timeline?: number;    // 0-1
   total: number;        // 0-1 normalized, weighted
-  stage?: string;       // optional conversation stage
+  stage?: Stage;
 }
 
 /* ================= UTILS ================= */
@@ -19,10 +26,25 @@ function clamp(val?: number): number {
   return Math.max(0, Math.min(1, val));
 }
 
+function normalizeStage(stage?: string): Stage {
+  const allowed: Stage[] = [
+    "greeting",
+    "discovery",
+    "strategy",
+    "service",
+    "conversion",
+  ];
+
+  if (allowed.includes(stage as Stage)) {
+    return stage as Stage;
+  }
+
+  return "discovery";
+}
+
 /* ================= CLASS ================= */
 export class LeadQualifier {
 
-  // Weighted BANT components (dynamic per stage)
   private defaultWeights = {
     budget: 0.25,
     authority: 0.25,
@@ -34,13 +56,15 @@ export class LeadQualifier {
   scoreLead(
     sessionId: string,
     bantData: Partial<LeadScore>,
-    stage: string = "initial"
+    stageInput: string = "discovery"
   ): LeadScore {
 
-    // Adjust weights dynamically by stage if needed
+    const stage = normalizeStage(stageInput);
     const weights = { ...this.defaultWeights };
-    if (stage === "early") weights.need += 0.1; // focus on need in early stage
-    if (stage === "late") weights.budget += 0.1; // emphasize budget later
+
+    // Dynamic weighting
+    if (stage === "discovery") weights.need += 0.1;
+    if (stage === "conversion") weights.budget += 0.1;
 
     const score: LeadScore = {
       budget: clamp(bantData.budget),
@@ -51,7 +75,7 @@ export class LeadQualifier {
       stage,
     };
 
-    // Weighted total
+    /* ---------- WEIGHTED TOTAL ---------- */
     score.total =
       (score.budget || 0) * weights.budget +
       (score.authority || 0) * weights.authority +
@@ -60,14 +84,14 @@ export class LeadQualifier {
 
     score.total = clamp(score.total);
 
-    // ---------- DEBUG ----------
+    /* ---------- DEBUG ---------- */
     if (process.env.DEBUG_MEMORY === "true") {
       console.log(`[LeadQualifier] ${sessionId} | stage=${stage} ->`, score);
     }
 
-    // ---------- MEMORY UPDATE ----------
+    /* ---------- NON-BLOCKING MEMORY UPDATE ---------- */
     if (sessionId && score.total > 0) {
-      this.safeUpdateLeadScore(sessionId, score);
+      this.safeUpdateLeadScore(sessionId, score); // ✅ no await
     }
 
     return score;
@@ -76,7 +100,6 @@ export class LeadQualifier {
   /* ================= SAFE MEMORY UPDATE ================= */
   private async safeUpdateLeadScore(sessionId: string, score: LeadScore) {
     try {
-      // Skip zero scores
       if (score.total <= 0) return;
 
       await memoryService.updateStrategicMemory(sessionId, {
@@ -91,11 +114,16 @@ export class LeadQualifier {
       } as Partial<StrategicMemory>);
 
       if (process.env.DEBUG_MEMORY === "true") {
-        console.log(`[LeadQualifier] leadScore=${score.total} saved for ${sessionId}`);
+        console.log(
+          `[LeadQualifier] leadScore=${score.total} saved for ${sessionId}`
+        );
       }
 
     } catch (err) {
-      console.warn(`[LeadQualifier] Memory update failed (${sessionId}):`, err);
+      console.warn(
+        `[LeadQualifier] Memory update failed (${sessionId}):`,
+        err
+      );
     }
   }
 }

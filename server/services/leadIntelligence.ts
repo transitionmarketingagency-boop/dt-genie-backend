@@ -14,7 +14,7 @@ export interface BANTSignals {
 
 /* ================= NORMALIZATION ================= */
 function normalize(text: string): string {
-  return text
+  return (text || "")
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -23,7 +23,7 @@ function normalize(text: string): string {
 
 /* ================= SAFE CLAMP ================= */
 function clamp(value: number | undefined): number {
-  if (!value || isNaN(value)) return 0;
+  if (value === undefined || value === null || isNaN(value)) return 0;
   return Math.max(0, Math.min(1, value));
 }
 
@@ -87,7 +87,7 @@ function detectSignals(
     clamp((value ?? 0) + increment);
 
   /* ---------- NEED ---------- */
-  signals.need = add(signals.need, 0.35 * includesAny(msg, needSignals));
+  signals.need = add(signals.need, 0.3 * includesAny(msg, needSignals));
 
   /* ---------- BUDGET ---------- */
   signals.budget = add(signals.budget, 0.25 * includesAny(msg, budgetSignals));
@@ -96,7 +96,7 @@ function detectSignals(
   signals.authority = add(signals.authority, 0.25 * includesAny(msg, authoritySignals));
 
   /* ---------- TIMELINE ---------- */
-  signals.timeline = add(signals.timeline, 0.15 * includesAny(msg, timelineSignals));
+  signals.timeline = add(signals.timeline, 0.2 * includesAny(msg, timelineSignals));
 
   /* ---------- BUYING BOOST ---------- */
   const buyingHits = includesAny(msg, buyingSignals);
@@ -129,16 +129,16 @@ export async function analyzeLeadSignals(
 
   let memorySignals: Partial<BANTSignals> = {};
 
-  /* ---------- LOAD MEMORY ---------- */
+  /* ---------- LOAD MEMORY (SAFE ACCESS) ---------- */
   if (sessionId) {
     try {
-      const mem = await memoryService.getStrategicMemory(sessionId);
+      const mem: any = await memoryService.getStrategicMemory(sessionId);
 
       memorySignals = {
-        budget: clamp(mem.budget),
-        authority: mem.decisionMaker ? 0.8 : 0,
-        need: Array.isArray(mem.goals) && mem.goals.length ? 0.6 : 0,
-        timeline: mem.timeline ? 0.6 : 0,
+        budget: clamp(mem?.budget),
+        authority: mem?.decisionMaker ? 0.8 : 0,
+        need: Array.isArray(mem?.goals) && mem.goals.length ? 0.6 : 0,
+        timeline: mem?.timeline ? 0.6 : 0,
       };
 
     } catch (err) {
@@ -163,13 +163,13 @@ export async function analyzeLeadSignals(
   /* ---------- SCORE ---------- */
   const score = leadQualifier.scoreLead(sessionId, signals);
 
-  /* ---------- SAVE MEMORY ---------- */
+  /* ---------- SAVE MEMORY (SAFE MERGE) ---------- */
   if (sessionId) {
     try {
       await memoryService.updateStrategicMemory(sessionId, {
         budget: signals.budget,
         decisionMaker: mapDecisionMaker(signals.authority),
-        goals: signals.need && signals.need > 0.5 ? ["growth"] : [],
+        goals: signals.need && signals.need > 0.5 ? ["growth"] : undefined,
         timeline: mapTimeline(signals.timeline),
       });
 

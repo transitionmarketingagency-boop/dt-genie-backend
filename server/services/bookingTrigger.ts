@@ -1,24 +1,29 @@
 // server/services/bookingTrigger.ts
 
 /* ================= TYPES ================= */
-type Stage = "greeting" | "discovery" | "strategy" | "service" | "conversion";
+export type Stage = "greeting" | "discovery" | "strategy" | "service" | "conversion";
 
 /* ================= COOLDOWN ================= */
 const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 min
 const bookingCooldownMap = new Map<string, number>();
 
 function isInCooldown(sessionId: string): boolean {
+  if (!sessionId) return false;
   const last = bookingCooldownMap.get(sessionId);
   return last ? Date.now() - last < BOOKING_COOLDOWN_MS : false;
 }
 
 function markTriggered(sessionId: string) {
+  if (!sessionId) return;
   bookingCooldownMap.set(sessionId, Date.now());
 }
 
 /* ================= NORMALIZE ================= */
 function normalize(text: string): string {
-  return (text || "").toLowerCase().trim();
+  return (text || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 /* ================= MAIN TRIGGER LOGIC ================= */

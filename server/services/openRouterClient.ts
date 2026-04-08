@@ -3,7 +3,7 @@
 import fetch from "node-fetch";
 import { strategicBrain } from "./strategicBrain.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
-import { shouldTriggerBooking } from "./bookingTrigger.js";
+import { shouldTriggerBooking, type Stage } from "./bookingTrigger.js";
 import type { LeadScore } from "./leadQualifier.js";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
@@ -48,9 +48,7 @@ function cleanPrompt(prompt: string): string {
 /* ================= RESPONSE CHECK ================= */
 function isValidResponse(text: string): boolean {
   if (!text || text.length < 20) return false;
-
   const lower = text.toLowerCase();
-
   return !(
     lower.includes("<|") ||
     lower.includes("|>") ||
@@ -84,6 +82,12 @@ function detectHighIntent(message: string): boolean {
 /* ================= CACHE ================= */
 const cache = new Map<string, string>();
 
+/* ================= HELPER: SAFE STAGE ================= */
+function toSafeStage(stage?: string): Stage {
+  const allowed: Stage[] = ["greeting", "discovery", "strategy", "service", "conversion"];
+  return allowed.includes(stage as Stage) ? (stage as Stage) : "greeting";
+}
+
 /* ================= MAIN ================= */
 export async function generateOpenRouter(
   prompt: string,
@@ -96,9 +100,7 @@ export async function generateOpenRouter(
   prompt = cleanPrompt(prompt);
   const cacheKey = `${sessionId || "global"}:${prompt.toLowerCase()}`;
 
-  if (cache.has(cacheKey)) {
-    return cache.get(cacheKey)!;
-  }
+  if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
   /* ---------- CONTEXT ---------- */
   let contextText = "";
@@ -111,7 +113,6 @@ export async function generateOpenRouter(
   if (sessionId) {
     try {
       const { brainContext } = await strategicBrain(prompt, sessionId);
-
       const ctx = (brainContext || {}) as SafeBrainContext;
 
       const leadScore = ctx.leadScore;
@@ -121,9 +122,7 @@ export async function generateOpenRouter(
           : leadScore?.total ?? 0;
 
       detectedServices = ctx.detectedServices || [];
-      goalsText = Array.isArray(ctx.goals)
-        ? ctx.goals.join(", ")
-        : "unknown";
+      goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
 
       const recentMessages = ctx.recentMessages || [];
       const industry = ctx.industry || "unknown";
@@ -132,8 +131,8 @@ export async function generateOpenRouter(
       /* ---------- EXECUTION MODE ---------- */
       if (highIntent) {
         executionMode = "execution";
-      const safeStage = (ctx.stage ?? "awareness") as any;
-await shouldTriggerBooking(sessionId, safeStage);
+        const safeStage = toSafeStage(ctx.stage);
+        await shouldTriggerBooking(sessionId, safeStage);
       } else {
         executionMode = ctx.executionMode || "exploration";
       }
@@ -218,9 +217,7 @@ If context exists, you MUST use it.
     let text = cleanResponse(raw);
 
     /* ---------- VALIDATION ---------- */
-    if (!isValidResponse(text)) {
-      throw new Error("Invalid response");
-    }
+    if (!isValidResponse(text)) throw new Error("Invalid response");
 
     text = finalize(text);
 
@@ -236,7 +233,6 @@ If context exists, you MUST use it.
     clearTimeout(timeout);
     console.warn("⚠️ OpenRouter failed:", err?.message);
 
-    /* ---------- SMART FALLBACK (NO LOOP) ---------- */
     return `Here’s a strong starting strategy:
 
 1. Identify your biggest bottleneck (traffic, conversion, or retention)

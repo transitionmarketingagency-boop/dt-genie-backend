@@ -91,7 +91,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   }
 
   /* ---------- STAGE ---------- */
-  const stage = detectStage(message, leadScore);
+  let stage = detectStage(message, leadScore);
   let executionMode: BrainContext["executionMode"] =
     stage === "greeting" ? "exploration" : "execution";
 
@@ -113,6 +113,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
       .filter((i) => i.type === "service" && i.confidence > 0.5)
       .map((i) => i.value);
 
+    // Merge with previous memory
     const existing = new Set(strategicMemory.servicesDiscussed || []);
     detectedServices.forEach((s) => existing.add(s));
     strategicMemory.servicesDiscussed = Array.from(existing);
@@ -135,9 +136,16 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   let reasoning = "";
   try {
     if (sessionId) {
-      // ✅ FIXED: Only 2 arguments
       const result = await reasoningEngine.analyze(sessionId, message);
       reasoning = result.strategy || "";
+
+      // Append service-specific fallback if multiple services detected
+      if (detectedServices.length > 1) {
+        const serviceFallbacks = detectedServices.map(
+          (s) => `Optimize ${s} with targeted tactics.`
+        );
+        reasoning += "\n\n" + serviceFallbacks.join("\n");
+      }
     }
   } catch {}
 

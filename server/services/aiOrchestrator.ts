@@ -1,15 +1,12 @@
-// server/services/aiOrchestrator.ts
-
 /* =====================================================
    NEON VISION / DT-GENIE AI ORCHESTRATION MODULE
    Combines Intent Detection, Service Suggestions,
    Lead Qualification, and Strategic Reasoning
 ===================================================== */
 
-import { leadQualifier, LeadScore } from "./leadQualifier.js";
-import { reasoningEngine, ReasoningData } from "./reasoningEngine.js";
-import { intents, getRelevantIntents, Intent } from "./intentManager.js";
-import type { StrategicMemory } from "./reasoningEngine.js";
+import { leadQualifier, type LeadScore } from "./leadQualifier.js";
+import { reasoningEngine, type ReasoningData } from "./reasoningEngine.js";
+import { getRelevantIntents, type Intent } from "./intentManager.js";
 
 /* ======================= TYPES ======================= */
 export interface ServiceRecommendation {
@@ -25,7 +22,9 @@ export interface OrchestratorResult {
 }
 
 /* ======================= SERVICE DETECTOR ======================= */
-export function detectServicesFromIntents(intentsDetected: { intent: Intent; score: number }[]): ServiceRecommendation[] {
+export function detectServicesFromIntents(
+  intentsDetected: { intent: Intent; score: number }[]
+): ServiceRecommendation[] {
   const services: ServiceRecommendation[] = [];
 
   for (const item of intentsDetected) {
@@ -37,31 +36,37 @@ export function detectServicesFromIntents(intentsDetected: { intent: Intent; sco
     }
   }
 
-  // Sort by confidence
-  services.sort((a, b) => b.confidence - a.confidence);
-
-  return services;
+  return services.sort((a, b) => b.confidence - a.confidence);
 }
 
 /* ======================= ORCHESTRATION ======================= */
-export async function processUserMessage(sessionId: string, message: string): Promise<OrchestratorResult> {
-  // 1️⃣ Detect intents
-const detectedIntents = getRelevantIntents(message, [], 5); 
+export async function processUserMessage(
+  sessionId: string,
+  message: string
+): Promise<OrchestratorResult> {
 
-  // 2️⃣ Detect services
+  /* ---------- 1️⃣ INTENT DETECTION ---------- */
+  const detectedIntents = getRelevantIntents(message, [], 5);
+
+  /* ---------- 2️⃣ SERVICE DETECTION ---------- */
   const recommendedServices = detectServicesFromIntents(detectedIntents);
 
-  // 3️⃣ Score the lead (BANT)
-  const leadScore = leadQualifier.scoreLead(sessionId, {
-    budget: detectedIntents.some(i => i.intent.name === "hire_intent") ? 1 : undefined,
-    authority: detectedIntents.some(i => i.intent.type === "buying") ? 1 : undefined,
-    need: recommendedServices.length > 0 ? 1 : 0,
-    timeline: detectedIntents.some(i => i.intent.name === "hire_intent") ? 1 : 0,
-  });
+  /* ---------- 3️⃣ LEAD SCORING (FIXED: AWAIT) ---------- */
+  const leadScore = await leadQualifier.scoreLead(
+    sessionId,
+    {
+      budget: detectedIntents.some(i => i.intent.name === "hire_intent") ? 1 : undefined,
+      authority: detectedIntents.some(i => i.intent.type === "buying") ? 1 : undefined,
+      need: recommendedServices.length > 0 ? 1 : 0,
+      timeline: detectedIntents.some(i => i.intent.name === "hire_intent") ? 1 : 0,
+    },
+    "discovery" // safe default stage
+  );
 
-  // 4️⃣ Generate strategic reasoning
+  /* ---------- 4️⃣ STRATEGIC REASONING ---------- */
   const strategy = await reasoningEngine.analyze(sessionId, message);
 
+  /* ---------- FINAL RETURN ---------- */
   return {
     intents: detectedIntents,
     recommendedServices,
