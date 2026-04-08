@@ -27,7 +27,6 @@ import { withTimeout } from "./timeoutHelper.js";
 
 import { neuralBrain } from "./neuralBrain.js";
 import { normalizeLeadScore, determineExecutionMode } from "./leadScoreHelper.js";
-import { checkHardResponses } from "./hardResponses.js";
 
 // ===================== TYPES ===================== //
 export interface BrainContext {
@@ -168,11 +167,6 @@ Before answering:
    - Strategy tied to outcome
 3. Optional: ONE sharp follow-up question ONLY if necessary
 
-🚫 ANTI-GENERIC ENFORCEMENT
-
-❌ BAD: "Use SEO, ads, and content marketing"
-✅ GOOD: "Your YouTube ads are underperforming because the first 3 seconds fail — test 5 new hooks targeting [specific audience]"
-
 🎯 FINAL RULES
 - Be sharp, direct, and strategic
 - Sound like a human expert
@@ -207,15 +201,7 @@ export async function executeHybridResponse({
   forceNoQuestions?: boolean;
 }) {
   try {
-    // 1️⃣ Hard response override
-    const hardResponse = checkHardResponses(message);
-    if (hardResponse) {
-      await memoryService.saveMessage(sessionId, "assistant", hardResponse);
-      return hardResponse;
-    }
-
-
-    // 3️⃣ Detect services & intents
+    // 1️⃣ Detect services & intents
     brainContext.detectedServices = [];
     brainContext.detectedIntents = [];
 
@@ -229,7 +215,7 @@ export async function executeHybridResponse({
       ? detectedIntentsRaw.map((i) => (i?.intent && typeof i.intent === "string" ? i.intent : "unknown"))
       : [];
 
-    // 4️⃣ Vector fusion
+    // 2️⃣ Vector fusion
     let fusedChunksText = "";
     try {
       const chunks = await getFusedChunks(message, 3);
@@ -238,7 +224,7 @@ export async function executeHybridResponse({
       console.warn("[Hybrid] Vector fusion failed:", err);
     }
 
-    // 5️⃣ Build hybrid prompt
+    // 3️⃣ Build hybrid prompt
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
@@ -248,7 +234,7 @@ export async function executeHybridResponse({
       message,
     });
 
-    // 6️⃣ AI model execution
+    // 4️⃣ AI model execution
     let response = "";
     try {
       const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
@@ -265,7 +251,7 @@ export async function executeHybridResponse({
       console.warn("[Hybrid] AI execution failed:", err);
     }
 
-    // 7️⃣ Fallback if low quality or empty
+    // 5️⃣ Fallback if low quality or empty
     if (!response || (isLowQuality(response) && response.trim().length < 20)) {
       const fallbackOptions = [
         "Can you share more details so I can provide precise guidance?",
@@ -275,22 +261,21 @@ export async function executeHybridResponse({
       response = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
     }
 
-    // 8️⃣ Cleanup, enforce bot name
+    // 6️⃣ Cleanup & enforce bot name
     response = cleanHybridResponse(response);
     if (forceNoQuestions) response = response.replace(/\?+/g, ".");
     response = enforceBotName(response);
 
-    // 9️⃣ Intelligent CTA
+    // 7️⃣ Intelligent CTA
     if (
       response &&
-      !response.includes("Tell me your goal") &&
       shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)
     ) {
       response +=
         "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
     }
 
-    // 🔟 Save assistant response to memory
+    // 8️⃣ Save assistant response
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;

@@ -49,9 +49,7 @@ function cleanPrompt(prompt: string): string {
 /* ================= RESPONSE VALIDATION ================= */
 function isValidResponse(text: string): boolean {
   if (!text || text.length < 25) return false;
-
   const lower = text.toLowerCase();
-
   return !(
     lower.includes("<|") ||
     lower.includes("|>") ||
@@ -74,35 +72,35 @@ function smartFallback(detectedServices: string[], goalsText: string): string {
   if (detectedServices.length > 0) {
     return `You're dealing with ${detectedServices.join(
       ", "
-    )}. The real issue is likely not the channel — it's execution.
+    )}. Execution is usually the bottleneck.
 
 Focus on:
-1. Fixing conversion leaks first (landing page, offer clarity)
+1. Fixing conversion leaks (landing page, offer clarity)
 2. Matching traffic intent with funnel stage
 3. Scaling only what already converts
 
-If you want, I can break this into a step-by-step execution plan based on your setup.`;
+I can map this into a step-by-step execution plan based on your setup if you want.`;
   }
 
   if (goalsText && goalsText !== "unknown") {
-    return `To achieve "${goalsText}", the bottleneck is usually in execution — not strategy.
+    return `To achieve "${goalsText}", the bottleneck is typically in execution, not strategy.
 
-You should:
+Steps to consider:
 1. Identify your highest ROI channel
 2. Fix conversion before scaling traffic
-3. Simplify your funnel before optimizing
+3. Simplify your funnel before optimization
 
-Tell me your current setup and I’ll map exact next steps.`;
+Share your current setup and I’ll provide exact next steps.`;
   }
 
   return `There’s a bottleneck in your current system.
 
-Before scaling anything:
+Before scaling:
 1. Identify if the issue is traffic, conversion, or retention
 2. Fix that layer completely
 3. Then scale what works
 
-Tell me what you're currently doing and I’ll pinpoint the exact issue.`;
+Tell me your current approach and I’ll pinpoint the exact issue.`;
 }
 
 /* ================= INTENT DETECTION ================= */
@@ -120,7 +118,7 @@ function hash(text: string) {
 /* ================= SAFE STAGE ================= */
 function toSafeStage(stage?: string): Stage {
   const allowed: Stage[] = ["greeting", "discovery", "strategy", "service", "conversion"];
-  return allowed.includes(stage as Stage) ? (stage as Stage) : "greeting";
+  return allowed.includes(stage as Stage) ? (stage as Stage) : "discovery";
 }
 
 /* ================= MAIN FUNCTION ================= */
@@ -133,7 +131,6 @@ export async function generateOpenRouter(
   }
 
   prompt = cleanPrompt(prompt);
-
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
@@ -158,11 +155,10 @@ export async function generateOpenRouter(
       detectedServices = ctx.detectedServices || [];
       goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
 
+      executionMode = highIntent ? "execution" : ctx.executionMode || "exploration";
+
       if (highIntent) {
-        executionMode = "execution";
         await shouldTriggerBooking(sessionId, toSafeStage(ctx.stage));
-      } else {
-        executionMode = ctx.executionMode || "exploration";
       }
 
       contextText = `Stage: ${ctx.stage || "unknown"}
@@ -202,7 +198,7 @@ Rules:
 - Give execution steps
 - No generic advice
 - No repeating questions
-            `.trim(),
+`.trim(),
           },
           {
             role: "user",
@@ -218,18 +214,14 @@ Rules:
     const data = (await res.json()) as OpenRouterResponse;
 
     let text = cleanResponse(
-      data?.choices?.[0]?.message?.content ||
-        data?.choices?.[0]?.text ||
-        ""
+      data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || ""
     );
 
     if (!isValidResponse(text)) throw new Error("Invalid AI response");
 
     text = finalize(text);
 
-    if (text.length > 30) {
-      cache.set(cacheKey, text);
-    }
+    if (text.length > 30) cache.set(cacheKey, text);
 
     return text;
   } catch (err) {
