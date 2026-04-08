@@ -16,7 +16,7 @@ export function neuralBrain(message: string) {
   }
 
   // Greeting detection
-  if (/^(hi|hello|hey|good morning|good afternoon|good evening)/i.test(msg)) {
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening)$/i.test(msg)) {
     return { type: "greeting" };
   }
 

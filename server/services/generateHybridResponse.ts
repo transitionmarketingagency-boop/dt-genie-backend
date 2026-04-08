@@ -20,11 +20,7 @@ import { analyzeLeadSignals } from "./leadIntelligence.js";
 import { shouldTriggerBooking } from "./bookingTrigger.js";
 
 // Modular helpers
-import {
-  detectBookingRejection,
-  smartFallback as smartFallbackHelper,
-  shouldIncludeCTA,
-} from "./responseDecision.js";
+import { detectBookingRejection, shouldIncludeCTA } from "./responseDecision.js";
 import { compressContext } from "./responseUtilities.js";
 import { GEMINI_ENABLED, canUseGemini, markGeminiUsed } from "./geminiManager.js";
 import { withTimeout } from "./timeoutHelper.js";
@@ -220,7 +216,7 @@ export async function executeHybridResponse({
     }
 
     // 2️⃣ Dynamic greeting
-    const greetingResp = await smartGreeting(brainContext, recentMessagesCache);
+const greetingResp = await smartGreeting(message, recentMessagesCache);
     if (greetingResp) {
       await memoryService.saveMessage(sessionId, "assistant", greetingResp);
       return greetingResp;
@@ -278,7 +274,12 @@ export async function executeHybridResponse({
 
     // 7️⃣ Fallback if low quality or empty
     if (!response || (isLowQuality(response) && response.trim().length < 20)) {
-      response = smartFallbackHelper();
+      const fallbackOptions = [
+        "Can you share more details so I can provide precise guidance?",
+        "Help me understand your current bottleneck to give targeted advice.",
+        "Provide your main goal and I'll map out the next steps.",
+      ];
+      response = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
     }
 
     // 8️⃣ Cleanup, enforce bot name

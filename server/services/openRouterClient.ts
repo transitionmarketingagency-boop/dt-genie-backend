@@ -4,7 +4,6 @@ import fetch from "node-fetch";
 import { strategicBrain } from "./strategicBrain.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { shouldTriggerBooking, type Stage } from "./bookingTrigger.js";
-import { smartFallback } from "./responseDecision.js";
 import type { LeadScore } from "./leadQualifier.js";
 import crypto from "crypto";
 
@@ -61,15 +60,6 @@ function isValidResponse(text: string): boolean {
   );
 }
 
-function isBadFallback(text: string): boolean {
-  const t = text.toLowerCase();
-  return (
-    t.includes("try again") ||
-    t.includes("temporary issue") ||
-    t.includes("slight delay")
-  );
-}
-
 function finalize(text: string): string {
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -78,9 +68,42 @@ function finalize(text: string): string {
     .replace(/[^\.\!\?]$/, (m) => m + ".");
 }
 
+/* ================= 🔥 NEW SMART FALLBACK ================= */
+function smartFallback(detectedServices: string[], goalsText: string): string {
+  if (detectedServices.length > 0) {
+    return `You're focusing on ${detectedServices.join(
+      ", "
+    )}. Here's the fastest way to improve results:
+
+1. Fix conversion bottlenecks first (landing page, offer clarity)
+2. Align traffic source with intent (ads vs organic mismatch is common)
+3. Optimize one channel deeply before scaling
+
+If you want, I can break this into a step-by-step execution plan.`;
+  }
+
+  if (goalsText && goalsText !== "unknown") {
+    return `To achieve "${goalsText}", you need to focus on:
+
+1. Identifying the highest ROI acquisition channel
+2. Fixing conversion leaks before scaling traffic
+3. Building a simple but optimized funnel
+
+Tell me your current setup and I’ll refine this into a precise plan.`;
+  }
+
+  return `To improve results, focus on this sequence:
+
+1. Identify your biggest bottleneck (traffic vs conversion vs retention)
+2. Fix that layer completely before adding complexity
+3. Scale only what is already working
+
+If you share your current setup, I’ll give you exact next steps.`;
+}
+
 /* ================= INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
-  return /(book|schedule|call|hire|start now|let's start|ready|help with|assist me)/i.test(message);
+  return /(book|schedule|call|hire|start now|ready|help with)/i.test(message);
 }
 
 /* ================= CACHE ================= */
@@ -89,7 +112,7 @@ function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-/* ================= HELPER: SAFE STAGE ================= */
+/* ================= HELPER ================= */
 function toSafeStage(stage?: string): Stage {
   const allowed: Stage[] = ["greeting", "discovery", "strategy", "service", "conversion"];
   return allowed.includes(stage as Stage) ? (stage as Stage) : "greeting";
@@ -108,7 +131,6 @@ export async function generateOpenRouter(
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
-  /* ---------- CONTEXT ---------- */
   let contextText = "";
   let executionMode = "exploration";
   const highIntent = detectHighIntent(prompt);
@@ -116,39 +138,25 @@ export async function generateOpenRouter(
   let detectedServices: string[] = [];
   let goalsText = "unknown";
   let dynamicGreeting: string | undefined;
-  let recentMessages: string[] = [];
 
   if (sessionId) {
     try {
       const { brainContext } = await strategicBrain(prompt, sessionId);
       const ctx = (brainContext || {}) as SafeBrainContext;
 
-      const isFresh = ctx.isFresh ?? false;
-      const leadScore = ctx.leadScore;
-      const totalScore = typeof leadScore === "number" ? leadScore : leadScore?.total ?? 0;
+      const totalScore =
+        typeof ctx.leadScore === "number"
+          ? ctx.leadScore
+          : ctx.leadScore?.total ?? 0;
 
-      detectedServices = isFresh ? [] : ctx.detectedServices || [];
-      goalsText = isFresh
-        ? "unknown"
-        : Array.isArray(ctx.goals)
-        ? ctx.goals.join(", ")
-        : "unknown";
-
-      recentMessages = isFresh ? [] : ctx.recentMessages || [];
-      const industry = ctx.industry || "unknown";
-      const businessType = ctx.businessType || "";
+      detectedServices = ctx.detectedServices || [];
+      goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
 
       dynamicGreeting = ctx.dynamicGreeting;
 
-      /* ---------- EXECUTION MODE ---------- */
       if (highIntent) {
         executionMode = "execution";
-        try {
-          const safeStage = toSafeStage(ctx.stage);
-          await shouldTriggerBooking(sessionId, safeStage);
-        } catch (err) {
-          console.warn("[BookingTrigger] Failed:", err);
-        }
+        await shouldTriggerBooking(sessionId, toSafeStage(ctx.stage));
       } else {
         executionMode = ctx.executionMode || "exploration";
       }
@@ -156,101 +164,60 @@ export async function generateOpenRouter(
       contextText = `Stage: ${ctx.stage || "unknown"}
 Mode: ${executionMode}
 Lead Score: ${totalScore.toFixed(2)}
-Industry: ${industry} ${businessType}
 Services: ${detectedServices.join(", ") || "none"}
-Goals: ${goalsText}
-Recent: ${recentMessages.slice(-3).join(" | ")}`.trim();
+Goals: ${goalsText}`.trim();
     } catch (err) {
-      console.warn("[StrategicBrain] Context load failed:", err);
+      console.warn("[Context failed]:", err);
     }
   }
 
-  /* ---------- GREETING OVERRIDE ---------- */
-  const greetingTriggers = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"];
-  if (greetingTriggers.some((g) => prompt.toLowerCase().includes(g)) && dynamicGreeting) {
+  /* ---------- GREETING FIX ---------- */
+  if (/^(hi|hello|hey)$/i.test(prompt.trim()) && dynamicGreeting) {
     return dynamicGreeting;
   }
 
-  /* ---------- OPENROUTER CALL WITH RETRY ---------- */
-  let attempt = 0;
-  let lastError: any;
-  while (attempt <= MAX_RETRIES) {
-    attempt++;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  /* ---------- OPENROUTER ---------- */
+  try {
+    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: highIntent ? 0.6 : 0.45,
+        max_tokens: 900,
+        messages: [
+          {
+            role: "system",
+            content: `You are a senior AI marketing strategist. Give direct, actionable strategies. No fluff.`,
+          },
+          {
+            role: "user",
+            content: `${contextText}\nUser: ${prompt}`,
+          },
+        ],
+      }),
+    });
 
-    try {
-      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-          "X-Title": "Neon Vision AI",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          temperature: highIntent ? 0.6 : 0.45,
-          top_p: 0.9,
-          max_tokens: 900,
-          messages: [
-            {
-              role: "system",
-              content: `
-You are Neon Vision — a senior AI marketing strategist.
+    const data = (await res.json()) as OpenRouterResponse;
+    let text = cleanResponse(
+      data?.choices?.[0]?.message?.content ||
+        data?.choices?.[0]?.text ||
+        ""
+    );
 
-RULES:
-- Always give actionable, step-by-step strategies
-- Use detected services: ${detectedServices.join(", ") || "none"}
-- Use goals: ${goalsText}
-- Use business context
-- No generic advice
-- No repetition
-- No asking same question again
+    if (!isValidResponse(text)) throw new Error("Invalid AI response");
 
-MODE:
-${executionMode === "execution"
-  ? "Give decisive, conversion-focused actions."
-  : "Give strategic insights with next steps."}
+    text = finalize(text);
+    cache.set(cacheKey, text);
 
-CRITICAL:
-If context exists, you MUST use it.
-              `.trim(),
-            },
-            {
-              role: "user",
-              content: `${contextText}\nUser: ${prompt}`,
-            },
-          ],
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!res.ok) throw new Error(await res.text());
-
-      const data = (await res.json()) as OpenRouterResponse;
-      let raw = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || "";
-      let text = cleanResponse(raw);
-
-      if (!isValidResponse(text)) throw new Error("Invalid response");
-
-      text = finalize(text);
-
-      if (text.length > 30 && !isBadFallback(text)) {
-        cache.set(cacheKey, text);
-      }
-
-      return text;
-    } catch (err: any) {
-      clearTimeout(timeout);
-      lastError = err;
-      console.warn(`⚠️ OpenRouter attempt ${attempt} failed:`, err?.message);
-
-      if (attempt > MAX_RETRIES) break;
-    }
+    return text;
+  } catch (err) {
+    console.warn("⚠️ OpenRouter failed:", err);
   }
 
-  /* ---------- CONTEXT-AWARE FALLBACK ---------- */
-  return smartFallback(detectedServices, goalsText ? [goalsText] : []);
+  /* ---------- ✅ FINAL FALLBACK ---------- */
+  return smartFallback(detectedServices, goalsText);
 }
