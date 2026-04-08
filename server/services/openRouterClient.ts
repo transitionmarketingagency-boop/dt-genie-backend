@@ -20,7 +20,7 @@ type SafeBrainContext = {
   dynamicGreeting?: string;
   industry?: string;
   businessType?: string;
-  isFresh?: boolean; // NEW: flag for new session
+  isFresh?: boolean;
 };
 
 /* ================= RESPONSE TYPE ================= */
@@ -35,6 +35,7 @@ interface OpenRouterResponse {
 const MODEL = "qwen/qwen3-235b-a22b-2507";
 const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 4200;
+const MAX_RETRIES = 1;
 
 /* ================= CLEAN PROMPT ================= */
 function cleanPrompt(prompt: string): string {
@@ -82,7 +83,6 @@ function detectHighIntent(message: string): boolean {
 }
 
 /* ================= CACHE ================= */
-// Use sessionId + hashed prompt to prevent cross-session pollution
 const cache = new Map<string, string>();
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
@@ -115,22 +115,25 @@ export async function generateOpenRouter(
   let detectedServices: string[] = [];
   let goalsText = "unknown";
   let dynamicGreeting: string | undefined;
+  let recentMessages: string[] = [];
 
   if (sessionId) {
     try {
       const { brainContext } = await strategicBrain(prompt, sessionId);
       const ctx = (brainContext || {}) as SafeBrainContext;
 
-      // If new session, reset detectedServices, goals, recentMessages
       const isFresh = ctx.isFresh ?? false;
-
       const leadScore = ctx.leadScore;
       const totalScore = typeof leadScore === "number" ? leadScore : leadScore?.total ?? 0;
 
       detectedServices = isFresh ? [] : ctx.detectedServices || [];
-      goalsText = isFresh ? "unknown" : Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
+      goalsText = isFresh
+        ? "unknown"
+        : Array.isArray(ctx.goals)
+        ? ctx.goals.join(", ")
+        : "unknown";
 
-      const recentMessages = isFresh ? [] : ctx.recentMessages || [];
+      recentMessages = isFresh ? [] : ctx.recentMessages || [];
       const industry = ctx.industry || "unknown";
       const businessType = ctx.businessType || "";
 
@@ -143,7 +146,7 @@ export async function generateOpenRouter(
           const safeStage = toSafeStage(ctx.stage);
           await shouldTriggerBooking(sessionId, safeStage);
         } catch (err) {
-          console.warn("[BookingTrigger] Failed to check booking:", err);
+          console.warn("[BookingTrigger] Failed:", err);
         }
       } else {
         executionMode = ctx.executionMode || "exploration";
@@ -156,43 +159,42 @@ Industry: ${industry} ${businessType}
 Services: ${detectedServices.join(", ") || "none"}
 Goals: ${goalsText}
 Recent: ${recentMessages.slice(-3).join(" | ")}`.trim();
-
     } catch (err) {
       console.warn("[StrategicBrain] Context load failed:", err);
     }
   }
 
-  // If prompt is a greeting, override fallback with dynamic greeting
+  /* ---------- GREETING OVERRIDE ---------- */
   const greetingTriggers = ["hi", "hello", "hey", "good morning", "good evening"];
-  if (
-    greetingTriggers.some((g) => prompt.toLowerCase().includes(g)) &&
-    dynamicGreeting
-  ) {
+  if (greetingTriggers.some((g) => prompt.toLowerCase().includes(g)) && dynamicGreeting) {
     return dynamicGreeting;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+  /* ---------- OPENROUTER CALL WITH RETRY ---------- */
+  let attempt = 0;
+  let lastError: any;
+  while (attempt <= MAX_RETRIES) {
+    attempt++;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
-  try {
-    console.log("⚡ OpenRouter call");
-
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-        "X-Title": "Neon Vision AI",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: highIntent ? 0.6 : 0.45,
-        top_p: 0.9,
-        max_tokens: 900,
-        messages: [
-          {
-            role: "system",
-            content: `
+    try {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+          "X-Title": "Neon Vision AI",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          temperature: highIntent ? 0.6 : 0.45,
+          top_p: 0.9,
+          max_tokens: 900,
+          messages: [
+            {
+              role: "system",
+              content: `
 You are Neon Vision — a senior AI marketing strategist.
 
 RULES:
@@ -211,56 +213,51 @@ ${executionMode === "execution"
 
 CRITICAL:
 If context exists, you MUST use it.
-            `.trim(),
-          },
-          {
-            role: "user",
-            content: `${contextText}\nUser: ${prompt}`,
-          },
-        ],
-      }),
-      signal: controller.signal,
-    });
+              `.trim(),
+            },
+            {
+              role: "user",
+              content: `${contextText}\nUser: ${prompt}`,
+            },
+          ],
+        }),
+        signal: controller.signal,
+      });
 
-    clearTimeout(timeout);
+      clearTimeout(timeout);
 
-    if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await res.text());
 
-    const data = (await res.json()) as OpenRouterResponse;
+      const data = (await res.json()) as OpenRouterResponse;
+      let raw = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || "";
+      let text = cleanResponse(raw);
 
-    let raw =
-      data?.choices?.[0]?.message?.content ||
-      data?.choices?.[0]?.text ||
-      "";
+      if (!isValidResponse(text)) throw new Error("Invalid response");
 
-    let text = cleanResponse(raw);
+      text = finalize(text);
 
-    /* ---------- VALIDATION ---------- */
-    if (!isValidResponse(text)) throw new Error("Invalid response");
+      if (text.length > 30 && !isBadFallback(text)) {
+        cache.set(cacheKey, text);
+      }
 
-    text = finalize(text);
+      return text;
+    } catch (err: any) {
+      clearTimeout(timeout);
+      lastError = err;
+      console.warn(`⚠️ OpenRouter attempt ${attempt} failed:`, err?.message);
 
-    /* ---------- CACHE GOOD ONLY ---------- */
-    if (text.length > 30 && !isBadFallback(text)) {
-      cache.set(cacheKey, text);
+      // If last retry, break and use fallback
+      if (attempt > MAX_RETRIES) break;
     }
-
-    console.log("✅ OpenRouter success");
-    return text;
-
-  } catch (err: any) {
-    clearTimeout(timeout);
-    console.warn("⚠️ OpenRouter failed:", err?.message);
-
-    // New: Only use fallback if not a greeting
-    if (dynamicGreeting) return dynamicGreeting;
-
-    return `Here’s a strong starting strategy:
-
-1. Identify your biggest bottleneck (traffic, conversion, or retention)
-2. Focus on 1–2 core channels first (ads, content, or email)
-3. Optimize based on real user behavior and data
-
-If you want, tell me your niche and I’ll map a precise execution plan.`;
   }
+
+  /* ---------- DYNAMIC FALLBACK ---------- */
+  const fallbackOptions = [
+    `Let's start by identifying your biggest bottleneck — is it traffic, conversion, or retention?`,
+    `Focus on 1–2 core channels first (ads, content, or email) and optimize them based on real data.`,
+    `Provide me your niche and I’ll map a precise execution plan for you.`,
+  ];
+
+  const fallback = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+  return fallback;
 }

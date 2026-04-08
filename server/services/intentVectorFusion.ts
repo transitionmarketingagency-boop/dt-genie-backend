@@ -1,4 +1,4 @@
-// ===================== IMPORTS ===================== //
+/* ===================== IMPORTS ===================== */
 import { getTopChunks } from "../queryChunks.js";
 import { detectIntent, Intent, intents } from "./intentManager.js";
 
@@ -40,18 +40,16 @@ function normalize(text: string): string {
 
 /* ======================= TOKENIZE ======================= */
 function tokenize(text: string): string[] {
-  return text.split(/\s+/).filter(Boolean);
+  return normalize(text).split(/\s+/).filter(Boolean);
 }
 
 /* ======================= KEYWORD OVERLAP ======================= */
 function keywordOverlap(aTokens: Set<string>, bTokens: Set<string>) {
   if (!aTokens.size || !bTokens.size) return 0;
-
   let overlap = 0;
   for (const word of aTokens) {
     if (bTokens.has(word)) overlap++;
   }
-
   return overlap / Math.max(aTokens.size, bTokens.size);
 }
 
@@ -61,15 +59,16 @@ function intentKeywordScore(
   chunkText: string,
   relevantKeywords: string[]
 ) {
-  let score = 0;
+  const msgTokens = new Set(tokenize(message));
+  const chunkTokens = new Set(tokenize(chunkText));
 
+  let score = 0;
   for (const kw of relevantKeywords) {
     if (!kw) continue;
-
-    if (chunkText.includes(kw) && message.includes(kw)) {
-      score += 0.03;
-      if (score >= 0.12) break; // cap
-    }
+    const kwTokens = new Set(tokenize(kw));
+    const overlap = keywordOverlap(msgTokens, kwTokens) * 0.12; // scaled max
+    score += overlap;
+    if (score >= 0.12) break;
   }
 
   return score;
@@ -77,24 +76,24 @@ function intentKeywordScore(
 
 /* ======================= BOOSTS ======================= */
 function serviceBoost(chunkText: string) {
-  return chunkText.includes("service") ? SERVICE_BOOST : 0;
+  return normalize(chunkText).includes("service") ? SERVICE_BOOST : 0;
 }
 
 function pricingBoost(chunkText: string, message: string) {
   if (!/(price|cost|pricing)/i.test(message)) return 0;
-  return chunkText.includes("price") ? PRICING_BOOST : 0;
+  return normalize(chunkText).includes("price") ? PRICING_BOOST : 0;
 }
 
 function bookingBoost(chunkText: string, message: string) {
   if (!/(book|schedule|call)/i.test(message)) return 0;
-  return chunkText.includes("book") ? BOOKING_BOOST : 0;
+  return normalize(chunkText).includes("book") ? BOOKING_BOOST : 0;
 }
 
 /* ======================= DEDUPE ======================= */
 function dedupeChunks(chunks: VectorChunk[]) {
   const seen = new Set<string>();
   return chunks.filter((c) => {
-    const key = (c.text || "").slice(0, 120);
+    const key = (c.text || "").slice(0, 120).trim();
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -154,8 +153,12 @@ export async function getFusedChunks(
     const keywordScore = keywordOverlap(messageTokens, chunkTokens);
 
     const intentBoost = detectedIntentNames.reduce((sum, intentName) => {
-      if (chunk.intent === intentName) {
-        return sum + (detectedIntentScores[intentName] || 0);
+      const keywords = intentKeywordMap[intentName] || [];
+      for (const kw of keywords) {
+        if (chunkTokens.has(kw)) {
+          sum += detectedIntentScores[intentName] || 0;
+          break;
+        }
       }
       return sum;
     }, 0);
@@ -190,7 +193,6 @@ export async function getFusedChunks(
     if (!c.text) return false;
     if (c.fusionScore < MIN_SCORE_THRESHOLD) return false;
     if (usedSources.has(c.source)) return false;
-
     usedSources.add(c.source);
     return true;
   });

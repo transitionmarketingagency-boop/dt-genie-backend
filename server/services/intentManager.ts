@@ -1,4 +1,3 @@
-// server/services/intentManager.ts
 /* =====================================================
    INTENT MANAGER (PRODUCTION READY FIX)
    Smart detection: keyword + phrase + intent types + scoring + service awareness
@@ -91,18 +90,23 @@ function calculateIntentScore(text: string, intent: Intent, detectedServices: st
     if (containsPhrase(text, keyword)) score += 0.5;
   }
 
-  // Service boost for service intents
+  // Service boost
   if (intent.type === "service" && detectedServices.length) {
     for (const service of detectedServices) {
-      if (intent.name.toLowerCase().includes(service.toLowerCase())) score += 0.4;
+      for (const kw of intent.keywords) {
+        if (kw.toLowerCase().includes(service.toLowerCase())) {
+          score += 0.4;
+          break;
+        }
+      }
     }
   }
 
-  // Normalize score
+  // Normalize by number of keywords
   if (intent.keywords.length) score /= intent.keywords.length;
 
-  // Short message penalty
-  if (text.length < 10) score *= 0.9;
+  // Short message penalty for non-general intents
+  if (text.length < 10 && intent.type !== "general") score *= 0.9;
 
   return Math.min(score, 1);
 }
@@ -131,8 +135,8 @@ export function detectIntent(
 
   for (const booster of boosters) {
     for (const phrase of booster.signals) {
-      if (text.includes(normalize(phrase))) {
-        // Either boost existing intent or create new
+      if (containsPhrase(text, phrase)) {
+        // Boost existing or create new intent
         const match = results.find(r => r.intent.type === booster.type);
         if (match) match.score = Math.min(match.score + booster.boost, 1);
         else {
@@ -151,13 +155,11 @@ export function detectIntent(
     }
   }
 
-  // Clamp scores
+  // Clamp & sort
   results.forEach(r => r.score = Math.min(r.score, 1));
-
-  // Sort by score
   results.sort((a, b) => b.score - a.score);
 
-  // Fallback only if no strong intent
+  // Fallback if no strong intent
   if (!results.some(r => r.score >= 0.4)) {
     results.push({
       intent: { name: "general_fallback", category: "general", type: "general", keywords: [], description: "Fallback" },
@@ -165,7 +167,6 @@ export function detectIntent(
     });
   }
 
-  // Return top N
   return results.slice(0, topN);
 }
 

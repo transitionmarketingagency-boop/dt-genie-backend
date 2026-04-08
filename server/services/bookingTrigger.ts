@@ -1,11 +1,16 @@
-// server/services/bookingTrigger.ts
-
 /* ================= TYPES ================= */
 export type Stage = "greeting" | "discovery" | "strategy" | "service" | "conversion";
 
 /* ================= COOLDOWN ================= */
 const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 min
 const bookingCooldownMap = new Map<string, number>();
+
+function cleanupCooldowns() {
+  const now = Date.now();
+  for (const [key, ts] of bookingCooldownMap.entries()) {
+    if (now - ts > 1000 * 60 * 60) bookingCooldownMap.delete(key); // 1h cleanup
+  }
+}
 
 function isInCooldown(sessionId: string): boolean {
   if (!sessionId) return false;
@@ -19,11 +24,8 @@ function markTriggered(sessionId: string) {
 }
 
 /* ================= NORMALIZE ================= */
-function normalize(text: string): string {
-  return (text || "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
+function normalize(text: string) {
+  return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 /* ================= MAIN TRIGGER LOGIC ================= */
@@ -34,78 +36,49 @@ export async function shouldTriggerBooking(
   message: string = ""
 ): Promise<boolean> {
   try {
-    const msg = normalize(message);
+    cleanupCooldowns();
 
-    /* ---------- COOLDOWN GUARD ---------- */
+    const msg = normalize(message);
+    if (!sessionId) return false;
+
     if (isInCooldown(sessionId)) return false;
 
-    /* ---------- HARD BLOCK (LOW INTENT) ---------- */
-    const isInformational =
-      msg.includes("what") ||
-      msg.includes("why") ||
-      msg.includes("how") ||
-      msg.includes("explain") ||
-      msg.includes("tell me") ||
-      msg.includes("guide") ||
-      msg.includes("learn");
+    // Low-intent informational check
+    const informational = ["what", "why", "how", "explain", "tell me", "guide", "learn"];
+    if (informational.some((w) => msg.includes(w)) && leadScore < 0.6) return false;
 
-    if (isInformational && leadScore < 0.6) {
-      return false;
-    }
+    // Explicit rejection phrases
+    const rejection = ["not now", "later", "just exploring", "no thanks", "dont want", "don't want"];
+    if (rejection.some((r) => msg.includes(r))) return false;
 
-    /* ---------- REJECTION ---------- */
-    const rejection =
-      msg.includes("not now") ||
-      msg.includes("later") ||
-      msg.includes("just exploring") ||
-      msg.includes("no thanks") ||
-      msg.includes("dont want") ||
-      msg.includes("don't want");
-
-    if (rejection) return false;
-
-    /* ---------- STRONG BUYING SIGNALS ---------- */
-    const strongIntent =
-      msg.includes("hire") ||
-      msg.includes("work with you") ||
-      msg.includes("get started") ||
-      msg.includes("start working") ||
-      msg.includes("let's start") ||
-      msg.includes("i want to proceed") ||
-      msg.includes("i'm ready") ||
-      msg.includes("book") ||
-      msg.includes("schedule") ||
-      msg.includes("call") ||
-      msg.includes("consultation");
-
-    if (strongIntent && msg.length > 8) {
+    // Strong buying signals
+    const strongIntent = [
+      "hire",
+      "work with you",
+      "get started",
+      "start working",
+      "let's start",
+      "i want to proceed",
+      "i'm ready",
+      "book",
+      "schedule",
+      "call",
+      "consultation"
+    ];
+    if (strongIntent.some((w) => msg.includes(w)) && msg.length > 8) {
       markTriggered(sessionId);
       return true;
     }
 
-    /* ---------- STAGE + LEAD INTELLIGENCE ---------- */
-
-    // 🔥 Conversion stage (high probability close)
-    if (stage === "conversion" && leadScore >= 0.5) {
+    // Stage-based thresholds
+    if ((stage === "conversion" && leadScore >= 0.5) ||
+        (stage === "service" && leadScore >= 0.65) ||
+        (stage === "strategy" && leadScore >= 0.75)) {
       markTriggered(sessionId);
       return true;
     }
 
-    // 🔥 Service stage (strong mid-funnel intent)
-    if (stage === "service" && leadScore >= 0.65) {
-      markTriggered(sessionId);
-      return true;
-    }
-
-    // 🔥 Strategy stage (only high-quality leads)
-    if (stage === "strategy" && leadScore >= 0.75) {
-      markTriggered(sessionId);
-      return true;
-    }
-
-    /* ---------- DEFAULT ---------- */
     return false;
-
   } catch (err) {
     console.error("[BookingTrigger] Error:", err);
     return false;

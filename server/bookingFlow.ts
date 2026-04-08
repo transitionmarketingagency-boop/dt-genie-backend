@@ -29,7 +29,7 @@ interface BookingResponse {
 
 /* ================= STORAGE ================= */
 const ongoingBookings: Record<string, BookingState> = {};
-const BOOKING_SESSION_TTL = 1000 * 60 * 30;
+const BOOKING_SESSION_TTL = 1000 * 60 * 30; // 30 minutes
 const baseCalendlyLink =
   "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
 
@@ -61,7 +61,7 @@ function cleanupExpiredBookings() {
 }
 
 /* ================= HELPERS ================= */
-function normalize(text: string) {
+function normalize(text: string): string {
   return (text || "").toLowerCase().trim();
 }
 
@@ -72,16 +72,13 @@ function isQuestion(text: string): boolean {
 function fallbackServiceDetection(message: string): string[] {
   const msg = normalize(message);
   const services: string[] = [];
-
   if (msg.includes("seo")) services.push("SEO Optimization");
   if (msg.includes("ads")) services.push("Performance Marketing");
   if (msg.includes("automation") || msg.includes("ai")) services.push("AI Marketing Automation");
   if (msg.includes("content")) services.push("Content Marketing");
   if (msg.includes("brand")) services.push("Brand Development");
   if (msg.includes("ecommerce")) services.push("Ecommerce Growth Systems");
-
   if (!services.length) services.push("Strategy Session");
-
   return services;
 }
 
@@ -108,50 +105,59 @@ const bookingFlow = {
     cleanupExpiredBookings();
 
     let booking = ongoingBookings[userId];
-    const message = (userMessage || "").trim();
+    const message = normalize(userMessage);
     const lang = detectLanguage(message);
 
     if (!booking) {
       booking = { step: 1, createdAt: Date.now() };
       ongoingBookings[userId] = booking;
 
+      const greetings = [
+        "Welcome! Let's plan your digital growth. What would you like help with?",
+        "Hi there! Which service are you interested in today?",
+        "Let's get started! What area of your business should we focus on?"
+      ];
       return {
-        response: t(
-          lang,
-          "Let’s restart your booking. What would you like help with?",
-          "چلیں دوبارہ شروع کرتے ہیں۔ آپ کو کس چیز میں مدد چاہیے؟"
-        ),
+        response: t(lang, greetings[Math.floor(Math.random() * greetings.length)], "خوش آمدید! آئیے آپ کے ڈیجیٹل کاروبار کی منصوبہ بندی کریں۔ آپ کس چیز میں مدد چاہتے ہیں؟"),
         nextStep: 1,
       };
     }
 
-    const highIntent = await shouldTriggerBooking(userId, "service");
+    let highIntent = false;
+    try {
+      highIntent = await shouldTriggerBooking(userId, "service");
+    } catch (err) {
+      console.warn("High intent check failed:", err);
+    }
 
     switch (booking.step) {
       case 1: {
         booking.step = 2;
 
-        // Detect services dynamically with async await
-        let detectedServices = await detectMultipleServices(message);
-        if (!detectedServices.length) detectedServices = fallbackServiceDetection(message);
+        let detectedServices: string[] = [];
+        try {
+          detectedServices = await detectMultipleServices(message);
+        } catch (err) {
+          console.warn("Service detection failed, using fallback:", err);
+        }
 
+        if (!detectedServices.length) detectedServices = fallbackServiceDetection(message);
         booking.serviceTypes = detectedServices;
 
-        // Generate execution plan dynamically
-        const plan = await generateExecutionPlan(detectedServices);
+        let plan = "";
+        try {
+          plan = await generateExecutionPlan(detectedServices);
+        } catch (err) {
+          console.warn("Execution plan generation failed:", err);
+          plan = "Standard action plan recommended.";
+        }
         booking.executionPlan = plan;
-
-        console.log({ userId, message, detectedServices, executionPlan: plan });
 
         return {
           response: t(
             lang,
-            `I suggest focusing on:\n- ${detectedServices.join(
-              "\n- "
-            )}\n\nExecution plan:\n${plan}\n\nWhen would you like to schedule?`,
-            `میں تجویز کرتا ہوں کہ آپ یہ خدمات منتخب کریں:\n- ${detectedServices.join(
-              "\n- "
-            )}\n\nعملدرآمد کا منصوبہ:\n${plan}\n\nآپ کب وقت لینا چاہتے ہیں؟`
+            `I suggest focusing on:\n- ${detectedServices.join("\n- ")}\n\nExecution plan:\n${plan}\n\nWhen would you like to schedule?`,
+            `میں تجویز کرتا ہوں کہ آپ یہ خدمات منتخب کریں:\n- ${detectedServices.join("\n- ")}\n\nعملدرآمد کا منصوبہ:\n${plan}\n\nآپ کب وقت لینا چاہتے ہیں؟`
           ),
           nextStep: 3,
         };
@@ -163,7 +169,7 @@ const bookingFlow = {
             response: t(
               lang,
               "We can pause booking for a moment. Let me answer your question first.",
-              "ہم بکنگ کو تھوڑی دیر روک دیتے ہیں، پہلے میں آپ کا سوال جواب دیتا ہوں۔"
+              "ہم تھوڑی دیر کے لیے بکنگ روک دیتے ہیں، پہلے میں آپ کا سوال جواب دوں۔"
             ),
           };
         }
@@ -192,15 +198,19 @@ const bookingFlow = {
         booking.email = message.toLowerCase();
         booking.calendlyLink = baseCalendlyLink;
 
-        await memoryService.storeBooking({
-          userId,
-          serviceTypes: booking.serviceTypes,
-          preferredTime: booking.preferredTime,
-          email: booking.email,
-          calendlyLink: booking.calendlyLink,
-          executionPlan: booking.executionPlan,
-          status: "pending",
-        } as any);
+        try {
+          await memoryService.storeBooking({
+            userId,
+            serviceTypes: booking.serviceTypes,
+            preferredTime: booking.preferredTime,
+            email: booking.email,
+            calendlyLink: booking.calendlyLink,
+            executionPlan: booking.executionPlan,
+            status: "pending",
+          } as any);
+        } catch (err) {
+          console.error("Memory service store failed:", err);
+        }
 
         booking.step = 5;
 
@@ -216,8 +226,12 @@ const bookingFlow = {
       }
 
       case 5: {
-        if (normalize(message).includes("i booked")) {
-          await memoryService.updateBookingStatus(userId, "confirmed");
+        if (message.includes("i booked")) {
+          try {
+            await memoryService.updateBookingStatus(userId, "confirmed");
+          } catch (err) {
+            console.error("Memory service update failed:", err);
+          }
           delete ongoingBookings[userId];
 
           return {

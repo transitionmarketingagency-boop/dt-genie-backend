@@ -187,6 +187,7 @@ Before answering:
 `.trim();
 }
 
+
 // ===================== HYBRID EXECUTION ===================== //
 export async function executeHybridResponse({
   sessionId,
@@ -212,21 +213,21 @@ export async function executeHybridResponse({
   forceNoQuestions?: boolean;
 }) {
   try {
-    // ================= 1️⃣ HARD RESPONSES (CRITICAL FIX) =================
+    // 1️⃣ Hard responses (override)
     const hardResponse = checkHardResponses(message);
     if (hardResponse) {
       await memoryService.saveMessage(sessionId, "assistant", hardResponse);
       return hardResponse;
     }
 
-    // ================= 2️⃣ GREETING CONTROL =================
+    // 2️⃣ Greetings
     const greetingResp = await smartGreeting(brainContext, recentMessagesCache);
     if (greetingResp) {
       await memoryService.saveMessage(sessionId, "assistant", greetingResp);
       return greetingResp;
     }
 
-    // ================= 3️⃣ DETECTION =================
+    // 3️⃣ Detect services and intents
     brainContext.detectedServices = [];
     brainContext.detectedIntents = [];
 
@@ -237,21 +238,19 @@ export async function executeHybridResponse({
 
     const detectedIntentsRaw = detectIntent(message);
     brainContext.detectedIntents = Array.isArray(detectedIntentsRaw)
-      ? detectedIntentsRaw.map((i) =>
-          i && typeof i.intent === "string" ? i.intent : "unknown"
-        )
+      ? detectedIntentsRaw.map((i) => (i && typeof i.intent === "string" ? i.intent : "unknown"))
       : [];
 
-    // ================= 4️⃣ VECTOR (SAFE) =================
+    // 4️⃣ Vector fusion (safe)
     let fusedChunksText = "";
     try {
       const chunks = await getFusedChunks(message, 3);
-      fusedChunksText = chunks.map((c) => c.text).join("\n\n");
+      fusedChunksText = chunks.map((c) => c.text).filter(Boolean).join("\n\n");
     } catch (err) {
-      console.warn("Vector failed:", err);
+      console.warn("Vector chunks failed:", err);
     }
 
-    // ================= 5️⃣ PROMPT =================
+    // 5️⃣ Build prompt
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
@@ -261,61 +260,52 @@ export async function executeHybridResponse({
       message,
     });
 
-    // ================= 6️⃣ MODEL EXECUTION =================
+    // 6️⃣ AI model execution
     let response = "";
-
     try {
-      const qwenResp = await withTimeout(
-        generateOpenRouter(prompt, sessionId),
-        6500
-      );
+      const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
+      console.log("[Hybrid Debug] OpenRouter response:", qwenResp);
 
       if (qwenResp && !isLowQuality(qwenResp) && !looksIncomplete(qwenResp)) {
         response = qwenResp;
       } else if (canUseGemini()) {
         const geminiResp = await withTimeout(generateGemini(prompt), 4500);
-        if (geminiResp) {
+        console.log("[Hybrid Debug] Gemini response:", geminiResp);
+        if (geminiResp && !looksIncomplete(geminiResp)) {
           response = geminiResp;
           markGeminiUsed();
         }
       }
     } catch (err) {
-      console.warn("AI model failed:", err);
+      console.warn("AI model execution failed:", err);
     }
 
-    // ================= 7️⃣ FIXED FALLBACK =================
-    if (!response || isLowQuality(response)) {
-      response = smartFallbackHelper(); // ✅ fixed: no args
+    // 7️⃣ Fixed fallback only if truly empty or extremely low-quality
+    if (!response || (isLowQuality(response) && response.trim().length < 20)) {
+      response = smartFallbackHelper();
     }
 
-    // ================= 8️⃣ CLEANUP =================
+    // 8️⃣ Cleanup & formatting
     response = cleanHybridResponse(response);
-
-    if (forceNoQuestions) {
-      response = response.replace(/\?+/g, ".");
-    }
-
+    if (forceNoQuestions) response = response.replace(/\?+/g, ".");
     response = enforceBotName(response);
 
-    // ================= 9️⃣ CTA (SMART) =================
+    // 9️⃣ Smart CTA (append only if dynamic response)
     if (
-      shouldIncludeCTA(
-        message,
-        intentCategories,
-        leadScoreValue,
-        brainContext.stage
-      )
+      response &&
+      !response.includes("Tell me your goal") &&
+      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)
     ) {
       response +=
         "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
     }
 
-    // ================= 🔟 SAVE =================
+    // 🔟 Save response to memory
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;
   } catch (err) {
-    console.error("Hybrid error:", err);
+    console.error("Hybrid execution error:", err);
     return "Something went wrong — try again.";
   }
 }

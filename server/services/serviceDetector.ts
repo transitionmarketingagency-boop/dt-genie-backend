@@ -34,17 +34,18 @@ function matchKeyword(text: string, keyword: string): number {
   const normalizedText = normalize(text);
   const kw = normalize(keyword);
 
+  // Exact match
   const exactRegex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
   if (exactRegex.test(normalizedText)) return 1;
 
+  // Partial word match
   const words = kw.split(" ");
   let hits = 0;
   for (const w of words) if (normalizedText.includes(w)) hits++;
-
   return (hits / words.length) * 0.6;
 }
 
-/* ================= SERVICES ================= */
+/* ================= SERVICES CONFIG ================= */
 const services: Record<string, { keywords: string[]; weight: number }> = {
   voice_search: { keywords: ["voice search","position zero","featured snippets","alexa","siri"], weight: 1 },
   email_marketing: { keywords: ["email marketing","klaviyo","email automation","cold email"], weight: 1 },
@@ -82,13 +83,15 @@ export async function detectServiceScores(
 
   for (const [service, config] of Object.entries(services)) {
     let score = 0;
+
+    // Keyword-based scoring
     for (const kw of config.keywords) score += matchKeyword(text, kw);
     score = (score / config.keywords.length) * config.weight;
 
-    // ✅ Vector-aware scoring using hybrid service
+    // Hybrid vector-aware scoring
     if (hybridResponseService?.detectServices) {
       try {
-        const detectedServices: string[] = await hybridResponseService.detectServices(text); // fix: pass text
+        const detectedServices: string[] = await hybridResponseService.detectServices(text);
         if (detectedServices.includes(service)) score = Math.max(score, 0.9);
       } catch (e) {
         console.warn("Hybrid vector scoring failed:", e);
@@ -110,6 +113,7 @@ export async function detectIntents(
   const results: DetectedIntent[] = [];
   const added = new Set<string>();
 
+  // Problem signals first
   for (const p of problemSignals) {
     if (text.includes(p)) {
       results.push({ type: "problem", value: p, confidence: 0.9 });
@@ -117,6 +121,7 @@ export async function detectIntents(
     }
   }
 
+  // Detect services
   const serviceScores = await detectServiceScores(text, sessionId);
   const sortedServices = Object.entries(serviceScores).sort((a, b) => b[1] - a[1]);
   for (const [service, score] of sortedServices) {
@@ -126,6 +131,7 @@ export async function detectIntents(
     }
   }
 
+  // Helper for other generic intents
   const addIntent = (kws: string[], type: DetectedIntent["type"], conf: number) => {
     for (const kw of kws) {
       if (matchKeyword(text, kw) > 0.7 && !added.has(kw)) {
@@ -141,6 +147,7 @@ export async function detectIntents(
   addIntent(marketingGoals, "marketing_goal", 0.75);
   addIntent(industries, "industry", 0.7);
 
+  // Fallback
   if (!results.length) {
     results.push({ type: "general", value: "general", confidence: 0.3 });
   }
