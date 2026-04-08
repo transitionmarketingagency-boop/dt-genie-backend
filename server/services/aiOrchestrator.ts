@@ -1,3 +1,4 @@
+// server/services/aiOrchestrator.ts
 /* =====================================================
    NEON VISION / DT-GENIE AI ORCHESTRATION MODULE
    Combines Intent Detection, Service Suggestions,
@@ -31,7 +32,7 @@ export function detectServicesFromIntents(
     if (item.intent.type === "service") {
       services.push({
         service: item.intent.name,
-        confidence: item.score,
+        confidence: item.score ?? 0,
       });
     }
   }
@@ -44,29 +45,57 @@ export async function processUserMessage(
   sessionId: string,
   message: string
 ): Promise<OrchestratorResult> {
+  // ---------- 1️⃣ INTENT DETECTION ----------
+  let detectedIntents: { intent: Intent; score: number }[] = [];
+  try {
+    detectedIntents = getRelevantIntents(message, [], 5) || [];
+  } catch (err) {
+    console.warn("Intent detection failed:", err);
+    detectedIntents = [];
+  }
 
-  /* ---------- 1️⃣ INTENT DETECTION ---------- */
-  const detectedIntents = getRelevantIntents(message, [], 5);
+  // ---------- 2️⃣ SERVICE DETECTION ----------
+  let recommendedServices: ServiceRecommendation[] = [];
+  try {
+    recommendedServices = detectServicesFromIntents(detectedIntents);
+  } catch (err) {
+    console.warn("Service detection failed:", err);
+    recommendedServices = [];
+  }
 
-  /* ---------- 2️⃣ SERVICE DETECTION ---------- */
-  const recommendedServices = detectServicesFromIntents(detectedIntents);
+  // ---------- 3️⃣ LEAD SCORING ----------
+  let leadScore: LeadScore = { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 };
+  try {
+    leadScore = await leadQualifier.scoreLead(
+      sessionId,
+      {
+        budget: detectedIntents.some((i) => i.intent.name === "hire_intent") ? 1 : undefined,
+        authority: detectedIntents.some((i) => i.intent.type === "buying") ? 1 : undefined,
+        need: recommendedServices.length > 0 ? 1 : 0,
+        timeline: detectedIntents.some((i) => i.intent.name === "hire_intent") ? 1 : 0,
+      },
+      "discovery"
+    );
+  } catch (err) {
+    console.warn("Lead scoring failed:", err);
+  }
 
-  /* ---------- 3️⃣ LEAD SCORING (FIXED: AWAIT) ---------- */
-  const leadScore = await leadQualifier.scoreLead(
-    sessionId,
-    {
-      budget: detectedIntents.some(i => i.intent.name === "hire_intent") ? 1 : undefined,
-      authority: detectedIntents.some(i => i.intent.type === "buying") ? 1 : undefined,
-      need: recommendedServices.length > 0 ? 1 : 0,
-      timeline: detectedIntents.some(i => i.intent.name === "hire_intent") ? 1 : 0,
-    },
-    "discovery" // safe default stage
-  );
+  // ---------- 4️⃣ STRATEGIC REASONING ----------
+  let strategy: ReasoningData = {
+    problem: "",
+    industry: "",
+    strategy: "",
+    recentMessages: [],
+    services: [],
+  };
+  try {
+    const analysis = await reasoningEngine.analyze(sessionId, message);
+    if (analysis) strategy = analysis;
+  } catch (err) {
+    console.warn("Strategic reasoning failed:", err);
+  }
 
-  /* ---------- 4️⃣ STRATEGIC REASONING ---------- */
-  const strategy = await reasoningEngine.analyze(sessionId, message);
-
-  /* ---------- FINAL RETURN ---------- */
+  // ---------- FINAL RETURN ----------
   return {
     intents: detectedIntents,
     recommendedServices,

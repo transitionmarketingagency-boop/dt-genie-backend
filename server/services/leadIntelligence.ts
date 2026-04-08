@@ -86,19 +86,19 @@ function detectSignals(
   const add = (value: number | undefined, increment: number) =>
     clamp((value ?? 0) + increment);
 
-  /* ---------- NEED ---------- */
+  // ----- NEED -----
   signals.need = add(signals.need, 0.3 * includesAny(msg, needSignals));
 
-  /* ---------- BUDGET ---------- */
+  // ----- BUDGET -----
   signals.budget = add(signals.budget, 0.25 * includesAny(msg, budgetSignals));
 
-  /* ---------- AUTHORITY ---------- */
+  // ----- AUTHORITY -----
   signals.authority = add(signals.authority, 0.25 * includesAny(msg, authoritySignals));
 
-  /* ---------- TIMELINE ---------- */
+  // ----- TIMELINE -----
   signals.timeline = add(signals.timeline, 0.2 * includesAny(msg, timelineSignals));
 
-  /* ---------- BUYING BOOST ---------- */
+  // ----- BUYING BOOST -----
   const buyingHits = includesAny(msg, buyingSignals);
   if (buyingHits) {
     signals.need = add(signals.need, 0.4);
@@ -129,10 +129,10 @@ export async function analyzeLeadSignals(
 
   let memorySignals: Partial<BANTSignals> = {};
 
-  /* ---------- LOAD MEMORY (SAFE ACCESS) ---------- */
+  // ----- LOAD MEMORY (SAFE ACCESS) -----
   if (sessionId) {
     try {
-      const mem: any = await memoryService.getStrategicMemory(sessionId);
+      const mem = await memoryService.getStrategicMemory(sessionId);
 
       memorySignals = {
         budget: clamp(mem?.budget),
@@ -148,11 +148,10 @@ export async function analyzeLeadSignals(
     }
   }
 
-  /* ---------- DETECT ---------- */
+  // ----- DETECT SIGNALS -----
   const signals = detectSignals(message, memorySignals);
 
   const hasSignal = Object.values(signals).some((v) => v && v > 0);
-
   if (!hasSignal) {
     return {
       signals,
@@ -160,10 +159,16 @@ export async function analyzeLeadSignals(
     };
   }
 
-  /* ---------- SCORE ---------- */
-  const score = leadQualifier.scoreLead(sessionId, signals);
+  // ----- SCORE LEAD -----
+  let score: LeadScore;
+  try {
+    score = leadQualifier.scoreLead(sessionId, signals);
+  } catch (err) {
+    console.error("[LeadQualifier] scoreLead failed:", err);
+    score = { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 };
+  }
 
-  /* ---------- SAVE MEMORY (SAFE MERGE) ---------- */
+  // ----- SAVE TO MEMORY -----
   if (sessionId) {
     try {
       await memoryService.updateStrategicMemory(sessionId, {
@@ -176,7 +181,6 @@ export async function analyzeLeadSignals(
       if (process.env.DEBUG_MEMORY === "true") {
         console.log(`[Memory] Updated strategic memory for session ${sessionId}`);
       }
-
     } catch (err) {
       if (process.env.DEBUG_MEMORY === "true") {
         console.warn("[Memory] Failed to update strategic memory:", err);

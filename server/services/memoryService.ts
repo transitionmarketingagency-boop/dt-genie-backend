@@ -1,3 +1,4 @@
+// server/services/memoryService.ts
 import * as sqlite from "sqlite";
 import sqlite3 from "sqlite3";
 import type { ChatMessage } from "../../shared/types.js";
@@ -13,7 +14,6 @@ const __dirname = path.dirname(__filename);
 /* ================= DB PATH ================= */
 const memoryDir = path.join(__dirname, "../memory");
 if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
-
 const dbPath = path.join(memoryDir, "chat_memory.db");
 
 /* ================= SQLITE ================= */
@@ -68,7 +68,6 @@ export interface StrategicMemory {
   lastDetectedServices?: string[];
   lastIntent?: string;
   updatedAt?: string;
-
   bantSignals?: {
     budget?: number;
     authority?: number;
@@ -172,7 +171,6 @@ export class MemoryService {
     }
 
     const now = new Date();
-
     const msg: ChatMessage = {
       id: crypto.randomUUID(),
       sessionId,
@@ -187,7 +185,7 @@ export class MemoryService {
       sessionId,
       role,
       normalized,
-      now.toISOString() // ✅ FIXED
+      now.toISOString()
     );
 
     await db.run(
@@ -214,7 +212,6 @@ export class MemoryService {
   /* -------- HISTORY -------- */
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
     const db = await this.db;
-
     const rows = await db.all(
       `SELECT * FROM chat_messages WHERE sessionId=? ORDER BY datetime(timestamp) DESC LIMIT ?`,
       sessionId,
@@ -233,7 +230,6 @@ export class MemoryService {
   /* -------- CONTEXT -------- */
   async getRecentContext(sessionId: string): Promise<ChatMessage[]> {
     const db = await this.db;
-
     const rows = await db.all(
       `SELECT * FROM chat_messages WHERE sessionId=? ORDER BY datetime(timestamp) DESC LIMIT ?`,
       sessionId,
@@ -252,7 +248,6 @@ export class MemoryService {
   /* ================= STRATEGIC ================= */
   async getStrategicMemory(sessionId: string): Promise<StrategicMemory> {
     const db = await this.db;
-
     const row = await db.get(
       `SELECT * FROM strategic_memory WHERE sessionId=?`,
       sessionId
@@ -268,7 +263,7 @@ export class MemoryService {
       leadScore: row.leadScore ?? undefined,
       stage: row.stage || undefined,
       budget: row.budget ?? undefined,
-      timeline: row.timeline || undefined,
+      timeline: row.timeline ?? undefined,
       decisionMaker: row.decisionMaker || undefined,
       interestLevel: row.interestLevel || undefined,
       lastUserProblem: row.lastUserProblem || undefined,
@@ -291,8 +286,7 @@ export class MemoryService {
       ...data,
       goals: data.goals ?? existing.goals ?? [],
       servicesDiscussed: data.servicesDiscussed ?? existing.servicesDiscussed ?? [],
-      lastDetectedServices:
-        data.lastDetectedServices ?? existing.lastDetectedServices ?? [],
+      lastDetectedServices: data.lastDetectedServices ?? existing.lastDetectedServices ?? [],
       bantSignals: {
         ...(existing.bantSignals || {}),
         ...(data.bantSignals || {}),
@@ -347,7 +341,6 @@ export class MemoryService {
     status?: string;
   }) {
     const db = await this.db;
-
     const id = crypto.randomUUID();
 
     await db.run(
@@ -363,10 +356,8 @@ export class MemoryService {
     );
   }
 
-  /* ✅ FIXED: REQUIRED METHOD */
   async updateBookingStatus(userId: string, status: string) {
     const db = await this.db;
-
     await db.run(
       `UPDATE bookings SET status=? WHERE userId=?`,
       status,

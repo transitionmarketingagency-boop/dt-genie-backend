@@ -22,7 +22,7 @@ export interface LeadScore {
 
 /* ================= UTILS ================= */
 function clamp(val?: number): number {
-  if (val === undefined || isNaN(val)) return 0;
+  if (val === undefined || val === null || isNaN(val)) return 0;
   return Math.max(0, Math.min(1, val));
 }
 
@@ -34,17 +34,12 @@ function normalizeStage(stage?: string): Stage {
     "service",
     "conversion",
   ];
-
-  if (allowed.includes(stage as Stage)) {
-    return stage as Stage;
-  }
-
+  if (stage && allowed.includes(stage as Stage)) return stage as Stage;
   return "discovery";
 }
 
 /* ================= CLASS ================= */
 export class LeadQualifier {
-
   private defaultWeights = {
     budget: 0.25,
     authority: 0.25,
@@ -58,7 +53,6 @@ export class LeadQualifier {
     bantData: Partial<LeadScore>,
     stageInput: string = "discovery"
   ): LeadScore {
-
     const stage = normalizeStage(stageInput);
     const weights = { ...this.defaultWeights };
 
@@ -75,7 +69,7 @@ export class LeadQualifier {
       stage,
     };
 
-    /* ---------- WEIGHTED TOTAL ---------- */
+    // ---------- WEIGHTED TOTAL ----------
     score.total =
       (score.budget || 0) * weights.budget +
       (score.authority || 0) * weights.authority +
@@ -84,46 +78,47 @@ export class LeadQualifier {
 
     score.total = clamp(score.total);
 
-    /* ---------- DEBUG ---------- */
+    // ---------- DEBUG ----------
     if (process.env.DEBUG_MEMORY === "true") {
       console.log(`[LeadQualifier] ${sessionId} | stage=${stage} ->`, score);
     }
 
-    /* ---------- NON-BLOCKING MEMORY UPDATE ---------- */
+    // ---------- NON-BLOCKING MEMORY UPDATE ----------
     if (sessionId && score.total > 0) {
-      this.safeUpdateLeadScore(sessionId, score); // ✅ no await
+      // Fire-and-forget
+      this.safeUpdateLeadScore(sessionId, score).catch((err) =>
+        console.warn("[LeadQualifier] async memory update failed:", err)
+      );
     }
 
     return score;
   }
 
   /* ================= SAFE MEMORY UPDATE ================= */
-  private async safeUpdateLeadScore(sessionId: string, score: LeadScore) {
+  private async safeUpdateLeadScore(
+    sessionId: string,
+    score: LeadScore
+  ) {
     try {
       if (score.total <= 0) return;
 
-      await memoryService.updateStrategicMemory(sessionId, {
+      // Only save fields that exist in StrategicMemory
+      const memoryUpdate: Partial<StrategicMemory> = {
         leadScore: score.total,
-        lastLeadStage: score.stage,
-        lastLeadComponents: {
-          budget: score.budget,
-          authority: score.authority,
-          need: score.need,
-          timeline: score.timeline,
-        },
-      } as Partial<StrategicMemory>);
+        // lastLeadComponents is optional in StrategicMemory, safe to include
+        lastDetectedServices: undefined, // placeholder if needed
+        updatedAt: new Date().toISOString(),
+      };
+
+      await memoryService.updateStrategicMemory(sessionId, memoryUpdate);
 
       if (process.env.DEBUG_MEMORY === "true") {
         console.log(
-          `[LeadQualifier] leadScore=${score.total} saved for ${sessionId}`
+          `[LeadQualifier] leadScore=${score.total} saved for session ${sessionId}`
         );
       }
-
     } catch (err) {
-      console.warn(
-        `[LeadQualifier] Memory update failed (${sessionId}):`,
-        err
-      );
+      console.warn(`[LeadQualifier] Memory update failed (${sessionId}):`, err);
     }
   }
 }

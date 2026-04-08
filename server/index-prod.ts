@@ -6,10 +6,18 @@ import express, { type Application, type Request, type Response } from "express"
 import { type Server } from "node:http";
 
 import runApp, { setupApp } from "./app.js";
-import { executeHybridResponse } from "./services/generateHybridResponse.js"; // ✅ FIXED
+import { executeHybridResponse } from "./services/generateHybridResponse.js";
 import { strategicBrain } from "./services/strategicBrain.js";
 import { initializeMemory, memoryService } from "./services/memoryService.js";
 import { initializeAIIntents } from "./services/json_loader.js";
+
+/* ================= TYPES ================= */
+interface BrainContext {
+  stage?: string;
+  intent?: string;
+  leadScore?: number;
+  reasoning?: string;
+}
 
 /* ================= ENV VALIDATION ================= */
 if (!process.env.GEMINI_API_KEY) {
@@ -69,7 +77,7 @@ async function startServer() {
     /* ================= CHAT ROUTE ================= */
     app.post("/chat", async (req: Request, res: Response) => {
       try {
-        let { message, sessionId } = req.body as {
+        const { message, sessionId: rawSessionId } = req.body as {
           message?: string;
           sessionId?: string;
         };
@@ -78,39 +86,64 @@ async function startServer() {
           return res.status(400).json({ error: "Message is required" });
         }
 
-        if (!sessionId || typeof sessionId !== "string") {
-          sessionId = "default-session";
+        const sessionId = rawSessionId && typeof rawSessionId === "string" ? rawSessionId : "default-session";
+
+        // Save user message
+        try {
+          await memoryService.addMessage(sessionId, "user", message);
+        } catch (err) {
+          console.warn("⚠️ Failed to save user message:", err);
         }
 
-        await memoryService.saveMessage(sessionId, "user", message);
+        // Strategic Brain analysis
+        let brainContext: BrainContext = {};
+        try {
+          const brainResult = await strategicBrain(message, sessionId);
+          brainContext = brainResult?.brainContext || {};
+          console.log(
+            `[Brain] Stage: ${brainContext.stage ?? "N/A"} | Intent: ${brainContext.intent ?? "N/A"} | LeadScore: ${brainContext.leadScore ?? 0} | Reasoning: ${brainContext.reasoning ?? "N/A"}`
+          );
+        } catch (err) {
+          console.warn("⚠️ Strategic brain analysis failed:", err);
+        }
 
-        const { brainContext } = await strategicBrain(message, sessionId);
-
-        console.log(
-          `[Brain] Stage: ${brainContext.stage} | Intent: ${brainContext.intent} | LeadScore: ${brainContext.leadScore} | Reasoning: ${brainContext.reasoning}`
-        );
-
-        const history = await memoryService.getRecentContext(sessionId);
+        // Get recent context
+        let history: { content: string }[] = [];
+        try {
+          history = await memoryService.getRecentContext(sessionId);
+        } catch (err) {
+          console.warn("⚠️ Failed to retrieve recent context:", err);
+        }
         const historyText = history.map(h => h.content).join("\n") || "";
 
-        const reply = await executeHybridResponse({ // ✅ FIXED
-          sessionId,
-          message,
-          brainContext: brainContext || {},
-          leadScoreValue: brainContext?.leadScore || 0,
-          detectedIntentNames: brainContext?.intent ? [brainContext.intent] : [],
-          vectorText: "",
-          historyText,
-          recentMessagesCache: history || [],
-          intentCategories: [],
-        });
+        // Generate hybrid AI response
+        let reply = "";
+        try {
+          reply = await executeHybridResponse({
+            sessionId,
+            message,
+            brainContext,
+            leadScoreValue: brainContext.leadScore ?? 0,
+            detectedIntentNames: brainContext.intent ? [brainContext.intent] : [],
+            vectorText: "",
+            historyText,
+            recentMessagesCache: history || [],
+            intentCategories: [],
+          });
+        } catch (err) {
+          console.warn("⚠️ Hybrid response generation failed:", err);
+        }
 
         const finalReply =
           reply && reply.trim().length > 0
             ? reply
             : "I'm here to help with AI marketing strategy, automation, SEO, and CGI advertising. What would you like to explore?";
 
-        await memoryService.saveMessage(sessionId, "assistant", finalReply);
+        try {
+          await memoryService.addMessage(sessionId, "assistant", finalReply);
+        } catch (err) {
+          console.warn("⚠️ Failed to save assistant message:", err);
+        }
 
         return res.json({ reply: finalReply });
       } catch (err) {

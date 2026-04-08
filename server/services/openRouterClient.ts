@@ -45,7 +45,7 @@ function cleanPrompt(prompt: string): string {
   );
 }
 
-/* ================= RESPONSE CHECK ================= */
+/* ================= RESPONSE VALIDATION ================= */
 function isValidResponse(text: string): boolean {
   if (!text || text.length < 20) return false;
   const lower = text.toLowerCase();
@@ -74,7 +74,7 @@ function finalize(text: string): string {
     .replace(/[^\.\!\?]$/, (m) => m + ".");
 }
 
-/* ================= INTENT ================= */
+/* ================= INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
   return /(book|schedule|call|hire|start now|let's start|ready)/i.test(message);
 }
@@ -88,7 +88,7 @@ function toSafeStage(stage?: string): Stage {
   return allowed.includes(stage as Stage) ? (stage as Stage) : "greeting";
 }
 
-/* ================= MAIN ================= */
+/* ================= MAIN FUNCTION ================= */
 export async function generateOpenRouter(
   prompt: string,
   sessionId?: string
@@ -131,24 +131,26 @@ export async function generateOpenRouter(
       /* ---------- EXECUTION MODE ---------- */
       if (highIntent) {
         executionMode = "execution";
-        const safeStage = toSafeStage(ctx.stage);
-        await shouldTriggerBooking(sessionId, safeStage);
+        try {
+          const safeStage = toSafeStage(ctx.stage);
+          await shouldTriggerBooking(sessionId, safeStage);
+        } catch (err) {
+          console.warn("[BookingTrigger] Failed to check booking:", err);
+        }
       } else {
         executionMode = ctx.executionMode || "exploration";
       }
 
-      contextText = `
-Stage: ${ctx.stage || "unknown"}
+      contextText = `Stage: ${ctx.stage || "unknown"}
 Mode: ${executionMode}
 Lead Score: ${totalScore.toFixed(2)}
 Industry: ${industry} ${businessType}
 Services: ${detectedServices.join(", ") || "none"}
 Goals: ${goalsText}
-Recent: ${recentMessages.slice(-3).join(" | ")}
-      `.trim();
+Recent: ${recentMessages.slice(-3).join(" | ")}`.trim();
 
     } catch (err) {
-      console.warn("⚠️ brain failed:", err);
+      console.warn("[StrategicBrain] Context load failed:", err);
     }
   }
 

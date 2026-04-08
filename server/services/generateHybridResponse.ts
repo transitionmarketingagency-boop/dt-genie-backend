@@ -34,6 +34,22 @@ import { normalizeLeadScore, determineExecutionMode } from "./leadScoreHelper.js
 import { smartGreeting } from "./greetingHelper.js";
 import { checkHardResponses } from "./hardResponses.js";
 
+// ===================== TYPES ===================== //
+export interface BrainContext {
+  stage?: string;
+  intent?: string;
+  reasoning?: string;
+  leadScore?: number;
+  detectedServices?: string[];
+  detectedIntents?: string[];
+  hasSufficientContext?: boolean;
+  strategicMemory?: {
+    industry?: string;
+    businessType?: string;
+  };
+  executionMode?: string;
+}
+
 // ===================== UTILITY HELPERS ===================== //
 function isLowQuality(text: string): boolean {
   if (!text) return true;
@@ -62,7 +78,7 @@ export function buildHybridPrompt({
   historyText,
   message,
 }: {
-  brainContext: any;
+  brainContext: BrainContext;
   leadScoreValue: number;
   detectedIntentNames: string[];
   vectorText: string;
@@ -70,15 +86,14 @@ export function buildHybridPrompt({
   message: string;
 }) {
   const avoidQuestions =
-    Boolean(brainContext?.hasSufficientContext) &&
-    brainContext?.stage !== "discovery";
+    Boolean(brainContext?.hasSufficientContext) && brainContext?.stage !== "discovery";
 
   const knownContext = `
 Known User Context:
 ${historyText || "No prior context available."}
 
-Industry: ${brainContext?.strategicMemory?.industry || "unknown"}
-Business Type: ${brainContext?.strategicMemory?.businessType || "unknown"}
+Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
+Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
 
 IMPORTANT:
 - Do NOT ask for information already provided
@@ -107,7 +122,7 @@ Solve the user's REAL business problem using strategy, not generic advice.
   → Tie everything to RESULTS (revenue, leads, ROAS)
 
 🧠 INTELLIGENCE MODE
-Execution Mode: ${brainContext?.executionMode || "exploration"}
+Execution Mode: ${brainContext?.executionMode ?? "exploration"}
 
 IF executionMode = "execution":
 - DO NOT ask unnecessary questions
@@ -121,13 +136,13 @@ IF executionMode = "exploration":
 ${avoidQuestions ? "CRITICAL: DO NOT ASK ANY QUESTIONS." : ""}
 
 📊 USER CONTEXT
-Stage: ${brainContext?.stage || "discovery"}
-Lead Score: ${leadScoreValue?.toFixed(2) || "0.00"}
+Stage: ${brainContext?.stage ?? "discovery"}
+Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
 Intent: ${detectedIntentNames?.join(", ") || "general"}
 Services: ${brainContext?.detectedServices?.join(", ") || "adaptive"}
 
 Strategic Insight:
-${brainContext?.reasoning || "No prior insight"}
+${brainContext?.reasoning ?? "No prior insight"}
 
 User Maturity:
 ${leadScoreValue > 0.6 ? "HIGH INTENT (ready to act)" : "EXPLORING"}
@@ -187,7 +202,7 @@ export async function executeHybridResponse({
 }: {
   sessionId: string;
   message: string;
-  brainContext: any;
+  brainContext: BrainContext;
   leadScoreValue: number;
   detectedIntentNames: string[];
   vectorText: string;
@@ -198,9 +213,20 @@ export async function executeHybridResponse({
   vectorCount?: number;
 }) {
   try {
-    // ----------------- Detect Services & Intents ----------------- //
-    brainContext.detectedServices = detectService(message);
-    brainContext.detectedIntents = detectIntent(message);
+
+// ----------------- Detect Services & Intents ----------------- //
+
+// detectService might be async, ensure await and normalize to string[]
+const detectedServices = await detectService(message);
+brainContext.detectedServices = Array.isArray(detectedServices)
+  ? detectedServices.filter((s): s is string => typeof s === "string")
+  : [];
+
+// detectIntent returns objects, extract just the intent string
+const detectedIntentsRaw = detectIntent(message); // [{intent: Intent, score: number}, ...]
+brainContext.detectedIntents = Array.isArray(detectedIntentsRaw)
+  ? detectedIntentsRaw.map((item) => (item && typeof item.intent === "string" ? item.intent : "unknown"))
+  : [];
 
     // ----------------- Fuse Chunks ----------------- //
     const fusedChunksResult: FusedChunk[] = await getFusedChunks(message);
@@ -221,25 +247,30 @@ export async function executeHybridResponse({
     let response = "";
     let modelUsed = "none";
 
-    const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
-    const qwenBad = !qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp);
+    try {
+      const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
+      const qwenBad = !qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp);
 
-    let geminiResp: string | null = null;
-    if (qwenBad && brainContext.hasSufficientContext && message.length > 20 && canUseGemini()) {
-      geminiResp = await withTimeout(generateGemini(prompt), 4500);
+      let geminiResp: string | null = null;
+      if (qwenBad && brainContext.hasSufficientContext && message.length > 20 && canUseGemini()) {
+        geminiResp = await withTimeout(generateGemini(prompt), 4500);
+      }
+
+      if (qwenResp && !qwenBad) {
+        response = qwenResp;
+        modelUsed = "Qwen";
+      } else if (geminiResp && !looksIncomplete(geminiResp)) {
+        response = geminiResp;
+        modelUsed = "Gemini";
+        markGeminiUsed();
+      }
+    } catch (err) {
+      console.warn("⚠️ AI model call failed:", err);
     }
 
-    if (qwenResp && !qwenBad) {
-      response = qwenResp;
-      modelUsed = "Qwen";
-    } else if (geminiResp && !looksIncomplete(geminiResp)) {
-      response = geminiResp;
-      modelUsed = "Gemini";
-      markGeminiUsed();
-    }
-
+    // ----------------- Fallback ----------------- //
     if (!response || isLowQuality(response) || looksIncomplete(response)) {
-      response = smartFallbackHelper(brainContext?.reasoning || "Let's focus on the main bottleneck.");
+      response = smartFallbackHelper(brainContext?.reasoning ?? "Let's focus on the main bottleneck.");
       modelUsed = "fallback";
     }
 
@@ -266,7 +297,7 @@ export async function executeHybridResponse({
 
     // ----------------- Anti-Repetition ----------------- //
     const lastAssistant =
-      recentMessagesCache?.slice()?.reverse()?.find((m) => m.role === "assistant")?.content || "";
+      recentMessagesCache?.slice()?.reverse()?.find((m) => m.role === "assistant")?.content ?? "";
     if (response && lastAssistant) {
       const normalizeText = (text: string) =>
         text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
@@ -277,7 +308,7 @@ export async function executeHybridResponse({
       if (isSimilar) {
         response = brainContext.hasSufficientContext
           ? `Let’s take this further.\n\n${
-              brainContext.reasoning || "We now need to refine execution instead of rethinking strategy."
+              brainContext.reasoning ?? "We now need to refine execution instead of rethinking strategy."
             }\n\nFocus on fixing the highest-impact bottleneck first.`
           : "Let’s focus this properly — what’s the main result you're trying to achieve?";
         modelUsed = "anti-repeat";
@@ -285,10 +316,14 @@ export async function executeHybridResponse({
     }
 
     // ----------------- Save to Memory ----------------- //
-    if (response) await memoryService.saveMessage(sessionId, "assistant", response);
+    try {
+      if (response) await memoryService.saveMessage(sessionId, "assistant", response);
+    } catch (err) {
+      console.warn("⚠️ Failed to save hybrid response to memory:", err);
+    }
 
     console.log(
-      `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage} | Chunks=${vectorCount} | LeadScore=${leadScoreValue}`
+      `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage ?? "N/A"} | Chunks=${vectorCount} | LeadScore=${leadScoreValue}`
     );
 
     return response;

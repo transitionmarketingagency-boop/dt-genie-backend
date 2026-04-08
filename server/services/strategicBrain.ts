@@ -77,41 +77,52 @@ function isHighIntent(message: string, stage: BrainContext["stage"], leadScore: 
 export async function strategicBrain(userMessage: string, sessionId?: string) {
   const message = normalizeText(userMessage);
 
-  const strategicMemory: StrategicMemory = sessionId
-    ? await memoryService.getStrategicMemory(sessionId).catch(() => ({}))
-    : {};
+  // ---------- Load Strategic Memory ----------
+  let strategicMemory: StrategicMemory = {};
+  if (sessionId) {
+    try {
+      strategicMemory = (await memoryService.getStrategicMemory(sessionId)) || {};
+    } catch (err) {
+      console.warn("Failed to load strategic memory:", err);
+      strategicMemory = {};
+    }
+  }
 
-  /* ---------- LEAD SCORE ---------- */
+  // ---------- LEAD SCORE ----------
   let leadScore = 0;
   if (sessionId) {
     try {
       const result = leadQualifier.scoreLead(sessionId, { need: 0.5 });
       leadScore = Math.min(result.total * 10, 10);
-    } catch {}
+    } catch (err) {
+      console.warn("Lead scoring failed:", err);
+      leadScore = 0;
+    }
   }
 
-  /* ---------- STAGE ---------- */
-  let stage = detectStage(message, leadScore);
-  let executionMode: BrainContext["executionMode"] =
-    stage === "greeting" ? "exploration" : "execution";
+  // ---------- STAGE ----------
+  const stage = detectStage(message, leadScore);
+  let executionMode: BrainContext["executionMode"] = stage === "greeting" ? "exploration" : "execution";
 
-  /* ---------- INTENTS ---------- */
+  // ---------- INTENTS ----------
   let unifiedIntentRanking: { intent: string; score: number }[] = [];
   let primaryIntent = "general";
-
   try {
-    const intents = getRelevantIntents(message, [], 5);
-    unifiedIntentRanking = intents.map((i) => ({ intent: i.intent.name, score: i.score }));
-    if (intents.length) primaryIntent = intents[0].intent.name;
-  } catch {}
+    const intents = getRelevantIntents(message, [], 5) || [];
+    unifiedIntentRanking = intents.map((i) => ({ intent: i.intent?.name || "general", score: i.score || 0 }));
+    if (intents.length && intents[0].intent?.name) primaryIntent = intents[0].intent.name;
+  } catch (err) {
+    console.warn("Intent extraction failed:", err);
+  }
 
-  /* ---------- SERVICES ---------- */
+  // ---------- SERVICES ----------
   let detectedServices: string[] = [];
   try {
-    const detected = await detectIntents(message);
+    const detected = (await detectIntents(message)) || [];
     detectedServices = detected
       .filter((i) => i.type === "service" && i.confidence > 0.5)
-      .map((i) => i.value);
+      .map((i) => i.value)
+      .filter(Boolean);
 
     // Merge with previous memory
     const existing = new Set(strategicMemory.servicesDiscussed || []);
@@ -119,69 +130,79 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     strategicMemory.servicesDiscussed = Array.from(existing);
 
     strategicMemory.lastService = detectedServices[0] || strategicMemory.lastService;
-  } catch {}
+  } catch (err) {
+    console.warn("Service detection failed:", err);
+  }
 
-  /* ---------- CONTEXT ---------- */
-  const hasBusinessContext =
-    /(roas|ads|sales|conversion|seo|revenue|store|business)/i.test(message);
-  const hasSufficientContext =
-    message.length > 8 || (strategicMemory.servicesDiscussed?.length ?? 0) > 0;
+  // ---------- CONTEXT ----------
+  const hasBusinessContext = /(roas|ads|sales|conversion|seo|revenue|store|business)/i.test(message);
+  const hasSufficientContext = message.length > 8 || (strategicMemory.servicesDiscussed?.length ?? 0) > 0;
 
   if (hasBusinessContext) {
     strategicMemory.businessMentioned = true;
     strategicMemory.lastUserProblem = message;
   }
 
-  /* ---------- REASONING ---------- */
+  // ---------- REASONING ----------
   let reasoning = "";
   try {
     if (sessionId) {
       const result = await reasoningEngine.analyze(sessionId, message);
-      reasoning = result.strategy || "";
+      reasoning = result?.strategy || "";
 
-      // Append service-specific fallback if multiple services detected
       if (detectedServices.length > 1) {
-        const serviceFallbacks = detectedServices.map(
-          (s) => `Optimize ${s} with targeted tactics.`
-        );
+        const serviceFallbacks = detectedServices.map((s) => `Optimize ${s} with targeted tactics.`);
         reasoning += "\n\n" + serviceFallbacks.join("\n");
       }
     }
-  } catch {}
+  } catch (err) {
+    console.warn("Reasoning analysis failed:", err);
+  }
 
   if (!reasoning || reasoning.length < 20) {
     reasoning =
       "Focus on identifying the exact bottleneck per service and optimize each layer: traffic, conversion, and offer alignment.";
   }
 
-  /* ---------- INTENT LEVEL ---------- */
+  // ---------- INTENT LEVEL ----------
   const highIntent = isHighIntent(message, stage, leadScore);
   if (highIntent) executionMode = "action";
 
-  /* ---------- SERVICE ---------- */
+  // ---------- SERVICE ----------
   const recommendedService = detectedServices[0] || strategicMemory.lastService || null;
   const triggerBooking = highIntent || (leadScore >= 6 && stage === "service");
 
-  /* ---------- RECENT CONTEXT ---------- */
-  const recentContext = sessionId
-    ? await memoryService.getRecentContext(sessionId).catch(() => [])
-    : [];
+  // ---------- RECENT CONTEXT ----------
+  let recentContext: { role: string; content: string }[] = [];
+  if (sessionId) {
+    try {
+      recentContext = (await memoryService.getRecentContext(sessionId)) || [];
+    } catch (err) {
+      console.warn("Recent context fetch failed:", err);
+      recentContext = [];
+    }
+  }
 
-  /* ---------- VECTOR CHUNKS ---------- */
+  // ---------- VECTOR CHUNKS ----------
   let fusedChunks: any[] = [];
   try {
     fusedChunks = await getFusedChunks(message, 3);
     fusedChunks = fusedChunks.filter((c) => c?.text && !/(contact|email|phone|http)/i.test(c.text));
-  } catch {}
+  } catch (err) {
+    console.warn("Fused chunks failed:", err);
+    fusedChunks = [];
+  }
 
-  /* ---------- SAVE MEMORY ---------- */
+  // ---------- SAVE MEMORY ----------
   if (sessionId) {
     try {
       await memoryService.updateStrategicMemory(sessionId, strategicMemory);
-    } catch {}
+    } catch (err) {
+      console.warn("Failed to update strategic memory:", err);
+    }
   }
 
-  /* ---------- FINAL CONTEXT ---------- */
+  // ---------- FINAL CONTEXT ----------
   const brainContext: BrainContext = {
     message: userMessage,
     intent: primaryIntent,
