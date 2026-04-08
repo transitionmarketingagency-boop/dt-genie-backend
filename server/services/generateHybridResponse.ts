@@ -199,7 +199,6 @@ export async function executeHybridResponse({
   recentMessagesCache,
   intentCategories,
   forceNoQuestions = false,
-  vectorCount = 0,
 }: {
   sessionId: string;
   message: string;
@@ -211,17 +210,23 @@ export async function executeHybridResponse({
   recentMessagesCache: any[];
   intentCategories: string[];
   forceNoQuestions?: boolean;
-  vectorCount?: number;
 }) {
   try {
-    // ----------- DYNAMIC GREETING CHECK -----------
+    // ================= 1️⃣ HARD RESPONSES (CRITICAL FIX) =================
+    const hardResponse = checkHardResponses(message);
+    if (hardResponse) {
+      await memoryService.saveMessage(sessionId, "assistant", hardResponse);
+      return hardResponse;
+    }
+
+    // ================= 2️⃣ GREETING CONTROL =================
     const greetingResp = await smartGreeting(brainContext, recentMessagesCache);
     if (greetingResp) {
       await memoryService.saveMessage(sessionId, "assistant", greetingResp);
       return greetingResp;
     }
 
-    // ----------------- Detect Services & Intents ----------------- //
+    // ================= 3️⃣ DETECTION =================
     brainContext.detectedServices = [];
     brainContext.detectedIntents = [];
 
@@ -232,15 +237,21 @@ export async function executeHybridResponse({
 
     const detectedIntentsRaw = detectIntent(message);
     brainContext.detectedIntents = Array.isArray(detectedIntentsRaw)
-      ? detectedIntentsRaw.map((item) => (item && typeof item.intent === "string" ? item.intent : "unknown"))
+      ? detectedIntentsRaw.map((i) =>
+          i && typeof i.intent === "string" ? i.intent : "unknown"
+        )
       : [];
 
-    // ----------------- Fuse Chunks ----------------- //
-    const fusedChunksResult: FusedChunk[] = await getFusedChunks(message);
-    const fusedChunksArray: string[] = fusedChunksResult.map((c) => c.text).filter(Boolean);
-    const fusedChunksText: string = fusedChunksArray.join("\n\n");
+    // ================= 4️⃣ VECTOR (SAFE) =================
+    let fusedChunksText = "";
+    try {
+      const chunks = await getFusedChunks(message, 3);
+      fusedChunksText = chunks.map((c) => c.text).join("\n\n");
+    } catch (err) {
+      console.warn("Vector failed:", err);
+    }
 
-    // ----------------- Build Prompt ----------------- //
+    // ================= 5️⃣ PROMPT =================
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
@@ -250,93 +261,62 @@ export async function executeHybridResponse({
       message,
     });
 
-    // ----------------- Model Execution ----------------- //
-    let response: string = "";
-    let modelUsed = "none";
+    // ================= 6️⃣ MODEL EXECUTION =================
+    let response = "";
 
     try {
-      const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
-      const qwenBad = !qwenResp || isLowQuality(qwenResp) || looksIncomplete(qwenResp);
+      const qwenResp = await withTimeout(
+        generateOpenRouter(prompt, sessionId),
+        6500
+      );
 
-      let geminiResp: string | null = null;
-      if (qwenBad && brainContext.hasSufficientContext && message.length > 20 && canUseGemini()) {
-        geminiResp = await withTimeout(generateGemini(prompt), 4500);
-      }
-
-      if (qwenResp && !qwenBad) {
+      if (qwenResp && !isLowQuality(qwenResp) && !looksIncomplete(qwenResp)) {
         response = qwenResp;
-        modelUsed = "Qwen";
-      } else if (geminiResp && !looksIncomplete(geminiResp)) {
-        response = geminiResp;
-        modelUsed = "Gemini";
-        markGeminiUsed();
+      } else if (canUseGemini()) {
+        const geminiResp = await withTimeout(generateGemini(prompt), 4500);
+        if (geminiResp) {
+          response = geminiResp;
+          markGeminiUsed();
+        }
       }
     } catch (err) {
-      console.warn("⚠️ AI model call failed:", err);
+      console.warn("AI model failed:", err);
     }
 
-    // ----------------- Fallback ----------------- //
-    if (!response || isLowQuality(response) || looksIncomplete(response)) {
- response = smartFallbackHelper();
-      modelUsed = "fallback";
+    // ================= 7️⃣ FIXED FALLBACK =================
+    if (!response || isLowQuality(response)) {
+      response = smartFallbackHelper(); // ✅ fixed: no args
     }
 
-    // ----------------- Cleanup & Enforcements ----------------- //
+    // ================= 8️⃣ CLEANUP =================
     response = cleanHybridResponse(response);
-    if (forceNoQuestions) response = response.replace(/\?+/g, ".");
-    if (response.length > 1200) response = compressResponse(response);
+
+    if (forceNoQuestions) {
+      response = response.replace(/\?+/g, ".");
+    }
+
     response = enforceBotName(response);
 
-    // ----------------- Smart CTA ----------------- //
+    // ================= 9️⃣ CTA (SMART) =================
     if (
-      response &&
-      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage) &&
-      brainContext.hasSufficientContext
+      shouldIncludeCTA(
+        message,
+        intentCategories,
+        leadScoreValue,
+        brainContext.stage
+      )
     ) {
-      const ctas = [
-        "We can turn this into a structured execution plan if you want.",
-        "I can map this into a step-by-step growth plan for your setup.",
-        "Want me to break this into an actionable plan tailored to your business?",
-      ];
-      response = response.replace(/[.!\s]*$/, "");
-      response += "\n\n" + ctas[Math.floor(Math.random() * ctas.length)];
+      response +=
+        "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
     }
 
-    // ----------------- Anti-Repetition ----------------- //
-    const lastAssistant =
-      recentMessagesCache?.slice()?.reverse()?.find((m) => m.role === "assistant")?.content ?? "";
-    if (response && lastAssistant) {
-      const normalizeText = (text: string) =>
-        text.toLowerCase().replace(/[^\w\s]/g, "").replace(/\s+/g, " ").trim();
-      const prev = normalizeText(lastAssistant).slice(0, 140);
-      const curr = normalizeText(response).slice(0, 140);
-      const isSimilar =
-        prev === curr || prev.includes(curr.slice(0, 80)) || curr.includes(prev.slice(0, 80));
-      if (isSimilar) {
-        response = brainContext.hasSufficientContext
-          ? `Let’s take this further.\n\n${
-              brainContext.reasoning ?? "We now need to refine execution instead of rethinking strategy."
-            }\n\nFocus on fixing the highest-impact bottleneck first.`
-          : "Let’s focus this properly — what’s the main result you're trying to achieve?";
-        modelUsed = "anti-repeat";
-      }
-    }
-
-    // ----------------- Save to Memory ----------------- //
-    try {
-      if (response) await memoryService.saveMessage(sessionId, "assistant", response);
-    } catch (err) {
-      console.warn("⚠️ Failed to save hybrid response to memory:", err);
-    }
-
-    console.log(
-      `[Hybrid RAG] Model=${modelUsed} | Stage=${brainContext.stage ?? "N/A"} | Chunks=${vectorCount} | LeadScore=${leadScoreValue}`
-    );
+    // ================= 🔟 SAVE =================
+    await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;
   } catch (err) {
-    console.error("Hybrid RAG error:", err);
-    return "Something went wrong on our side — try again in a moment.";
+    console.error("Hybrid error:", err);
+    return "Something went wrong — try again.";
   }
 }
 

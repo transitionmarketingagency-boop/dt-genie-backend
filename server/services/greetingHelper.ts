@@ -1,22 +1,29 @@
 // server/services/smartGreeting.ts
-import { memoryService } from "./memoryService.js";
 
 /**
- * Returns a dynamic greeting if the assistant hasn't spoken yet and context is low.
- * Prevents greeting overrides for service-specific queries.
+ * Lightweight greeting — only triggers for very short messages
+ * and never overrides meaningful queries.
  */
-export async function smartGreeting(brainContext: any, recentMessages: any[]): Promise<string | null> {
-  const hasContext = brainContext?.hasSufficientContext || (brainContext?.leadScore ?? 0) > 0.3;
-  const hasAssistantSpoken = recentMessages.some((m: any) => m.role === "assistant");
+export async function smartGreeting(
+  brainContext: any,
+  recentMessages: any[]
+): Promise<string | null> {
 
-  // Only greet if no assistant reply yet AND low context
-  if (hasContext || hasAssistantSpoken) return null;
+  const message = brainContext?.message?.toLowerCase?.() || "";
 
-  // Use dynamic greeting if set in brain context
-  if (brainContext?.dynamicGreeting) return brainContext.dynamicGreeting;
+  // ✅ ONLY trigger on pure greetings
+  const isGreeting = /^(hi|hello|hey|yo|whats up|what's up)$/.test(message);
+
+  if (!isGreeting) return null;
+
+  // ❌ DO NOT depend on recentMessages (unstable)
+  // ❌ DO NOT depend on leadScore (can be noisy)
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greeting =
+    hour < 12 ? "Good morning"
+    : hour < 18 ? "Good afternoon"
+    : "Good evening";
 
   return `${greeting} — what are you trying to improve right now?`;
 }
