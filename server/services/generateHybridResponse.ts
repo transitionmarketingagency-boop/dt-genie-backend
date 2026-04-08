@@ -277,7 +277,7 @@ export async function executeHybridResponse({
 
     // ----------------- Fallback ----------------- //
     if (!response || isLowQuality(response) || looksIncomplete(response)) {
-      response = smartFallbackHelper(brainContext?.reasoning ?? "Let's focus on the main bottleneck.");
+ response = smartFallbackHelper();
       modelUsed = "fallback";
     }
 

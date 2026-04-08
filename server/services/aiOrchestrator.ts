@@ -1,12 +1,9 @@
-// server/services/aiOrchestrator.ts
 /* =====================================================
    NEON VISION / DT-GENIE AI ORCHESTRATION MODULE
-   Combines Intent Detection, Service Suggestions,
-   Lead Qualification, and Strategic Reasoning
+   Clean Version (NO HARDCODED REASONING)
 ===================================================== */
 
 import { leadQualifier, type LeadScore } from "./leadQualifier.js";
-import { reasoningEngine, type ReasoningData } from "./reasoningEngine.js";
 import { getRelevantIntents, type Intent } from "./intentManager.js";
 
 /* ======================= TYPES ======================= */
@@ -19,7 +16,7 @@ export interface OrchestratorResult {
   intents: { intent: Intent; score: number }[];
   recommendedServices: ServiceRecommendation[];
   leadScore: LeadScore;
-  strategy: ReasoningData;
+  // ❌ removed ReasoningData completely
 }
 
 /* ======================= SERVICE DETECTOR ======================= */
@@ -29,7 +26,7 @@ export function detectServicesFromIntents(
   const services: ServiceRecommendation[] = [];
 
   for (const item of intentsDetected) {
-    if (item.intent.type === "service") {
+    if (item.intent?.type === "service") {
       services.push({
         service: item.intent.name,
         confidence: item.score ?? 0,
@@ -64,7 +61,14 @@ export async function processUserMessage(
   }
 
   // ---------- 3️⃣ LEAD SCORING ----------
-  let leadScore: LeadScore = { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 };
+  let leadScore: LeadScore = {
+    total: 0,
+    budget: 0,
+    authority: 0,
+    need: 0,
+    timeline: 0,
+  };
+
   try {
     leadScore = await leadQualifier.scoreLead(
       sessionId,
@@ -80,27 +84,12 @@ export async function processUserMessage(
     console.warn("Lead scoring failed:", err);
   }
 
-  // ---------- 4️⃣ STRATEGIC REASONING ----------
-  let strategy: ReasoningData = {
-    problem: "",
-    industry: "",
-    strategy: "",
-    recentMessages: [],
-    services: [],
-  };
-  try {
-    const analysis = await reasoningEngine.analyze(sessionId, message);
-    if (analysis) strategy = analysis;
-  } catch (err) {
-    console.warn("Strategic reasoning failed:", err);
-  }
+  // ✅ NO REASONING — LET LLM HANDLE IT
 
-  // ---------- FINAL RETURN ----------
   return {
     intents: detectedIntents,
     recommendedServices,
     leadScore,
-    strategy,
   };
 }
 
