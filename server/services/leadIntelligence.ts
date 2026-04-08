@@ -1,5 +1,3 @@
-// server/services/leadIntelligence.ts
-
 import { leadQualifier } from "./leadQualifier.js";
 import type { LeadScore } from "./leadQualifier.js";
 import { memoryService } from "./memoryService.js";
@@ -38,42 +36,14 @@ function includesAny(text: string, keywords: string[]): number {
 }
 
 /* ================= SIGNAL KEYWORDS ================= */
-const budgetSignals = [
-  "budget", "cost", "pricing", "price", "how much",
-  "investment", "spend", "ad spend", "we can spend"
-];
-
-const authoritySignals = [
-  "i am the owner", "i'm the owner", "i run the company",
-  "decision maker", "my company", "our company",
-  "founder", "ceo"
-];
-
-const needSignals = [
-  "we need", "we are struggling", "looking for", "need help",
-  "want to improve", "need marketing", "need automation",
-  "low roas", "no sales", "bad results", "not working",
-  "conversion issue"
-];
-
-const timelineSignals = [
-  "as soon as possible", "urgent", "this month",
-  "next month", "immediately", "soon", "right away"
-];
-
-const buyingSignals = [
-  "i want to start", "let's start", "ready to begin",
-  "how do we proceed", "how do we start",
-  "i want to work with you", "hire you",
-  "start project"
-];
+const budgetSignals = ["budget","cost","pricing","price","how much","investment","spend","ad spend","we can spend"];
+const authoritySignals = ["i am the owner","i'm the owner","i run the company","decision maker","my company","our company","founder","ceo"];
+const needSignals = ["we need","we are struggling","looking for","need help","want to improve","need marketing","need automation","low roas","no sales","bad results","not working","conversion issue"];
+const timelineSignals = ["as soon as possible","urgent","this month","next month","immediately","soon","right away"];
+const buyingSignals = ["i want to start","let's start","ready to begin","how do we proceed","how do we start","i want to work with you","hire you","start project"];
 
 /* ================= SIGNAL DETECTION ================= */
-function detectSignals(
-  message: string,
-  memorySignals: Partial<BANTSignals> = {}
-): BANTSignals {
-
+function detectSignals(message: string, memorySignals: Partial<BANTSignals> = {}): BANTSignals {
   const msg = normalize(message);
 
   const signals: BANTSignals = {
@@ -83,8 +53,7 @@ function detectSignals(
     timeline: clamp(memorySignals.timeline),
   };
 
-  const add = (value: number | undefined, increment: number) =>
-    clamp((value ?? 0) + increment);
+  const add = (value: number | undefined, increment: number) => clamp((value ?? 0) + increment);
 
   // ----- NEED -----
   signals.need = add(signals.need, 0.3 * includesAny(msg, needSignals));
@@ -129,7 +98,7 @@ export async function analyzeLeadSignals(
 
   let memorySignals: Partial<BANTSignals> = {};
 
-  // ----- LOAD MEMORY (SAFE ACCESS) -----
+  // ----- LOAD CURRENT SESSION MEMORY -----
   if (sessionId) {
     try {
       const mem = await memoryService.getStrategicMemory(sessionId);
@@ -168,7 +137,7 @@ export async function analyzeLeadSignals(
     score = { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 };
   }
 
-  // ----- SAVE TO MEMORY -----
+  // ----- SAVE CURRENT SESSION MEMORY -----
   if (sessionId) {
     try {
       await memoryService.updateStrategicMemory(sessionId, {
@@ -176,6 +145,7 @@ export async function analyzeLeadSignals(
         decisionMaker: mapDecisionMaker(signals.authority),
         goals: signals.need && signals.need > 0.5 ? ["growth"] : undefined,
         timeline: mapTimeline(signals.timeline),
+        lastInteraction: Date.now(), // FIXED: timestamp number
       });
 
       if (process.env.DEBUG_MEMORY === "true") {

@@ -1,5 +1,3 @@
-// server/services/strategicBrain.ts
-
 import { getRelevantIntents } from "./intentManager.js";
 import { getFusedChunks } from "./intentVectorFusion.js";
 import { memoryService } from "./memoryService.js";
@@ -16,6 +14,7 @@ export type StrategicMemory = {
   lastUserProblem?: string;
   lastService?: string;
   businessType?: string;
+  lastInteraction?: number;
 };
 
 export type BrainContext = {
@@ -79,9 +78,14 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   // ---------- Load Strategic Memory ----------
   let strategicMemory: StrategicMemory = {};
+  let isFreshSession = true;
+
   if (sessionId) {
     try {
       strategicMemory = (await memoryService.getStrategicMemory(sessionId)) || {};
+      const last = strategicMemory.lastInteraction ?? 0;
+      isFreshSession = Date.now() - last > 1000 * 60 * 30; // 30 min freshness
+      strategicMemory.lastInteraction = Date.now();
     } catch (err) {
       console.warn("Failed to load strategic memory:", err);
       strategicMemory = {};
@@ -90,7 +94,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
 
   // ---------- LEAD SCORE ----------
   let leadScore = 0;
-  if (sessionId) {
+  if (!isFreshSession && sessionId) {
     try {
       const result = leadQualifier.scoreLead(sessionId, { need: 0.5 });
       leadScore = Math.min(result.total * 10, 10);
@@ -124,8 +128,8 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
       .map((i) => i.value)
       .filter(Boolean);
 
-    // Merge with previous memory
-    const existing = new Set(strategicMemory.servicesDiscussed || []);
+    // Merge only if session is not fresh
+    const existing = isFreshSession ? new Set<string>() : new Set(strategicMemory.servicesDiscussed || []);
     detectedServices.forEach((s) => existing.add(s));
     strategicMemory.servicesDiscussed = Array.from(existing);
 
@@ -143,10 +147,16 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     strategicMemory.lastUserProblem = message;
   }
 
+  // ---------- DYNAMIC GREETING ----------
+  let dynamicGreeting: string | undefined;
+  if (stage === "greeting" && leadScore < 0.5) {
+    dynamicGreeting = "Hey — what are you trying to improve right now?";
+  }
+
   // ---------- REASONING ----------
   let reasoning = "";
   try {
-    if (sessionId) {
+    if (!dynamicGreeting && sessionId) {
       const result = await reasoningEngine.analyze(sessionId, message);
       reasoning = result?.strategy || "";
 
@@ -159,9 +169,14 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     console.warn("Reasoning analysis failed:", err);
   }
 
+  // ---------- Reasoning Fallback ----------
   if (!reasoning || reasoning.length < 20) {
-    reasoning =
-      "Focus on identifying the exact bottleneck per service and optimize each layer: traffic, conversion, and offer alignment.";
+    if (!dynamicGreeting) {
+      reasoning =
+        "Focus on identifying the exact bottleneck per service and optimize each layer: traffic, conversion, and offer alignment.";
+    } else {
+      reasoning = dynamicGreeting;
+    }
   }
 
   // ---------- INTENT LEVEL ----------
@@ -176,22 +191,28 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
   let recentContext: { role: string; content: string }[] = [];
   if (sessionId) {
     try {
-      recentContext = (await memoryService.getRecentContext(sessionId)) || [];
+      recentContext = (await memoryService.getRecentContext(sessionId))
+        .filter(msg => {
+          const ts = msg.timestamp instanceof Date ? msg.timestamp.getTime() : new Date(msg.timestamp).getTime();
+          return Date.now() - ts < 1000 * 60 * 60; // last 1 hour
+        })
+        .map(msg => ({ role: msg.role, content: msg.content }));
     } catch (err) {
       console.warn("Recent context fetch failed:", err);
       recentContext = [];
     }
   }
 
-  // ---------- VECTOR CHUNKS ----------
-  let fusedChunks: any[] = [];
-  try {
-    fusedChunks = await getFusedChunks(message, 3);
-    fusedChunks = fusedChunks.filter((c) => c?.text && !/(contact|email|phone|http)/i.test(c.text));
-  } catch (err) {
-    console.warn("Fused chunks failed:", err);
-    fusedChunks = [];
-  }
+// ---------- VECTOR CHUNKS ----------
+let fusedChunks: any[] = [];
+try {
+  // Pass number of chunks instead of an object
+  fusedChunks = await getFusedChunks(message, 3);
+  fusedChunks = fusedChunks.filter((c) => c?.text && !/(contact|email|phone|http)/i.test(c.text));
+} catch (err) {
+  console.warn("Fused chunks failed:", err);
+  fusedChunks = [];
+}
 
   // ---------- SAVE MEMORY ----------
   if (sessionId) {
@@ -219,10 +240,7 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
     executionMode,
     highIntent,
     hasSufficientContext,
-    dynamicGreeting:
-      stage === "greeting" && leadScore < 0.5
-        ? "Hey — what are you trying to improve right now?"
-        : undefined,
+    dynamicGreeting,
   };
 
   return { brainContext, chunks: fusedChunks };

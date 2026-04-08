@@ -48,6 +48,7 @@ export interface BrainContext {
     businessType?: string;
   };
   executionMode?: string;
+  isFresh?: boolean;
 }
 
 // ===================== UTILITY HELPERS ===================== //
@@ -213,20 +214,26 @@ export async function executeHybridResponse({
   vectorCount?: number;
 }) {
   try {
+    // ----------- DYNAMIC GREETING CHECK -----------
+    const greetingResp = await smartGreeting(brainContext, recentMessagesCache);
+    if (greetingResp) {
+      await memoryService.saveMessage(sessionId, "assistant", greetingResp);
+      return greetingResp;
+    }
 
-// ----------------- Detect Services & Intents ----------------- //
+    // ----------------- Detect Services & Intents ----------------- //
+    brainContext.detectedServices = [];
+    brainContext.detectedIntents = [];
 
-// detectService might be async, ensure await and normalize to string[]
-const detectedServices = await detectService(message);
-brainContext.detectedServices = Array.isArray(detectedServices)
-  ? detectedServices.filter((s): s is string => typeof s === "string")
-  : [];
+    const detectedServices = await detectService(message);
+    brainContext.detectedServices = Array.isArray(detectedServices)
+      ? detectedServices.filter((s): s is string => typeof s === "string")
+      : [];
 
-// detectIntent returns objects, extract just the intent string
-const detectedIntentsRaw = detectIntent(message); // [{intent: Intent, score: number}, ...]
-brainContext.detectedIntents = Array.isArray(detectedIntentsRaw)
-  ? detectedIntentsRaw.map((item) => (item && typeof item.intent === "string" ? item.intent : "unknown"))
-  : [];
+    const detectedIntentsRaw = detectIntent(message);
+    brainContext.detectedIntents = Array.isArray(detectedIntentsRaw)
+      ? detectedIntentsRaw.map((item) => (item && typeof item.intent === "string" ? item.intent : "unknown"))
+      : [];
 
     // ----------------- Fuse Chunks ----------------- //
     const fusedChunksResult: FusedChunk[] = await getFusedChunks(message);
@@ -244,7 +251,7 @@ brainContext.detectedIntents = Array.isArray(detectedIntentsRaw)
     });
 
     // ----------------- Model Execution ----------------- //
-    let response = "";
+    let response: string = "";
     let modelUsed = "none";
 
     try {

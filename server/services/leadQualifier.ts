@@ -1,5 +1,3 @@
-// server/services/leadQualifier.ts
-
 import { memoryService } from "./memoryService.js";
 import type { StrategicMemory } from "./memoryService.js";
 
@@ -16,7 +14,7 @@ export interface LeadScore {
   authority?: number;   // 0-1
   need?: number;        // 0-1
   timeline?: number;    // 0-1
-  total: number;        // 0-1 normalized, weighted
+  total: number;        // 0-1 normalized
   stage?: Stage;
 }
 
@@ -27,13 +25,7 @@ function clamp(val?: number): number {
 }
 
 function normalizeStage(stage?: string): Stage {
-  const allowed: Stage[] = [
-    "greeting",
-    "discovery",
-    "strategy",
-    "service",
-    "conversion",
-  ];
+  const allowed: Stage[] = ["greeting","discovery","strategy","service","conversion"];
   if (stage && allowed.includes(stage as Stage)) return stage as Stage;
   return "discovery";
 }
@@ -48,11 +40,7 @@ export class LeadQualifier {
   };
 
   /* ================= SCORE LEAD ================= */
-  scoreLead(
-    sessionId: string,
-    bantData: Partial<LeadScore>,
-    stageInput: string = "discovery"
-  ): LeadScore {
+  scoreLead(sessionId: string, bantData: Partial<LeadScore>, stageInput: string = "discovery"): LeadScore {
     const stage = normalizeStage(stageInput);
     const weights = { ...this.defaultWeights };
 
@@ -85,7 +73,6 @@ export class LeadQualifier {
 
     // ---------- NON-BLOCKING MEMORY UPDATE ----------
     if (sessionId && score.total > 0) {
-      // Fire-and-forget
       this.safeUpdateLeadScore(sessionId, score).catch((err) =>
         console.warn("[LeadQualifier] async memory update failed:", err)
       );
@@ -95,27 +82,19 @@ export class LeadQualifier {
   }
 
   /* ================= SAFE MEMORY UPDATE ================= */
-  private async safeUpdateLeadScore(
-    sessionId: string,
-    score: LeadScore
-  ) {
+  private async safeUpdateLeadScore(sessionId: string, score: LeadScore) {
     try {
       if (score.total <= 0) return;
 
-      // Only save fields that exist in StrategicMemory
       const memoryUpdate: Partial<StrategicMemory> = {
         leadScore: score.total,
-        // lastLeadComponents is optional in StrategicMemory, safe to include
-        lastDetectedServices: undefined, // placeholder if needed
-        updatedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(), // FIXED: store as string
       };
 
       await memoryService.updateStrategicMemory(sessionId, memoryUpdate);
 
       if (process.env.DEBUG_MEMORY === "true") {
-        console.log(
-          `[LeadQualifier] leadScore=${score.total} saved for session ${sessionId}`
-        );
+        console.log(`[LeadQualifier] leadScore=${score.total} saved for session ${sessionId}`);
       }
     } catch (err) {
       console.warn(`[LeadQualifier] Memory update failed (${sessionId}):`, err);

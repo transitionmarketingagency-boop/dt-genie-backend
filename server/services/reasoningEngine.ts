@@ -51,7 +51,6 @@ export class ReasoningEngine {
     let detectedServices: string[] = [];
     try {
       const hybridServices = await hybridResponseService.detectServices(userQuestion);
-
       detectedServices =
         hybridServices && hybridServices.length
           ? hybridServices
@@ -60,7 +59,7 @@ export class ReasoningEngine {
       detectedServices = strategicMemory.servicesDiscussed || [];
     }
 
-    // ✅ HARD LIMIT (CRITICAL FIX)
+    // ✅ HARD LIMIT & DEDUPLICATE
     detectedServices = [...new Set(detectedServices)].slice(0, 2);
 
     /* ---------- CLEAN CONTEXT ---------- */
@@ -71,15 +70,14 @@ export class ReasoningEngine {
         content: safeString(m?.content),
       }));
 
-    /* ---------- SAFE VECTOR USAGE (NO RAW LEAK) ---------- */
+    /* ---------- SAFE VECTOR USAGE ---------- */
     let insightHint = "";
     try {
-      const chunks = await getFusedChunks(userQuestion, 3);
-
+      const chunks = await getFusedChunks(userQuestion, 3); // ✅ PASS NUMBER
       if (chunks?.length) {
         insightHint = chunks
           .slice(0, 2) // ✅ HARD LIMIT
-          .map((c) => safeString(c.text).slice(0, 100)) // ✅ NO RAW JSON
+          .map((c) => safeString(c.text).slice(0, 100)) // ✅ TRIM TEXT
           .join(" ");
       }
     } catch {
@@ -145,7 +143,7 @@ export class ReasoningEngine {
     return "general";
   }
 
-  /* ================= STRATEGY BUILDER (FIXED CORE) ================= */
+  /* ================= STRATEGY BUILDER ================= */
   private buildStrategy({
     problem,
     industry,
@@ -159,7 +157,6 @@ export class ReasoningEngine {
   }): string {
     const svc = services.length ? services.join(", ") : "your marketing system";
 
-    /* ---------- CORE STRATEGY (NO TEMPLATE LOOP) ---------- */
     if (problem === "conversion") {
       return `You're getting traffic but not converting. Focus on fixing your offer, landing page clarity, and trust signals. Improve your ${svc} by aligning messaging with buyer intent.`;
     }
@@ -176,7 +173,6 @@ export class ReasoningEngine {
       return `You need stronger acquisition channels. Scale your ${svc} using paid ads, SEO, and high-performing content distribution.`;
     }
 
-    /* ---------- DEFAULT ---------- */
     return `Focus on identifying your biggest bottleneck and optimize your ${svc}. Start with the highest-impact area affecting growth.`;
   }
 }

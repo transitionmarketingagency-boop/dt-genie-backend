@@ -1,4 +1,3 @@
-// server/services/memoryService.ts
 import * as sqlite from "sqlite";
 import sqlite3 from "sqlite3";
 import type { ChatMessage } from "../../shared/types.js";
@@ -39,17 +38,12 @@ function safeParse<T>(value: unknown, fallback: T): T {
 /* ================= NORMALIZE ================= */
 function normalizeContent(text: unknown): string {
   if (typeof text !== "string") return "";
-
   let clean = text
     .normalize("NFKC")
     .replace(/[\u0000-\u001F\u007F]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-
-  if (!clean) return "";
-  if (clean.length > 4000) clean = clean.slice(0, 4000);
-
-  return clean;
+  return clean.slice(0, 4000);
 }
 
 /* ================= TYPES ================= */
@@ -68,6 +62,7 @@ export interface StrategicMemory {
   lastDetectedServices?: string[];
   lastIntent?: string;
   updatedAt?: string;
+  lastInteraction?: number; // FIXED: store as timestamp
   bantSignals?: {
     budget?: number;
     authority?: number;
@@ -79,7 +74,6 @@ export interface StrategicMemory {
 /* ================= INIT ================= */
 export async function initializeMemory(): Promise<void> {
   const db = await dbPromise;
-
   await db.exec(`PRAGMA journal_mode = WAL;`);
   await db.exec(`PRAGMA synchronous = NORMAL;`);
   await db.exec(`PRAGMA busy_timeout = 5000;`);
@@ -111,7 +105,8 @@ export async function initializeMemory(): Promise<void> {
       lastDetectedServices TEXT,
       lastIntent TEXT,
       bantSignals TEXT,
-      updatedAt TEXT
+      updatedAt TEXT,
+      lastInteraction REAL
     )
   `);
 
@@ -142,23 +137,17 @@ export class MemoryService {
     content: string
   ): Promise<ChatMessage> {
     const db = await this.db;
-
     const normalized = normalizeContent(content);
     if (!normalized) throw new Error("Empty message");
 
-    const last = await db.get(
+    const last: any = await db.get(
       `SELECT * FROM chat_messages WHERE sessionId=? ORDER BY datetime(timestamp) DESC LIMIT 1`,
       sessionId
     );
 
     if (last) {
-      const same =
-        normalizeContent(last.content) === normalized &&
-        last.role === role;
-
-      const recent =
-        Date.now() - new Date(last.timestamp).getTime() < 8000;
-
+      const same = normalizeContent(last.content) === normalized && last.role === role;
+      const recent = Date.now() - new Date(last.timestamp).getTime() < 8000;
       if (same && recent) {
         return {
           id: last.id,
@@ -200,7 +189,7 @@ export class MemoryService {
     return msg;
   }
 
-  /* ✅ BACKWARD COMPAT */
+  /* -------- SAVE MESSAGE (BACKWARD COMPAT) -------- */
   async saveMessage(
     sessionId: string,
     role: "user" | "assistant",
@@ -217,7 +206,6 @@ export class MemoryService {
       sessionId,
       MAX_HISTORY_MESSAGES
     );
-
     return rows.reverse().map((r: any) => ({
       id: r.id,
       sessionId: r.sessionId,
@@ -235,7 +223,6 @@ export class MemoryService {
       sessionId,
       MAX_CONTEXT_MESSAGES
     );
-
     return rows.reverse().map((r: any) => ({
       id: r.id,
       sessionId: r.sessionId,
@@ -248,12 +235,14 @@ export class MemoryService {
   /* ================= STRATEGIC ================= */
   async getStrategicMemory(sessionId: string): Promise<StrategicMemory> {
     const db = await this.db;
-    const row = await db.get(
-      `SELECT * FROM strategic_memory WHERE sessionId=?`,
-      sessionId
-    );
+    const row = await db.get(`SELECT * FROM strategic_memory WHERE sessionId=?`, sessionId);
 
     if (!row) return {};
+
+    // Reset stale sessions (>1 day)
+    const last = row.lastInteraction ? new Date(row.lastInteraction).getTime() : null;
+    const isStale = last && Date.now() - last > 24 * 60 * 60 * 1000;
+    if (isStale) return {};
 
     return {
       industry: row.industry || undefined,
@@ -271,13 +260,11 @@ export class MemoryService {
       lastIntent: row.lastIntent || undefined,
       bantSignals: safeParse(row.bantSignals, {}),
       updatedAt: row.updatedAt || undefined,
+      lastInteraction: row.lastInteraction ?? undefined,
     };
   }
 
-  async updateStrategicMemory(
-    sessionId: string,
-    data: Partial<StrategicMemory>
-  ) {
+  async updateStrategicMemory(sessionId: string, data: Partial<StrategicMemory>) {
     const db = await this.db;
     const existing = await this.getStrategicMemory(sessionId);
 
@@ -292,10 +279,11 @@ export class MemoryService {
         ...(data.bantSignals || {}),
       },
       updatedAt: new Date().toISOString(),
+      lastInteraction: Date.now(),
     };
 
     await db.run(
-      `INSERT INTO strategic_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO strategic_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(sessionId) DO UPDATE SET
        industry=excluded.industry,
        businessType=excluded.businessType,
@@ -311,7 +299,8 @@ export class MemoryService {
        lastDetectedServices=excluded.lastDetectedServices,
        lastIntent=excluded.lastIntent,
        bantSignals=excluded.bantSignals,
-       updatedAt=excluded.updatedAt`,
+       updatedAt=excluded.updatedAt,
+       lastInteraction=excluded.lastInteraction`,
       sessionId,
       merged.industry ?? null,
       merged.businessType ?? null,
@@ -327,7 +316,8 @@ export class MemoryService {
       JSON.stringify(merged.lastDetectedServices),
       merged.lastIntent ?? null,
       JSON.stringify(merged.bantSignals),
-      merged.updatedAt
+      merged.updatedAt,
+      merged.lastInteraction
     );
   }
 
@@ -342,7 +332,6 @@ export class MemoryService {
   }) {
     const db = await this.db;
     const id = crypto.randomUUID();
-
     await db.run(
       `INSERT INTO bookings VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       id,
@@ -358,11 +347,7 @@ export class MemoryService {
 
   async updateBookingStatus(userId: string, status: string) {
     const db = await this.db;
-    await db.run(
-      `UPDATE bookings SET status=? WHERE userId=?`,
-      status,
-      userId
-    );
+    await db.run(`UPDATE bookings SET status=? WHERE userId=?`, status, userId);
   }
 }
 

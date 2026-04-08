@@ -5,6 +5,7 @@ import { strategicBrain } from "./strategicBrain.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { shouldTriggerBooking, type Stage } from "./bookingTrigger.js";
 import type { LeadScore } from "./leadQualifier.js";
+import crypto from "crypto";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
@@ -19,6 +20,7 @@ type SafeBrainContext = {
   dynamicGreeting?: string;
   industry?: string;
   businessType?: string;
+  isFresh?: boolean; // NEW: flag for new session
 };
 
 /* ================= RESPONSE TYPE ================= */
@@ -80,7 +82,11 @@ function detectHighIntent(message: string): boolean {
 }
 
 /* ================= CACHE ================= */
+// Use sessionId + hashed prompt to prevent cross-session pollution
 const cache = new Map<string, string>();
+function hash(text: string) {
+  return crypto.createHash("sha256").update(text).digest("hex");
+}
 
 /* ================= HELPER: SAFE STAGE ================= */
 function toSafeStage(stage?: string): Stage {
@@ -98,8 +104,7 @@ export async function generateOpenRouter(
   }
 
   prompt = cleanPrompt(prompt);
-  const cacheKey = `${sessionId || "global"}:${prompt.toLowerCase()}`;
-
+  const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
   /* ---------- CONTEXT ---------- */
@@ -109,24 +114,27 @@ export async function generateOpenRouter(
 
   let detectedServices: string[] = [];
   let goalsText = "unknown";
+  let dynamicGreeting: string | undefined;
 
   if (sessionId) {
     try {
       const { brainContext } = await strategicBrain(prompt, sessionId);
       const ctx = (brainContext || {}) as SafeBrainContext;
 
+      // If new session, reset detectedServices, goals, recentMessages
+      const isFresh = ctx.isFresh ?? false;
+
       const leadScore = ctx.leadScore;
-      const totalScore =
-        typeof leadScore === "number"
-          ? leadScore
-          : leadScore?.total ?? 0;
+      const totalScore = typeof leadScore === "number" ? leadScore : leadScore?.total ?? 0;
 
-      detectedServices = ctx.detectedServices || [];
-      goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
+      detectedServices = isFresh ? [] : ctx.detectedServices || [];
+      goalsText = isFresh ? "unknown" : Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
 
-      const recentMessages = ctx.recentMessages || [];
+      const recentMessages = isFresh ? [] : ctx.recentMessages || [];
       const industry = ctx.industry || "unknown";
       const businessType = ctx.businessType || "";
+
+      dynamicGreeting = ctx.dynamicGreeting;
 
       /* ---------- EXECUTION MODE ---------- */
       if (highIntent) {
@@ -152,6 +160,15 @@ Recent: ${recentMessages.slice(-3).join(" | ")}`.trim();
     } catch (err) {
       console.warn("[StrategicBrain] Context load failed:", err);
     }
+  }
+
+  // If prompt is a greeting, override fallback with dynamic greeting
+  const greetingTriggers = ["hi", "hello", "hey", "good morning", "good evening"];
+  if (
+    greetingTriggers.some((g) => prompt.toLowerCase().includes(g)) &&
+    dynamicGreeting
+  ) {
+    return dynamicGreeting;
   }
 
   const controller = new AbortController();
@@ -234,6 +251,9 @@ If context exists, you MUST use it.
   } catch (err: any) {
     clearTimeout(timeout);
     console.warn("⚠️ OpenRouter failed:", err?.message);
+
+    // New: Only use fallback if not a greeting
+    if (dynamicGreeting) return dynamicGreeting;
 
     return `Here’s a strong starting strategy:
 

@@ -1,5 +1,3 @@
-// server/services/serviceDetector.ts
-
 import { hybridResponseService } from "./generateHybridResponse.js";
 
 export type DetectedIntent = {
@@ -87,10 +85,10 @@ export async function detectServiceScores(
     for (const kw of config.keywords) score += matchKeyword(text, kw);
     score = (score / config.keywords.length) * config.weight;
 
-    // Vector-aware scoring using detectServices(sessionId)
-    if (sessionId && hybridResponseService?.detectServices) {
+    // ✅ Vector-aware scoring using hybrid service
+    if (hybridResponseService?.detectServices) {
       try {
-        const detectedServices: string[] = await hybridResponseService.detectServices(sessionId);
+        const detectedServices: string[] = await hybridResponseService.detectServices(text); // fix: pass text
         if (detectedServices.includes(service)) score = Math.max(score, 0.9);
       } catch (e) {
         console.warn("Hybrid vector scoring failed:", e);
