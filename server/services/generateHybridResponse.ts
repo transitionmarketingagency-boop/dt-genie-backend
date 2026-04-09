@@ -201,22 +201,20 @@ export async function executeHybridResponse({
   forceNoQuestions?: boolean;
 }) {
   try {
-    // 1️⃣ Detect services & intents
-    brainContext.detectedServices = [];
-
+    /* ================= 1. SERVICE DETECTION ================= */
     const detectedServices = await detectService(message);
     brainContext.detectedServices = Array.isArray(detectedServices)
       ? detectedServices.filter((s): s is string => typeof s === "string")
       : [];
 
-    // 2️⃣ Vector fusion
+    /* ================= 2. VECTOR CONTEXT ================= */
     let fusedChunksText = "";
     try {
       const chunks = await getFusedChunks(message, 3);
       fusedChunksText = chunks.map((c) => c.text).filter(Boolean).join("\n\n");
     } catch {}
 
-    // 3️⃣ Build prompt
+    /* ================= 3. BUILD PROMPT ================= */
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
@@ -227,30 +225,36 @@ export async function executeHybridResponse({
     });
 
     let response = "";
+    let attempt = 0;
 
-    // ================= PRIMARY: QWEN ================= //
-    try {
-      const qwenResp = await withTimeout(
-        generateOpenRouter(prompt, sessionId),
-        9000 // 🔥 increased timeout
-      );
+    /* ================= 4. PRIMARY: QWEN (RETRY) ================= */
+    while (attempt < 2 && !response) {
+      try {
+        const qwenResp = await withTimeout(
+          generateOpenRouter(prompt, sessionId),
+          25000 // ✅ MATCH OpenRouter timeout
+        );
 
-      if (qwenResp && qwenResp.length > 40) {
-        response = qwenResp;
+        if (qwenResp && qwenResp.length > 20) {
+          response = qwenResp;
+          break;
+        }
+      } catch (err) {
+        console.warn(`[Qwen attempt ${attempt + 1} failed]`, err);
       }
-    } catch (err) {
-      console.warn("[Qwen failed]", err);
+
+      attempt++;
     }
 
-    // ================= FALLBACK: GEMINI ================= //
-    if (!response) {
+    /* ================= 5. SECONDARY: GEMINI ================= */
+    if (!response && GEMINI_ENABLED && canUseGemini()) {
       try {
         const geminiResp = await withTimeout(
           generateGemini(prompt, sessionId),
-          8000
+          15000
         );
 
-        if (geminiResp && geminiResp.length > 40) {
+        if (geminiResp && geminiResp.length > 20) {
           response = geminiResp;
           markGeminiUsed();
         }
@@ -259,22 +263,29 @@ export async function executeHybridResponse({
       }
     }
 
+    /* ================= 🚨 HARD FAIL ================= */
+    if (!response) {
+      throw new Error("ALL AI MODELS FAILED");
+    }
 
-    // ================= CLEAN ================= //
+    /* ================= 6. CLEAN ================= */
     response = cleanHybridResponse(response);
-    if (forceNoQuestions) response = response.replace(/\?+/g, ".");
+
+    if (forceNoQuestions) {
+      response = response.replace(/\?+/g, ".");
+    }
+
     response = enforceBotName(response);
 
-    // ================= CTA ================= //
+    /* ================= 7. CTA ================= */
     if (
-      response &&
       shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)
     ) {
       response +=
         "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
     }
 
-    // ================= SAVE ================= //
+    /* ================= 8. SAVE ================= */
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;
@@ -282,12 +293,7 @@ export async function executeHybridResponse({
   } catch (err) {
     console.error("[Hybrid Fatal Error]:", err);
 
-    return `
-Something broke in the system — but here's the direction:
-
-Focus on fixing conversion before scaling traffic.
-
-Tell me your setup and I’ll guide you precisely.
-    `.trim();
+    // ❌ NO STATIC RESPONSE
+    throw err;
   }
 }

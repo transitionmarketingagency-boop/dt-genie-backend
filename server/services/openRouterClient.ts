@@ -2,6 +2,7 @@
 
 import fetch from "node-fetch";
 import { strategicBrain } from "./strategicBrain.js";
+import { memoryService } from "./memoryService.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import { shouldTriggerBooking, type Stage } from "./bookingTrigger.js";
 import type { LeadScore } from "./leadQualifier.js";
@@ -9,33 +10,28 @@ import crypto from "crypto";
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-/* ================= SAFE BRAIN TYPE ================= */
+/* ================= TYPES ================= */
 type SafeBrainContext = {
   stage?: string;
   executionMode?: string;
   leadScore?: LeadScore | number;
   detectedServices?: string[];
   goals?: string[];
-  recentMessages?: string[];
-  industry?: string;
-  businessType?: string;
-  isFresh?: boolean;
 };
-
-/* ================= RESPONSE TYPE ================= */
-interface OpenRouterResponse {
-  choices?: {
-    message?: { content?: string };
-    text?: string;
-  }[];
-}
 
 /* ================= CONFIG ================= */
 const MODEL = "qwen/qwen3-235b-a22b-2507";
-const REQUEST_TIMEOUT = 12000;
+const REQUEST_TIMEOUT = 25000; // ⬅️ increased
 const MAX_PROMPT_LENGTH = 4200;
+const MAX_RETRIES = 2;
 
-/* ================= CLEAN PROMPT ================= */
+/* ================= CACHE ================= */
+const cache = new Map<string, string>();
+function hash(text: string) {
+  return crypto.createHash("sha256").update(text).digest("hex");
+}
+
+/* ================= HELPERS ================= */
 function cleanPrompt(prompt: string): string {
   return (
     prompt
@@ -46,9 +42,8 @@ function cleanPrompt(prompt: string): string {
   );
 }
 
-/* ================= RESPONSE VALIDATION ================= */
 function isValidResponse(text: string): boolean {
-  if (!text || text.length < 25) return false;
+  if (!text || text.length < 15) return false; // ⬅️ relaxed
   const lower = text.toLowerCase();
   return !(
     lower.includes("<|") ||
@@ -58,7 +53,6 @@ function isValidResponse(text: string): boolean {
   );
 }
 
-/* ================= FINAL CLEAN ================= */
 function finalize(text: string): string {
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -67,21 +61,37 @@ function finalize(text: string): string {
     .replace(/[^\.\!\?]$/, (m) => m + ".");
 }
 
-/* ================= INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
-  return /(book|schedule|call|hire|start now|ready|help with|assist me)/i.test(message);
+  return /(book|schedule|call|hire|start|ready|work with you)/i.test(message);
 }
 
-/* ================= CACHE ================= */
-const cache = new Map<string, string>();
-function hash(text: string) {
-  return crypto.createHash("sha256").update(text).digest("hex");
-}
-
-/* ================= SAFE STAGE ================= */
 function toSafeStage(stage?: string): Stage {
   const allowed: Stage[] = ["greeting", "discovery", "strategy", "service", "conversion"];
   return allowed.includes(stage as Stage) ? (stage as Stage) : "discovery";
+}
+
+/* ================= CORE API CALL ================= */
+async function callOpenRouter(messages: any[], temperature: number, signal: AbortSignal) {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      temperature,
+      max_tokens: 900,
+      messages,
+    }),
+    signal,
+  });
+
+  const data: any = await res.json();
+
+  return cleanResponse(
+    data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || ""
+  );
 }
 
 /* ================= MAIN FUNCTION ================= */
@@ -90,8 +100,7 @@ export async function generateOpenRouter(
   sessionId?: string
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
-    // Dynamic default message if API key is missing
-    return `I can't access my AI engine right now, but share your goal and current setup, and I can respond dynamically.`;
+    throw new Error("Missing OpenRouter API Key"); // ⬅️ NO fallback
   }
 
   prompt = cleanPrompt(prompt);
@@ -102,12 +111,9 @@ export async function generateOpenRouter(
   let executionMode = "exploration";
   const highIntent = detectHighIntent(prompt);
 
-  let detectedServices: string[] = [];
-  let goalsText = "";
-
-  /* ---------- CONTEXT ---------- */
-  if (sessionId) {
-    try {
+  /* ================= CONTEXT ================= */
+  try {
+    if (sessionId) {
       const { brainContext } = await strategicBrain(prompt, sessionId);
       const ctx = (brainContext || {}) as SafeBrainContext;
 
@@ -116,82 +122,93 @@ export async function generateOpenRouter(
           ? ctx.leadScore
           : ctx.leadScore?.total ?? 0;
 
-      detectedServices = ctx.detectedServices || [];
-      goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "";
-
       executionMode = highIntent ? "execution" : ctx.executionMode || "exploration";
 
       if (highIntent) {
         await shouldTriggerBooking(sessionId, toSafeStage(ctx.stage));
       }
 
-      contextText = `Stage: ${ctx.stage || "unknown"}
+      contextText = `
+Stage: ${ctx.stage || "unknown"}
 Mode: ${executionMode}
 Lead Score: ${totalScore.toFixed(2)}
-Services: ${detectedServices.join(", ") || "none"}
-Goals: ${goalsText}`.trim();
-    } catch (err) {
-      console.warn("[Context failed]:", err);
+Services: ${ctx.detectedServices?.join(", ") || "none"}
+Goals: ${ctx.goals?.join(", ") || "none"}
+      `.trim();
     }
-  }
-
-  /* ---------- OPENROUTER CALL ---------- */
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-
-    const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        temperature: highIntent ? 0.6 : 0.45,
-        max_tokens: 900,
-        messages: [
-          {
-            role: "system",
-            content: `
-You are a senior AI marketing strategist.
-Rules:
-- Be direct and actionable
-- Diagnose the real problem
-- Give execution steps
-- No generic advice
-- No repeating questions
-`.trim(),
-          },
-          {
-            role: "user",
-            content: `${contextText}\nUser: ${prompt}`,
-          },
-        ],
-      }),
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeout);
-
-    const data = (await res.json()) as OpenRouterResponse;
-
-    let text = cleanResponse(
-      data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || ""
-    );
-
-    if (!isValidResponse(text)) {
-      // Dynamic fallback: just echo context + prompt in natural way
-      text = `Based on your current context:\n${contextText}\nYour query: "${prompt}". Let's explore the next steps dynamically.`;
-    }
-
-    text = finalize(text);
-
-    if (text.length > 30) cache.set(cacheKey, text);
-    return text;
   } catch (err) {
-    console.warn("⚠️ OpenRouter failed:", err);
-    // Dynamic fallback
-    return `I encountered a temporary issue generating a response, but based on your context:\n${contextText}\nYou asked: "${prompt}"`;
+    console.warn("[Strategic brain failed]", err);
   }
+
+  /* ================= HARD FALLBACK: MEMORY ================= */
+  if (!contextText && sessionId) {
+    try {
+      const history = await memoryService.getRecentContext(sessionId);
+      contextText = history
+        .map((m) => `${m.role}: ${m.content}`)
+        .join("\n")
+        .slice(0, 1000);
+    } catch {}
+  }
+
+  /* ================= FINAL SAFETY ================= */
+  if (!contextText) {
+    contextText = "No prior context available.";
+  }
+
+  const messages = [
+    {
+      role: "system",
+      content: `
+You are a senior AI marketing strategist.
+
+Rules:
+- Be direct, natural, human
+- No robotic tone
+- No repeating patterns
+- Diagnose real problem
+- If user greeting → respond naturally, short, human.
+- If user asks identity → explain agency clearly.
+- If user asks services → explain offerings clearly.
+- Give actionable steps
+      `.trim(),
+    },
+    {
+      role: "user",
+      content: `${contextText}\nUser: ${prompt}`,
+    },
+  ];
+
+  /* ================= RETRY LOOP ================= */
+  let attempt = 0;
+
+  while (attempt < MAX_RETRIES) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
+      let text = await callOpenRouter(
+        messages,
+        highIntent ? 0.6 : 0.5,
+        controller.signal
+      );
+
+      clearTimeout(timeout);
+
+      if (isValidResponse(text)) {
+        text = finalize(text);
+        cache.set(cacheKey, text);
+        return text;
+      }
+
+      // 🔁 retry with slightly different temperature
+      attempt++;
+    } catch (err) {
+      attempt++;
+      console.warn(`⚠️ Retry ${attempt} failed`, err);
+    }
+  }
+
+  // ❌ NO STATIC FALLBACK
+  throw new Error("AI response generation failed after retries");
 }
