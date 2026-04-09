@@ -40,7 +40,19 @@ const budgetSignals = ["budget","cost","pricing","price","how much","investment"
 const authoritySignals = ["i am the owner","i'm the owner","i run the company","decision maker","my company","our company","founder","ceo"];
 const needSignals = ["we need","we are struggling","looking for","need help","want to improve","need marketing","need automation","low roas","no sales","bad results","not working","conversion issue"];
 const timelineSignals = ["as soon as possible","urgent","this month","next month","immediately","soon","right away"];
-const buyingSignals = ["i want to start","let's start","ready to begin","how do we proceed","how do we start","i want to work with you","hire you","start project"];
+const buyingSignals = [
+  "i want to start",
+  "let's start",
+  "ready to begin",
+  "how do we proceed",
+  "how do we start",
+  "i want to work with you",
+  "hire you",
+  "start project",
+  "help me scale",
+  "fix this for me",
+  "can you do this",
+];
 
 /* ================= SIGNAL DETECTION ================= */
 function detectSignals(message: string, memorySignals: Partial<BANTSignals> = {}): BANTSignals {
@@ -69,10 +81,11 @@ function detectSignals(message: string, memorySignals: Partial<BANTSignals> = {}
 
   // ----- BUYING BOOST -----
   const buyingHits = includesAny(msg, buyingSignals);
-  if (buyingHits) {
-    signals.need = add(signals.need, 0.4);
-    signals.timeline = add(signals.timeline, 0.3);
-  }
+if (buyingHits) {
+  signals.need = add(signals.need, 0.6);
+  signals.timeline = add(signals.timeline, 0.5);
+  signals.authority = add(signals.authority, 0.3);
+}
 
   return signals;
 }

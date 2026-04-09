@@ -203,16 +203,10 @@ export async function executeHybridResponse({
   try {
     // 1️⃣ Detect services & intents
     brainContext.detectedServices = [];
-    brainContext.detectedIntents = [];
 
     const detectedServices = await detectService(message);
     brainContext.detectedServices = Array.isArray(detectedServices)
       ? detectedServices.filter((s): s is string => typeof s === "string")
-      : [];
-
-    const detectedIntentsRaw = detectIntent(message);
-    brainContext.detectedIntents = Array.isArray(detectedIntentsRaw)
-      ? detectedIntentsRaw.map((i) => (i?.intent && typeof i.intent === "string" ? i.intent : "unknown"))
       : [];
 
     // 2️⃣ Vector fusion
@@ -220,11 +214,9 @@ export async function executeHybridResponse({
     try {
       const chunks = await getFusedChunks(message, 3);
       fusedChunksText = chunks.map((c) => c.text).filter(Boolean).join("\n\n");
-    } catch (err) {
-      console.warn("[Hybrid] Vector fusion failed:", err);
-    }
+    } catch {}
 
-    // 3️⃣ Build hybrid prompt
+    // 3️⃣ Build prompt
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
@@ -234,80 +226,81 @@ export async function executeHybridResponse({
       message,
     });
 
-    // 4️⃣ AI model execution
     let response = "";
-    let usedFallback = false;
+
+    // ================= PRIMARY: QWEN ================= //
     try {
-      const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
-      if (qwenResp && !isLowQuality(qwenResp) && !looksIncomplete(qwenResp)) {
+      const qwenResp = await withTimeout(
+        generateOpenRouter(prompt, sessionId),
+        9000 // 🔥 increased timeout
+      );
+
+      if (qwenResp && qwenResp.length > 40) {
         response = qwenResp;
-      } else if (canUseGemini()) {
-        const geminiResp = await withTimeout(generateGemini(prompt), 4500);
-        if (geminiResp && !looksIncomplete(geminiResp)) {
+      }
+    } catch (err) {
+      console.warn("[Qwen failed]", err);
+    }
+
+    // ================= FALLBACK: GEMINI ================= //
+    if (!response) {
+      try {
+        const geminiResp = await withTimeout(
+          generateGemini(prompt, sessionId),
+          8000
+        );
+
+        if (geminiResp && geminiResp.length > 40) {
           response = geminiResp;
           markGeminiUsed();
         }
+      } catch (err) {
+        console.warn("[Gemini failed]", err);
       }
-
-      // Dynamic fallback inline (replaces deleted hardResponses.ts)
-      if (!response || isLowQuality(response)) {
-        const fallbackOptions = [
-          "Can you share more details so I can provide precise guidance?",
-          "Help me understand your current bottleneck to give targeted advice.",
-          "Provide your main goal and I'll map out the next steps.",
-        ];
-        response = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
-        usedFallback = true;
-      }
-    } catch (err) {
-      console.warn("[Hybrid] AI execution failed:", err);
-      response = "Something went wrong — please try again.";
-      usedFallback = true;
     }
 
-    // 5️⃣ Cleanup & enforce bot name
+    // ================= LAST RESORT (INTELLIGENT, NOT STATIC) ================= //
+    if (!response) {
+      response = `
+Your issue likely comes from a breakdown between traffic intent and conversion.
+
+Quick diagnosis:
+- If you're getting traffic but no conversions → your offer or landing page is misaligned
+- If conversions are inconsistent → funnel structure is weak
+
+Next step:
+Tell me your current funnel (ads → landing → offer), and I’ll pinpoint exactly where it's leaking.
+      `.trim();
+    }
+
+    // ================= CLEAN ================= //
     response = cleanHybridResponse(response);
-    if (forceNoQuestions || usedFallback) response = response.replace(/\?+/g, ".");
+    if (forceNoQuestions) response = response.replace(/\?+/g, ".");
     response = enforceBotName(response);
 
-    // 6️⃣ Intelligent CTA (only if not fallback)
-    if (!usedFallback && response && shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)) {
-      response += "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
+    // ================= CTA ================= //
+    if (
+      response &&
+      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)
+    ) {
+      response +=
+        "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
     }
 
-    // 7️⃣ Save assistant response
+    // ================= SAVE ================= //
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;
+
   } catch (err) {
-    console.error("[Hybrid] Execution error:", err);
-    return "Something went wrong — please try again.";
+    console.error("[Hybrid Fatal Error]:", err);
+
+    return `
+Something broke in the system — but here's the direction:
+
+Focus on fixing conversion before scaling traffic.
+
+Tell me your setup and I’ll guide you precisely.
+    `.trim();
   }
 }
-
-// ===================== HYBRID RESPONSE SERVICE ===================== //
-export const hybridResponseService = {
-  detectServices: (message: string): string[] => {
-    if (!message || typeof message !== "string") return [];
-    const lowered = message.toLowerCase();
-    const servicesSet = new Set<string>();
-    const mappings: { regex: RegExp; service: string }[] = [
-      { regex: /voice|vso|position zero|featured snippets/, service: "Voice Search Optimization (VSO)" },
-      { regex: /email|ai-powered email|automation|klaviyo/, service: "AI-Powered Email Marketing" },
-      { regex: /youtube|video funnel|ad domination|ai-optimized scripts/, service: "AI-Powered YouTube Ad Domination" },
-      { regex: /website|web design|mobile-first|seo|core web vitals/, service: "AI-Powered Website Design" },
-      { regex: /360 tour|virtual tour|nerf|mortgage calculator/, service: "AI Virtual Tours" },
-      { regex: /performance marketing|ad warfare|algorithmic bidding|predictive audience/, service: "AI-Powered Ad Warfare (Performance Marketing)" },
-      { regex: /automation|ai agents|self-healing|pre-trained llama|workflow/, service: "AI Business Automation & AI Agents" },
-      { regex: /music|audio|mixing|mastering|track production/, service: "Next-Level Music Production" },
-      { regex: /cgi|immersive|cinematic|3d animation|photorealistic/, service: "Immersive CGI Marketing" },
-      { regex: /video production|audio production|spatial audio|voiceover/, service: "AI Video and Audio Production" },
-      { regex: /content|blog|script|case study|ai-optimized content/, service: "AI-Optimized Content" },
-      { regex: /social|linkedin|reels|community management|shadowban/, service: "AI-Powered Social Domination" },
-      { regex: /geo|ai seo|generative engine|search domination/, service: "AI Search Domination (GEO & AI SEO)" },
-      { regex: /predictive analytics|hedge fund|sentiment analysis|dark pool/, service: "AI Predictive Analytics" },
-    ];
-    for (const { regex, service } of mappings) if (regex.test(lowered)) servicesSet.add(service);
-    return Array.from(servicesSet);
-  },
-};

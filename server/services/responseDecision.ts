@@ -1,16 +1,17 @@
 /* ================= BOOKING REJECTION ================= */
 export function detectBookingRejection(message: string): boolean {
   const msg = message.toLowerCase();
-  return (
-    msg.includes("not now") ||
-    msg.includes("don't want") ||
-    msg.includes("dont want") ||
-    msg.includes("later") ||
-    msg.includes("no thanks") ||
-    msg.includes("stop") ||
-    msg.includes("just exploring") ||
-    msg.includes("not interested")
-  );
+
+  return [
+    "not now",
+    "dont want",
+    "don't want",
+    "later",
+    "no thanks",
+    "stop",
+    "just exploring",
+    "not interested",
+  ].some((phrase) => msg.includes(phrase));
 }
 
 /* ================= CTA LOGIC ================= */
@@ -22,19 +23,21 @@ export function shouldIncludeCTA(
 ): boolean {
   const lower = message.toLowerCase();
 
-  const explicitIntent =
-    lower.includes("call") ||
-    lower.includes("schedule") ||
-    lower.includes("consultation") ||
-    lower.includes("hire") ||
-    lower.includes("start") ||
-    lower.includes("help with") ||
-    lower.includes("assist me") ||
-    lower.includes("recommend services");
+  /* -------- STRONG INTENT ONLY -------- */
+  const strongIntent =
+    /(book|schedule|call|hire|start|work with you|help me scale|i want help)/i.test(
+      lower
+    );
 
-  const highIntent = leadScore >= 5 || ["service", "conversion"].includes(stage);
+  /* -------- HIGH LEAD QUALITY -------- */
+  const highIntent = leadScore >= 6 || ["service", "conversion"].includes(stage);
 
-  if (intentCategories.includes("general") && leadScore < 5) return false;
+  /* -------- BLOCK LOW QUALITY CTA -------- */
+  const weakQuery =
+    /(hi|hello|who are you|what do you do)/i.test(lower);
 
-  return explicitIntent || highIntent;
+  if (weakQuery) return false;
+
+  /* -------- FINAL DECISION -------- */
+  return strongIntent || highIntent;
 }

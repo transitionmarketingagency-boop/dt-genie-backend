@@ -1,4 +1,4 @@
-import { hybridResponseService } from "./generateHybridResponse.js";
+import { hybridResponseService } from "./hybridResponseService.js";
 
 export type DetectedIntent = {
   type:
