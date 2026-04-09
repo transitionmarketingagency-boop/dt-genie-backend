@@ -67,42 +67,6 @@ function finalize(text: string): string {
     .replace(/[^\.\!\?]$/, (m) => m + ".");
 }
 
-/* ================= SMART FALLBACK ================= */
-function smartFallback(detectedServices: string[], goalsText: string): string {
-  if (detectedServices.length > 0) {
-    return `You're dealing with ${detectedServices.join(
-      ", "
-    )}. Execution is usually the bottleneck.
-
-Focus on:
-1. Fixing conversion leaks (landing page, offer clarity)
-2. Matching traffic intent with funnel stage
-3. Scaling only what already converts
-
-I can map this into a step-by-step execution plan based on your setup if you want.`;
-  }
-
-  if (goalsText && goalsText !== "unknown") {
-    return `To achieve "${goalsText}", the bottleneck is typically in execution, not strategy.
-
-Steps to consider:
-1. Identify your highest ROI channel
-2. Fix conversion before scaling traffic
-3. Simplify your funnel before optimization
-
-Share your current setup and I’ll provide exact next steps.`;
-  }
-
-  return `There’s a bottleneck in your current system.
-
-Before scaling:
-1. Identify if the issue is traffic, conversion, or retention
-2. Fix that layer completely
-3. Then scale what works
-
-Tell me your current approach and I’ll pinpoint the exact issue.`;
-}
-
 /* ================= INTENT DETECTION ================= */
 function detectHighIntent(message: string): boolean {
   return /(book|schedule|call|hire|start now|ready|help with|assist me)/i.test(message);
@@ -110,7 +74,6 @@ function detectHighIntent(message: string): boolean {
 
 /* ================= CACHE ================= */
 const cache = new Map<string, string>();
-
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
@@ -127,7 +90,8 @@ export async function generateOpenRouter(
   sessionId?: string
 ): Promise<string> {
   if (!OPENROUTER_API_KEY) {
-    return `Tell me what you're trying to improve — I’ll map out the exact strategy.`;
+    // Dynamic default message if API key is missing
+    return `I can't access my AI engine right now, but share your goal and current setup, and I can respond dynamically.`;
   }
 
   prompt = cleanPrompt(prompt);
@@ -139,7 +103,7 @@ export async function generateOpenRouter(
   const highIntent = detectHighIntent(prompt);
 
   let detectedServices: string[] = [];
-  let goalsText = "unknown";
+  let goalsText = "";
 
   /* ---------- CONTEXT ---------- */
   if (sessionId) {
@@ -153,7 +117,7 @@ export async function generateOpenRouter(
           : ctx.leadScore?.total ?? 0;
 
       detectedServices = ctx.detectedServices || [];
-      goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "unknown";
+      goalsText = Array.isArray(ctx.goals) ? ctx.goals.join(", ") : "";
 
       executionMode = highIntent ? "execution" : ctx.executionMode || "exploration";
 
@@ -191,7 +155,6 @@ Goals: ${goalsText}`.trim();
             role: "system",
             content: `
 You are a senior AI marketing strategist.
-
 Rules:
 - Be direct and actionable
 - Diagnose the real problem
@@ -217,18 +180,18 @@ Rules:
       data?.choices?.[0]?.message?.content || data?.choices?.[0]?.text || ""
     );
 
-    if (!isValidResponse(text)) throw new Error("Invalid AI response");
+    if (!isValidResponse(text)) {
+      // Dynamic fallback: just echo context + prompt in natural way
+      text = `Based on your current context:\n${contextText}\nYour query: "${prompt}". Let's explore the next steps dynamically.`;
+    }
 
     text = finalize(text);
 
-    // Only cache valid AI output
     if (text.length > 30) cache.set(cacheKey, text);
-
     return text;
   } catch (err) {
     console.warn("⚠️ OpenRouter failed:", err);
+    // Dynamic fallback
+    return `I encountered a temporary issue generating a response, but based on your context:\n${contextText}\nYou asked: "${prompt}"`;
   }
-
-  /* ---------- FINAL FALLBACK ---------- */
-  return smartFallback(detectedServices, goalsText);
 }

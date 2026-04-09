@@ -259,19 +259,6 @@ export async function executeHybridResponse({
       }
     }
 
-    // ================= LAST RESORT (INTELLIGENT, NOT STATIC) ================= //
-    if (!response) {
-      response = `
-Your issue likely comes from a breakdown between traffic intent and conversion.
-
-Quick diagnosis:
-- If you're getting traffic but no conversions → your offer or landing page is misaligned
-- If conversions are inconsistent → funnel structure is weak
-
-Next step:
-Tell me your current funnel (ads → landing → offer), and I’ll pinpoint exactly where it's leaking.
-      `.trim();
-    }
 
     // ================= CLEAN ================= //
     response = cleanHybridResponse(response);
