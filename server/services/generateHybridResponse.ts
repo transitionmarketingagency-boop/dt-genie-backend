@@ -236,6 +236,7 @@ export async function executeHybridResponse({
 
     // 4️⃣ AI model execution
     let response = "";
+    let usedFallback = false;
     try {
       const qwenResp = await withTimeout(generateOpenRouter(prompt, sessionId), 6500);
       if (qwenResp && !isLowQuality(qwenResp) && !looksIncomplete(qwenResp)) {
@@ -247,35 +248,34 @@ export async function executeHybridResponse({
           markGeminiUsed();
         }
       }
+
+      // Dynamic fallback inline (replaces deleted hardResponses.ts)
+      if (!response || isLowQuality(response)) {
+        const fallbackOptions = [
+          "Can you share more details so I can provide precise guidance?",
+          "Help me understand your current bottleneck to give targeted advice.",
+          "Provide your main goal and I'll map out the next steps.",
+        ];
+        response = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
+        usedFallback = true;
+      }
     } catch (err) {
       console.warn("[Hybrid] AI execution failed:", err);
+      response = "Something went wrong — please try again.";
+      usedFallback = true;
     }
 
-    // 5️⃣ Fallback if low quality or empty
-    if (!response || (isLowQuality(response) && response.trim().length < 20)) {
-      const fallbackOptions = [
-        "Can you share more details so I can provide precise guidance?",
-        "Help me understand your current bottleneck to give targeted advice.",
-        "Provide your main goal and I'll map out the next steps.",
-      ];
-      response = fallbackOptions[Math.floor(Math.random() * fallbackOptions.length)];
-    }
-
-    // 6️⃣ Cleanup & enforce bot name
+    // 5️⃣ Cleanup & enforce bot name
     response = cleanHybridResponse(response);
-    if (forceNoQuestions) response = response.replace(/\?+/g, ".");
+    if (forceNoQuestions || usedFallback) response = response.replace(/\?+/g, ".");
     response = enforceBotName(response);
 
-    // 7️⃣ Intelligent CTA
-    if (
-      response &&
-      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)
-    ) {
-      response +=
-        "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
+    // 6️⃣ Intelligent CTA (only if not fallback)
+    if (!usedFallback && response && shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)) {
+      response += "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
     }
 
-    // 8️⃣ Save assistant response
+    // 7️⃣ Save assistant response
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;

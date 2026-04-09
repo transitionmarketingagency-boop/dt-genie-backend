@@ -221,6 +221,7 @@ Rules:
 
     text = finalize(text);
 
+    // Only cache valid AI output
     if (text.length > 30) cache.set(cacheKey, text);
 
     return text;
