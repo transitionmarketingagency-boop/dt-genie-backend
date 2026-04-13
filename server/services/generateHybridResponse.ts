@@ -177,6 +177,7 @@ Before answering:
 }
 
 // ===================== HYBRID EXECUTION ===================== //
+
 export async function executeHybridResponse({
   sessionId,
   message,
@@ -201,6 +202,15 @@ export async function executeHybridResponse({
   forceNoQuestions?: boolean;
 }) {
   try {
+    const msg = message.trim().toLowerCase();
+
+    /* ================= ⚡ FAST PATH ================= */
+    if (/^(hi|hello|hey|yo)\b/.test(msg)) {
+      const quickReply = `Hey — tell me what you're trying to improve right now (traffic, conversions, or leads), and I’ll guide you precisely.`;
+      await memoryService.saveMessage(sessionId, "assistant", quickReply);
+      return quickReply;
+    }
+
     /* ================= 1. SERVICE DETECTION ================= */
     const detectedServices = await detectService(message);
     brainContext.detectedServices = Array.isArray(detectedServices)
@@ -227,15 +237,23 @@ export async function executeHybridResponse({
     let response = "";
     let attempt = 0;
 
-    /* ================= 4. PRIMARY: QWEN (RETRY) ================= */
+    const isGood = (text: string): boolean => {
+      if (!text) return false;
+      if (text.length < 40) return false;
+      if (text.includes("Something broke")) return false;
+      if (text.includes("undefined")) return false;
+      return true;
+    };
+
+    /* ================= 4. PRIMARY: QWEN ================= */
     while (attempt < 2 && !response) {
       try {
         const qwenResp = await withTimeout(
           generateOpenRouter(prompt, sessionId),
-          25000 // ✅ MATCH OpenRouter timeout
+          15000
         );
 
-        if (qwenResp && qwenResp.length > 20) {
+        if (typeof qwenResp === "string" && isGood(qwenResp)) {
           response = qwenResp;
           break;
         }
@@ -251,10 +269,10 @@ export async function executeHybridResponse({
       try {
         const geminiResp = await withTimeout(
           generateGemini(prompt, sessionId),
-          15000
+          10000
         );
 
-        if (geminiResp && geminiResp.length > 20) {
+        if (typeof geminiResp === "string" && isGood(geminiResp)) {
           response = geminiResp;
           markGeminiUsed();
         }
@@ -263,9 +281,19 @@ export async function executeHybridResponse({
       }
     }
 
-    /* ================= 🚨 HARD FAIL ================= */
+    /* ================= 🧠 INTELLIGENT FALLBACK ================= */
     if (!response) {
-      throw new Error("ALL AI MODELS FAILED");
+      response = `
+You're trying to: "${message}"
+
+Instead of guessing, here’s the fastest way forward:
+
+1. Clarify your current situation (traffic, leads, or sales issue)
+2. Identify where the funnel is breaking
+3. Fix conversion BEFORE scaling traffic
+
+Give me a bit more detail on your setup — I’ll map a precise strategy.
+      `.trim();
     }
 
     /* ================= 6. CLEAN ================= */
@@ -282,7 +310,7 @@ export async function executeHybridResponse({
       shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)
     ) {
       response +=
-        "\n\nWant me to map this into a step-by-step execution plan tailored to your business?";
+        "\n\nIf you want, I can break this into an exact execution plan for your business.";
     }
 
     /* ================= 8. SAVE ================= */
@@ -293,7 +321,6 @@ export async function executeHybridResponse({
   } catch (err) {
     console.error("[Hybrid Fatal Error]:", err);
 
-    // ❌ NO STATIC RESPONSE
-    throw err;
+    return `Tell me your goal and current setup — I’ll guide you step-by-step.`;
   }
 }
