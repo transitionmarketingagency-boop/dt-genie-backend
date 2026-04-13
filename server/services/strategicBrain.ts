@@ -26,61 +26,97 @@ function normalize(text: string) {
   return (text || "").toLowerCase().trim();
 }
 
-function detectStage(message: string, intentType?: string): BrainContext["stage"] {
+function detectContextShift(message: string, memory: StrategicMemory): boolean {
+  if (!memory?.industry && !memory?.businessType) return false;
+
+  const shiftSignals = ["i run", "i have", "my business", "my store", "we are"];
+
+  return shiftSignals.some((s) => message.includes(s));
+}
+
+function detectStage(
+  message: string,
+  intentType?: string
+): BrainContext["stage"] {
   if (intentType === "greeting") return "greeting";
   if (intentType === "booking") return "conversion";
   if (intentType === "service_inquiry") return "service";
   if (intentType === "problem") return "strategy";
 
-  if (/(hire|book|schedule|call|start)/i.test(message)) return "conversion";
-  if (/(price|cost|service)/i.test(message)) return "service";
-  if (/(how|improve|fix|strategy)/i.test(message)) return "strategy";
+  if (/(hire|book|schedule|call|start|work with you)/i.test(message))
+    return "conversion";
+
+  if (/(price|cost|service|offer)/i.test(message)) return "service";
+
+  if (/(how|improve|fix|scale|strategy)/i.test(message)) return "strategy";
 
   return "discovery";
 }
 
 /* ================= MAIN ================= */
-export async function strategicBrain(userMessage: string, sessionId?: string) {
+export async function strategicBrain(
+  userMessage: string,
+  sessionId?: string
+) {
   const message = normalize(userMessage);
 
   /* ---------- MEMORY ---------- */
   let strategicMemory: StrategicMemory = {};
   if (sessionId) {
     try {
-      strategicMemory = (await memoryService.getStrategicMemory(sessionId)) || {};
+      strategicMemory =
+        (await memoryService.getStrategicMemory(sessionId)) || {};
     } catch {
       strategicMemory = {};
     }
   }
 
-  /* ---------- NEURAL INTENT (CRITICAL FIX) ---------- */
-  const intent = neuralBrain(message);
+  /* ---------- CONTEXT SHIFT FIX ---------- */
+  const hasShift = detectContextShift(message, strategicMemory);
+  if (hasShift) {
+    strategicMemory = {}; // reset stale context
+  }
 
-  /* ---------- LEAD SCORE ---------- */
+  /* ---------- NEURAL INTENT ---------- */
+  let intent: any = {};
+  try {
+    intent = neuralBrain(message) || {};
+  } catch {
+    intent = {};
+  }
+
+  const intentType = intent?.type || "general";
+  const highIntent = Boolean(intent?.highIntent);
+
+  /* ---------- LEAD SCORE (FIXED TYPE SAFE) ---------- */
   let leadScore = 0;
   try {
     const result = leadQualifier.scoreLead(sessionId || "anon", {});
-    leadScore = (result.total || 0) * 10;
+    leadScore = Math.min(10, Math.max(0, result?.total || 0));
   } catch {
     leadScore = 0;
   }
 
   /* ---------- STAGE ---------- */
-  const stage = detectStage(message, intent.type);
+  const stage = detectStage(message, intentType);
 
   /* ---------- EXECUTION MODE ---------- */
   const executionMode =
-    intent.highIntent || leadScore > 6 || stage === "conversion"
+    highIntent ||
+    stage === "conversion" ||
+    leadScore >= 7 ||
+    /(start|do it|help|fix this now)/i.test(message)
       ? "execution"
       : "exploration";
 
   /* ---------- CONTEXT QUALITY ---------- */
   const hasSufficientContext =
-    message.length > 12 ||
-    intent.type === "problem" ||
-    intent.type === "service_inquiry";
+    message.length > 15 ||
+    intentType === "problem" ||
+    intentType === "service_inquiry" ||
+    highIntent;
 
-  /* ---------- RETURN STRONG CONTEXT ---------- */
+  /* ---------- FINAL OUTPUT ---------- */
   return {
     brainContext: {
       message: userMessage,
@@ -89,8 +125,8 @@ export async function strategicBrain(userMessage: string, sessionId?: string) {
       detectedServices: strategicMemory.servicesDiscussed || [],
       executionMode,
       hasSufficientContext,
-      intentType: intent.type,
-      highIntent: intent.highIntent,
+      intentType,
+      highIntent,
     },
     chunks: [],
   };

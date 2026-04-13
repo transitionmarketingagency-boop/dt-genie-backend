@@ -176,7 +176,40 @@ Before answering:
 `.trim();
 }
 
+
 // ===================== HYBRID EXECUTION ===================== //
+
+/* ================= QUALITY GATE ================= */
+function isGoodResponse(text: string | null | undefined): text is string {
+  if (!text) return false;
+
+  const clean = text.trim();
+
+  if (clean.length < 80) return false;
+  if (!/[.?!]$/.test(clean)) return false;
+  if (clean.includes("You're trying to:")) return false;
+  if (clean.includes("Something broke")) return false;
+  if (clean.includes("undefined")) return false;
+  if (clean.split(" ").length < 12) return false;
+
+  return true;
+}
+
+/* ================= CONTEXT RESET ================= */
+function shouldResetContext(message: string): boolean {
+  const triggers = ["i run", "i am a", "my business", "new idea", "different"];
+  const lower = message.toLowerCase();
+  return triggers.some(t => lower.includes(t));
+}
+
+/* ================= RESPONSE REPAIR ================= */
+function repairIfCut(text: string): string {
+  const trimmed = text.trim();
+  if (!/[.?!]$/.test(trimmed)) {
+    return trimmed + ".";
+  }
+  return trimmed;
+}
 
 export async function executeHybridResponse({
   sessionId,
@@ -204,11 +237,19 @@ export async function executeHybridResponse({
   try {
     const msg = message.trim().toLowerCase();
 
-    /* ================= ⚡ FAST PATH ================= */
-    if (/^(hi|hello|hey|yo)\b/.test(msg)) {
-      const quickReply = `Hey — tell me what you're trying to improve right now (traffic, conversions, or leads), and I’ll guide you precisely.`;
+    /* ================= ⚡ SMART FAST PATH ================= */
+    if (/^(hi|hello|hey|yo)\b/.test(msg) && !historyText) {
+      const quickReply = `Hey — what are you trying to improve right now: traffic, conversions, or leads?`;
       await memoryService.saveMessage(sessionId, "assistant", quickReply);
       return quickReply;
+    }
+
+    /* ================= 🧠 CONTEXT RESET FIX ================= */
+    if (shouldResetContext(message)) {
+      brainContext.reasoning = "";
+      brainContext.detectedServices = [];
+      brainContext.intent = "fresh";
+      brainContext.stage = "discovery";
     }
 
     /* ================= 1. SERVICE DETECTION ================= */
@@ -222,7 +263,9 @@ export async function executeHybridResponse({
     try {
       const chunks = await getFusedChunks(message, 3);
       fusedChunksText = chunks.map((c) => c.text).filter(Boolean).join("\n\n");
-    } catch {}
+    } catch (err) {
+      console.warn("[Vector failed]", err);
+    }
 
     /* ================= 3. BUILD PROMPT ================= */
     const prompt = buildHybridPrompt({
@@ -234,37 +277,41 @@ export async function executeHybridResponse({
       message,
     });
 
-    let response = "";
-    let attempt = 0;
+    let response: string | null = null;
 
-    const isGood = (text: string): boolean => {
-      if (!text) return false;
-      if (text.length < 40) return false;
-      if (text.includes("Something broke")) return false;
-      if (text.includes("undefined")) return false;
-      return true;
-    };
+    /* ================= 4. PRIMARY (FAST QWEN) ================= */
+    try {
+      const qwenResp = await withTimeout(
+        generateOpenRouter(prompt, sessionId),
+        12000 // 🔥 reduced from 15s
+      );
 
-    /* ================= 4. PRIMARY: QWEN ================= */
-    while (attempt < 2 && !response) {
-      try {
-        const qwenResp = await withTimeout(
-          generateOpenRouter(prompt, sessionId),
-          15000
-        );
-
-        if (typeof qwenResp === "string" && isGood(qwenResp)) {
-          response = qwenResp;
-          break;
-        }
-      } catch (err) {
-        console.warn(`[Qwen attempt ${attempt + 1} failed]`, err);
+      if (isGoodResponse(qwenResp)) {
+        response = qwenResp;
       }
-
-      attempt++;
+    } catch (err) {
+      console.warn("[Qwen failed]", err);
     }
 
-    /* ================= 5. SECONDARY: GEMINI ================= */
+    /* ================= 5. RETRY (ANTI-CUT FIX) ================= */
+    if (!response) {
+      try {
+        const retryPrompt = prompt + "\n\nRespond clearly with complete sentences. Do not cut off.";
+
+        const retryResp = await withTimeout(
+          generateOpenRouter(retryPrompt, sessionId),
+          8000
+        );
+
+        if (isGoodResponse(retryResp)) {
+          response = retryResp;
+        }
+      } catch (err) {
+        console.warn("[Qwen retry failed]", err);
+      }
+    }
+
+    /* ================= 6. GEMINI FALLBACK ================= */
     if (!response && GEMINI_ENABLED && canUseGemini()) {
       try {
         const geminiResp = await withTimeout(
@@ -272,7 +319,7 @@ export async function executeHybridResponse({
           10000
         );
 
-        if (typeof geminiResp === "string" && isGood(geminiResp)) {
+        if (isGoodResponse(geminiResp)) {
           response = geminiResp;
           markGeminiUsed();
         }
@@ -281,23 +328,14 @@ export async function executeHybridResponse({
       }
     }
 
-    /* ================= 🧠 INTELLIGENT FALLBACK ================= */
+    /* ================= 🚨 HARD FAIL (NO BAD FALLBACKS) ================= */
     if (!response) {
-      response = `
-You're trying to: "${message}"
-
-Instead of guessing, here’s the fastest way forward:
-
-1. Clarify your current situation (traffic, leads, or sales issue)
-2. Identify where the funnel is breaking
-3. Fix conversion BEFORE scaling traffic
-
-Give me a bit more detail on your setup — I’ll map a precise strategy.
-      `.trim();
+      throw new Error("All models failed quality check");
     }
 
-    /* ================= 6. CLEAN ================= */
+    /* ================= 7. CLEAN + REPAIR ================= */
     response = cleanHybridResponse(response);
+    response = repairIfCut(response);
 
     if (forceNoQuestions) {
       response = response.replace(/\?+/g, ".");
@@ -305,15 +343,16 @@ Give me a bit more detail on your setup — I’ll map a precise strategy.
 
     response = enforceBotName(response);
 
-    /* ================= 7. CTA ================= */
+    /* ================= 8. CTA CONTROL ================= */
     if (
-      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage)
+      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage) &&
+      !response.toLowerCase().includes("execution plan")
     ) {
       response +=
-        "\n\nIf you want, I can break this into an exact execution plan for your business.";
+        "\n\nIf you want, I can map this into a precise execution plan for your business.";
     }
 
-    /* ================= 8. SAVE ================= */
+    /* ================= 9. SAVE ================= */
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;
@@ -321,6 +360,7 @@ Give me a bit more detail on your setup — I’ll map a precise strategy.
   } catch (err) {
     console.error("[Hybrid Fatal Error]:", err);
 
-    return `Tell me your goal and current setup — I’ll guide you step-by-step.`;
+    // ❌ NO TEMPLATE FALLBACK (removes your current problem)
+    throw err;
   }
 }
