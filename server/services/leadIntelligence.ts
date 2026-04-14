@@ -25,20 +25,24 @@ function clamp(value: number | undefined): number {
   return Math.max(0, Math.min(1, value));
 }
 
-/* ================= FLEXIBLE MATCH ================= */
+/* ================= FLEXIBLE MATCH (FIXED) ================= */
 function includesAny(text: string, keywords: string[]): number {
   let score = 0;
+
   for (const kw of keywords) {
-    const regex = new RegExp(`\\b${kw}\\b`, "i");
-    if (regex.test(text)) score += 1;
+    // 🔥 phrase + partial match support
+    if (text.includes(kw)) {
+      score += 1;
+    }
   }
+
   return score;
 }
 
 /* ================= SIGNAL KEYWORDS ================= */
 const budgetSignals = ["budget","cost","pricing","price","how much","investment","spend","ad spend","we can spend"];
-const authoritySignals = ["i am the owner","i'm the owner","i run the company","decision maker","my company","our company","founder","ceo"];
-const needSignals = ["we need","we are struggling","looking for","need help","want to improve","need marketing","need automation","low roas","no sales","bad results","not working","conversion issue"];
+const authoritySignals = ["i am the owner","i'm the owner","i run","decision maker","my company","our company","founder","ceo"];
+const needSignals = ["we need","struggling","looking for","need help","want to improve","need marketing","automation","low roas","no sales","bad results","not working","conversion issue"];
 const timelineSignals = ["as soon as possible","urgent","this month","next month","immediately","soon","right away"];
 const buyingSignals = [
   "i want to start",
@@ -65,13 +69,14 @@ function detectSignals(message: string, memorySignals: Partial<BANTSignals> = {}
     timeline: clamp(memorySignals.timeline),
   };
 
-  const add = (value: number | undefined, increment: number) => clamp((value ?? 0) + increment);
+  const add = (value: number | undefined, increment: number) =>
+    clamp((value ?? 0) + increment);
 
   // ----- NEED -----
-  signals.need = add(signals.need, 0.3 * includesAny(msg, needSignals));
+  signals.need = add(signals.need, 0.25 * includesAny(msg, needSignals));
 
   // ----- BUDGET -----
-  signals.budget = add(signals.budget, 0.25 * includesAny(msg, budgetSignals));
+  signals.budget = add(signals.budget, 0.2 * includesAny(msg, budgetSignals));
 
   // ----- AUTHORITY -----
   signals.authority = add(signals.authority, 0.25 * includesAny(msg, authoritySignals));
@@ -79,13 +84,13 @@ function detectSignals(message: string, memorySignals: Partial<BANTSignals> = {}
   // ----- TIMELINE -----
   signals.timeline = add(signals.timeline, 0.2 * includesAny(msg, timelineSignals));
 
-  // ----- BUYING BOOST -----
+  // ----- BUYING INTENT BOOST (UPGRADED) -----
   const buyingHits = includesAny(msg, buyingSignals);
-if (buyingHits) {
-  signals.need = add(signals.need, 0.6);
-  signals.timeline = add(signals.timeline, 0.5);
-  signals.authority = add(signals.authority, 0.3);
-}
+  if (buyingHits > 0) {
+    signals.need = add(signals.need, 0.5);
+    signals.timeline = add(signals.timeline, 0.4);
+    signals.authority = add(signals.authority, 0.3);
+  }
 
   return signals;
 }
@@ -109,9 +114,19 @@ export async function analyzeLeadSignals(
   sessionId: string
 ): Promise<{ signals: BANTSignals; score: LeadScore }> {
 
+  const cleanMsg = normalize(message);
+
+  // 🔥 IGNORE LOW VALUE INPUTS
+  if (cleanMsg.length < 3) {
+    return {
+      signals: {},
+      score: { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 },
+    };
+  }
+
   let memorySignals: Partial<BANTSignals> = {};
 
-  // ----- LOAD CURRENT SESSION MEMORY -----
+  /* ================= LOAD MEMORY ================= */
   if (sessionId) {
     try {
       const mem = await memoryService.getStrategicMemory(sessionId);
@@ -119,8 +134,8 @@ export async function analyzeLeadSignals(
       memorySignals = {
         budget: clamp(mem?.budget),
         authority: mem?.decisionMaker ? 0.8 : 0,
-        need: Array.isArray(mem?.goals) && mem.goals.length ? 0.6 : 0,
-        timeline: mem?.timeline ? 0.6 : 0,
+        need: Array.isArray(mem?.goals) && mem.goals.length ? 0.5 : 0,
+        timeline: mem?.timeline ? 0.5 : 0,
       };
 
     } catch (err) {
@@ -130,10 +145,11 @@ export async function analyzeLeadSignals(
     }
   }
 
-  // ----- DETECT SIGNALS -----
-  const signals = detectSignals(message, memorySignals);
+  /* ================= DETECT SIGNALS ================= */
+  const signals = detectSignals(cleanMsg, memorySignals);
 
   const hasSignal = Object.values(signals).some((v) => v && v > 0);
+
   if (!hasSignal) {
     return {
       signals,
@@ -141,8 +157,9 @@ export async function analyzeLeadSignals(
     };
   }
 
-  // ----- SCORE LEAD -----
+  /* ================= SCORE ================= */
   let score: LeadScore;
+
   try {
     score = leadQualifier.scoreLead(sessionId, signals);
   } catch (err) {
@@ -150,20 +167,21 @@ export async function analyzeLeadSignals(
     score = { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 };
   }
 
-  // ----- SAVE CURRENT SESSION MEMORY -----
+  /* ================= SAVE MEMORY (SAFE MERGE) ================= */
   if (sessionId) {
     try {
+      const mem = await memoryService.getStrategicMemory(sessionId);
+
       await memoryService.updateStrategicMemory(sessionId, {
-        budget: signals.budget,
-        decisionMaker: mapDecisionMaker(signals.authority),
-        goals: signals.need && signals.need > 0.5 ? ["growth"] : undefined,
-        timeline: mapTimeline(signals.timeline),
-        lastInteraction: Date.now(), // FIXED: timestamp number
+        budget: signals.budget ?? mem.budget,
+        decisionMaker: mapDecisionMaker(signals.authority) ?? mem.decisionMaker,
+        timeline: mapTimeline(signals.timeline) ?? mem.timeline,
+        goals:
+          signals.need && signals.need > 0.5
+            ? [...new Set([...(mem.goals || []), "growth"])]
+            : mem.goals,
       });
 
-      if (process.env.DEBUG_MEMORY === "true") {
-        console.log(`[Memory] Updated strategic memory for session ${sessionId}`);
-      }
     } catch (err) {
       if (process.env.DEBUG_MEMORY === "true") {
         console.warn("[Memory] Failed to update strategic memory:", err);

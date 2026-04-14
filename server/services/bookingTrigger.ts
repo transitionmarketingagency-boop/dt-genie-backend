@@ -1,30 +1,41 @@
 /* ================= TYPES ================= */
-export type Stage = "greeting" | "discovery" | "strategy" | "service" | "conversion";
+export type Stage =
+  | "greeting"
+  | "discovery"
+  | "strategy"
+  | "service"
+  | "conversion";
 
 /* ================= COOLDOWN ================= */
 const BOOKING_COOLDOWN_MS = 1000 * 60 * 5; // 5 min
 const bookingCooldownMap = new Map<string, number>();
 
-function cleanupCooldowns() {
+function cleanupCooldowns(): void {
   const now = Date.now();
+
   for (const [key, ts] of bookingCooldownMap.entries()) {
-    if (now - ts > 1000 * 60 * 60) bookingCooldownMap.delete(key); // 1h cleanup
+    if (now - ts > 1000 * 60 * 60) {
+      bookingCooldownMap.delete(key); // cleanup after 1 hour
+    }
   }
 }
 
 function isInCooldown(sessionId: string): boolean {
   if (!sessionId) return false;
+
   const last = bookingCooldownMap.get(sessionId);
-  return last ? Date.now() - last < BOOKING_COOLDOWN_MS : false;
+  if (!last) return false;
+
+  return Date.now() - last < BOOKING_COOLDOWN_MS;
 }
 
-function markTriggered(sessionId: string) {
+function markTriggered(sessionId: string): void {
   if (!sessionId) return;
   bookingCooldownMap.set(sessionId, Date.now());
 }
 
 /* ================= NORMALIZE ================= */
-function normalize(text: string) {
+function normalize(text: string): string {
   return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
@@ -38,42 +49,74 @@ export async function shouldTriggerBooking(
   try {
     cleanupCooldowns();
 
-    const msg = normalize(message);
-    if (!sessionId) return false;
+    if (!sessionId || typeof sessionId !== "string") return false;
 
+    const msg = normalize(message);
+
+    /* ---------- COOLDOWN CHECK ---------- */
     if (isInCooldown(sessionId)) return false;
 
-    // Low-intent informational check
-    const informational = ["what", "why", "how", "explain", "tell me", "guide", "learn"];
-    if (informational.some((w) => msg.includes(w)) && leadScore < 0.6) return false;
+    /* ---------- LOW INTENT FILTER ---------- */
+    const informationalWords = [
+      "what",
+      "why",
+      "how",
+      "explain",
+      "tell me",
+      "guide",
+      "learn",
+    ];
 
-    // Explicit rejection phrases
-    const rejection = ["not now", "later", "just exploring", "no thanks", "dont want", "don't want"];
-    if (rejection.some((r) => msg.includes(r))) return false;
+    const isInformational = informationalWords.some((w) =>
+      msg.includes(w)
+    );
 
-    // Strong buying signals
-    const strongIntent = [
+    if (isInformational && leadScore < 0.6) return false;
+
+    /* ---------- REJECTION FILTER ---------- */
+    const rejectionPhrases = [
+      "not now",
+      "later",
+      "just exploring",
+      "no thanks",
+      "dont want",
+      "don't want",
+      "stop",
+    ];
+
+    if (rejectionPhrases.some((r) => msg.includes(r))) return false;
+
+    /* ---------- STRONG BUYING SIGNALS ---------- */
+    const strongIntentSignals = [
       "hire",
       "work with you",
       "get started",
       "start working",
       "let's start",
+      "im ready",
+      "i am ready",
       "i want to proceed",
-      "i'm ready",
       "book",
       "schedule",
       "call",
-      "consultation"
+      "consultation",
     ];
-    if (strongIntent.some((w) => msg.includes(w)) && msg.length > 8) {
+
+    const hasStrongIntent =
+      strongIntentSignals.some((w) => msg.includes(w)) && msg.length > 8;
+
+    if (hasStrongIntent) {
       markTriggered(sessionId);
       return true;
     }
 
-    // Stage-based thresholds
-    if ((stage === "conversion" && leadScore >= 0.5) ||
-        (stage === "service" && leadScore >= 0.65) ||
-        (stage === "strategy" && leadScore >= 0.75)) {
+    /* ---------- STAGE-BASED TRIGGERS ---------- */
+    const stageTriggers =
+      (stage === "conversion" && leadScore >= 0.5) ||
+      (stage === "service" && leadScore >= 0.65) ||
+      (stage === "strategy" && leadScore >= 0.75);
+
+    if (stageTriggers) {
       markTriggered(sessionId);
       return true;
     }

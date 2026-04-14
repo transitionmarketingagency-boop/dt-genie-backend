@@ -45,8 +45,8 @@ function cleanPrompt(prompt: string) {
 }
 
 /* ---------------- VALIDATION ---------------- */
-function isValidResponse(text: string) {
-  if (!text || text.length < 15) return false;
+function isValidResponse(text: string | null | undefined): text is string {
+  if (!text || text.length < 30) return false;
 
   const lower = text.toLowerCase();
 
@@ -77,8 +77,7 @@ function containsNonEnglish(text: string): boolean {
 }
 
 function ensureComplete(text: string): string {
-  if (!/[.!?]$/.test(text)) return text + ".";
-  return text;
+  return /[.!?]$/.test(text) ? text : text + ".";
 }
 
 function fixSpacing(text: string): string {
@@ -125,9 +124,9 @@ function extractScore(score: SafeLeadScore): number {
 export async function generateGemini(
   prompt: string,
   sessionId?: string
-): Promise<string> {
+): Promise<string | null> {
   const API_KEY = process.env.GEMINI_API_KEY;
-  if (!API_KEY) return "";
+  if (!API_KEY) return null;
 
   prompt = cleanPrompt(prompt);
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
@@ -201,14 +200,23 @@ Response:
 
     clearTimeout(timeout);
 
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[Gemini HTTP Error]", res.status, errText);
+      return null;
+    }
 
     const data: any = await res.json();
 
-    let content =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "";
+    const raw =
+      data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
 
-    content = cleanResponse(content);
+    if (!raw) {
+      console.warn("[Gemini] Empty response structure", data);
+      return null;
+    }
+
+    let content = cleanResponse(raw);
 
     /* ---------- VALIDATION ---------- */
     if (
@@ -216,25 +224,31 @@ Response:
       isFakeDelay(content) ||
       containsNonEnglish(content)
     ) {
-      throw new Error("Rejected Gemini output");
+      console.warn("[Gemini] Rejected response:", content);
+      return null;
     }
 
     content = fixSpacing(content);
     content = ensureComplete(content);
 
     /* ---------- CACHE ---------- */
-    if (content.length > 30) {
+    if (content.length > 40) {
       recentCache.set(cacheKey, content);
     }
 
     console.log("✅ Gemini success");
     return content;
+
   } catch (err: any) {
     clearTimeout(timeout);
-    console.warn("⚠️ Gemini failed:", err?.message || err);
 
-    // IMPORTANT: return EMPTY so OpenRouter or hybrid fallback handles it
-    return "";
+    if (err.name === "AbortError") {
+      console.warn("⚠️ Gemini timeout");
+    } else {
+      console.warn("⚠️ Gemini failed:", err?.message || err);
+    }
+
+    return null; // 🔥 CRITICAL FIX
   }
 }
 

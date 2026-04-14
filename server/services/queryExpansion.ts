@@ -1,39 +1,51 @@
 // server/services/queryExpansion.ts
-/**
- * Expands a user message for semantic search / vector queries.
- * Adds service-specific keywords and recent conversation history.
- * Enhanced to preserve intent specificity and prevent dilution.
- */
+
 export async function expandQueryNeural(
   userMessage: string,
   history: string[] = []
 ): Promise<string[]> {
-  const normalized = userMessage.trim().toLowerCase();
-  const expansions = [normalized];
+  if (typeof userMessage !== "string") return [];
 
-  // Use first 6 words as base for expansions
-  const words = normalized.split(" ").slice(0, 6);
+  const normalized = userMessage.trim().toLowerCase();
+  if (!normalized) return [];
+
+  const expansions = new Set<string>();
+  expansions.add(normalized);
+
+  const words = normalized.split(/\s+/).slice(0, 6);
+
   if (words.length > 1) {
     const base = words.join(" ");
-    expansions.push(`${base} marketing strategy`);
-    expansions.push(`${base} service solution`);
-    expansions.push(`${base} business growth`);
-    expansions.push(`${base} conversion optimization`);
+
+    expansions.add(`${base} marketing strategy`);
+    expansions.add(`${base} service solution`);
+    expansions.add(`${base} business growth`);
+    expansions.add(`${base} conversion optimization`);
   }
 
-  // Include last 2 user messages for context-aware expansion
-  history.slice(-2).forEach((h) => expansions.push(h.toLowerCase()));
+  // safe history injection
+  history
+    .filter((h) => typeof h === "string" && h.trim().length > 0)
+    .slice(-2)
+    .forEach((h) => expansions.add(h.toLowerCase().trim()));
 
-  // Service-specific triggers
+  // service expansion rules
   if (normalized.includes("seo") || normalized.includes("position zero")) {
-    expansions.push("voice search optimization", "ai seo strategy", "featured snippets");
-  }
-  if (normalized.includes("youtube") || normalized.includes("video ads")) {
-    expansions.push("youtube ads optimization", "video marketing funnel");
-  }
-  if (normalized.includes("cgi") || normalized.includes("3d")) {
-    expansions.push("cgi marketing", "immersive 3d ads", "product renders");
+    expansions.add("voice search optimization");
+    expansions.add("ai seo strategy");
+    expansions.add("featured snippets optimization");
   }
 
-  return Array.from(new Set(expansions)); // Remove duplicates
+  if (normalized.includes("youtube") || normalized.includes("video ads")) {
+    expansions.add("youtube ads optimization");
+    expansions.add("video marketing funnel");
+  }
+
+  if (normalized.includes("cgi") || normalized.includes("3d")) {
+    expansions.add("cgi marketing");
+    expansions.add("immersive 3d ads");
+    expansions.add("product renders");
+  }
+
+  return Array.from(expansions);
 }

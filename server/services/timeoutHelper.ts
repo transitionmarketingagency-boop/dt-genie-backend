@@ -1,22 +1,24 @@
-// server/services/timeoutHelper.ts
-
 /**
  * Wraps a promise with a timeout.
- * Returns null if the promise doesn't resolve in the given ms.
+ * Returns null if it doesn't resolve in time.
  */
-export async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
-  let timer: NodeJS.Timeout | undefined;
+export async function withTimeout<T>(
+  promise: Promise<T>,
+  ms: number
+): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
   try {
-    return await Promise.race([
-      promise,
-      new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), ms);
-      }),
-    ]);
+    const timeoutPromise = new Promise<null>((resolve) => {
+      timer = setTimeout(() => resolve(null), ms);
+    });
+
+    const result = await Promise.race([promise, timeoutPromise]);
+
+    return result as T | null;
   } catch {
     return null;
   } finally {
-    if (timer !== undefined) clearTimeout(timer);
+    if (timer) clearTimeout(timer);
   }
 }

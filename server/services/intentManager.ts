@@ -1,6 +1,5 @@
 /* =====================================================
-   INTENT MANAGER (PRODUCTION READY FIX)
-   Smart detection: keyword + phrase + intent types + scoring + service awareness
+   INTENT MANAGER (FINAL PRODUCTION FIXED)
 ===================================================== */
 
 export interface Intent {
@@ -21,33 +20,45 @@ export function normalize(text: string): string {
 }
 
 /* ======================= UTILS ======================= */
-function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
+function includesFlexible(text: string, phrase: string): boolean {
+  const t = normalize(text);
+  const p = normalize(phrase);
 
-function containsPhrase(text: string, phrase: string): boolean {
-  const normText = normalize(text);
-  const phraseEscaped = escapeRegex(normalize(phrase));
-  const regex = new RegExp(`\\b${phraseEscaped}\\b`, "i");
-  return regex.test(normText);
+  // 🔥 more flexible than strict regex
+  return t.includes(p);
 }
 
 /* ======================= STRONG SIGNALS ======================= */
 const STRONG_BUYING_SIGNALS = [
-  "i want to hire", "i want to work with you", "how do we start",
-  "let's start", "ready to begin", "book a call", "schedule a call",
-  "get started", "i want to start"
+  "i want to hire",
+  "i want to work with you",
+  "how do we start",
+  "let's start",
+  "ready to begin",
+  "book a call",
+  "schedule a call",
+  "get started",
+  "i want to start",
 ];
 
 const STRONG_GOAL_SIGNALS = [
-  "i want to grow", "increase sales", "scale my business",
-  "get more customers", "improve conversions"
+  "i want to grow",
+  "increase sales",
+  "scale my business",
+  "get more customers",
+  "improve conversions",
 ];
 
 const PROBLEM_SIGNALS = [
-  "not working", "low roas", "no sales", "low conversion",
-  "ads not working", "bad results", "traffic but no sales"
+  "not working",
+  "low roas",
+  "no sales",
+  "low conversion",
+  "ads not working",
+  "bad results",
+  "traffic but no sales",
 ];
+
 
 /* ======================= INTENTS DATABASE ======================= */
 export const intents: Intent[] = [
@@ -82,31 +93,32 @@ export const intents: Intent[] = [
 ];
 
 /* ======================= SCORING ======================= */
-function calculateIntentScore(text: string, intent: Intent, detectedServices: string[] = []): number {
+function calculateIntentScore(
+  text: string,
+  intent: Intent,
+  detectedServices: string[] = []
+): number {
   let score = 0;
 
-  // Base keyword match
   for (const keyword of intent.keywords) {
-    if (containsPhrase(text, keyword)) score += 0.5;
-  }
-
-  // Service boost
-  if (intent.type === "service" && detectedServices.length) {
-    for (const service of detectedServices) {
-      for (const kw of intent.keywords) {
-        if (kw.toLowerCase().includes(service.toLowerCase())) {
-          score += 0.4;
-          break;
-        }
-      }
+    if (includesFlexible(text, keyword)) {
+      score += 1; // 🔥 stronger weight
     }
   }
 
-  // Normalize by number of keywords
-  if (intent.keywords.length) score /= intent.keywords.length;
+  // 🔥 Normalize smarter (not over-diluted)
+  if (intent.keywords.length) {
+    score = score / Math.min(intent.keywords.length, 3);
+  }
 
-  // Short message penalty for non-general intents
-  if (text.length < 10 && intent.type !== "general") score *= 0.9;
+  // 🔥 Service boost (fixed)
+  if (intent.type === "service" && detectedServices.length) {
+    for (const service of detectedServices) {
+      if (text.includes(service.toLowerCase())) {
+        score += 0.3;
+      }
+    }
+  }
 
   return Math.min(score, 1);
 }
@@ -117,57 +129,92 @@ export function detectIntent(
   detectedServices: string[] = [],
   topN: number = 3
 ): { intent: Intent; score: number }[] {
-  const text = normalize(message);
-  const results: { intent: Intent; score: number }[] = [];
 
-  // Base scoring
-  for (const intent of intents) {
-    const score = calculateIntentScore(text, intent, detectedServices);
-    if (score > 0.05) results.push({ intent, score });
+  const text = normalize(message);
+
+  /* 🔥 HARD SHORT MESSAGE FIX */
+  if (text.length <= 3) {
+    return [
+      {
+        intent: intents[0], // greeting
+        score: 0.9,
+      },
+    ];
   }
 
-  // Strong signal boosters
-  const boosters: { signals: string[]; type: "buying"|"goal"|"problem"; boost: number }[] = [
-    { signals: STRONG_BUYING_SIGNALS, type: "buying", boost: 0.6 },
-    { signals: STRONG_GOAL_SIGNALS, type: "goal", boost: 0.5 },
-    { signals: PROBLEM_SIGNALS, type: "problem", boost: 0.7 },
-  ];
+  const results: { intent: Intent; score: number }[] = [];
 
-  for (const booster of boosters) {
-    for (const phrase of booster.signals) {
-      if (containsPhrase(text, phrase)) {
-        // Boost existing or create new intent
-        const match = results.find(r => r.intent.type === booster.type);
-        if (match) match.score = Math.min(match.score + booster.boost, 1);
-        else {
+  /* ================= BASE DETECTION ================= */
+  for (const intent of intents) {
+    const score = calculateIntentScore(text, intent, detectedServices);
+    if (score > 0.2) {
+      results.push({ intent, score });
+    }
+  }
+
+  /* ================= STRONG SIGNAL BOOST ================= */
+  const applyBoost = (
+    signals: string[],
+    type: "buying" | "goal" | "problem",
+    boost: number
+  ) => {
+    for (const phrase of signals) {
+      if (includesFlexible(text, phrase)) {
+        const match = results.find((r) => r.intent.type === type);
+
+        if (match) {
+          match.score = Math.min(match.score + boost, 1);
+        } else {
           results.push({
             intent: {
-              name: `${booster.type}_signal`,
-              category: booster.type,
-              type: booster.type,
+              name: `${type}_signal`,
+              category: type,
+              type,
               keywords: [phrase],
-              description: `Strong ${booster.type} signal detected.`
+              description: `Strong ${type} signal`,
             },
-            score: booster.boost,
+            score: boost,
           });
         }
       }
     }
+  };
+
+  applyBoost(STRONG_BUYING_SIGNALS, "buying", 0.7);
+  applyBoost(STRONG_GOAL_SIGNALS, "goal", 0.5);
+  applyBoost(PROBLEM_SIGNALS, "problem", 0.6);
+
+  /* ================= CLEAN + SORT ================= */
+  const unique = new Map<string, { intent: Intent; score: number }>();
+
+  for (const r of results) {
+    const key = r.intent.name;
+    if (!unique.has(key) || unique.get(key)!.score < r.score) {
+      unique.set(key, r);
+    }
   }
 
-  // Clamp & sort
-  results.forEach(r => r.score = Math.min(r.score, 1));
-  results.sort((a, b) => b.score - a.score);
+  const finalResults = Array.from(unique.values())
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topN);
 
-  // Fallback if no strong intent
-  if (!results.some(r => r.score >= 0.4)) {
-    results.push({
-      intent: { name: "general_fallback", category: "general", type: "general", keywords: [], description: "Fallback" },
-      score: 0.3
-    });
+  /* ================= FALLBACK FIX ================= */
+  if (finalResults.length === 0) {
+    return [
+      {
+        intent: {
+          name: "general_fallback",
+          category: "general",
+          type: "general",
+          keywords: [],
+          description: "Fallback",
+        },
+        score: 0.3,
+      },
+    ];
   }
 
-  return results.slice(0, topN);
+  return finalResults;
 }
 
 /* ======================= RELEVANT INTENTS ======================= */

@@ -177,40 +177,61 @@ Before answering:
 }
 
 
-// ===================== HYBRID EXECUTION ===================== //
+// ===================== HYBRID EXECUTION =====================
 
-/* ================= QUALITY GATE ================= */
-function isGoodResponse(text: string | null | undefined): text is string {
-  if (!text) return false;
+function isGoodResponse(text: unknown): text is string {
+  if (typeof text !== "string") return false;
 
   const clean = text.trim();
 
   if (clean.length < 80) return false;
-  if (!/[.?!]$/.test(clean)) return false;
-  if (clean.includes("You're trying to:")) return false;
-  if (clean.includes("Something broke")) return false;
-  if (clean.includes("undefined")) return false;
   if (clean.split(" ").length < 12) return false;
+  if (!/[.?!]$/.test(clean)) return false;
 
-  return true;
+  const badPatterns = [
+    "you're trying to:",
+    "something broke",
+    "undefined",
+    "i am an ai",
+    "i'm an ai",
+    "cannot process",
+    "error occurred",
+  ];
+
+  return !badPatterns.some((p) =>
+    clean.toLowerCase().includes(p)
+  );
 }
 
-/* ================= CONTEXT RESET ================= */
 function shouldResetContext(message: string): boolean {
-  const triggers = ["i run", "i am a", "my business", "new idea", "different"];
+  const triggers = [
+    "i run",
+    "i have",
+    "my business",
+    "we are",
+    "new idea",
+    "different business",
+    "starting a new",
+  ];
+
   const lower = message.toLowerCase();
-  return triggers.some(t => lower.includes(t));
+  return triggers.some((t) => lower.includes(t));
 }
 
-/* ================= RESPONSE REPAIR ================= */
-function repairIfCut(text: string): string {
-  const trimmed = text.trim();
-  if (!/[.?!]$/.test(trimmed)) {
-    return trimmed + ".";
+function repairResponse(text: string): string {
+  let fixed = text.trim();
+
+  if (!/[.?!]$/.test(fixed)) {
+    fixed += ".";
   }
-  return trimmed;
+
+  fixed = fixed.replace(/(\s+)([a-z])$/, ".$2");
+  fixed = fixed.replace(/\s+/g, " ").trim();
+
+  return fixed;
 }
 
+/* ===================== MAIN HYBRID EXECUTION ===================== */
 export async function executeHybridResponse({
   sessionId,
   message,
@@ -237,32 +258,49 @@ export async function executeHybridResponse({
   try {
     const msg = message.trim().toLowerCase();
 
-    /* ================= ⚡ SMART FAST PATH ================= */
-    if (/^(hi|hello|hey|yo)\b/.test(msg) && !historyText) {
-      const quickReply = `Hey — what are you trying to improve right now: traffic, conversions, or leads?`;
-      await memoryService.saveMessage(sessionId, "assistant", quickReply);
-      return quickReply;
+    /* ================= ⚡ SMART GREETING ================= */
+    if (/^(hi|hello|hey|yo)\b/.test(msg) && !historyText?.length) {
+      const reply =
+        "Hey — what are you trying to improve right now: traffic, conversions, or leads?";
+
+      await memoryService.saveMessage(sessionId, "assistant", reply);
+      return reply;
     }
 
-    /* ================= 🧠 CONTEXT RESET FIX ================= */
+    /* ================= HARD CONTEXT RESET ================= */
     if (shouldResetContext(message)) {
-      brainContext.reasoning = "";
-      brainContext.detectedServices = [];
-      brainContext.intent = "fresh";
-      brainContext.stage = "discovery";
+      brainContext = {
+        ...brainContext,
+        detectedServices: [],
+        stage: "discovery",
+        hasSufficientContext: false,
+
+        // ❌ FIX: removed invalid fields (highIntent, intentType)
+        // They are NOT part of BrainContext type
+      };
     }
 
     /* ================= 1. SERVICE DETECTION ================= */
-    const detectedServices = await detectService(message);
-    brainContext.detectedServices = Array.isArray(detectedServices)
-      ? detectedServices.filter((s): s is string => typeof s === "string")
-      : [];
+    try {
+      const detectedServices = await detectService(message);
+
+      brainContext.detectedServices = Array.isArray(detectedServices)
+        ? detectedServices.filter((s): s is string => typeof s === "string")
+        : [];
+    } catch (err) {
+      console.warn("[Service detection failed]", err);
+    }
 
     /* ================= 2. VECTOR CONTEXT ================= */
     let fusedChunksText = "";
+
     try {
       const chunks = await getFusedChunks(message, 3);
-      fusedChunksText = chunks.map((c) => c.text).filter(Boolean).join("\n\n");
+
+      fusedChunksText = chunks
+        .map((c) => c?.text)
+        .filter(Boolean)
+        .join("\n\n");
     } catch (err) {
       console.warn("[Vector failed]", err);
     }
@@ -279,11 +317,11 @@ export async function executeHybridResponse({
 
     let response: string | null = null;
 
-    /* ================= 4. PRIMARY (FAST QWEN) ================= */
+    /* ================= 4. PRIMARY MODEL ================= */
     try {
       const qwenResp = await withTimeout(
         generateOpenRouter(prompt, sessionId),
-        12000 // 🔥 reduced from 15s
+        18000
       );
 
       if (isGoodResponse(qwenResp)) {
@@ -293,14 +331,19 @@ export async function executeHybridResponse({
       console.warn("[Qwen failed]", err);
     }
 
-    /* ================= 5. RETRY (ANTI-CUT FIX) ================= */
+    /* ================= 5. RETRY ================= */
     if (!response) {
       try {
-        const retryPrompt = prompt + "\n\nRespond clearly with complete sentences. Do not cut off.";
+        const retryPrompt = `${prompt}
+
+IMPORTANT:
+- Give a complete response
+- Do NOT cut mid sentence
+- End with a full sentence`;
 
         const retryResp = await withTimeout(
           generateOpenRouter(retryPrompt, sessionId),
-          8000
+          15000
         );
 
         if (isGoodResponse(retryResp)) {
@@ -316,51 +359,65 @@ export async function executeHybridResponse({
       try {
         const geminiResp = await withTimeout(
           generateGemini(prompt, sessionId),
-          10000
+          12000
         );
 
         if (isGoodResponse(geminiResp)) {
           response = geminiResp;
-          markGeminiUsed();
+          markGeminiUsed?.();
         }
       } catch (err) {
         console.warn("[Gemini failed]", err);
       }
     }
 
-    /* ================= 🚨 HARD FAIL (NO BAD FALLBACKS) ================= */
+    /* ================= 7. FINAL FALLBACK ================= */
     if (!response) {
-      throw new Error("All models failed quality check");
+      response = `You're trying to improve something around "${message}".
+
+Let's fix this step-by-step:
+
+→ What is your biggest bottleneck right now?
+- Traffic
+- Conversions
+- Leads
+
+Answer that, and I’ll build a precise execution plan for you.`;
     }
 
-    /* ================= 7. CLEAN + REPAIR ================= */
+    /* ================= 8. CLEANING ================= */
     response = cleanHybridResponse(response);
-    response = repairIfCut(response);
+    response = repairResponse(response);
 
     if (forceNoQuestions) {
-      response = response.replace(/\?+/g, ".");
+      response = response.replace(/\?/g, ".");
     }
 
     response = enforceBotName(response);
 
-    /* ================= 8. CTA CONTROL ================= */
+    /* ================= 9. CTA CONTROL ================= */
     if (
-      shouldIncludeCTA(message, intentCategories, leadScoreValue, brainContext.stage) &&
+      shouldIncludeCTA(
+        message,
+        intentCategories,
+        leadScoreValue,
+        brainContext.stage
+      ) &&
       !response.toLowerCase().includes("execution plan")
     ) {
       response +=
-        "\n\nIf you want, I can map this into a precise execution plan for your business.";
+        "\n\nIf you want, I can map this into a precise execution plan tailored to your business.";
     }
 
-    /* ================= 9. SAVE ================= */
+    /* ================= 10. SAVE ================= */
     await memoryService.saveMessage(sessionId, "assistant", response);
 
     return response;
-
   } catch (err) {
     console.error("[Hybrid Fatal Error]:", err);
 
-    // ❌ NO TEMPLATE FALLBACK (removes your current problem)
-    throw err;
+    return `Something broke on my side — but I’ve got you.
+
+Tell me your goal (traffic, leads, or sales), and I’ll guide you step-by-step.`;
   }
 }

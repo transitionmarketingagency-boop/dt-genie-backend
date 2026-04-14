@@ -34,21 +34,23 @@ function detectContextShift(message: string, memory: StrategicMemory): boolean {
   return shiftSignals.some((s) => message.includes(s));
 }
 
-function detectStage(
-  message: string,
-  intentType?: string
-): BrainContext["stage"] {
+/* ================= STAGE DETECTION ================= */
+function detectStage(message: string, intentType?: string): BrainContext["stage"] {
+  const msg = message.toLowerCase();
+
   if (intentType === "greeting") return "greeting";
   if (intentType === "booking") return "conversion";
   if (intentType === "service_inquiry") return "service";
   if (intentType === "problem") return "strategy";
 
-  if (/(hire|book|schedule|call|start|work with you)/i.test(message))
+  if (/(hire|book|schedule|call|start|work with you|let's start)/i.test(msg))
     return "conversion";
 
-  if (/(price|cost|service|offer)/i.test(message)) return "service";
+  if (/(price|cost|service|offer|what do you do)/i.test(msg))
+    return "service";
 
-  if (/(how|improve|fix|scale|strategy)/i.test(message)) return "strategy";
+  if (/(how|improve|fix|scale|strategy|optimize)/i.test(msg))
+    return "strategy";
 
   return "discovery";
 }
@@ -71,10 +73,11 @@ export async function strategicBrain(
     }
   }
 
-  /* ---------- CONTEXT SHIFT FIX ---------- */
+  /* ---------- CONTEXT SHIFT (SAFE RESET) ---------- */
   const hasShift = detectContextShift(message, strategicMemory);
-  if (hasShift) {
-    strategicMemory = {}; // reset stale context
+
+  if (hasShift && message.length > 20) {
+    strategicMemory = {}; // reset ONLY when strong signal + enough context
   }
 
   /* ---------- NEURAL INTENT ---------- */
@@ -82,17 +85,23 @@ export async function strategicBrain(
   try {
     intent = neuralBrain(message) || {};
   } catch {
-    intent = {};
+    intent = { type: "general", highIntent: false };
   }
 
   const intentType = intent?.type || "general";
   const highIntent = Boolean(intent?.highIntent);
 
-  /* ---------- LEAD SCORE (FIXED TYPE SAFE) ---------- */
+  /* ---------- LEAD SCORE (FIXED) ---------- */
   let leadScore = 0;
+
   try {
-    const result = leadQualifier.scoreLead(sessionId || "anon", {});
-    leadScore = Math.min(10, Math.max(0, result?.total || 0));
+    const scoreResult = leadQualifier.scoreLead(sessionId || "anon", {
+      // optional safety fallback (no empty object blind scoring)
+      need: intentType === "problem" ? 0.5 : 0.2,
+      authority: highIntent ? 0.6 : 0.2,
+    });
+
+    leadScore = Number(scoreResult?.total || 0);
   } catch {
     leadScore = 0;
   }
@@ -100,18 +109,18 @@ export async function strategicBrain(
   /* ---------- STAGE ---------- */
   const stage = detectStage(message, intentType);
 
-  /* ---------- EXECUTION MODE ---------- */
+  /* ---------- EXECUTION MODE (FIXED LOGIC) ---------- */
   const executionMode =
     highIntent ||
     stage === "conversion" ||
-    leadScore >= 7 ||
-    /(start|do it|help|fix this now)/i.test(message)
+    leadScore >= 0.6 ||
+    (intentType === "problem" && message.length > 20)
       ? "execution"
       : "exploration";
 
   /* ---------- CONTEXT QUALITY ---------- */
   const hasSufficientContext =
-    message.length > 15 ||
+    message.length > 12 ||
     intentType === "problem" ||
     intentType === "service_inquiry" ||
     highIntent;

@@ -31,7 +31,8 @@ const MIN_SCORE_THRESHOLD = 0.05;
 
 /* ======================= NORMALIZE ======================= */
 function normalize(text: string): string {
-  return (text || "")
+  if (!text) return "";
+  return text
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
     .replace(/\s+/g, " ")
@@ -43,31 +44,37 @@ function tokenize(text: string): string[] {
   return normalize(text).split(/\s+/).filter(Boolean);
 }
 
-/* ======================= KEYWORD OVERLAP ======================= */
-function keywordOverlap(aTokens: Set<string>, bTokens: Set<string>) {
-  if (!aTokens.size || !bTokens.size) return 0;
-  let overlap = 0;
-  for (const word of aTokens) {
-    if (bTokens.has(word)) overlap++;
+/* ======================= OVERLAP ======================= */
+function keywordOverlap(a: Set<string>, b: Set<string>): number {
+  if (!a.size || !b.size) return 0;
+
+  let hits = 0;
+  for (const word of a) {
+    if (b.has(word)) hits++;
   }
-  return overlap / Math.max(aTokens.size, bTokens.size);
+
+  return hits / Math.max(a.size, b.size);
 }
 
 /* ======================= INTENT KEYWORD SCORE ======================= */
 function intentKeywordScore(
   message: string,
   chunkText: string,
-  relevantKeywords: string[]
-) {
+  keywords: string[]
+): number {
   const msgTokens = new Set(tokenize(message));
   const chunkTokens = new Set(tokenize(chunkText));
 
   let score = 0;
-  for (const kw of relevantKeywords) {
+
+  for (const kw of keywords) {
     if (!kw) continue;
+
     const kwTokens = new Set(tokenize(kw));
-    const overlap = keywordOverlap(msgTokens, kwTokens) * 0.12; // scaled max
-    score += overlap;
+    const overlap = keywordOverlap(msgTokens, kwTokens);
+
+    score += overlap * 0.12;
+
     if (score >= 0.12) break;
   }
 
@@ -75,26 +82,30 @@ function intentKeywordScore(
 }
 
 /* ======================= BOOSTS ======================= */
-function serviceBoost(chunkText: string) {
+function serviceBoost(chunkText: string): number {
   return normalize(chunkText).includes("service") ? SERVICE_BOOST : 0;
 }
 
-function pricingBoost(chunkText: string, message: string) {
+function pricingBoost(chunkText: string, message: string): number {
   if (!/(price|cost|pricing)/i.test(message)) return 0;
   return normalize(chunkText).includes("price") ? PRICING_BOOST : 0;
 }
 
-function bookingBoost(chunkText: string, message: string) {
+function bookingBoost(chunkText: string, message: string): number {
   if (!/(book|schedule|call)/i.test(message)) return 0;
   return normalize(chunkText).includes("book") ? BOOKING_BOOST : 0;
 }
 
 /* ======================= DEDUPE ======================= */
-function dedupeChunks(chunks: VectorChunk[]) {
+function dedupeChunks(chunks: VectorChunk[]): VectorChunk[] {
   const seen = new Set<string>();
+
   return chunks.filter((c) => {
-    const key = (c.text || "").slice(0, 120).trim();
+    if (!c?.text) return false;
+
+    const key = c.text.slice(0, 120).trim();
     if (seen.has(key)) return false;
+
     seen.add(key);
     return true;
   });
@@ -112,6 +123,7 @@ export async function getFusedChunks(
 
   /* ---------- VECTOR FETCH ---------- */
   let vectorChunks: VectorChunk[] = [];
+
   try {
     vectorChunks = await getTopChunks(userMessage, baseTopN + 5, 0.5);
   } catch (err) {
@@ -120,26 +132,31 @@ export async function getFusedChunks(
   }
 
   if (!vectorChunks?.length) return [];
+
   vectorChunks = dedupeChunks(vectorChunks);
 
   /* ---------- INTENT DETECTION ---------- */
   let detectedIntents: { intent: Intent; score?: number }[] = [];
+
   try {
     detectedIntents = detectIntent(userMessage, [], 5);
   } catch (err) {
     console.warn("Intent detection failed:", err);
   }
 
-  const detectedIntentNames = detectedIntents.map((d) => d.intent.name);
-  const detectedIntentScores = detectedIntents.reduce((acc, d) => {
-    acc[d.intent.name] = d.score ?? 0.3;
-    return acc;
-  }, {} as Record<string, number>);
+  const intentNames = detectedIntents.map((d) => d.intent.name);
+
+  const intentScores: Record<string, number> = {};
+  for (const d of detectedIntents) {
+    intentScores[d.intent.name] = d.score ?? 0.3;
+  }
 
   const intentKeywordMap: Record<string, string[]> = {};
-  for (const intentName of detectedIntentNames) {
-    const foundIntent = intents.find((i) => i.name === intentName);
-    intentKeywordMap[intentName] = (foundIntent?.keywords || [])
+
+  for (const name of intentNames) {
+    const found = intents.find((i) => i.name === name);
+
+    intentKeywordMap[name] = (found?.keywords || [])
       .map(normalize)
       .filter(Boolean);
   }
@@ -152,19 +169,23 @@ export async function getFusedChunks(
     const vectorScore = chunk.score ?? 0;
     const keywordScore = keywordOverlap(messageTokens, chunkTokens);
 
-    const intentBoost = detectedIntentNames.reduce((sum, intentName) => {
-      const keywords = intentKeywordMap[intentName] || [];
+    /* INTENT BOOST */
+    const intentBoost = intentNames.reduce((sum, name) => {
+      const keywords = intentKeywordMap[name] || [];
+
       for (const kw of keywords) {
         if (chunkTokens.has(kw)) {
-          sum += detectedIntentScores[intentName] || 0;
+          sum += intentScores[name] || 0;
           break;
         }
       }
+
       return sum;
     }, 0);
 
-    const keywordIntentScore = detectedIntentNames.reduce((sum, intentName) => {
-      const keywords = intentKeywordMap[intentName] || [];
+    /* INTENT TEXT SCORE */
+    const keywordIntentScore = intentNames.reduce((sum, name) => {
+      const keywords = intentKeywordMap[name] || [];
       return sum + intentKeywordScore(normalizedMessage, chunkText, keywords);
     }, 0);
 
@@ -181,18 +202,21 @@ export async function getFusedChunks(
       text: chunk.text,
       source: chunk.source,
       intent: chunk.intent ?? "general",
-      fusionScore: Number((fusionScore || 0).toFixed(4)),
+      fusionScore: Number(fusionScore.toFixed(4)),
     };
   });
 
-  /* ---------- SORT & FILTER ---------- */
+  /* ---------- SORT ---------- */
   fused.sort((a, b) => b.fusionScore - a.fusionScore);
 
+  /* ---------- FILTER ---------- */
   const usedSources = new Set<string>();
+
   const finalChunks = fused.filter((c) => {
     if (!c.text) return false;
     if (c.fusionScore < MIN_SCORE_THRESHOLD) return false;
     if (usedSources.has(c.source)) return false;
+
     usedSources.add(c.source);
     return true;
   });

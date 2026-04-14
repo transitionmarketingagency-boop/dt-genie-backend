@@ -8,12 +8,13 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 /* ================= CONFIG ================= */
 const MODEL = "qwen/qwen3-235b-a22b";
-const REQUEST_TIMEOUT = 12000; // 🔥 reduced
+const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 3500;
 const MAX_RETRIES = 2;
 
 /* ================= CACHE ================= */
 const cache = new Map<string, string>();
+
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
@@ -29,7 +30,7 @@ function cleanPrompt(prompt: string): string {
   );
 }
 
-/* ================= 🔥 STRONG VALIDATION ================= */
+/* ================= RESPONSE VALIDATION ================= */
 function isComplete(text: string | null | undefined): text is string {
   if (!text) return false;
 
@@ -54,9 +55,11 @@ function finalize(text: string): string {
 /* ================= CORE CALL ================= */
 async function callOpenRouter(
   prompt: string,
-  signal: AbortSignal,
   temperature: number
 ): Promise<string | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
   try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -67,7 +70,7 @@ async function callOpenRouter(
       body: JSON.stringify({
         model: MODEL,
         temperature,
-        max_tokens: 1400, // 🔥 increased to prevent cut
+        max_tokens: 1400,
         messages: [
           {
             role: "user",
@@ -75,17 +78,37 @@ async function callOpenRouter(
           },
         ],
       }),
-      signal,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
+
+    /* 🔥 HANDLE HTTP ERRORS */
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error("[OpenRouter HTTP Error]", res.status, errText);
+      return null;
+    }
 
     const data: any = await res.json();
 
-    return cleanResponse(
+    const raw =
       data?.choices?.[0]?.message?.content ||
-        data?.choices?.[0]?.text ||
-        null
-    );
-  } catch (err) {
+      data?.choices?.[0]?.text ||
+      null;
+
+    if (!raw) {
+      console.warn("[OpenRouter] Empty response structure", data);
+      return null;
+    }
+
+    return cleanResponse(raw);
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      console.warn("[OpenRouter] Request timed out");
+    } else {
+      console.error("[OpenRouter] Fetch failed:", err);
+    }
     return null;
   }
 }
@@ -102,6 +125,7 @@ export async function generateOpenRouter(
   prompt = cleanPrompt(prompt);
 
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
+
   if (cache.has(cacheKey)) {
     return cache.get(cacheKey)!;
   }
@@ -109,33 +133,27 @@ export async function generateOpenRouter(
   let attempt = 0;
   let response: string | null = null;
 
-  /* ================= PRIMARY ================= */
   while (attempt < MAX_RETRIES && !response) {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-
-      const raw = await callOpenRouter(prompt, controller.signal, 0.5);
-
-      clearTimeout(timeout);
+      /* ================= PRIMARY ================= */
+      const raw = await callOpenRouter(prompt, 0.5);
 
       if (isComplete(raw)) {
         response = finalize(raw);
         break;
       }
 
-      /* 🔁 RETRY WITH FIX INSTRUCTION */
+      /* ================= RETRY ================= */
       const retryPrompt =
         prompt +
         "\n\nRespond clearly with complete sentences. Do not cut off.";
 
-      const retry = await callOpenRouter(retryPrompt, controller.signal, 0.6);
+      const retry = await callOpenRouter(retryPrompt, 0.6);
 
       if (isComplete(retry)) {
         response = finalize(retry);
         break;
       }
-
     } catch (err) {
       console.warn(`[OpenRouter attempt ${attempt + 1} failed]`, err);
     }
@@ -143,11 +161,12 @@ export async function generateOpenRouter(
     attempt++;
   }
 
-  /* ================= CACHE ONLY GOOD ================= */
+  /* ================= CACHE ONLY VALID ================= */
   if (response) {
     cache.set(cacheKey, response);
     return response;
   }
 
-  return null; // 🔥 let upstream handle failure properly
+  /* ❌ LET CALLER HANDLE FAILURE (CRITICAL DESIGN) */
+  return null;
 }
