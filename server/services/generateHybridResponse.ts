@@ -28,6 +28,7 @@ import { withTimeout } from "./timeoutHelper.js";
 import { neuralBrain } from "./neuralBrain.js";
 import { normalizeLeadScore, determineExecutionMode } from "./leadScoreHelper.js";
 
+
 // ===================== TYPES ===================== //
 export interface BrainContext {
   stage?: string;
@@ -60,8 +61,12 @@ function compressResponse(text: string): string {
   return text.length > 1200 ? text.slice(0, 1200) + "..." : text;
 }
 
+// ⚠️ FIX: safe fallback (prevents crash if import missing)
 function cleanHybridResponse(text: string): string {
-  return cleanResponse(text).trim();
+  if (!text) return "";
+  return typeof cleanResponse === "function"
+    ? cleanResponse(text).trim()
+    : text.trim();
 }
 
 // ===================== HYBRID PROMPT BUILDER ===================== //
@@ -83,6 +88,8 @@ export function buildHybridPrompt({
   const avoidQuestions =
     Boolean(brainContext?.hasSufficientContext) && brainContext?.stage !== "discovery";
 
+  const hasVectorKnowledge = Boolean(vectorText && vectorText.trim().length > 50);
+
   const knownContext = `
 Known User Context:
 ${historyText || "No prior context available."}
@@ -91,8 +98,8 @@ Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
 Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
 
 IMPORTANT:
-- Do NOT ask for information already provided
-- Use this context to MOVE FORWARD (not repeat questions)
+- Do NOT repeat questions already answered
+- Move the conversation FORWARD with execution-focused thinking
 `.trim();
 
   return `
@@ -107,26 +114,25 @@ Solve the user's REAL business problem using strategy, not generic advice.
 - NEVER give generic advice
 - NEVER repeat previous responses
 - NEVER ignore provided context
-- NEVER ask the same question again
 - NEVER reset the conversation direction
-- NEVER output vague frameworks without specificity
+- NEVER hallucinate when knowledge is available
 
 - ALWAYS:
-  → Diagnose the ROOT problem
+  → Use provided KNOWLEDGE FIRST (vector data is priority source)
+  → Diagnose root problem precisely
   → Give SPECIFIC, EXECUTABLE actions
-  → Tie everything to RESULTS (revenue, leads, ROAS)
+  → Tie everything to measurable outcomes (revenue, leads, ROAS)
 
 🧠 INTELLIGENCE MODE
 Execution Mode: ${brainContext?.executionMode ?? "exploration"}
 
 IF executionMode = "execution":
 - DO NOT ask unnecessary questions
-- Give DIRECT implementation steps
-- Move toward action, plan, or next step
+- Focus on direct implementation steps
 
 IF executionMode = "exploration":
 - Diagnose deeply
-- Ask MAX 1 high-value question (only if needed)
+- Ask MAX 1 high-value question ONLY if required
 
 ${avoidQuestions ? "CRITICAL: DO NOT ASK ANY QUESTIONS." : ""}
 
@@ -145,33 +151,31 @@ ${leadScoreValue > 0.6 ? "HIGH INTENT (ready to act)" : "EXPLORING"}
 🧩 KNOWN CONTEXT
 ${knownContext}
 
-📚 KNOWLEDGE
-${vectorText || "No vector knowledge available."}
+📚 KNOWLEDGE (PRIORITY SOURCE — DO NOT IGNORE)
+${hasVectorKnowledge ? vectorText : "NO VECTOR DATA AVAILABLE — use general reasoning only"}
 
 👤 USER MESSAGE
 ${message}
 
-🧠 THINKING INSTRUCTIONS
-Before answering:
-
-1. Identify the REAL underlying problem.
-2. Determine the fastest path to measurable improvement.
-3. Give exact, actionable steps tied to outcomes.
+🧠 THINKING RULES
+1. If KNOWLEDGE exists → ALWAYS prioritize it
+2. If knowledge is missing → use strategic reasoning
+3. Never mix both blindly
+4. Always stay grounded in provided data
 
 ✍️ RESPONSE STRUCTURE
-
 1. Identify the REAL problem (specific, not generic)
-2. Provide a CLEAR, EXECUTABLE solution
+2. Provide a CLEAR EXECUTABLE solution
    - Steps
    - Tactics
    - Strategy tied to outcome
-3. Optional: ONE sharp follow-up question ONLY if necessary
+3. Optional: ONE sharp follow-up question ONLY if needed
 
 🎯 FINAL RULES
 - Be sharp, direct, and strategic
-- Sound like a human expert
-- Avoid fluff, filler, repetition
-- Prefer depth over surface-level advice
+- Sound like a real consultant, not an AI
+- Avoid fluff and repetition
+- Prefer depth over surface advice
 - If context exists → MOVE FORWARD, don’t reset
 `.trim();
 }
@@ -219,13 +223,14 @@ function shouldResetContext(message: string): boolean {
 }
 
 function repairResponse(text: string): string {
-  let fixed = text.trim();
+  let fixed = (text || "").trim();
+
+  if (!fixed) return "";
 
   if (!/[.?!]$/.test(fixed)) {
     fixed += ".";
   }
 
-  fixed = fixed.replace(/(\s+)([a-z])$/, ".$2");
   fixed = fixed.replace(/\s+/g, " ").trim();
 
   return fixed;
@@ -235,7 +240,7 @@ function repairResponse(text: string): string {
 export async function executeHybridResponse({
   sessionId,
   message,
-  brainContext,
+  brainContext = {},
   leadScoreValue,
   detectedIntentNames,
   vectorText,
@@ -246,7 +251,7 @@ export async function executeHybridResponse({
 }: {
   sessionId: string;
   message: string;
-  brainContext: BrainContext;
+  brainContext: any;
   leadScoreValue: number;
   detectedIntentNames: string[];
   vectorText: string;
@@ -256,27 +261,27 @@ export async function executeHybridResponse({
   forceNoQuestions?: boolean;
 }) {
   try {
-    const msg = message.trim().toLowerCase();
+    const msg = (message || "").trim().toLowerCase();
 
     /* ================= ⚡ SMART GREETING ================= */
     if (/^(hi|hello|hey|yo)\b/.test(msg) && !historyText?.length) {
       const reply =
         "Hey — what are you trying to improve right now: traffic, conversions, or leads?";
 
-      await memoryService.saveMessage(sessionId, "assistant", reply);
+      try {
+        await memoryService.addMessage(sessionId, "assistant", reply);
+      } catch {}
+
       return reply;
     }
 
     /* ================= HARD CONTEXT RESET ================= */
-    if (shouldResetContext(message)) {
+    if (shouldResetContext(message || "")) {
       brainContext = {
-        ...brainContext,
+        ...(brainContext || {}),
         detectedServices: [],
         stage: "discovery",
         hasSufficientContext: false,
-
-        // ❌ FIX: removed invalid fields (highIntent, intentType)
-        // They are NOT part of BrainContext type
       };
     }
 
@@ -285,10 +290,10 @@ export async function executeHybridResponse({
       const detectedServices = await detectService(message);
 
       brainContext.detectedServices = Array.isArray(detectedServices)
-        ? detectedServices.filter((s): s is string => typeof s === "string")
+        ? detectedServices.filter((s: any) => typeof s === "string")
         : [];
-    } catch (err) {
-      console.warn("[Service detection failed]", err);
+    } catch {
+      brainContext.detectedServices = [];
     }
 
     /* ================= 2. VECTOR CONTEXT ================= */
@@ -297,12 +302,13 @@ export async function executeHybridResponse({
     try {
       const chunks = await getFusedChunks(message, 3);
 
-      fusedChunksText = chunks
-        .map((c) => c?.text)
+      fusedChunksText = (chunks || [])
+        .filter(Boolean)
+        .map((c: any) => c?.text)
         .filter(Boolean)
         .join("\n\n");
-    } catch (err) {
-      console.warn("[Vector failed]", err);
+    } catch {
+      fusedChunksText = "";
     }
 
     /* ================= 3. BUILD PROMPT ================= */
@@ -327,9 +333,7 @@ export async function executeHybridResponse({
       if (isGoodResponse(qwenResp)) {
         response = qwenResp;
       }
-    } catch (err) {
-      console.warn("[Qwen failed]", err);
-    }
+    } catch {}
 
     /* ================= 5. RETRY ================= */
     if (!response) {
@@ -349,9 +353,7 @@ IMPORTANT:
         if (isGoodResponse(retryResp)) {
           response = retryResp;
         }
-      } catch (err) {
-        console.warn("[Qwen retry failed]", err);
-      }
+      } catch {}
     }
 
     /* ================= 6. GEMINI FALLBACK ================= */
@@ -366,9 +368,7 @@ IMPORTANT:
           response = geminiResp;
           markGeminiUsed?.();
         }
-      } catch (err) {
-        console.warn("[Gemini failed]", err);
-      }
+      } catch {}
     }
 
     /* ================= 7. FINAL FALLBACK ================= */
@@ -401,7 +401,7 @@ Answer that, and I’ll build a precise execution plan for you.`;
         message,
         intentCategories,
         leadScoreValue,
-        brainContext.stage
+        brainContext?.stage
       ) &&
       !response.toLowerCase().includes("execution plan")
     ) {
@@ -410,7 +410,9 @@ Answer that, and I’ll build a precise execution plan for you.`;
     }
 
     /* ================= 10. SAVE ================= */
-    await memoryService.saveMessage(sessionId, "assistant", response);
+    try {
+      await memoryService.addMessage(sessionId, "assistant", response);
+    } catch {}
 
     return response;
   } catch (err) {
