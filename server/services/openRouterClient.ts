@@ -1,6 +1,5 @@
 // server/services/openRouterClient.ts
 
-import fetch from "node-fetch";
 import { cleanResponse } from "../utils/cleanResponse.js";
 import crypto from "crypto";
 

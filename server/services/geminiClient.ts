@@ -2,7 +2,6 @@
 
 import { fileURLToPath, pathToFileURL } from "url";
 import { dirname, join } from "path";
-import fetch from "node-fetch";
 import * as dotenv from "dotenv";
 import { strategicBrain } from "./strategicBrain.js";
 import crypto from "crypto";
