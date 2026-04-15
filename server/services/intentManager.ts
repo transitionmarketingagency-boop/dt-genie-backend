@@ -1,5 +1,5 @@
 /* =====================================================
-   INTENT MANAGER (FINAL PRODUCTION FIXED)
+   INTENT MANAGER (ULTRA STABLE PRODUCTION VERSION)
 ===================================================== */
 
 export interface Intent {
@@ -10,7 +10,7 @@ export interface Intent {
   description: string;
 }
 
-/* ======================= NORMALIZATION ======================= */
+/* ================= NORMALIZE ================= */
 export function normalize(text: string): string {
   return (text || "")
     .toLowerCase()
@@ -19,16 +19,31 @@ export function normalize(text: string): string {
     .trim();
 }
 
-/* ======================= UTILS ======================= */
-function includesFlexible(text: string, phrase: string): boolean {
-  const t = normalize(text);
-  const p = normalize(phrase);
-
-  // 🔥 more flexible than strict regex
-  return t.includes(p);
+/* ================= TOKENIZE ================= */
+function tokenize(text: string): string[] {
+  return normalize(text).split(" ").filter(Boolean);
 }
 
-/* ======================= STRONG SIGNALS ======================= */
+/* ================= MATCH HELPERS ================= */
+function phraseMatch(text: string, phrase: string): boolean {
+  return normalize(text).includes(normalize(phrase));
+}
+
+function tokenOverlapScore(text: string, keywords: string[]): number {
+  const tokens = new Set(tokenize(text));
+  let hits = 0;
+
+  for (const kw of keywords) {
+    const kwTokens = tokenize(kw);
+    if (kwTokens.every(t => tokens.has(t))) {
+      hits++;
+    }
+  }
+
+  return hits / Math.max(keywords.length, 1);
+}
+
+/* ================= STRONG SIGNALS ================= */
 const STRONG_BUYING_SIGNALS = [
   "i want to hire",
   "i want to work with you",
@@ -38,92 +53,126 @@ const STRONG_BUYING_SIGNALS = [
   "book a call",
   "schedule a call",
   "get started",
-  "i want to start",
+  "start project",
 ];
 
 const STRONG_GOAL_SIGNALS = [
-  "i want to grow",
   "increase sales",
+  "get more leads",
+  "grow my business",
   "scale my business",
-  "get more customers",
   "improve conversions",
 ];
 
-const PROBLEM_SIGNALS = [
-  "not working",
-  "low roas",
+const STRONG_PROBLEM_SIGNALS = [
   "no sales",
-  "low conversion",
+  "low sales",
+  "low roas",
   "ads not working",
   "bad results",
+  "no leads",
   "traffic but no sales",
 ];
 
-
-/* ======================= INTENTS DATABASE ======================= */
+/* ================= INTENTS ================= */
 export const intents: Intent[] = [
-  // GENERAL
   { name: "greeting", category: "general", type: "general", keywords: ["hi","hello","hey"], description: "Greeting" },
   { name: "about_company", category: "general", type: "general", keywords: ["who are you","what do you do","your company"], description: "Company info" },
 
-  // GOALS
-  { name: "business_growth", category: "sales", type: "goal", keywords: ["grow","scale","increase sales","more revenue"], description: "User wants growth" },
+  { name: "business_growth", category: "sales", type: "goal", keywords: ["grow","scale","increase sales","more revenue"], description: "Growth intent" },
 
-  // PROBLEMS
-  { name: "low_roas", category: "marketing", type: "problem", keywords: ["low roas","bad roas","roas is low"], description: "ROAS issue" },
-  { name: "no_sales", category: "sales", type: "problem", keywords: ["no sales","not getting sales","zero sales"], description: "Sales problem" },
-  { name: "conversion_problem", category: "marketing", type: "problem", keywords: ["low conversion","conversion problem","no conversions"], description: "Conversion issue" },
+  { name: "no_sales", category: "sales", type: "problem", keywords: ["no sales","not getting sales","zero sales"], description: "Sales issue" },
+  { name: "low_roas", category: "marketing", type: "problem", keywords: ["low roas","bad roas"], description: "ROAS issue" },
+  { name: "conversion_problem", category: "marketing", type: "problem", keywords: ["low conversion","no conversions"], description: "Conversion issue" },
 
-  // SERVICES
-  { name: "voice_search_optimization", category: "service", type: "service", keywords: ["voice search","vso","position zero","featured snippets","alexa","siri","google assistant","aeo","answer engine optimization"], description: "Voice search optimization." },
-  { name: "ai_email_marketing", category: "service", type: "service", keywords: ["email marketing","email automation","klaviyo","cold email","newsletter automation"], description: "Email campaigns and automation." },
-  { name: "youtube_ad_domination", category: "service", type: "service", keywords: ["youtube ads","video marketing","video funnels","youtube campaigns"], description: "YouTube advertising." },
-  { name: "ai_website_design", category: "service", type: "service", keywords: ["website design","shopify","woocommerce","seo website","web development"], description: "Website development services." },
-  { name: "ai_virtual_tours", category: "service", type: "service", keywords: ["virtual tours","360 tours","3d tours","real estate renders","cgi tours","interactive floor plans"], description: "Virtual property experiences." },
-  { name: "performance_marketing_warfare", category: "service", type: "service", keywords: ["ppc","performance marketing","ads","conversion optimization","lower cac","increase roas"], description: "Paid ads optimization." },
-  { name: "immersive_cgi_marketing", category: "service", type: "service", keywords: ["cgi","3d ads","cgi ads","product renders","viral cgi","realistic cgi"], description: "CGI marketing." },
-  { name: "ai_video_audio_production", category: "service", type: "service", keywords: ["video production","audio production","editing","content production","ai voiceover","retention heatmaps"], description: "Media production." },
-  { name: "ai_optimized_content", category: "service", type: "service", keywords: ["content creation","blogs","copywriting","content marketing","lead magnets"], description: "Content marketing." },
-  { name: "ai_social_domination", category: "service", type: "service", keywords: ["social media","instagram","tiktok","linkedin marketing","hack algorithm","shadowban fix"], description: "Social growth." },
-  { name: "ai_search_domination_geo", category: "service", type: "service", keywords: ["geo","ai seo","chatgpt ranking","gemini ranking","rank on chatgpt","optimize for gemini","ai indexing"], description: "AI search ranking." },
-  { name: "ai_predictive_analytics", category: "service", type: "service", keywords: ["analytics","data","predictive","forecasting","market shifts","sentiment analysis"], description: "Data intelligence." },
+  { name: "ai_search_domination_geo", category: "service", type: "service", keywords: ["geo","ai seo","chatgpt ranking","gemini ranking"], description: "AI search ranking" },
+  { name: "performance_marketing", category: "service", type: "service", keywords: ["ads","ppc","performance marketing"], description: "Paid ads" },
+  { name: "ai_automation", category: "service", type: "service", keywords: ["automation","ai automation","workflow automation"], description: "Automation systems" },
+  { name: "cgi_tours", category: "service", type: "service", keywords: ["3d tours","virtual tours","cgi"], description: "CGI tours" },
 
-  // BUYING
-  { name: "hire_intent", category: "sales", type: "buying", keywords: ["hire","work with you","start project"], description: "User wants to hire" },
+  { name: "hire_intent", category: "sales", type: "buying", keywords: ["hire","work with you","start project"], description: "Buying intent" },
 ];
 
-/* ======================= SCORING ======================= */
-function calculateIntentScore(
-  text: string,
-  intent: Intent,
-  detectedServices: string[] = []
-): number {
+/* ================= PRIORITY ================= */
+const TYPE_PRIORITY = {
+  buying: 5,
+  problem: 4,
+  goal: 3,
+  service: 2,
+  general: 1,
+};
+
+/* ================= SCORING ================= */
+function calculateScore(text: string, intent: Intent): number {
   let score = 0;
 
-  for (const keyword of intent.keywords) {
-    if (includesFlexible(text, keyword)) {
-      score += 1; // 🔥 stronger weight
+  // phrase match (strong)
+  for (const kw of intent.keywords) {
+    if (phraseMatch(text, kw)) {
+      score += 0.6;
     }
   }
 
-  // 🔥 Normalize smarter (not over-diluted)
-  if (intent.keywords.length) {
-    score = score / Math.min(intent.keywords.length, 3);
-  }
-
-  // 🔥 Service boost (fixed)
-  if (intent.type === "service" && detectedServices.length) {
-    for (const service of detectedServices) {
-      if (text.includes(service.toLowerCase())) {
-        score += 0.3;
-      }
-    }
-  }
+  // token overlap (soft)
+  score += tokenOverlapScore(text, intent.keywords) * 0.5;
 
   return Math.min(score, 1);
 }
 
-/* ======================= DETECT INTENT ======================= */
+/* ================= STRONG SIGNAL BOOST ================= */
+function applyStrongSignals(
+  text: string,
+  results: { intent: Intent; score: number }[]
+) {
+  const boost = (
+    signals: string[],
+    type: Intent["type"],
+    value: number
+  ) => {
+    for (const phrase of signals) {
+      if (phraseMatch(text, phrase)) {
+        results.push({
+          intent: {
+            name: `${type}_signal`,
+            category: type,
+            type,
+            keywords: [phrase],
+            description: `Strong ${type}`,
+          },
+          score: value,
+        });
+      }
+    }
+  };
+
+  boost(STRONG_BUYING_SIGNALS, "buying", 0.95);
+  boost(STRONG_PROBLEM_SIGNALS, "problem", 0.85);
+  boost(STRONG_GOAL_SIGNALS, "goal", 0.75);
+}
+
+/* ================= CLEAN + PRIORITIZE ================= */
+function cleanResults(results: { intent: Intent; score: number }[]) {
+  const map = new Map<string, { intent: Intent; score: number }>();
+
+  for (const r of results) {
+    const existing = map.get(r.intent.name);
+    if (!existing || existing.score < r.score) {
+      map.set(r.intent.name, r);
+    }
+  }
+
+  return Array.from(map.values())
+    .sort((a, b) => {
+      const pDiff =
+        TYPE_PRIORITY[b.intent.type] - TYPE_PRIORITY[a.intent.type];
+
+      if (pDiff !== 0) return pDiff;
+
+      return b.score - a.score;
+    });
+}
+
+/* ================= DETECT INTENT ================= */
 export function detectIntent(
   message: string,
   detectedServices: string[] = [],
@@ -132,78 +181,46 @@ export function detectIntent(
 
   const text = normalize(message);
 
-  /* 🔥 HARD SHORT MESSAGE FIX */
-  if (text.length <= 3) {
+  if (!text) {
     return [
       {
-        intent: intents[0], // greeting
+        intent: intents[0],
         score: 0.9,
       },
     ];
   }
 
-  const results: { intent: Intent; score: number }[] = [];
+  let results: { intent: Intent; score: number }[] = [];
 
-  /* ================= BASE DETECTION ================= */
+  // base scoring
   for (const intent of intents) {
-    const score = calculateIntentScore(text, intent, detectedServices);
-    if (score > 0.2) {
+    const score = calculateScore(text, intent);
+    if (score > 0.25) {
       results.push({ intent, score });
     }
   }
 
-  /* ================= STRONG SIGNAL BOOST ================= */
-  const applyBoost = (
-    signals: string[],
-    type: "buying" | "goal" | "problem",
-    boost: number
-  ) => {
-    for (const phrase of signals) {
-      if (includesFlexible(text, phrase)) {
-        const match = results.find((r) => r.intent.type === type);
+  // strong signals
+  applyStrongSignals(text, results);
 
-        if (match) {
-          match.score = Math.min(match.score + boost, 1);
-        } else {
-          results.push({
-            intent: {
-              name: `${type}_signal`,
-              category: type,
-              type,
-              keywords: [phrase],
-              description: `Strong ${type} signal`,
-            },
-            score: boost,
-          });
-        }
-      }
-    }
-  };
+  // clean + prioritize
+  let final = cleanResults(results);
 
-  applyBoost(STRONG_BUYING_SIGNALS, "buying", 0.7);
-  applyBoost(STRONG_GOAL_SIGNALS, "goal", 0.5);
-  applyBoost(PROBLEM_SIGNALS, "problem", 0.6);
+  // 🔥 CRITICAL FIX: suppress weak service intents
+  const hasStrongNonService = final.some(
+    (r) => r.intent.type === "buying" || r.intent.type === "problem"
+  );
 
-  /* ================= CLEAN + SORT ================= */
-  const unique = new Map<string, { intent: Intent; score: number }>();
-
-  for (const r of results) {
-    const key = r.intent.name;
-    if (!unique.has(key) || unique.get(key)!.score < r.score) {
-      unique.set(key, r);
-    }
+  if (hasStrongNonService) {
+    final = final.filter((r) => r.intent.type !== "service");
   }
 
-  const finalResults = Array.from(unique.values())
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topN);
-
-  /* ================= FALLBACK FIX ================= */
-  if (finalResults.length === 0) {
+  // fallback
+  if (final.length === 0) {
     return [
       {
         intent: {
-          name: "general_fallback",
+          name: "general",
           category: "general",
           type: "general",
           keywords: [],
@@ -214,10 +231,10 @@ export function detectIntent(
     ];
   }
 
-  return finalResults;
+  return final.slice(0, topN);
 }
 
-/* ======================= RELEVANT INTENTS ======================= */
+/* ================= PUBLIC ================= */
 export function getRelevantIntents(
   message: string,
   detectedServices: string[] = [],

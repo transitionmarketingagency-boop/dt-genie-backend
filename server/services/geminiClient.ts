@@ -1,38 +1,30 @@
-// server/services/geminiClient.ts
-
-import { fileURLToPath, pathToFileURL } from "url";
+import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import * as dotenv from "dotenv";
 import { strategicBrain } from "./strategicBrain.js";
 import crypto from "crypto";
 
-/* ---------------- ESM PATHS ---------------- */
+/* ================= PATH ================= */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-/* ---------------- ENV ---------------- */
+/* ================= ENV ================= */
 dotenv.config({ path: join(__dirname, "../../.env") });
 
-/* ---------------- CONFIG ---------------- */
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
 const TIMEOUT = 12000;
 
-/* ---------------- IDENTITY ---------------- */
-const identityUrl = pathToFileURL(join(__dirname, "../system/identity.js")).href;
-const { BOT_NAME } = await import(identityUrl);
+const BOT_NAME = "DT Genie";
 
-/* ---------------- CACHE ---------------- */
-const recentCache: Map<string, string> = new Map();
+/* ================= CACHE ================= */
+const cache = new Map<string, string>();
 
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-/* ---------------- TYPES ---------------- */
-type SafeLeadScore = number | { total?: number } | undefined;
-
-/* ---------------- PROMPT CLEAN ---------------- */
+/* ================= CLEAN PROMPT ================= */
 function cleanPrompt(prompt: string) {
   return (
     prompt
@@ -43,40 +35,24 @@ function cleanPrompt(prompt: string) {
   );
 }
 
-/* ---------------- VALIDATION ---------------- */
+/* ================= VALIDATION ================= */
 function isValidResponse(text: string | null | undefined): text is string {
-  if (!text || text.length < 30) return false;
+  if (!text || text.length < 40) return false;
 
-  const lower = text.toLowerCase();
+  const t = text.toLowerCase();
 
-  return ![
+  const badPatterns = [
     "```",
-    "<|",
-    "|>",
     "assistant:",
     "system:",
     "undefined",
-    "null",
     "error",
-  ].some((s) => lower.includes(s));
-}
+    "<|",
+  ];
 
-function isFakeDelay(text: string): boolean {
-  const t = text.toLowerCase();
-  return [
-    "temporary delay",
-    "slight delay",
-    "having trouble",
-    "try again shortly",
-  ].some((s) => t.includes(s));
-}
+  if (badPatterns.some((p) => t.includes(p))) return false;
 
-function containsNonEnglish(text: string): boolean {
-  return /[^\x00-\x7F]/.test(text);
-}
-
-function ensureComplete(text: string): string {
-  return /[.!?]$/.test(text) ? text : text + ".";
+  return true;
 }
 
 function fixSpacing(text: string): string {
@@ -86,17 +62,11 @@ function fixSpacing(text: string): string {
     .trim();
 }
 
-function cleanResponse(text: string) {
-  return (
-    text
-      ?.replace(/assistant:|system:/gi, "")
-      .replace(/```[\s\S]*?```/g, "")
-      .replace(/\s+/g, " ")
-      .trim() || ""
-  );
+function ensureComplete(text: string): string {
+  return /[.!?]$/.test(text) ? text : text + ".";
 }
 
-/* ---------------- INTENT ---------------- */
+/* ================= INTENT ================= */
 function detectHighIntent(prompt: string): boolean {
   const text = prompt.toLowerCase();
   return [
@@ -110,16 +80,7 @@ function detectHighIntent(prompt: string): boolean {
   ].some((s) => text.includes(s));
 }
 
-/* ---------------- SAFE SCORE ---------------- */
-function extractScore(score: SafeLeadScore): number {
-  if (typeof score === "number") return score;
-  if (typeof score === "object" && score !== null && "total" in score) {
-    return typeof score.total === "number" ? score.total : 0;
-  }
-  return 0;
-}
-
-/* ---------------- MAIN FUNCTION ---------------- */
+/* ================= MAIN ================= */
 export async function generateGemini(
   prompt: string,
   sessionId?: string
@@ -128,12 +89,10 @@ export async function generateGemini(
   if (!API_KEY) return null;
 
   prompt = cleanPrompt(prompt);
+
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
+  if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
-  /* ---------- CACHE ---------- */
-  if (recentCache.has(cacheKey)) return recentCache.get(cacheKey)!;
-
-  /* ---------- CONTEXT ---------- */
   let contextText = "";
 
   if (sessionId) {
@@ -143,46 +102,36 @@ export async function generateGemini(
         sessionId
       );
 
-      const stage = brainContext?.stage || "unknown";
-      const score = extractScore(brainContext?.leadScore);
-
-      contextText = `Context: stage=${stage}, score=${score.toFixed(2)}.`;
-    } catch (err) {
-      console.warn("[Gemini context failed]", err);
-    }
+      contextText = `Stage: ${brainContext?.stage || "unknown"} | LeadScore: ${
+        brainContext?.leadScore || 0
+      }`;
+    } catch {}
   }
 
   const highIntent = detectHighIntent(prompt);
 
-  /* ---------- FINAL PROMPT ---------- */
   const finalPrompt = `
-You are ${BOT_NAME}, AI strategist for Digital Transition Marketing.
-
-Your job:
-Give clear, specific, and practical marketing advice.
+You are ${BOT_NAME}, a strategic marketing assistant.
 
 Rules:
-- Answer exactly what the user asked
-- Be concise but complete
-- Avoid generic responses
-- No fluff or filler
-- No system talk
-- No broken sentences
+- Be precise and practical
+- Avoid fluff
+- No repetition
+- Give actionable answers only
 
+Context:
 ${contextText}
 
 User:
 ${prompt}
 
-Response:
+Answer:
 `.trim();
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
 
   try {
-    console.log(`⚡ Gemini call (highIntent=${highIntent})`);
-
     const res = await fetch(`${ENDPOINT}?key=${API_KEY}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -200,8 +149,7 @@ Response:
     clearTimeout(timeout);
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("[Gemini HTTP Error]", res.status, errText);
+      console.error("[Gemini HTTP Error]", res.status);
       return null;
     }
 
@@ -210,46 +158,20 @@ Response:
     const raw =
       data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
 
-    if (!raw) {
-      console.warn("[Gemini] Empty response structure", data);
-      return null;
-    }
+    if (!isValidResponse(raw)) return null;
 
-    let content = cleanResponse(raw);
-
-    /* ---------- VALIDATION ---------- */
-    if (
-      !isValidResponse(content) ||
-      isFakeDelay(content) ||
-      containsNonEnglish(content)
-    ) {
-      console.warn("[Gemini] Rejected response:", content);
-      return null;
-    }
-
-    content = fixSpacing(content);
+    let content = fixSpacing(raw);
     content = ensureComplete(content);
 
-    /* ---------- CACHE ---------- */
-    if (content.length > 40) {
-      recentCache.set(cacheKey, content);
-    }
+    cache.set(cacheKey, content);
 
-    console.log("✅ Gemini success");
     return content;
-
   } catch (err: any) {
     clearTimeout(timeout);
-
-    if (err.name === "AbortError") {
-      console.warn("⚠️ Gemini timeout");
-    } else {
-      console.warn("⚠️ Gemini failed:", err?.message || err);
-    }
-
-    return null; // 🔥 CRITICAL FIX
+    console.warn("[Gemini Error]", err?.message || err);
+    return null;
   }
 }
 
-/* ---------------- EXPORT ---------------- */
+/* ================= EXPORT ================= */
 export const geminiClient = generateGemini;

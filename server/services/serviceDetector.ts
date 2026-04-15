@@ -1,4 +1,6 @@
-import { hybridResponseService } from "./hybridResponseService.js";
+/* =====================================================
+   SERVICE DETECTOR — FINAL PRODUCTION STABLE
+===================================================== */
 
 export type DetectedIntent = {
   type:
@@ -10,15 +12,13 @@ export type DetectedIntent = {
     | "marketing_goal"
     | "problem"
     | "industry"
-    | "general"
-    | "redirect";
+    | "general";
   value: string;
   confidence: number;
 };
 
 /* ================= NORMALIZATION ================= */
-function normalize(text: string | undefined | null): string {
-  if (!text) return "";
+function normalize(text: string = ""): string {
   return text
     .toLowerCase()
     .replace(/[^\w\s]/g, " ")
@@ -30,19 +30,19 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/* ================= SMART MATCH ================= */
+/* ================= KEYWORD MATCH ================= */
 function matchKeyword(text: string, keyword: string): number {
   const normalizedText = normalize(text);
   const kw = normalize(keyword);
+
   if (!kw) return 0;
 
   const exactRegex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
   if (exactRegex.test(normalizedText)) return 1;
 
   const words = kw.split(" ").filter(Boolean);
-  if (!words.length) return 0;
-
   let hits = 0;
+
   for (const w of words) {
     if (normalizedText.includes(w)) hits++;
   }
@@ -52,43 +52,150 @@ function matchKeyword(text: string, keyword: string): number {
 
 /* ================= SERVICES CONFIG ================= */
 const services: Record<string, { keywords: string[]; weight: number }> = {
-  voice_search: { keywords: ["voice search", "position zero", "featured snippets", "alexa", "siri"], weight: 1 },
-  email_marketing: { keywords: ["email marketing", "klaviyo", "email automation", "cold email"], weight: 1 },
-  youtube_ads: { keywords: ["youtube ads", "video marketing", "youtube campaigns"], weight: 1 },
-  website_design: { keywords: ["website design", "shopify", "woocommerce", "web development"], weight: 1 },
-  virtual_tours: { keywords: ["virtual tours", "360 tours", "cgi tours", "real estate renders"], weight: 1 },
-  performance_marketing: { keywords: ["ppc", "performance marketing", "ads", "increase roas", "lower cac"], weight: 1.2 },
-  ai_automation: { keywords: ["ai agents", "automation", "crm automation", "workflow"], weight: 1 },
-  cgi_marketing: { keywords: ["cgi", "3d ads", "cgi ads", "product renders"], weight: 1.1 },
-  video_audio: { keywords: ["video production", "audio production", "editing"], weight: 1 },
-  content_marketing: { keywords: ["content marketing", "copywriting", "blogs"], weight: 1 },
-  social_media: { keywords: ["instagram", "tiktok", "linkedin marketing"], weight: 1 },
-  geo_ai_seo: { keywords: ["geo", "ai seo", "chatgpt ranking", "gemini ranking"], weight: 1 },
-  predictive_analytics: { keywords: ["analytics", "forecasting", "data insights"], weight: 1 },
+  ai_automation: {
+    keywords: [
+      "ai automation",
+      "ai agents",
+      "workflow automation",
+      "crm automation",
+      "chatbot automation",
+      "lead automation",
+    ],
+    weight: 1.2,
+  },
+
+  performance_marketing: {
+    keywords: [
+      "ppc",
+      "ads",
+      "performance marketing",
+      "facebook ads",
+      "google ads",
+      "increase roas",
+      "lower cac",
+    ],
+    weight: 1.3,
+  },
+
+  content_marketing: {
+    keywords: [
+      "content marketing",
+      "copywriting",
+      "blogs",
+      "lead magnets",
+      "seo content",
+    ],
+    weight: 1,
+  },
+
+  social_media: {
+    keywords: [
+      "instagram",
+      "tiktok",
+      "linkedin",
+      "social media",
+      "grow followers",
+    ],
+    weight: 1,
+  },
+
+  website_design: {
+    keywords: [
+      "website",
+      "web design",
+      "shopify",
+      "woocommerce",
+      "landing page",
+      "conversion website",
+    ],
+    weight: 1,
+  },
+
+  email_marketing: {
+    keywords: [
+      "email marketing",
+      "email automation",
+      "klaviyo",
+      "newsletter",
+      "cold email",
+    ],
+    weight: 1,
+  },
+
+  cgi_marketing: {
+    keywords: [
+      "cgi",
+      "3d ads",
+      "product render",
+      "visual ads",
+      "3d marketing",
+    ],
+    weight: 1.1,
+  },
+
+  video_audio: {
+    keywords: [
+      "video editing",
+      "video production",
+      "audio production",
+      "reels",
+      "youtube content",
+    ],
+    weight: 1,
+  },
+
+  seo_geo: {
+    keywords: [
+      "seo",
+      "ai seo",
+      "geo",
+      "chatgpt ranking",
+      "gemini ranking",
+      "search ranking",
+    ],
+    weight: 1,
+  },
+
+  virtual_tours: {
+    keywords: [
+      "virtual tours",
+      "360 tours",
+      "real estate tours",
+      "3d tours",
+    ],
+    weight: 1,
+  },
+
+  predictive_analytics: {
+    keywords: [
+      "analytics",
+      "data insights",
+      "forecasting",
+      "prediction",
+    ],
+    weight: 1,
+  },
 };
 
 /* ================= PROBLEM SIGNALS ================= */
 const problemSignals = [
   "low roas",
-  "bad roas",
   "no sales",
   "low conversion",
   "ads not working",
-  "not getting results",
+  "bad results",
   "traffic but no sales",
 ];
 
-/* ================= GENERIC INTENTS ================= */
-const leadIntent = ["generate leads", "get more clients", "more customers"];
-const pricingIntent = ["price", "pricing", "cost", "how much"];
-const consultationIntent = ["book call", "schedule call", "consultation", "audit"];
-const marketingGoals = ["increase traffic", "grow brand", "more sales", "scale"];
-const industries = ["real estate", "ecommerce", "saas", "travel"];
+/* ================= GENERIC ================= */
+const leadIntent = ["get more clients", "generate leads"];
+const pricingIntent = ["price", "cost", "pricing"];
+const consultationIntent = ["book call", "schedule call"];
+const marketingGoals = ["grow business", "increase sales", "scale"];
 
 /* ================= SERVICE SCORING ================= */
 export async function detectServiceScores(
-  text: string,
-  sessionId?: string
+  text: string
 ): Promise<Record<string, number>> {
   const scores: Record<string, number> = {};
 
@@ -99,22 +206,10 @@ export async function detectServiceScores(
       score += matchKeyword(text, kw);
     }
 
-    score = config.keywords.length
-      ? (score / config.keywords.length) * config.weight
-      : 0;
-
-    // hybrid boost
-    if (hybridResponseService?.detectServices) {
-      try {
-        const detected = await hybridResponseService.detectServices(text);
-
-        if (detected?.includes(service)) {
-          score = Math.max(score, 0.9);
-        }
-      } catch {
-        // silent fail
-      }
-    }
+    score =
+      config.keywords.length > 0
+        ? (score / config.keywords.length) * config.weight
+        : 0;
 
     if (score > 0.2) {
       scores[service] = Math.min(score, 1);
@@ -126,60 +221,47 @@ export async function detectServiceScores(
 
 /* ================= MAIN DETECTOR ================= */
 export async function detectIntents(
-  message: string,
-  sessionId?: string
+  message: string
 ): Promise<DetectedIntent[]> {
   const text = normalize(message);
   const results: DetectedIntent[] = [];
-  const added = new Set<string>();
 
-  /* ---------- PROBLEM DETECTION ---------- */
+  /* PROBLEMS */
   for (const p of problemSignals) {
     if (text.includes(normalize(p))) {
       results.push({ type: "problem", value: p, confidence: 0.9 });
-      added.add(p);
     }
   }
 
-  /* ---------- SERVICE DETECTION ---------- */
-  const serviceScores = await detectServiceScores(text, sessionId);
+  /* SERVICES */
+  const serviceScores = await detectServiceScores(text);
 
-  const sortedServices = Object.entries(serviceScores).sort(
-    (a, b) => b[1] - a[1]
-  );
-
-  for (const [service, score] of sortedServices) {
-    if (!added.has(service)) {
-      results.push({
-        type: "service",
-        value: service,
-        confidence: Number(score.toFixed(2)),
-      });
-      added.add(service);
-    }
+  for (const [service, score] of Object.entries(serviceScores)) {
+    results.push({
+      type: "service",
+      value: service,
+      confidence: Number(score.toFixed(2)),
+    });
   }
 
-  /* ---------- GENERIC INTENTS ---------- */
-  const addIntent = (
-    kws: string[],
+  /* GENERIC */
+  const pushIfMatch = (
+    list: string[],
     type: DetectedIntent["type"],
     conf: number
   ) => {
-    for (const kw of kws) {
-      if (matchKeyword(text, kw) > 0.7 && !added.has(kw)) {
+    for (const kw of list) {
+      if (matchKeyword(text, kw) > 0.7) {
         results.push({ type, value: kw, confidence: conf });
-        added.add(kw);
       }
     }
   };
 
-  addIntent(leadIntent, "lead", 0.8);
-  addIntent(pricingIntent, "pricing", 0.85);
-  addIntent(consultationIntent, "consultation", 0.9);
-  addIntent(marketingGoals, "marketing_goal", 0.75);
-  addIntent(industries, "industry", 0.7);
+  pushIfMatch(leadIntent, "lead", 0.8);
+  pushIfMatch(pricingIntent, "pricing", 0.85);
+  pushIfMatch(consultationIntent, "consultation", 0.9);
+  pushIfMatch(marketingGoals, "marketing_goal", 0.75);
 
-  /* ---------- FALLBACK ---------- */
   if (!results.length) {
     results.push({
       type: "general",
@@ -191,21 +273,21 @@ export async function detectIntents(
   return results.sort((a, b) => b.confidence - a.confidence);
 }
 
-/* ================= HELPERS ================= */
-export async function detectService(
-  message: string,
-  sessionId?: string
-): Promise<string | null> {
-  const services = await detectMultipleServices(message, sessionId);
-  return services.length ? services[0] : null;
-}
+/* ================= EXPORTS (CRITICAL FIX) ================= */
 
+// ✅ REQUIRED by bookingFlow + other scripts
 export async function detectMultipleServices(
-  message: string,
-  sessionId?: string
+  message: string
 ): Promise<string[]> {
-  const intents = await detectIntents(message, sessionId);
+  const intents = await detectIntents(message);
   return intents
     .filter((i) => i.type === "service")
     .map((i) => i.value);
+}
+
+// ✅ REQUIRED by generateHybridResponse
+export async function detectService(
+  message: string
+): Promise<string[]> {
+  return detectMultipleServices(message);
 }

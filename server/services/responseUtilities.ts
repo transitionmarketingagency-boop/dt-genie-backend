@@ -1,7 +1,6 @@
-// server/services/responseUtilities.ts
-
 export const MAX_CONTEXT_CHARS = 1400;
 
+/* ================= CONTEXT COMPRESSION ================= */
 export function compressContext(
   chunks: any[],
   maxLength: number = 320
@@ -27,6 +26,7 @@ export function compressContext(
     .slice(0, MAX_CONTEXT_CHARS);
 }
 
+/* ================= RESPONSE COMPRESSION ================= */
 export function compressResponse(text: string): string {
   if (typeof text !== "string") return "";
   if (text.length < 1200) return text;
@@ -35,21 +35,23 @@ export function compressResponse(text: string): string {
   if (!sentences) return text;
 
   let selected = sentences.slice(0, 6).join(" ").trim();
+
   if (!/[.!?]$/.test(selected)) selected += ".";
 
   return selected;
 }
 
+/* ================= TOOL SANITIZATION ================= */
 export function sanitizeTools(text: string): string {
   if (typeof text !== "string") return "";
 
   const toolMap: Record<string, string> = {
-    Creatify: "advanced AI content systems",
-    Wisepops: "AI marketing automation tools",
+    Creatify: "AI content systems",
+    Wisepops: "AI marketing tools",
     "AdCreative.ai": "AI ad optimization systems",
     "AIclicks.io": "AI performance tracking tools",
-    OpenAI: "proprietary AI systems",
-    Midjourney: "proprietary AI systems",
+    OpenAI: "AI systems",
+    Midjourney: "AI visual systems",
   };
 
   let cleaned = text;
@@ -61,6 +63,7 @@ export function sanitizeTools(text: string): string {
   return cleaned;
 }
 
+/* ================= REMOVE CONTACT INFO ================= */
 export function removeContactInfo(text: string): string {
   if (typeof text !== "string") return "";
 
@@ -74,6 +77,7 @@ export function removeContactInfo(text: string): string {
     );
 }
 
+/* ================= MAIN CLEANER (STANDARDIZED) ================= */
 export function cleanHybridResponse(text: string): string {
   if (typeof text !== "string") return "";
 
@@ -81,9 +85,12 @@ export function cleanHybridResponse(text: string): string {
   cleaned = removeContactInfo(cleaned);
   cleaned = cleaned.replace(/\s+/g, " ").trim();
 
+  if (cleaned.length < 25) return "";
+
   return cleaned;
 }
 
+/* ================= QUALITY CHECKS ================= */
 export function isLowQuality(text: string): boolean {
   if (typeof text !== "string") return true;
 
@@ -111,7 +118,5 @@ export function looksIncomplete(text: string): boolean {
     return true;
   }
 
-  if (!/[a-zA-Z]/.test(trimmed)) return true;
-
-  return false;
+  return !/[a-zA-Z]/.test(trimmed);
 }

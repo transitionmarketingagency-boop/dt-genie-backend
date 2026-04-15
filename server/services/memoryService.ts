@@ -50,8 +50,10 @@ function isContextShift(message: string): boolean {
 
 function safeParse<T>(value: unknown, fallback: T): T {
   if (!value || typeof value !== "string") return fallback;
+
   try {
-    return JSON.parse(value) as T;
+    const parsed = JSON.parse(value);
+    return parsed ?? fallback;
   } catch {
     return fallback;
   }
@@ -66,7 +68,6 @@ export interface StrategicMemory {
   leadScore?: number;
   stage?: string;
 
-  // 🔥 REQUIRED BY leadIntelligence
   budget?: number;
   timeline?: string;
   decisionMaker?: string;
@@ -79,6 +80,11 @@ export interface StrategicMemory {
   updatedAt?: string;
   lastInteraction?: number;
   isStale?: boolean;
+
+  /* ================= PHASE 2 ADDITIONS ================= */
+  conversionProbability?: number;   // NEW
+  ctaReadiness?: number;            // NEW
+  intentMomentum?: number;          // NEW
 
   bantSignals?: {
     budget?: number;
@@ -277,17 +283,40 @@ export class MemoryService {
   async updateStrategicMemory(sessionId: string, data: Partial<StrategicMemory>) {
     const db = await this.db;
     const existing = await this.getStrategicMemory(sessionId);
+const enriched: StrategicMemory = {
+  ...existing,
+  ...data,
+  updatedAt: new Date().toISOString(),
+  lastInteraction: Date.now(),
 
-    if (data.lastUserProblem && isContextShift(data.lastUserProblem)) {
-      await db.run(`DELETE FROM strategic_memory WHERE sessionId=?`, sessionId);
-    }
+  /* ================= PHASE 2 AUTO SIGNALS ================= */
+  conversionProbability:
+    data.leadScore
+      ? Math.min(1, (data.leadScore / 100) + 0.1)
+      : existing.conversionProbability ?? 0,
 
-    const merged: StrategicMemory = {
-      ...existing,
-      ...data,
-      updatedAt: new Date().toISOString(),
-      lastInteraction: Date.now(),
-    };
+  ctaReadiness:
+    data.stage === "decision"
+      ? 0.9
+      : data.stage === "consideration"
+      ? 0.6
+      : 0.3,
+
+  intentMomentum:
+    Array.isArray(data.servicesDiscussed)
+      ? Math.min(1, (data.servicesDiscussed.length || 0) * 0.15)
+      : existing.intentMomentum ?? 0,
+};
+
+if (
+  data.lastUserProblem &&
+  isContextShift(data.lastUserProblem) &&
+  !existing?.businessType // prevent accidental wipes after setup
+) {
+  await db.run(`DELETE FROM strategic_memory WHERE sessionId=?`, sessionId);
+}
+
+const merged: StrategicMemory = enriched;
 
     await db.run(
       `INSERT INTO strategic_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

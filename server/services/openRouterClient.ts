@@ -1,5 +1,3 @@
-// server/services/openRouterClient.ts
-
 import { cleanResponse } from "../utils/cleanResponse.js";
 import crypto from "crypto";
 
@@ -18,7 +16,7 @@ function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
 }
 
-/* ================= HELPERS ================= */
+/* ================= PROMPT CLEAN ================= */
 function cleanPrompt(prompt: string): string {
   return (
     prompt
@@ -29,21 +27,22 @@ function cleanPrompt(prompt: string): string {
   );
 }
 
-/* ================= RESPONSE VALIDATION ================= */
-function isComplete(text: string | null | undefined): text is string {
+/* ================= VALIDATION ================= */
+function isValidResponse(text: string | null | undefined): text is string {
   if (!text) return false;
 
   const t = text.trim();
 
   if (t.length < 80) return false;
-  if (!/[.?!]$/.test(t)) return false;
+  if (t.split(" ").length < 12) return false;
   if (t.includes("undefined")) return false;
   if (t.includes("Something broke")) return false;
-  if (t.split(" ").length < 12) return false;
+  if (!/[.?!]$/.test(t)) return false;
 
   return true;
 }
 
+/* ================= FINAL NORMALIZER ================= */
 function finalize(text: string): string {
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -70,22 +69,15 @@ async function callOpenRouter(
         model: MODEL,
         temperature,
         max_tokens: 1400,
-        messages: [
-          {
-            role: "user",
-            content: prompt,
-          },
-        ],
+        messages: [{ role: "user", content: prompt }],
       }),
       signal: controller.signal,
     });
 
     clearTimeout(timeout);
 
-    /* 🔥 HANDLE HTTP ERRORS */
     if (!res.ok) {
-      const errText = await res.text();
-      console.error("[OpenRouter HTTP Error]", res.status, errText);
+      console.error("[OpenRouter HTTP Error]", res.status);
       return null;
     }
 
@@ -96,18 +88,18 @@ async function callOpenRouter(
       data?.choices?.[0]?.text ||
       null;
 
-    if (!raw) {
-      console.warn("[OpenRouter] Empty response structure", data);
-      return null;
-    }
+    if (!raw) return null;
 
     return cleanResponse(raw);
   } catch (err: any) {
-    if (err.name === "AbortError") {
-      console.warn("[OpenRouter] Request timed out");
+    clearTimeout(timeout);
+
+    if (err?.name === "AbortError") {
+      console.warn("[OpenRouter] Timeout");
     } else {
-      console.error("[OpenRouter] Fetch failed:", err);
+      console.error("[OpenRouter] Error:", err);
     }
+
     return null;
   }
 }
@@ -124,48 +116,38 @@ export async function generateOpenRouter(
   prompt = cleanPrompt(prompt);
 
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
-
-  if (cache.has(cacheKey)) {
-    return cache.get(cacheKey)!;
-  }
+  if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
   let attempt = 0;
   let response: string | null = null;
 
   while (attempt < MAX_RETRIES && !response) {
-    try {
-      /* ================= PRIMARY ================= */
-      const raw = await callOpenRouter(prompt, 0.5);
+    const base = await callOpenRouter(prompt, 0.55);
 
-      if (isComplete(raw)) {
-        response = finalize(raw);
-        break;
-      }
+    if (isValidResponse(base)) {
+      response = finalize(base);
+      break;
+    }
 
-      /* ================= RETRY ================= */
-      const retryPrompt =
-        prompt +
-        "\n\nRespond clearly with complete sentences. Do not cut off.";
+    // retry with stronger instruction
+    const retryPrompt =
+      prompt +
+      "\n\nIMPORTANT: Respond in complete structured sentences. No cutoff.";
 
-      const retry = await callOpenRouter(retryPrompt, 0.6);
+    const retry = await callOpenRouter(retryPrompt, 0.65);
 
-      if (isComplete(retry)) {
-        response = finalize(retry);
-        break;
-      }
-    } catch (err) {
-      console.warn(`[OpenRouter attempt ${attempt + 1} failed]`, err);
+    if (isValidResponse(retry)) {
+      response = finalize(retry);
+      break;
     }
 
     attempt++;
   }
 
-  /* ================= CACHE ONLY VALID ================= */
   if (response) {
     cache.set(cacheKey, response);
     return response;
   }
 
-  /* ❌ LET CALLER HANDLE FAILURE (CRITICAL DESIGN) */
   return null;
 }

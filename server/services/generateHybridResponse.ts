@@ -1,4 +1,5 @@
 // ===================== IMPORTS ===================== //
+
 // Core AI services
 import { getFusedChunks } from "./intentVectorFusion.js";
 import { generateOpenRouter } from "./openRouterClient.js";
@@ -8,6 +9,38 @@ import { memoryService } from "./memoryService.js";
 // System utilities
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
 import { cleanResponse } from "../utils/cleanResponse.js";
+
+
+// ===================== PHASE 2 OPTIMIZER (SAFE LOADER) ===================== //
+
+type ProcessResponseFn = (text: string) => {
+  optimized: string;
+  quality?: any;
+};
+
+let processResponse: ProcessResponseFn | null = null;
+
+async function loadOptimizer(): Promise<ProcessResponseFn | null> {
+  if (processResponse) return processResponse;
+
+  try {
+    // ✅ FIXED: correct NodeNext relative path from server/services → root
+    const mod: any = await import("../../responseOptimizer.js");
+
+    const fn = mod?.processResponse;
+
+    if (typeof fn === "function") {
+      processResponse = fn;
+      return processResponse;
+    }
+
+    processResponse = null;
+    return null;
+  } catch (err) {
+    processResponse = null;
+    return null;
+  }
+}
 
 // Intent & Service detection
 import { detectIntent } from "./intentManager.js";
@@ -22,11 +55,19 @@ import { shouldTriggerBooking } from "./bookingTrigger.js";
 // Modular helpers
 import { detectBookingRejection, shouldIncludeCTA } from "./responseDecision.js";
 import { compressContext } from "./responseUtilities.js";
-import { GEMINI_ENABLED, canUseGemini, markGeminiUsed } from "./geminiManager.js";
+import {
+  GEMINI_ENABLED,
+  canUseGemini,
+  markGeminiUsed,
+} from "./geminiManager.js";
 import { withTimeout } from "./timeoutHelper.js";
 
+// AI / reasoning layer
 import { neuralBrain } from "./neuralBrain.js";
-import { normalizeLeadScore, determineExecutionMode } from "./leadScoreHelper.js";
+import {
+  normalizeLeadScore,
+  determineExecutionMode,
+} from "./leadScoreHelper.js";
 
 
 // ===================== TYPES ===================== //
@@ -46,22 +87,9 @@ export interface BrainContext {
   isFresh?: boolean;
 }
 
-// ===================== UTILITY HELPERS ===================== //
-function isLowQuality(text: string): boolean {
-  if (!text) return true;
-  return text.split(" ").length < 3 || text.trim().length < 20;
-}
 
-function looksIncomplete(text: string): boolean {
-  if (!text) return true;
-  return !/[.?!]$/.test(text.trim());
-}
+// ===================== SAFE HELPERS ===================== //
 
-function compressResponse(text: string): string {
-  return text.length > 1200 ? text.slice(0, 1200) + "..." : text;
-}
-
-// ⚠️ FIX: safe fallback (prevents crash if import missing)
 function cleanHybridResponse(text: string): string {
   if (!text) return "";
   return typeof cleanResponse === "function"
@@ -69,7 +97,22 @@ function cleanHybridResponse(text: string): string {
     : text.trim();
 }
 
-// ===================== HYBRID PROMPT BUILDER ===================== //
+function removeForbiddenContent(text: string): string {
+  if (!text) return "";
+
+  return text
+    // ❌ remove emails
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i, "")
+    // ❌ remove links
+    .replace(/https?:\/\/\S+/gi, "")
+    // ❌ remove tool mentions
+    .replace(/\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot)\b/gi, "")
+    .trim();
+}
+
+
+// ===================== PROMPT BUILDER ===================== //
+
 export function buildHybridPrompt({
   brainContext,
   leadScoreValue,
@@ -85,121 +128,137 @@ export function buildHybridPrompt({
   historyText: string;
   message: string;
 }) {
-  const avoidQuestions =
-    Boolean(brainContext?.hasSufficientContext) && brainContext?.stage !== "discovery";
 
-  const hasVectorKnowledge = Boolean(vectorText && vectorText.trim().length > 50);
+  const hasVectorKnowledge =
+    Boolean(vectorText && vectorText.trim().length > 50);
 
-  const knownContext = `
-Known User Context:
-${historyText || "No prior context available."}
+  const executionMode = brainContext?.executionMode ?? "exploration";
+
+  return `
+You are an AI assistant representing Digital Transition Marketing.
+
+Your role is to provide accurate, grounded, and business-relevant answers.
+
+--------------------------------------------------
+
+CRITICAL RULES (STRICT)
+
+1. ONLY use the provided KNOWLEDGE when available
+2. DO NOT make up services, tools, data, or claims
+3. DO NOT mention tools, platforms, or software unless explicitly in knowledge
+4. DO NOT give contact details, emails, or external links
+5. DO NOT invent statistics, case studies, or numbers
+6. DO NOT act like a “guru” or “strategist personality”
+7. DO NOT ask repetitive or unnecessary questions
+
+If knowledge is missing:
+→ Give a safe, general answer WITHOUT fabricating details
+
+--------------------------------------------------
+
+BUSINESS CONTEXT
+
+Company: Digital Transition Marketing
+
+Focus Areas:
+- AI Automation
+- Marketing Systems
+- Lead Generation
+- Content & Growth Strategy
+- CGI & Real Estate Marketing
+
+--------------------------------------------------
+
+USER CONTEXT
+
+Stage: ${brainContext?.stage ?? "unknown"}
+Intent: ${detectedIntentNames?.join(", ") || "general"}
+Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
 
 Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
 Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
 
+--------------------------------------------------
+
+CONVERSATION HISTORY
+
+${historyText || "None"}
+
+--------------------------------------------------
+
+KNOWLEDGE (PRIMARY SOURCE)
+
+${hasVectorKnowledge ? vectorText : "NO DATA AVAILABLE"}
+
 IMPORTANT:
-- Do NOT repeat questions already answered
-- Move the conversation FORWARD with execution-focused thinking
-`.trim();
+- If KNOWLEDGE exists → BASE your answer on it
+- Do NOT ignore it
+- Do NOT override it with assumptions
 
-  return `
-You are ${BOT_NAME}, a senior AI growth strategist from Digital Transition Marketing.
+--------------------------------------------------
 
-You think like a top 1% consultant — not a chatbot.
+USER MESSAGE
 
-🔥 CORE OBJECTIVE
-Solve the user's REAL business problem using strategy, not generic advice.
-
-🚨 HARD RULES (NON-NEGOTIABLE)
-- NEVER give generic advice
-- NEVER repeat previous responses
-- NEVER ignore provided context
-- NEVER reset the conversation direction
-- NEVER hallucinate when knowledge is available
-
-- ALWAYS:
-  → Use provided KNOWLEDGE FIRST (vector data is priority source)
-  → Diagnose root problem precisely
-  → Give SPECIFIC, EXECUTABLE actions
-  → Tie everything to measurable outcomes (revenue, leads, ROAS)
-
-🧠 INTELLIGENCE MODE
-Execution Mode: ${brainContext?.executionMode ?? "exploration"}
-
-IF executionMode = "execution":
-- DO NOT ask unnecessary questions
-- Focus on direct implementation steps
-
-IF executionMode = "exploration":
-- Diagnose deeply
-- Ask MAX 1 high-value question ONLY if required
-
-${avoidQuestions ? "CRITICAL: DO NOT ASK ANY QUESTIONS." : ""}
-
-📊 USER CONTEXT
-Stage: ${brainContext?.stage ?? "discovery"}
-Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
-Intent: ${detectedIntentNames?.join(", ") || "general"}
-Services: ${brainContext?.detectedServices?.join(", ") || "adaptive"}
-
-Strategic Insight:
-${brainContext?.reasoning ?? "No prior insight"}
-
-User Maturity:
-${leadScoreValue > 0.6 ? "HIGH INTENT (ready to act)" : "EXPLORING"}
-
-🧩 KNOWN CONTEXT
-${knownContext}
-
-📚 KNOWLEDGE (PRIORITY SOURCE — DO NOT IGNORE)
-${hasVectorKnowledge ? vectorText : "NO VECTOR DATA AVAILABLE — use general reasoning only"}
-
-👤 USER MESSAGE
 ${message}
 
-🧠 THINKING RULES
-1. If KNOWLEDGE exists → ALWAYS prioritize it
-2. If knowledge is missing → use strategic reasoning
-3. Never mix both blindly
-4. Always stay grounded in provided data
+--------------------------------------------------
 
-✍️ RESPONSE STRUCTURE
-1. Identify the REAL problem (specific, not generic)
-2. Provide a CLEAR EXECUTABLE solution
-   - Steps
-   - Tactics
-   - Strategy tied to outcome
-3. Optional: ONE sharp follow-up question ONLY if needed
+RESPONSE RULES
 
-🎯 FINAL RULES
-- Be sharp, direct, and strategic
-- Sound like a real consultant, not an AI
-- Avoid fluff and repetition
-- Prefer depth over surface advice
-- If context exists → MOVE FORWARD, don’t reset
+- Be clear, direct, and practical
+- No fluff, no hype language
+- No fake frameworks
+- No unnecessary complexity
+- Keep it natural and human
+
+STRUCTURE:
+
+1. Direct answer to the question
+2. Short explanation (based on knowledge if available)
+3. Practical next step (only if useful)
+
+If executionMode = "execution":
+→ Give direct actionable steps
+→ Do NOT ask questions
+
+If executionMode = "exploration":
+→ You may ask ONE useful question if needed
+
+--------------------------------------------------
+
+FINAL CHECK BEFORE ANSWERING
+
+- Is this based on knowledge?
+- Did I avoid making things up?
+- Is this relevant to the user’s question?
+- Is this complete and not cut off?
+
+If not → fix before responding.
 `.trim();
 }
 
 
-// ===================== HYBRID EXECUTION =====================
+// ===================== HYBRID EXECUTION ===================== //
 
 function isGoodResponse(text: unknown): text is string {
   if (typeof text !== "string") return false;
 
   const clean = text.trim();
 
-  if (clean.length < 80) return false;
-  if (clean.split(" ").length < 12) return false;
-  if (!/[.?!]$/.test(clean)) return false;
+  if (clean.length < 60) return false;
+  if (clean.split(" ").length < 10) return false;
 
   const badPatterns = [
-    "you're trying to:",
+    "you're trying to",
+    "traffic conversions leads",
     "something broke",
     "undefined",
     "i am an ai",
     "i'm an ai",
-    "cannot process",
     "error occurred",
+    "@",
+    "http",
+    "www.",
   ];
 
   return !badPatterns.some((p) =>
@@ -213,9 +272,9 @@ function shouldResetContext(message: string): boolean {
     "i have",
     "my business",
     "we are",
-    "new idea",
-    "different business",
+    "new business",
     "starting a new",
+    "different business",
   ];
 
   const lower = message.toLowerCase();
@@ -231,12 +290,11 @@ function repairResponse(text: string): string {
     fixed += ".";
   }
 
-  fixed = fixed.replace(/\s+/g, " ").trim();
-
-  return fixed;
+  return fixed.replace(/\s+/g, " ").trim();
 }
 
-/* ===================== MAIN HYBRID EXECUTION ===================== */
+// ===================== MAIN EXECUTION ===================== //
+
 export async function executeHybridResponse({
   sessionId,
   message,
@@ -263,29 +321,28 @@ export async function executeHybridResponse({
   try {
     const msg = (message || "").trim().toLowerCase();
 
-    /* ================= ⚡ SMART GREETING ================= */
-    if (/^(hi|hello|hey|yo)\b/.test(msg) && !historyText?.length) {
-      const reply =
-        "Hey — what are you trying to improve right now: traffic, conversions, or leads?";
+    /* ================= SMART GREETING ================= */
+    if (
+      /^(hi|hello|hey|yo)\b/.test(msg) &&
+      (!historyText || historyText.length < 10)
+    ) {
+      const reply = "Hey — what do you want to improve right now?";
 
-      try {
-        await memoryService.addMessage(sessionId, "assistant", reply);
-      } catch {}
-
+      await memoryService.addMessage(sessionId, "assistant", reply);
       return reply;
     }
 
-    /* ================= HARD CONTEXT RESET ================= */
+    /* ================= CONTEXT RESET ================= */
     if (shouldResetContext(message || "")) {
       brainContext = {
-        ...(brainContext || {}),
+        ...brainContext,
         detectedServices: [],
         stage: "discovery",
         hasSufficientContext: false,
       };
     }
 
-    /* ================= 1. SERVICE DETECTION ================= */
+    /* ================= SERVICE DETECTION ================= */
     try {
       const detectedServices = await detectService(message);
 
@@ -296,14 +353,13 @@ export async function executeHybridResponse({
       brainContext.detectedServices = [];
     }
 
-    /* ================= 2. VECTOR CONTEXT ================= */
+    /* ================= VECTOR ================= */
     let fusedChunksText = "";
 
     try {
-      const chunks = await getFusedChunks(message, 3);
+      const chunks = await getFusedChunks(message, 4);
 
       fusedChunksText = (chunks || [])
-        .filter(Boolean)
         .map((c: any) => c?.text)
         .filter(Boolean)
         .join("\n\n");
@@ -311,7 +367,7 @@ export async function executeHybridResponse({
       fusedChunksText = "";
     }
 
-    /* ================= 3. BUILD PROMPT ================= */
+    /* ================= PROMPT ================= */
     const prompt = buildHybridPrompt({
       brainContext,
       leadScoreValue,
@@ -323,79 +379,75 @@ export async function executeHybridResponse({
 
     let response: string | null = null;
 
-    /* ================= 4. PRIMARY MODEL ================= */
+    /* ================= PRIMARY MODEL ================= */
     try {
-      const qwenResp = await withTimeout(
+      const result = await withTimeout(
         generateOpenRouter(prompt, sessionId),
-        18000
+        9000
       );
 
-      if (isGoodResponse(qwenResp)) {
-        response = qwenResp;
+      if (isGoodResponse(result)) {
+        response = result;
       }
     } catch {}
 
-    /* ================= 5. RETRY ================= */
-    if (!response) {
-      try {
-        const retryPrompt = `${prompt}
-
-IMPORTANT:
-- Give a complete response
-- Do NOT cut mid sentence
-- End with a full sentence`;
-
-        const retryResp = await withTimeout(
-          generateOpenRouter(retryPrompt, sessionId),
-          15000
-        );
-
-        if (isGoodResponse(retryResp)) {
-          response = retryResp;
-        }
-      } catch {}
-    }
-
-    /* ================= 6. GEMINI FALLBACK ================= */
+    /* ================= GEMINI FALLBACK ================= */
     if (!response && GEMINI_ENABLED && canUseGemini()) {
       try {
-        const geminiResp = await withTimeout(
+        const result = await withTimeout(
           generateGemini(prompt, sessionId),
-          12000
+          7000
         );
 
-        if (isGoodResponse(geminiResp)) {
-          response = geminiResp;
+        if (isGoodResponse(result)) {
+          response = result;
           markGeminiUsed?.();
         }
       } catch {}
     }
 
-    /* ================= 7. FINAL FALLBACK ================= */
+    /* ================= FINAL FALLBACK ================= */
     if (!response) {
-      response = `You're trying to improve something around "${message}".
-
-Let's fix this step-by-step:
-
-→ What is your biggest bottleneck right now?
-- Traffic
-- Conversions
-- Leads
-
-Answer that, and I’ll build a precise execution plan for you.`;
+      response = fusedChunksText
+        ? fusedChunksText.split("\n\n")[0]
+        : "I couldn’t find enough relevant data to give a precise answer. Can you clarify your goal a bit more?";
     }
 
-    /* ================= 8. CLEANING ================= */
-    response = cleanHybridResponse(response);
-    response = repairResponse(response);
 
-    if (forceNoQuestions) {
-      response = response.replace(/\?/g, ".");
+// ================= CLEANING =================
+response = cleanHybridResponse(response);
+response = repairResponse(response);
+
+
+// ================= PHASE 2 INTELLIGENCE LAYER =================
+try {
+  const optimizer = await loadOptimizer();
+
+  if (optimizer) {
+    const result = optimizer(response || "");
+
+    if (
+      result &&
+      typeof result === "object" &&
+      typeof result.optimized === "string"
+    ) {
+      response = result.optimized;
     }
+  }
+} catch (err) {
+  // silent fail (production safe)
+}
 
-    response = enforceBotName(response);
+// ================= SAFETY =================
+if (forceNoQuestions && typeof response === "string") {
+  response = response.replace(/\?/g, ".");
+}
 
-    /* ================= 9. CTA CONTROL ================= */
+// ================= BOT ENFORCEMENT =================
+response = enforceBotName(response || "");
+
+
+    /* ================= CTA CONTROL ================= */
     if (
       shouldIncludeCTA(
         message,
@@ -403,23 +455,19 @@ Answer that, and I’ll build a precise execution plan for you.`;
         leadScoreValue,
         brainContext?.stage
       ) &&
-      !response.toLowerCase().includes("execution plan")
+      !/execution plan/i.test(response || "")
     ) {
       response +=
-        "\n\nIf you want, I can map this into a precise execution plan tailored to your business.";
+        "\n\nIf you want, I can map this into a precise plan for your business.";
     }
 
-    /* ================= 10. SAVE ================= */
-    try {
-      await memoryService.addMessage(sessionId, "assistant", response);
-    } catch {}
+    /* ================= SAVE ================= */
+    await memoryService.addMessage(sessionId, "assistant", response || "");
 
     return response;
   } catch (err) {
     console.error("[Hybrid Fatal Error]:", err);
 
-    return `Something broke on my side — but I’ve got you.
-
-Tell me your goal (traffic, leads, or sales), and I’ll guide you step-by-step.`;
+    return "Something went wrong. Try rephrasing your question.";
   }
 }
