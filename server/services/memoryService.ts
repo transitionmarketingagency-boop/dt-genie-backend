@@ -13,6 +13,7 @@ const __dirname = path.dirname(__filename);
 /* ================= DB PATH ================= */
 const memoryDir = path.join(__dirname, "../memory");
 if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
+
 const dbPath = path.join(memoryDir, "chat_memory.db");
 
 /* ================= SQLITE ================= */
@@ -29,6 +30,7 @@ const MAX_CONTEXT_MESSAGES = 6;
 
 function normalizeContent(text: unknown): string {
   if (typeof text !== "string") return "";
+
   return text
     .normalize("NFKC")
     .replace(/[\u0000-\u001F\u007F]+/g, " ")
@@ -59,7 +61,16 @@ function safeParse<T>(value: unknown, fallback: T): T {
   }
 }
 
+function safeStringify(value: unknown) {
+  try {
+    return JSON.stringify(value ?? null);
+  } catch {
+    return JSON.stringify(null);
+  }
+}
+
 /* ================= TYPES ================= */
+
 export interface StrategicMemory {
   industry?: string;
   businessType?: string;
@@ -81,10 +92,10 @@ export interface StrategicMemory {
   lastInteraction?: number;
   isStale?: boolean;
 
-  /* ================= PHASE 2 ADDITIONS ================= */
-  conversionProbability?: number;   // NEW
-  ctaReadiness?: number;            // NEW
-  intentMomentum?: number;          // NEW
+  /* PHASE 2 */
+  conversionProbability?: number;
+  ctaReadiness?: number;
+  intentMomentum?: number;
 
   bantSignals?: {
     budget?: number;
@@ -95,6 +106,7 @@ export interface StrategicMemory {
 }
 
 /* ================= INIT ================= */
+
 export async function initializeMemory(): Promise<void> {
   const db = await dbPromise;
 
@@ -128,6 +140,9 @@ export async function initializeMemory(): Promise<void> {
       lastDetectedServices TEXT,
       lastIntent TEXT,
       bantSignals TEXT,
+      conversionProbability REAL,
+      ctaReadiness REAL,
+      intentMomentum REAL,
       updatedAt TEXT,
       lastInteraction REAL
     )
@@ -150,11 +165,16 @@ export async function initializeMemory(): Promise<void> {
 }
 
 /* ================= SERVICE ================= */
+
 export class MemoryService {
   private db = dbPromise;
 
   /* ---------- ADD MESSAGE ---------- */
-  async addMessage(sessionId: string, role: "user" | "assistant", content: string) {
+  async addMessage(
+    sessionId: string,
+    role: "user" | "assistant",
+    content: string
+  ) {
     const db = await this.db;
     const normalized = normalizeContent(content);
 
@@ -189,17 +209,21 @@ export class MemoryService {
       sessionId,
       role,
       normalized,
-      now.toISOString() // ✅ FIXED
+      now.toISOString()
     );
 
     return msg;
   }
 
-  async saveMessage(sessionId: string, role: "user" | "assistant", content: string) {
+  async saveMessage(
+    sessionId: string,
+    role: "user" | "assistant",
+    content: string
+  ) {
     return this.addMessage(sessionId, role, content);
   }
 
-  /* ---------- HISTORY (RESTORED) ---------- */
+  /* ---------- HISTORY ---------- */
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
     const db = await this.db;
 
@@ -273,6 +297,10 @@ export class MemoryService {
 
       bantSignals: safeParse(row.bantSignals, {}),
 
+      conversionProbability: row.conversionProbability,
+      ctaReadiness: row.ctaReadiness,
+      intentMomentum: row.intentMomentum,
+
       updatedAt: row.updatedAt,
       lastInteraction: last,
       isStale,
@@ -280,46 +308,53 @@ export class MemoryService {
   }
 
   /* ---------- UPDATE MEMORY ---------- */
-  async updateStrategicMemory(sessionId: string, data: Partial<StrategicMemory>) {
+  async updateStrategicMemory(
+    sessionId: string,
+    data: Partial<StrategicMemory>
+  ) {
     const db = await this.db;
+
     const existing = await this.getStrategicMemory(sessionId);
-const enriched: StrategicMemory = {
-  ...existing,
-  ...data,
-  updatedAt: new Date().toISOString(),
-  lastInteraction: Date.now(),
 
-  /* ================= PHASE 2 AUTO SIGNALS ================= */
-  conversionProbability:
-    data.leadScore
-      ? Math.min(1, (data.leadScore / 100) + 0.1)
-      : existing.conversionProbability ?? 0,
+    // 🔥 SAFE MERGE (NO DATA LOSS)
+    const merged: StrategicMemory = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString(),
+      lastInteraction: Date.now(),
 
-  ctaReadiness:
-    data.stage === "decision"
-      ? 0.9
-      : data.stage === "consideration"
-      ? 0.6
-      : 0.3,
+      conversionProbability:
+        data.leadScore !== undefined
+          ? Math.min(1, data.leadScore / 100 + 0.1)
+          : existing.conversionProbability ?? 0,
 
-  intentMomentum:
-    Array.isArray(data.servicesDiscussed)
-      ? Math.min(1, (data.servicesDiscussed.length || 0) * 0.15)
-      : existing.intentMomentum ?? 0,
-};
+      ctaReadiness:
+        data.stage === "decision"
+          ? 0.9
+          : data.stage === "consideration"
+          ? 0.6
+          : existing.ctaReadiness ?? 0.3,
 
-if (
-  data.lastUserProblem &&
-  isContextShift(data.lastUserProblem) &&
-  !existing?.businessType // prevent accidental wipes after setup
-) {
-  await db.run(`DELETE FROM strategic_memory WHERE sessionId=?`, sessionId);
-}
+      intentMomentum:
+        Array.isArray(data.servicesDiscussed)
+          ? Math.min(1, data.servicesDiscussed.length * 0.15)
+          : existing.intentMomentum ?? 0,
+    };
 
-const merged: StrategicMemory = enriched;
+    // ⚠️ SAFE RESET (only if clearly new context)
+    if (
+      data.lastUserProblem &&
+      isContextShift(data.lastUserProblem) &&
+      existing.businessType
+    ) {
+      await db.run(
+        `DELETE FROM strategic_memory WHERE sessionId=?`,
+        sessionId
+      );
+    }
 
     await db.run(
-      `INSERT INTO strategic_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO strategic_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(sessionId) DO UPDATE SET
        industry=excluded.industry,
        businessType=excluded.businessType,
@@ -335,13 +370,16 @@ const merged: StrategicMemory = enriched;
        lastDetectedServices=excluded.lastDetectedServices,
        lastIntent=excluded.lastIntent,
        bantSignals=excluded.bantSignals,
+       conversionProbability=excluded.conversionProbability,
+       ctaReadiness=excluded.ctaReadiness,
+       intentMomentum=excluded.intentMomentum,
        updatedAt=excluded.updatedAt,
        lastInteraction=excluded.lastInteraction`,
       sessionId,
       merged.industry ?? null,
       merged.businessType ?? null,
-      JSON.stringify(merged.goals),
-      JSON.stringify(merged.servicesDiscussed),
+      safeStringify(merged.goals),
+      safeStringify(merged.servicesDiscussed),
       merged.leadScore ?? null,
       merged.stage ?? null,
       merged.budget ?? null,
@@ -349,15 +387,18 @@ const merged: StrategicMemory = enriched;
       merged.decisionMaker ?? null,
       merged.interestLevel ?? null,
       merged.lastUserProblem ?? null,
-      JSON.stringify(merged.lastDetectedServices),
+      safeStringify(merged.lastDetectedServices),
       merged.lastIntent ?? null,
-      JSON.stringify(merged.bantSignals),
+      safeStringify(merged.bantSignals),
+      merged.conversionProbability ?? null,
+      merged.ctaReadiness ?? null,
+      merged.intentMomentum ?? null,
       merged.updatedAt,
       merged.lastInteraction
     );
   }
 
-  /* ---------- BOOKINGS (RESTORED) ---------- */
+  /* ---------- BOOKINGS ---------- */
   async storeBooking(data: {
     userId: string;
     serviceType?: string;

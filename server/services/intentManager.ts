@@ -1,5 +1,5 @@
 /* =====================================================
-   INTENT MANAGER (ULTRA STABLE PRODUCTION VERSION)
+   INTENT MANAGER (PHASE 5 PRODUCTION VERSION)
 ===================================================== */
 
 export interface Intent {
@@ -106,15 +106,13 @@ const TYPE_PRIORITY = {
 function calculateScore(text: string, intent: Intent): number {
   let score = 0;
 
-  // phrase match (strong)
   for (const kw of intent.keywords) {
     if (phraseMatch(text, kw)) {
       score += 0.6;
     }
   }
 
-  // token overlap (soft)
-  score += tokenOverlapScore(text, intent.keywords) * 0.5;
+  score += tokenOverlapScore(text, intent.keywords) * 0.4;
 
   return Math.min(score, 1);
 }
@@ -124,13 +122,17 @@ function applyStrongSignals(
   text: string,
   results: { intent: Intent; score: number }[]
 ) {
+  const seenTypes = new Set<string>();
+
   const boost = (
     signals: string[],
     type: Intent["type"],
     value: number
   ) => {
     for (const phrase of signals) {
-      if (phraseMatch(text, phrase)) {
+      if (phraseMatch(text, phrase) && !seenTypes.has(type)) {
+        seenTypes.add(type);
+
         results.push({
           intent: {
             name: `${type}_signal`,
@@ -161,15 +163,14 @@ function cleanResults(results: { intent: Intent; score: number }[]) {
     }
   }
 
-  return Array.from(map.values())
-    .sort((a, b) => {
-      const pDiff =
-        TYPE_PRIORITY[b.intent.type] - TYPE_PRIORITY[a.intent.type];
+  return Array.from(map.values()).sort((a, b) => {
+    const pDiff =
+      TYPE_PRIORITY[b.intent.type] - TYPE_PRIORITY[a.intent.type];
 
-      if (pDiff !== 0) return pDiff;
+    if (pDiff !== 0) return pDiff;
 
-      return b.score - a.score;
-    });
+    return b.score - a.score;
+  });
 }
 
 /* ================= DETECT INTENT ================= */
@@ -192,7 +193,6 @@ export function detectIntent(
 
   let results: { intent: Intent; score: number }[] = [];
 
-  // base scoring
   for (const intent of intents) {
     const score = calculateScore(text, intent);
     if (score > 0.25) {
@@ -200,22 +200,35 @@ export function detectIntent(
     }
   }
 
-  // strong signals
   applyStrongSignals(text, results);
 
-  // clean + prioritize
   let final = cleanResults(results);
 
-  // 🔥 CRITICAL FIX: suppress weak service intents
-  const hasStrongNonService = final.some(
-    (r) => r.intent.type === "buying" || r.intent.type === "problem"
+  /* 🔥 PHASE 5 FIX: smarter suppression */
+  const hasStrongIntent = final.some(
+    (r) =>
+      (r.intent.type === "buying" || r.intent.type === "problem") &&
+      r.score > 0.7
   );
 
-  if (hasStrongNonService) {
-    final = final.filter((r) => r.intent.type !== "service");
+  if (hasStrongIntent) {
+    final = final.filter(
+      (r) =>
+        r.intent.type !== "service" ||
+        r.score > 0.6 // allow strong service to survive
+    );
   }
 
-  // fallback
+  /* 🔥 PHASE 5 FIX: greeting suppression */
+  const hasNonGreeting = final.some(
+    (r) => r.intent.name !== "greeting"
+  );
+
+  if (hasNonGreeting) {
+    final = final.filter((r) => r.intent.name !== "greeting");
+  }
+
+  /* fallback */
   if (final.length === 0) {
     return [
       {

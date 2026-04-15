@@ -5,6 +5,7 @@ import { getFusedChunks } from "./intentVectorFusion.js";
 import { generateOpenRouter } from "./openRouterClient.js";
 import { generateGemini } from "./geminiClient.js";
 import { memoryService } from "./memoryService.js";
+import { generateCTA } from "./ctaEngine.js";
 
 // System utilities
 import { enforceBotName, BOT_NAME } from "../system/identity.js";
@@ -293,7 +294,6 @@ function repairResponse(text: string): string {
   return fixed.replace(/\s+/g, " ").trim();
 }
 
-// ===================== MAIN EXECUTION ===================== //
 
 export async function executeHybridResponse({
   sessionId,
@@ -321,19 +321,50 @@ export async function executeHybridResponse({
   try {
     const msg = (message || "").trim().toLowerCase();
 
-    /* ================= SMART GREETING ================= */
-    if (
-      /^(hi|hello|hey|yo)\b/.test(msg) &&
-      (!historyText || historyText.length < 10)
-    ) {
-      const reply = "Hey — what do you want to improve right now?";
 
-      await memoryService.addMessage(sessionId, "assistant", reply);
-      return reply;
-    }
+// ================= ENTRY INTELLIGENCE (FINAL STABLE FIX) =================
 
-    /* ================= CONTEXT RESET ================= */
-    if (shouldResetContext(message || "")) {
+const isFirstMessage = !historyText || historyText.length < 10;
+const isGreeting = /^(hi|hello|hey|yo)\b/.test(msg);
+
+const isHighIntent =
+  leadScoreValue >= 0.6 ||
+  /(book|hire|call|schedule|appointment)/i.test(msg);
+
+/**
+ * FINAL ENTRY MODE (IMMUTABLE)
+ * We keep it SIMPLE to avoid TS narrowing bugs
+ */
+const entryMode =
+  isFirstMessage && isGreeting
+    ? "onboarding"
+    : isHighIntent
+    ? "execution"
+    : "continuation";
+
+// SAFE alias (no re-declaration risk, no TS narrowing issues)
+const finalEntryMode = entryMode;
+
+/* ================= SMART ONBOARDING SHORTCUT ================= */
+
+if (isFirstMessage && isGreeting) {
+  const reply =
+    "Hey — tell me what you're trying to improve in your business right now.";
+
+  await memoryService.addMessage(sessionId, "assistant", reply);
+  return reply;
+}
+
+
+    // ================= CONTEXT RESET =================
+
+    const strongResetSignal =
+      message.length > 80 &&
+      /(new business|different business|start over|completely different)/i.test(
+        message
+      );
+
+    if (strongResetSignal) {
       brainContext = {
         ...brainContext,
         detectedServices: [],
@@ -342,7 +373,8 @@ export async function executeHybridResponse({
       };
     }
 
-    /* ================= SERVICE DETECTION ================= */
+    // ================= SERVICE DETECTION =================
+
     try {
       const detectedServices = await detectService(message);
 
@@ -353,7 +385,12 @@ export async function executeHybridResponse({
       brainContext.detectedServices = [];
     }
 
-    /* ================= VECTOR ================= */
+    const hasServiceContext =
+      Array.isArray(brainContext.detectedServices) &&
+      brainContext.detectedServices.length > 0;
+
+    // ================= VECTOR =================
+
     let fusedChunksText = "";
 
     try {
@@ -367,9 +404,23 @@ export async function executeHybridResponse({
       fusedChunksText = "";
     }
 
-    /* ================= PROMPT ================= */
+    // ================= CONTINUITY SIGNAL =================
+
+    const hasContextContinuity =
+      typeof historyText === "string" &&
+      historyText.length > 120 &&
+      (hasServiceContext || message.length > 20 || fusedChunksText.length > 100);
+
+    if (hasContextContinuity) {
+    }
+
+    // ================= PROMPT =================
+
     const prompt = buildHybridPrompt({
-      brainContext,
+      brainContext: {
+        ...brainContext,
+        entryMode, // Phase 5 signal (clean + single source)
+      },
       leadScoreValue,
       detectedIntentNames,
       vectorText: fusedChunksText,
@@ -379,7 +430,8 @@ export async function executeHybridResponse({
 
     let response: string | null = null;
 
-    /* ================= PRIMARY MODEL ================= */
+    // ================= PRIMARY MODEL =================
+
     try {
       const result = await withTimeout(
         generateOpenRouter(prompt, sessionId),
@@ -391,7 +443,8 @@ export async function executeHybridResponse({
       }
     } catch {}
 
-    /* ================= GEMINI FALLBACK ================= */
+    // ================= GEMINI FALLBACK =================
+
     if (!response && GEMINI_ENABLED && canUseGemini()) {
       try {
         const result = await withTimeout(
@@ -406,68 +459,70 @@ export async function executeHybridResponse({
       } catch {}
     }
 
-    /* ================= FINAL FALLBACK ================= */
+    // ================= FINAL FALLBACK =================
+
     if (!response) {
       response = fusedChunksText
         ? fusedChunksText.split("\n\n")[0]
-        : "I couldn’t find enough relevant data to give a precise answer. Can you clarify your goal a bit more?";
+: isFirstMessage && isGreeting
+        ? "Tell me a bit about your business so I can guide you properly."
+        : "I need a bit more detail to give you a precise answer — what exactly are you trying to achieve?";
     }
 
+    // ================= CLEANING =================
 
-// ================= CLEANING =================
-response = cleanHybridResponse(response);
-response = repairResponse(response);
+    response = cleanHybridResponse(response);
+    response = repairResponse(response);
 
+    // ================= PHASE 2 OPTIMIZER =================
 
-// ================= PHASE 2 INTELLIGENCE LAYER =================
-try {
-  const optimizer = await loadOptimizer();
+    try {
+      const optimizer = await loadOptimizer();
 
-  if (optimizer) {
-    const result = optimizer(response || "");
+      if (optimizer) {
+        const result = optimizer(response || "");
 
-    if (
-      result &&
-      typeof result === "object" &&
-      typeof result.optimized === "string"
-    ) {
-      response = result.optimized;
+        if (
+          result &&
+          typeof result === "object" &&
+          typeof result.optimized === "string"
+        ) {
+          response = result.optimized;
+        }
+      }
+    } catch {}
+
+    // ================= SAFETY =================
+
+    if (forceNoQuestions && typeof response === "string") {
+      response = response.replace(/\?/g, ".");
     }
-  }
-} catch (err) {
-  // silent fail (production safe)
+
+    // ================= BOT ENFORCEMENT =================
+
+    response = enforceBotName(response || "");
+
+/* ================= CTA ENGINE (PHASE 5.5) ================= */
+
+const cta = generateCTA({
+  message,
+  stage: brainContext?.stage,
+  leadScore: leadScoreValue,
+  detectedServices: brainContext?.detectedServices,
+  executionMode: brainContext?.executionMode,
+});
+
+if (cta && typeof response === "string") {
+  response += cta;
 }
 
-// ================= SAFETY =================
-if (forceNoQuestions && typeof response === "string") {
-  response = response.replace(/\?/g, ".");
-}
+    // ================= SAVE =================
 
-// ================= BOT ENFORCEMENT =================
-response = enforceBotName(response || "");
-
-
-    /* ================= CTA CONTROL ================= */
-    if (
-      shouldIncludeCTA(
-        message,
-        intentCategories,
-        leadScoreValue,
-        brainContext?.stage
-      ) &&
-      !/execution plan/i.test(response || "")
-    ) {
-      response +=
-        "\n\nIf you want, I can map this into a precise plan for your business.";
-    }
-
-    /* ================= SAVE ================= */
     await memoryService.addMessage(sessionId, "assistant", response || "");
 
     return response;
   } catch (err) {
     console.error("[Hybrid Fatal Error]:", err);
-
     return "Something went wrong. Try rephrasing your question.";
   }
 }

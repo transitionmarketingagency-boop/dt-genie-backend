@@ -15,22 +15,17 @@ function cleanupCooldowns(): void {
 
   for (const [key, ts] of bookingCooldownMap.entries()) {
     if (now - ts > 1000 * 60 * 60) {
-      bookingCooldownMap.delete(key); // cleanup after 1 hour
+      bookingCooldownMap.delete(key);
     }
   }
 }
 
 function isInCooldown(sessionId: string): boolean {
-  if (!sessionId) return false;
-
   const last = bookingCooldownMap.get(sessionId);
-  if (!last) return false;
-
-  return Date.now() - last < BOOKING_COOLDOWN_MS;
+  return last ? Date.now() - last < BOOKING_COOLDOWN_MS : false;
 }
 
 function markTriggered(sessionId: string): void {
-  if (!sessionId) return;
   bookingCooldownMap.set(sessionId, Date.now());
 }
 
@@ -39,7 +34,7 @@ function normalize(text: string): string {
   return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/* ================= MAIN TRIGGER LOGIC ================= */
+/* ================= MAIN ================= */
 export async function shouldTriggerBooking(
   sessionId: string,
   stage: Stage,
@@ -49,74 +44,48 @@ export async function shouldTriggerBooking(
   try {
     cleanupCooldowns();
 
-    if (!sessionId || typeof sessionId !== "string") return false;
+    if (!sessionId) return false;
 
     const msg = normalize(message);
 
-    /* ---------- COOLDOWN CHECK ---------- */
+    /* ---------- COOLDOWN ---------- */
     if (isInCooldown(sessionId)) return false;
 
+    /* ---------- REJECTION ---------- */
+    if (
+      /(not now|later|just exploring|no thanks|dont want|don't want|stop)/i.test(
+        msg
+      )
+    ) {
+      return false;
+    }
+
     /* ---------- LOW INTENT FILTER ---------- */
-    const informationalWords = [
-      "what",
-      "why",
-      "how",
-      "explain",
-      "tell me",
-      "guide",
-      "learn",
-    ];
+    if (
+      /(what|why|how|explain|tell me|guide|learn)/i.test(msg) &&
+      leadScore < 0.6
+    ) {
+      return false;
+    }
 
-    const isInformational = informationalWords.some((w) =>
-      msg.includes(w)
-    );
-
-    if (isInformational && leadScore < 0.6) return false;
-
-    /* ---------- REJECTION FILTER ---------- */
-    const rejectionPhrases = [
-      "not now",
-      "later",
-      "just exploring",
-      "no thanks",
-      "dont want",
-      "don't want",
-      "stop",
-    ];
-
-    if (rejectionPhrases.some((r) => msg.includes(r))) return false;
-
-    /* ---------- STRONG BUYING SIGNALS ---------- */
-    const strongIntentSignals = [
-      "hire",
-      "work with you",
-      "get started",
-      "start working",
-      "let's start",
-      "im ready",
-      "i am ready",
-      "i want to proceed",
-      "book",
-      "schedule",
-      "call",
-      "consultation",
-    ];
-
-    const hasStrongIntent =
-      strongIntentSignals.some((w) => msg.includes(w)) && msg.length > 8;
-
-    if (hasStrongIntent) {
+    /* ---------- STRONG BUYING INTENT ---------- */
+    if (
+      /(hire|start|work with you|get started|book|schedule|call|consultation)/i.test(
+        msg
+      ) &&
+      msg.length > 8
+    ) {
       markTriggered(sessionId);
       return true;
     }
 
-    /* ---------- STAGE-BASED TRIGGERS ---------- */
-    const stageTriggers =
+    /* ---------- STAGE + SCORE LOGIC ---------- */
+    const shouldTrigger =
       (stage === "conversion" && leadScore >= 0.5) ||
       (stage === "service" && leadScore >= 0.65) ||
       (stage === "strategy" && leadScore >= 0.75);
 
-    if (stageTriggers) {
+    if (shouldTrigger) {
       markTriggered(sessionId);
       return true;
     }

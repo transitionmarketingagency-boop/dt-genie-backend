@@ -10,7 +10,6 @@ export type StrategicMemory = {
   businessType?: string;
   lastInteraction?: number;
 
-  // Phase 3 enrichment
   leadScore?: number;
   stage?: string;
   intentType?: string;
@@ -21,20 +20,13 @@ export type ExecutionMode = "execution" | "exploration";
 export type BrainContext = {
   message: string;
   stage: "greeting" | "discovery" | "strategy" | "service" | "conversion";
-
   leadScore: number;
-
   detectedServices?: string[];
-
   executionMode: ExecutionMode;
-
   hasSufficientContext?: boolean;
-
   intentType?: string;
-
   highIntent?: boolean;
 
-  // Phase 3 signals
   shouldAskQuestion?: boolean;
   shouldGiveCTA?: boolean;
   confidenceLevel?: number;
@@ -47,18 +39,33 @@ function normalize(text: string) {
 }
 
 function detectContextShift(message: string, memory: StrategicMemory): boolean {
-  if (!memory?.industry && !memory?.businessType) return false;
+  if (!memory) return false;
 
-  const shiftSignals = [
+  const strongSignals = [
+    "new business",
+    "different business",
+    "start over",
+    "completely different",
+  ];
+
+  const weakSignals = [
     "i run",
     "i have",
     "my business",
     "my store",
     "we are",
-    "new business",
   ];
 
-  return shiftSignals.some((s) => message.includes(s));
+  const hasStrong = strongSignals.some((s) => message.includes(s));
+  const hasWeak = weakSignals.some((s) => message.includes(s));
+
+  // 🔥 Phase 5 logic:
+  // strong → always reset
+  // weak → only reset if memory exists
+  if (hasStrong) return true;
+  if (hasWeak && (memory.industry || memory.businessType)) return true;
+
+  return false;
 }
 
 /* ================= STAGE DETECTOR ================= */
@@ -74,19 +81,19 @@ function detectStage(
   if (intentType === "service_inquiry") return "service";
   if (intentType === "problem") return "strategy";
 
-  if (/(hire|book|schedule|call|start|work with you|let's start)/i.test(msg))
+  if (/(hire|book|schedule|call|start|work with you)/i.test(msg))
     return "conversion";
 
-  if (/(price|cost|service|offer|what do you do)/i.test(msg))
+  if (/(price|cost|service|offer)/i.test(msg))
     return "service";
 
-  if (/(how|improve|fix|scale|strategy|optimize)/i.test(msg))
+  if (/(how|improve|fix|scale|optimize|strategy)/i.test(msg))
     return "strategy";
 
   return "discovery";
 }
 
-/* ================= PHASE 3 DECISION ENGINE ================= */
+/* ================= PHASE 5 DECISION ENGINE ================= */
 
 function computeExecutionSignals(params: {
   stage: BrainContext["stage"];
@@ -98,24 +105,24 @@ function computeExecutionSignals(params: {
 
   const isShort = message.length < 40;
 
-  // 🔥 FORCE LITERAL TYPE SAFETY
+  // 🔥 Phase 5 smarter blending (less rigid thresholds)
   const executionMode: ExecutionMode =
-    highIntent || stage === "conversion" || leadScore >= 0.65
+    highIntent || stage === "conversion" || leadScore >= 0.6
       ? "execution"
       : "exploration";
 
-  const shouldGiveCTA: boolean =
+  const shouldGiveCTA =
     executionMode === "execution" ||
     leadScore >= 0.7 ||
     stage === "service";
 
-  const shouldAskQuestion: boolean =
+  const shouldAskQuestion =
     executionMode === "exploration" &&
     !highIntent &&
     leadScore < 0.6 &&
     !isShort;
 
-  const confidenceLevel: number = Math.min(
+  const confidenceLevel = Math.min(
     1,
     leadScore * 0.7 + (highIntent ? 0.3 : 0)
   );
@@ -125,7 +132,7 @@ function computeExecutionSignals(params: {
     shouldGiveCTA,
     shouldAskQuestion,
     confidenceLevel,
-  } as const; // 🔥 CRITICAL FIX
+  } as const;
 }
 
 /* ================= MAIN ENGINE ================= */
@@ -148,7 +155,7 @@ export async function strategicBrain(
     }
   }
 
-  /* ---------- CONTEXT SHIFT RESET ---------- */
+  /* ---------- CONTEXT SHIFT ---------- */
   const hasShift = detectContextShift(message, strategicMemory);
 
   if (hasShift && message.length > 20) {
@@ -161,7 +168,7 @@ export async function strategicBrain(
   try {
     intent = neuralBrain(message) || {};
   } catch {
-    intent = { type: "general", highIntent: false };
+    intent = {};
   }
 
   const intentType = intent?.type || "general";
@@ -210,8 +217,6 @@ export async function strategicBrain(
       hasSufficientContext,
       intentType,
       highIntent,
-
-      // Phase 3 outputs
       shouldAskQuestion: signals.shouldAskQuestion,
       shouldGiveCTA: signals.shouldGiveCTA,
       confidenceLevel: signals.confidenceLevel,

@@ -4,13 +4,13 @@ import { memoryService } from "./memoryService.js";
 
 /* ================= TYPES ================= */
 export interface BANTSignals {
-  budget?: number;     // 0-1
-  authority?: number;  // 0-1
-  need?: number;       // 0-1
-  timeline?: number;   // 0-1
+  budget?: number;
+  authority?: number;
+  need?: number;
+  timeline?: number;
 }
 
-/* ================= NORMALIZATION ================= */
+/* ================= NORMALIZE ================= */
 function normalize(text: string): string {
   return (text || "")
     .toLowerCase()
@@ -19,96 +19,59 @@ function normalize(text: string): string {
     .trim();
 }
 
-/* ================= SAFE CLAMP ================= */
-function clamp(value: number | undefined): number {
-  if (value === undefined || value === null || isNaN(value)) return 0;
-  return Math.max(0, Math.min(1, value));
+function clamp(v: number | undefined): number {
+  if (!v || isNaN(v)) return 0;
+  return Math.max(0, Math.min(1, v));
 }
 
-/* ================= FLEXIBLE MATCH (FIXED) ================= */
+/* ================= MATCH ================= */
 function includesAny(text: string, keywords: string[]): number {
-  let score = 0;
-
+  let hits = 0;
   for (const kw of keywords) {
-    // 🔥 phrase + partial match support
-    if (text.includes(kw)) {
-      score += 1;
-    }
+    if (text.includes(kw)) hits++;
   }
-
-  return score;
+  return hits;
 }
 
-/* ================= SIGNAL KEYWORDS ================= */
-const budgetSignals = ["budget","cost","pricing","price","how much","investment","spend","ad spend","we can spend"];
-const authoritySignals = ["i am the owner","i'm the owner","i run","decision maker","my company","our company","founder","ceo"];
-const needSignals = ["we need","struggling","looking for","need help","want to improve","need marketing","automation","low roas","no sales","bad results","not working","conversion issue"];
-const timelineSignals = ["as soon as possible","urgent","this month","next month","immediately","soon","right away"];
-const buyingSignals = [
-  "i want to start",
-  "let's start",
-  "ready to begin",
-  "how do we proceed",
-  "how do we start",
-  "i want to work with you",
-  "hire you",
-  "start project",
-  "help me scale",
-  "fix this for me",
-  "can you do this",
-];
+/* ================= SIGNALS ================= */
+const budgetSignals = ["budget","price","cost","investment","spend"];
+const authoritySignals = ["i run","i am the owner","founder","ceo","my company"];
+const needSignals = ["need","problem","low sales","no leads","bad results","not working"];
+const timelineSignals = ["urgent","asap","soon","immediately","this month"];
+const buyingSignals = ["hire","start","work with you","book","schedule"];
 
-/* ================= SIGNAL DETECTION ================= */
-function detectSignals(message: string, memorySignals: Partial<BANTSignals> = {}): BANTSignals {
+/* ================= DETECT ================= */
+function detectSignals(
+  message: string,
+  memory: Partial<BANTSignals>
+): BANTSignals {
   const msg = normalize(message);
 
   const signals: BANTSignals = {
-    budget: clamp(memorySignals.budget),
-    authority: clamp(memorySignals.authority),
-    need: clamp(memorySignals.need),
-    timeline: clamp(memorySignals.timeline),
+    budget: clamp(memory.budget),
+    authority: clamp(memory.authority),
+    need: clamp(memory.need),
+    timeline: clamp(memory.timeline),
   };
 
-  const add = (value: number | undefined, increment: number) =>
-    clamp((value ?? 0) + increment);
+  const add = (v: number | undefined, inc: number) =>
+    clamp((v ?? 0) + inc);
 
-  // ----- NEED -----
-  signals.need = add(signals.need, 0.25 * includesAny(msg, needSignals));
+  signals.need = add(signals.need, 0.2 * includesAny(msg, needSignals));
+  signals.budget = add(signals.budget, 0.15 * includesAny(msg, budgetSignals));
+  signals.authority = add(signals.authority, 0.2 * includesAny(msg, authoritySignals));
+  signals.timeline = add(signals.timeline, 0.15 * includesAny(msg, timelineSignals));
 
-  // ----- BUDGET -----
-  signals.budget = add(signals.budget, 0.2 * includesAny(msg, budgetSignals));
-
-  // ----- AUTHORITY -----
-  signals.authority = add(signals.authority, 0.25 * includesAny(msg, authoritySignals));
-
-  // ----- TIMELINE -----
-  signals.timeline = add(signals.timeline, 0.2 * includesAny(msg, timelineSignals));
-
-  // ----- BUYING INTENT BOOST (UPGRADED) -----
-  const buyingHits = includesAny(msg, buyingSignals);
-  if (buyingHits > 0) {
-    signals.need = add(signals.need, 0.5);
-    signals.timeline = add(signals.timeline, 0.4);
-    signals.authority = add(signals.authority, 0.3);
+  if (includesAny(msg, buyingSignals) > 0) {
+    signals.need = add(signals.need, 0.4);
+    signals.timeline = add(signals.timeline, 0.3);
+    signals.authority = add(signals.authority, 0.25);
   }
 
   return signals;
 }
 
-/* ================= HELPERS ================= */
-function mapDecisionMaker(authority?: number): string | undefined {
-  if (!authority) return undefined;
-  return authority > 0.6 ? "yes" : undefined;
-}
-
-function mapTimeline(timeline?: number): string | undefined {
-  if (!timeline) return undefined;
-  if (timeline > 0.7) return "immediate";
-  if (timeline > 0.4) return "soon";
-  return "later";
-}
-
-/* ================= MAIN FUNCTION ================= */
+/* ================= MAIN ================= */
 export async function analyzeLeadSignals(
   message: string,
   sessionId: string
@@ -116,7 +79,6 @@ export async function analyzeLeadSignals(
 
   const cleanMsg = normalize(message);
 
-  // 🔥 IGNORE LOW VALUE INPUTS
   if (cleanMsg.length < 3) {
     return {
       signals: {},
@@ -126,68 +88,43 @@ export async function analyzeLeadSignals(
 
   let memorySignals: Partial<BANTSignals> = {};
 
-  /* ================= LOAD MEMORY ================= */
-  if (sessionId) {
-    try {
-      const mem = await memoryService.getStrategicMemory(sessionId);
+  try {
+    const mem = await memoryService.getStrategicMemory(sessionId);
 
-      memorySignals = {
-        budget: clamp(mem?.budget),
-        authority: mem?.decisionMaker ? 0.8 : 0,
-        need: Array.isArray(mem?.goals) && mem.goals.length ? 0.5 : 0,
-        timeline: mem?.timeline ? 0.5 : 0,
-      };
+    memorySignals = {
+      budget: clamp(mem?.budget),
+      authority: mem?.decisionMaker ? 0.8 : 0,
+      need: mem?.goals?.length ? 0.5 : 0,
+      timeline: mem?.timeline ? 0.5 : 0,
+    };
+  } catch {}
 
-    } catch (err) {
-      if (process.env.DEBUG_MEMORY === "true") {
-        console.warn("[Memory] Failed to load strategic memory:", err);
-      }
-    }
-  }
-
-  /* ================= DETECT SIGNALS ================= */
   const signals = detectSignals(cleanMsg, memorySignals);
 
-  const hasSignal = Object.values(signals).some((v) => v && v > 0);
-
-  if (!hasSignal) {
-    return {
-      signals,
-      score: { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 },
-    };
-  }
-
-  /* ================= SCORE ================= */
   let score: LeadScore;
 
   try {
     score = leadQualifier.scoreLead(sessionId, signals);
-  } catch (err) {
-    console.error("[LeadQualifier] scoreLead failed:", err);
+  } catch {
     score = { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 };
   }
 
-  /* ================= SAVE MEMORY (SAFE MERGE) ================= */
-  if (sessionId) {
-    try {
-      const mem = await memoryService.getStrategicMemory(sessionId);
+  /* ================= MEMORY UPDATE ================= */
+  try {
+    const mem = await memoryService.getStrategicMemory(sessionId);
 
-      await memoryService.updateStrategicMemory(sessionId, {
-        budget: signals.budget ?? mem.budget,
-        decisionMaker: mapDecisionMaker(signals.authority) ?? mem.decisionMaker,
-        timeline: mapTimeline(signals.timeline) ?? mem.timeline,
-        goals:
-          signals.need && signals.need > 0.5
-            ? [...new Set([...(mem.goals || []), "growth"])]
-            : mem.goals,
-      });
-
-    } catch (err) {
-      if (process.env.DEBUG_MEMORY === "true") {
-        console.warn("[Memory] Failed to update strategic memory:", err);
-      }
-    }
-  }
+    await memoryService.updateStrategicMemory(sessionId, {
+      budget: signals.budget ?? mem.budget,
+      timeline:
+        signals.timeline && signals.timeline > 0.7
+          ? "immediate"
+          : mem.timeline,
+      decisionMaker:
+        signals.authority && signals.authority > 0.6
+          ? "yes"
+          : mem.decisionMaker,
+    });
+  } catch {}
 
   return { signals, score };
 }
