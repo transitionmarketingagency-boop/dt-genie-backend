@@ -2,6 +2,7 @@ import { memoryService } from "./memoryService.js";
 import type { StrategicMemory } from "./memoryService.js";
 
 /* ================= TYPES ================= */
+
 export type Stage =
   | "greeting"
   | "discovery"
@@ -10,10 +11,10 @@ export type Stage =
   | "conversion";
 
 export interface LeadScore {
-  budget?: number;
-  authority?: number;
-  need?: number;
-  timeline?: number;
+  budget: number;
+  authority: number;
+  need: number;
+  timeline: number;
   total: number;
   stage?: Stage;
 }
@@ -26,18 +27,30 @@ type WeightSet = {
 };
 
 /* ================= UTILS ================= */
+
 function clamp(val?: number): number {
   if (val === undefined || val === null || isNaN(val)) return 0;
   return Math.max(0, Math.min(1, val));
 }
 
 function normalizeStage(stage?: string): Stage {
-  const allowed: Stage[] = ["greeting", "discovery", "strategy", "service", "conversion"];
-  if (stage && allowed.includes(stage as Stage)) return stage as Stage;
+  const allowed: Stage[] = [
+    "greeting",
+    "discovery",
+    "strategy",
+    "service",
+    "conversion",
+  ];
+
+  if (stage && allowed.includes(stage as Stage)) {
+    return stage as Stage;
+  }
+
   return "discovery";
 }
 
-/* 🔥 STRICT WEIGHT NORMALIZER (FIXED) */
+/* ================= WEIGHT NORMALIZER ================= */
+
 function normalizeWeights(weights: WeightSet): WeightSet {
   const sum =
     weights.budget +
@@ -54,6 +67,7 @@ function normalizeWeights(weights: WeightSet): WeightSet {
 }
 
 /* ================= CLASS ================= */
+
 export class LeadQualifier {
   private baseWeights: WeightSet = {
     budget: 0.25,
@@ -62,7 +76,6 @@ export class LeadQualifier {
     timeline: 0.15,
   };
 
-  /* ================= SCORE LEAD ================= */
   scoreLead(
     sessionId: string,
     bantData: Partial<LeadScore>,
@@ -74,27 +87,20 @@ export class LeadQualifier {
 
     /* ================= DYNAMIC WEIGHTS ================= */
 
-    if (stage === "discovery") {
-      weights.need += 0.1;
-    }
-
+    if (stage === "discovery") weights.need += 0.1;
     if (stage === "strategy") {
       weights.need += 0.1;
       weights.timeline += 0.05;
     }
-
-    if (stage === "service") {
-      weights.authority += 0.1;
-    }
-
+    if (stage === "service") weights.authority += 0.1;
     if (stage === "conversion") {
       weights.budget += 0.1;
       weights.authority += 0.1;
     }
 
-    // ✅ FIXED (strict type-safe normalization)
     weights = normalizeWeights(weights);
 
+    // ✅ FIX: ALL values MUST be defined numbers
     const score: LeadScore = {
       budget: clamp(bantData.budget),
       authority: clamp(bantData.authority),
@@ -104,23 +110,28 @@ export class LeadQualifier {
       stage,
     };
 
-    /* ================= BASE SCORE ================= */
+    /* ================= SAFE SCORE CALC (STRICT FIX) ================= */
+
+    const budget = score.budget;
+    const authority = score.authority;
+    const need = score.need;
+    const timeline = score.timeline;
+
     let total =
-      (score.budget || 0) * weights.budget +
-      (score.authority || 0) * weights.authority +
-      (score.need || 0) * weights.need +
-      (score.timeline || 0) * weights.timeline;
+      budget * weights.budget +
+      authority * weights.authority +
+      need * weights.need +
+      timeline * weights.timeline;
 
     /* ================= HIGH INTENT BOOST ================= */
-    const highIntent =
-      (score.need || 0) > 0.6 &&
-      ((score.timeline || 0) > 0.5 || (score.authority || 0) > 0.5);
 
-    if (highIntent) {
-      total += 0.15;
-    }
+    const highIntent =
+      need > 0.6 && (timeline > 0.5 || authority > 0.5);
+
+    if (highIntent) total += 0.15;
 
     /* ================= CONVERSION BOOST ================= */
+
     if (stage === "conversion") {
       total += 0.1;
     }
@@ -128,11 +139,16 @@ export class LeadQualifier {
     score.total = clamp(total);
 
     /* ================= DEBUG ================= */
+
     if (process.env.DEBUG_MEMORY === "true") {
-      console.log(`[LeadQualifier] ${sessionId} | stage=${stage} ->`, score);
+      console.log(
+        `[LeadQualifier] ${sessionId} | stage=${stage} ->`,
+        score
+      );
     }
 
     /* ================= MEMORY UPDATE ================= */
+
     if (sessionId && score.total > 0) {
       this.safeUpdateLeadScore(sessionId, score).catch((err) =>
         console.warn("[LeadQualifier] async memory update failed:", err)
@@ -142,8 +158,10 @@ export class LeadQualifier {
     return score;
   }
 
-  /* ================= MEMORY UPDATE ================= */
-  private async safeUpdateLeadScore(sessionId: string, score: LeadScore) {
+  private async safeUpdateLeadScore(
+    sessionId: string,
+    score: LeadScore
+  ) {
     try {
       if (score.total <= 0) return;
 
@@ -162,10 +180,14 @@ export class LeadQualifier {
         );
       }
     } catch (err) {
-      console.warn(`[LeadQualifier] Memory update failed (${sessionId}):`, err);
+      console.warn(
+        `[LeadQualifier] Memory update failed (${sessionId}):`,
+        err
+      );
     }
   }
 }
 
 /* ================= SINGLETON ================= */
+
 export const leadQualifier = new LeadQualifier();

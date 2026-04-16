@@ -3,6 +3,7 @@ import type { LeadScore } from "./leadQualifier.js";
 import { memoryService } from "./memoryService.js";
 
 /* ================= TYPES ================= */
+
 export interface BANTSignals {
   budget?: number;
   authority?: number;
@@ -11,6 +12,7 @@ export interface BANTSignals {
 }
 
 /* ================= NORMALIZE ================= */
+
 function normalize(text: string): string {
   return (text || "")
     .toLowerCase()
@@ -20,11 +22,12 @@ function normalize(text: string): string {
 }
 
 function clamp(v: number | undefined): number {
-  if (!v || isNaN(v)) return 0;
+  if (v === undefined || v === null || isNaN(v)) return 0;
   return Math.max(0, Math.min(1, v));
 }
 
 /* ================= MATCH ================= */
+
 function includesAny(text: string, keywords: string[]): number {
   let hits = 0;
   for (const kw of keywords) {
@@ -34,13 +37,15 @@ function includesAny(text: string, keywords: string[]): number {
 }
 
 /* ================= SIGNALS ================= */
-const budgetSignals = ["budget","price","cost","investment","spend"];
-const authoritySignals = ["i run","i am the owner","founder","ceo","my company"];
-const needSignals = ["need","problem","low sales","no leads","bad results","not working"];
-const timelineSignals = ["urgent","asap","soon","immediately","this month"];
-const buyingSignals = ["hire","start","work with you","book","schedule"];
+
+const budgetSignals = ["budget", "price", "cost", "investment", "spend"];
+const authoritySignals = ["i run", "i am the owner", "founder", "ceo", "my company"];
+const needSignals = ["need", "problem", "low sales", "no leads", "not working"];
+const timelineSignals = ["urgent", "asap", "soon", "immediately", "this month"];
+const buyingSignals = ["hire", "start", "work with you", "book", "schedule"];
 
 /* ================= DETECT ================= */
+
 function detectSignals(
   message: string,
   memory: Partial<BANTSignals>
@@ -63,26 +68,32 @@ function detectSignals(
   signals.timeline = add(signals.timeline, 0.15 * includesAny(msg, timelineSignals));
 
   if (includesAny(msg, buyingSignals) > 0) {
-    signals.need = add(signals.need, 0.4);
-    signals.timeline = add(signals.timeline, 0.3);
-    signals.authority = add(signals.authority, 0.25);
+    signals.need = add(signals.need, 0.35);
+    signals.timeline = add(signals.timeline, 0.25);
+    signals.authority = add(signals.authority, 0.2);
   }
 
   return signals;
 }
 
 /* ================= MAIN ================= */
+
 export async function analyzeLeadSignals(
   message: string,
   sessionId: string
 ): Promise<{ signals: BANTSignals; score: LeadScore }> {
-
   const cleanMsg = normalize(message);
 
   if (cleanMsg.length < 3) {
     return {
       signals: {},
-      score: { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 },
+      score: {
+        total: 0,
+        budget: 0,
+        authority: 0,
+        need: 0,
+        timeline: 0,
+      },
     };
   }
 
@@ -91,13 +102,18 @@ export async function analyzeLeadSignals(
   try {
     const mem = await memoryService.getStrategicMemory(sessionId);
 
-    memorySignals = {
-      budget: clamp(mem?.budget),
-      authority: mem?.decisionMaker ? 0.8 : 0,
-      need: mem?.goals?.length ? 0.5 : 0,
-      timeline: mem?.timeline ? 0.5 : 0,
-    };
-  } catch {}
+memorySignals = {
+  budget: clamp(mem?.budget),
+  authority: mem?.decisionMaker ? 0.8 : 0,
+
+  // FIX: "goal" → "goals"
+  need: mem?.goals?.length ? 0.5 : 0,
+
+  timeline: mem?.timeline ? 0.5 : 0,
+};
+  } catch {
+    memorySignals = {};
+  }
 
   const signals = detectSignals(cleanMsg, memorySignals);
 
@@ -106,24 +122,35 @@ export async function analyzeLeadSignals(
   try {
     score = leadQualifier.scoreLead(sessionId, signals);
   } catch {
-    score = { total: 0, budget: 0, authority: 0, need: 0, timeline: 0 };
+    score = {
+      total: 0,
+      budget: 0,
+      authority: 0,
+      need: 0,
+      timeline: 0,
+    };
   }
 
-  /* ================= MEMORY UPDATE ================= */
+  /* ================= MEMORY UPDATE (SAFE-GATED) ================= */
+
   try {
     const mem = await memoryService.getStrategicMemory(sessionId);
 
-    await memoryService.updateStrategicMemory(sessionId, {
-      budget: signals.budget ?? mem.budget,
-      timeline:
-        signals.timeline && signals.timeline > 0.7
-          ? "immediate"
-          : mem.timeline,
-      decisionMaker:
-        signals.authority && signals.authority > 0.6
-          ? "yes"
-          : mem.decisionMaker,
-    });
+    const shouldUpdate = score.total > 0.2; // 🔥 prevents noise pollution
+
+    if (shouldUpdate) {
+      await memoryService.updateStrategicMemory(sessionId, {
+        budget: signals.budget ?? mem?.budget,
+        timeline:
+          signals.timeline && signals.timeline > 0.75
+            ? "immediate"
+            : mem?.timeline,
+        decisionMaker:
+          signals.authority && signals.authority > 0.7
+            ? "yes"
+            : mem?.decisionMaker,
+      });
+    }
   } catch {}
 
   return { signals, score };

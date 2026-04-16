@@ -1,5 +1,5 @@
 /* =====================================================
-   CTA ENGINE (PHASE 5.5 — CONVERSION INTELLIGENCE)
+   CTA ENGINE (PHASE 6 — PRODUCTION STABLE)
 ===================================================== */
 
 type Stage =
@@ -19,23 +19,38 @@ interface CTAInput {
   executionMode?: ExecutionMode;
 }
 
-/* ================= HELPERS ================= */
-
+/* ================= NORMALIZE ================= */
 function normalize(text: string): string {
-  return (text || "").toLowerCase().trim();
+  return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+/* ================= REJECTION ================= */
+function detectRejection(message: string): boolean {
+  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later)/i.test(
+    message
+  );
+}
+
+/* ================= LOW VALUE ================= */
 function isWeakMessage(message: string): boolean {
-  return /^(hi|hello|hey|yo|ok|yes|no)$/i.test(message);
+  const msg = normalize(message);
+
+  if (!msg) return true;
+
+  if (msg.length < 4) return true;
+
+  if (/^(hi|hello|hey|yo|ok|yes|no)$/i.test(msg)) return true;
+
+  return false;
 }
 
+/* ================= PRIMARY SERVICE ================= */
 function detectPrimaryService(services: string[] = []): string {
   if (!services.length) return "general";
 
-  // prioritize high-value services
   const priority = [
-    "ai_automation",
     "performance_marketing",
+    "ai_automation",
     "ai_search_domination_geo",
     "cgi_tours",
   ];
@@ -44,7 +59,7 @@ function detectPrimaryService(services: string[] = []): string {
     if (services.includes(p)) return p;
   }
 
-  return services[0];
+  return services[0] || "general";
 }
 
 /* ================= CTA TEMPLATES ================= */
@@ -71,26 +86,47 @@ const CTA_TEMPLATES = {
   },
 
   cgi_tours: {
-    soft: "I can show how CGI tours would fit into your property marketing.",
-    strong: "We can build high-conversion CGI visuals for your projects — want to see the approach?",
+    soft: "I can show how CGI visuals would improve your marketing.",
+    strong: "We can build high-conversion visuals for you — want to see the approach?",
   },
 };
 
-/* ================= STAGE LOGIC ================= */
+/* ================= SHOULD SHOW CTA ================= */
 
 function shouldShowCTA(input: CTAInput): boolean {
   const { message, stage, leadScore } = input;
 
-  if (isWeakMessage(message)) return false;
+  const msg = normalize(message);
+
+  /* ---------- HARD BLOCK ---------- */
+  if (detectRejection(msg)) return false;
+
+  if (isWeakMessage(msg)) return false;
 
   if (stage === "greeting") return false;
 
-  if (leadScore >= 0.5) return true;
+  /* ---------- INFORMATIONAL CONTROL ---------- */
+  const isInformational =
+    /(what|why|how|explain|tell me|guide|learn)/i.test(msg);
+
+  if (isInformational && leadScore < 0.6) return false;
+
+  /* ---------- STRONG INTENT ---------- */
+  if (
+    /(hire|start|book|schedule|call|work with you|get started)/i.test(msg)
+  ) {
+    return true;
+  }
+
+  /* ---------- STAGE + SCORE ---------- */
+  if (leadScore >= 0.6) return true;
 
   if (stage === "service" || stage === "conversion") return true;
 
   return false;
 }
+
+/* ================= INTENSITY ================= */
 
 function getCTAIntensity(input: CTAInput): "soft" | "strong" {
   const { leadScore, stage, executionMode } = input;
@@ -104,23 +140,21 @@ function getCTAIntensity(input: CTAInput): "soft" | "strong" {
   return "soft";
 }
 
-/* ================= MAIN ENGINE ================= */
+/* ================= MAIN ================= */
 
 export function generateCTA(input: CTAInput): string {
   try {
-    const { message, detectedServices = [] } = input;
-
     if (!shouldShowCTA(input)) return "";
 
-    const service = detectPrimaryService(detectedServices);
+    const service = detectPrimaryService(input.detectedServices);
 
     const intensity = getCTAIntensity(input);
 
-    const serviceTemplates =
+    const templates =
       CTA_TEMPLATES[service as keyof typeof CTA_TEMPLATES] ||
       CTA_TEMPLATES.general;
 
-    const cta = serviceTemplates[intensity];
+    const cta = templates[intensity];
 
     if (!cta) return "";
 

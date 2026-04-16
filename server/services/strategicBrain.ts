@@ -35,17 +35,18 @@ export type BrainContext = {
 /* ================= HELPERS ================= */
 
 function normalize(text: string) {
-  return (text || "").toLowerCase().trim();
+  return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function detectContextShift(message: string, memory: StrategicMemory): boolean {
-  if (!memory) return false;
+  if (!message) return false;
 
   const strongSignals = [
     "new business",
     "different business",
     "start over",
     "completely different",
+    "reset",
   ];
 
   const weakSignals = [
@@ -54,16 +55,19 @@ function detectContextShift(message: string, memory: StrategicMemory): boolean {
     "my business",
     "my store",
     "we are",
+    "our company",
   ];
 
   const hasStrong = strongSignals.some((s) => message.includes(s));
   const hasWeak = weakSignals.some((s) => message.includes(s));
 
-  // 🔥 Phase 5 logic:
-  // strong → always reset
-  // weak → only reset if memory exists
+  const hasExistingMemory =
+    !!memory?.industry ||
+    !!memory?.businessType ||
+    (memory?.servicesDiscussed?.length ?? 0) > 0;
+
   if (hasStrong) return true;
-  if (hasWeak && (memory.industry || memory.businessType)) return true;
+  if (hasWeak && hasExistingMemory) return true;
 
   return false;
 }
@@ -81,13 +85,13 @@ function detectStage(
   if (intentType === "service_inquiry") return "service";
   if (intentType === "problem") return "strategy";
 
-  if (/(hire|book|schedule|call|start|work with you)/i.test(msg))
+  if (/(hire|book|schedule|call|start|work with you|consult)/i.test(msg))
     return "conversion";
 
-  if (/(price|cost|service|offer)/i.test(msg))
+  if (/(price|cost|service|offer|plan|package)/i.test(msg))
     return "service";
 
-  if (/(how|improve|fix|scale|optimize|strategy)/i.test(msg))
+  if (/(how|improve|fix|scale|optimize|strategy|grow|increase)/i.test(msg))
     return "strategy";
 
   return "discovery";
@@ -103,28 +107,27 @@ function computeExecutionSignals(params: {
 }) {
   const { stage, leadScore, highIntent, message } = params;
 
-  const isShort = message.length < 40;
+  const isShort = message.length < 35;
 
-  // 🔥 Phase 5 smarter blending (less rigid thresholds)
   const executionMode: ExecutionMode =
-    highIntent || stage === "conversion" || leadScore >= 0.6
+    highIntent || stage === "conversion" || leadScore >= 0.65
       ? "execution"
       : "exploration";
 
   const shouldGiveCTA =
     executionMode === "execution" ||
-    leadScore >= 0.7 ||
+    leadScore >= 0.75 ||
     stage === "service";
 
   const shouldAskQuestion =
     executionMode === "exploration" &&
-    !highIntent &&
     leadScore < 0.6 &&
+    !highIntent &&
     !isShort;
 
   const confidenceLevel = Math.min(
     1,
-    leadScore * 0.7 + (highIntent ? 0.3 : 0)
+    leadScore * 0.75 + (highIntent ? 0.25 : 0)
   );
 
   return {
@@ -158,15 +161,21 @@ export async function strategicBrain(
   /* ---------- CONTEXT SHIFT ---------- */
   const hasShift = detectContextShift(message, strategicMemory);
 
-  if (hasShift && message.length > 20) {
-    strategicMemory = {};
+  if (hasShift) {
+    strategicMemory = {
+      servicesDiscussed: [],
+      industry: undefined,
+      businessType: undefined,
+      leadScore: 0,
+      stage: "discovery",
+    };
   }
 
   /* ---------- NEURAL INTENT ---------- */
   let intent: any = {};
 
   try {
-    intent = neuralBrain(message) || {};
+    intent = neuralBrain?.(message) || {};
   } catch {
     intent = {};
   }
@@ -178,12 +187,12 @@ export async function strategicBrain(
   let leadScore = 0;
 
   try {
-    const scoreResult = leadQualifier.scoreLead(sessionId || "anon", {
-      need: intentType === "problem" ? 0.5 : 0.2,
-      authority: highIntent ? 0.7 : 0.2,
+    const scoreResult = leadQualifier?.scoreLead?.(sessionId || "anon", {
+      need: intentType === "problem" ? 0.55 : 0.25,
+      authority: highIntent ? 0.75 : 0.25,
     });
 
-    leadScore = Number(scoreResult?.total || 0);
+    leadScore = Number(scoreResult?.total ?? 0);
   } catch {
     leadScore = 0;
   }
@@ -201,7 +210,7 @@ export async function strategicBrain(
 
   /* ---------- CONTEXT QUALITY ---------- */
   const hasSufficientContext =
-    message.length > 12 ||
+    message.length > 10 ||
     intentType === "problem" ||
     intentType === "service_inquiry" ||
     highIntent;
@@ -212,7 +221,7 @@ export async function strategicBrain(
       message: userMessage,
       stage,
       leadScore,
-      detectedServices: strategicMemory.servicesDiscussed || [],
+      detectedServices: strategicMemory?.servicesDiscussed || [],
       executionMode: signals.executionMode,
       hasSufficientContext,
       intentType,

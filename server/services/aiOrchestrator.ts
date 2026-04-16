@@ -18,27 +18,25 @@ export interface OrchestratorResult {
   leadScore: LeadScore;
 }
 
-/* ======================= SERVICE DETECTOR (FIXED) ======================= */
+/* ======================= SERVICE DETECTOR ======================= */
 export function detectServicesFromIntents(
   intentsDetected: { intent: Intent; score: number }[]
 ): ServiceRecommendation[] {
   const services: ServiceRecommendation[] = [];
 
-  for (const item of intentsDetected) {
-    const intent = item.intent;
-
+  for (const item of intentsDetected || []) {
+    const intent = item?.intent;
     if (!intent) continue;
 
-    // 🔥 improved detection (service OR high-value keyword match)
     const isService =
-      intent.type === "service" ||
-      intent.category === "service" ||
-      intent.name.includes("service");
+      intent?.type === "service" ||
+      intent?.category === "service" ||
+      (typeof intent?.name === "string" && intent.name.includes("service"));
 
     if (isService) {
       services.push({
-        service: intent.name,
-        confidence: Math.min(Math.max(item.score || 0, 0), 1),
+        service: intent.name || "unknown_service",
+        confidence: Math.max(0, Math.min(1, item?.score ?? 0)),
       });
     }
   }
@@ -46,7 +44,7 @@ export function detectServicesFromIntents(
   return services.sort((a, b) => b.confidence - a.confidence);
 }
 
-/* ======================= NORMALIZE INTENT SIGNALS ======================= */
+/* ======================= SIGNAL EXTRACTION ======================= */
 function extractLeadSignals(intents: { intent: Intent; score: number }[]) {
   const signals = {
     hire: false,
@@ -54,10 +52,10 @@ function extractLeadSignals(intents: { intent: Intent; score: number }[]) {
     serviceInterest: false,
   };
 
-  for (const i of intents) {
-    if (i.intent.name === "hire_intent") signals.hire = true;
-    if (i.intent.type === "buying") signals.buying = true;
-    if (i.intent.type === "service") signals.serviceInterest = true;
+  for (const i of intents || []) {
+    if (i?.intent?.name === "hire_intent") signals.hire = true;
+    if (i?.intent?.type === "buying") signals.buying = true;
+    if (i?.intent?.type === "service") signals.serviceInterest = true;
   }
 
   return signals;
@@ -79,7 +77,6 @@ export async function processUserMessage(
     detectedIntents = [];
   }
 
-  // 🔥 ensure stability
   if (!Array.isArray(detectedIntents)) {
     detectedIntents = [];
   }
@@ -97,7 +94,7 @@ export async function processUserMessage(
   /* ---------- 3️⃣ SIGNAL EXTRACTION ---------- */
   const signals = extractLeadSignals(detectedIntents);
 
-  /* ---------- 4️⃣ LEAD SCORING (FIXED SYNC USAGE) ---------- */
+  /* ---------- 4️⃣ LEAD SCORING ---------- */
   let leadScore: LeadScore = {
     total: 0,
     budget: 0,
@@ -107,17 +104,24 @@ export async function processUserMessage(
   };
 
   try {
-    leadScore = leadQualifier.scoreLead(
+    const rawScore = leadQualifier.scoreLead(
       sessionId,
       {
-        // 🔥 SAFE BANT SIGNALS
         budget: signals.hire ? 0.8 : 0,
         authority: signals.buying ? 0.7 : 0,
-        need: signals.serviceInterest || recommendedServices.length > 0 ? 0.6 : 0,
+        need:
+          signals.serviceInterest || recommendedServices.length > 0
+            ? 0.6
+            : 0,
         timeline: signals.hire ? 0.5 : 0,
       },
       "discovery"
     );
+
+    leadScore = {
+      ...rawScore,
+      total: Math.max(0, Math.min(1, rawScore.total ?? 0)),
+    };
   } catch (err) {
     console.warn("Lead scoring failed:", err);
   }

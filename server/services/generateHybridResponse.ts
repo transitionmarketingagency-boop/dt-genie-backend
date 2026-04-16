@@ -245,9 +245,10 @@ function isGoodResponse(text: unknown): text is string {
   if (typeof text !== "string") return false;
 
   const clean = text.trim();
+  const lower = clean.toLowerCase();
 
-  if (clean.length < 60) return false;
-  if (clean.split(" ").length < 10) return false;
+  if (clean.length < 80) return false;
+  if (clean.split(" ").length < 12) return false;
 
   const badPatterns = [
     "you're trying to",
@@ -260,11 +261,22 @@ function isGoodResponse(text: unknown): text is string {
     "@",
     "http",
     "www.",
+    "intent:",
+    "examples:",
+    "response:",
+    "faq [",
+    "source:",
+    "{",
+    "}",
   ];
 
-  return !badPatterns.some((p) =>
-    clean.toLowerCase().includes(p)
-  );
+  if (badPatterns.some((p) => lower.includes(p))) return false;
+
+  // 🔥 prevent garbage repetition / loops
+  const sentences = clean.split(/[.!?]/).map(s => s.trim()).filter(Boolean);
+  if (sentences.length >= 2 && sentences[0] === sentences[1]) return false;
+
+  return true;
 }
 
 function shouldResetContext(message: string): boolean {
@@ -292,6 +304,34 @@ function repairResponse(text: string): string {
   }
 
   return fixed.replace(/\s+/g, " ").trim();
+}
+
+function sanitizeFinalOutput(text: string): string {
+  if (!text) return "";
+
+  let cleaned = text;
+
+  // remove dataset / vector leaks
+  if (
+    cleaned.includes('"intent"') ||
+    cleaned.includes('"examples"') ||
+    cleaned.includes('"response"') ||
+    cleaned.includes("FAQ [") ||
+    cleaned.includes("Source:")
+  ) {
+    return "Let me give you a clear answer based on your situation.\n\nCan you clarify your main goal right now?";
+  }
+
+  // remove fake system outputs
+  cleaned = cleaned.replace(/system is now operational.*$/i, "");
+
+  // remove tool mentions again (double safety)
+  cleaned = cleaned.replace(
+    /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini)\b/gi,
+    ""
+  );
+
+  return cleaned.trim();
 }
 
 
@@ -406,11 +446,14 @@ if (isFirstMessage && isGreeting) {
 
     // ================= CONTINUITY SIGNAL =================
 
-    const hasContextContinuity =
-      typeof historyText === "string" &&
-      historyText.length > 120 &&
-      (hasServiceContext || message.length > 20 || fusedChunksText.length > 100);
-
+const hasContextContinuity =
+  typeof historyText === "string" &&
+  historyText.length > 80 &&
+  (
+    hasServiceContext ||
+    fusedChunksText.length > 80 ||
+    message.length > 25
+  );
     if (hasContextContinuity) {
     }
 
@@ -419,7 +462,7 @@ if (isFirstMessage && isGreeting) {
     const prompt = buildHybridPrompt({
       brainContext: {
         ...brainContext,
-        entryMode, // Phase 5 signal (clean + single source)
+     entryMode: finalEntryMode,
       },
       leadScoreValue,
       detectedIntentNames,
@@ -462,11 +505,13 @@ if (isFirstMessage && isGreeting) {
     // ================= FINAL FALLBACK =================
 
     if (!response) {
-      response = fusedChunksText
-        ? fusedChunksText.split("\n\n")[0]
-: isFirstMessage && isGreeting
-        ? "Tell me a bit about your business so I can guide you properly."
-        : "I need a bit more detail to give you a precise answer — what exactly are you trying to achieve?";
+response = fusedChunksText
+  ? fusedChunksText.split("\n\n")[0]
+  : isFirstMessage && isGreeting
+  ? "Tell me what you're trying to improve in your business right now."
+  : brainContext?.detectedServices?.length
+  ? `To give you a precise answer, I need a bit more detail about your ${brainContext.detectedServices[0]} setup. What are you currently doing?`
+  : "Can you clarify your main goal or what you're trying to achieve?";
     }
 
     // ================= CLEANING =================
@@ -479,17 +524,18 @@ if (isFirstMessage && isGreeting) {
     try {
       const optimizer = await loadOptimizer();
 
-      if (optimizer) {
-        const result = optimizer(response || "");
+if (optimizer) {
+  const result = optimizer(response || "");
 
-        if (
-          result &&
-          typeof result === "object" &&
-          typeof result.optimized === "string"
-        ) {
-          response = result.optimized;
-        }
-      }
+  if (
+    result &&
+    typeof result === "object" &&
+    typeof result.optimized === "string" &&
+    isGoodResponse(result.optimized)
+  ) {
+    response = result.optimized;
+  }
+}
     } catch {}
 
     // ================= SAFETY =================
@@ -500,7 +546,8 @@ if (isFirstMessage && isGreeting) {
 
     // ================= BOT ENFORCEMENT =================
 
-    response = enforceBotName(response || "");
+response = sanitizeFinalOutput(response || "");
+response = enforceBotName(response || "");
 
 /* ================= CTA ENGINE (PHASE 5.5) ================= */
 
@@ -512,7 +559,11 @@ const cta = generateCTA({
   executionMode: brainContext?.executionMode,
 });
 
-if (cta && typeof response === "string") {
+if (
+  cta &&
+  typeof response === "string" &&
+  !detectBookingRejection(message)
+) {
   response += cta;
 }
 

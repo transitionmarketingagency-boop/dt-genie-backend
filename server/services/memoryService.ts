@@ -36,18 +36,48 @@ function normalizeContent(text: unknown): string {
     .replace(/[\u0000-\u001F\u007F]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()
-    .slice(0, 8000);
+    .slice(0, 3000); // reduced slightly (prevents payload pollution)
+}
+
+/* 🔥 CRITICAL FIX: block dataset / garbage leaks */
+function isGarbage(text: string): boolean {
+  if (!text) return true;
+
+  return (
+    text.includes('"intent"') ||
+    text.includes('"examples"') ||
+    text.includes('"response"') ||
+    text.includes('"category"') ||
+    text.includes("FAQ [") ||
+    text.includes("Source:") ||
+    text.includes("Phase ") ||
+    text.length > 2000
+  );
 }
 
 function isLowValue(text: string): boolean {
   if (!text) return true;
   if (text.length < 10) return true;
-  if (/^(ok|yes|no|hi|hello)$/i.test(text)) return true;
+  if (/^(ok|yes|no|hi|hello|hey)$/i.test(text)) return true;
   return false;
 }
 
-function isContextShift(message: string): boolean {
-  return /(i run|i have|my business|we are|new business)/i.test(message);
+/* 🔥 improved context shift */
+function detectIndustry(message: string): string | null {
+  const msg = message.toLowerCase();
+
+  if (msg.includes("saas")) return "saas";
+  if (msg.includes("ecom")) return "ecommerce";
+  if (msg.includes("real estate")) return "real_estate";
+  if (msg.includes("hotel")) return "hospitality";
+
+  return null;
+}
+
+function isContextShift(message: string, existing?: string): boolean {
+  const detected = detectIndustry(message);
+  if (!detected || !existing) return false;
+  return detected !== existing;
 }
 
 function safeParse<T>(value: unknown, fallback: T): T {
@@ -92,7 +122,6 @@ export interface StrategicMemory {
   lastInteraction?: number;
   isStale?: boolean;
 
-  /* PHASE 2 */
   conversionProbability?: number;
   ctaReadiness?: number;
   intentMomentum?: number;
@@ -178,7 +207,7 @@ export class MemoryService {
     const db = await this.db;
     const normalized = normalizeContent(content);
 
-    if (!normalized) return null;
+    if (!normalized || isGarbage(normalized)) return null;
 
     const last = await db.get(
       `SELECT * FROM chat_messages WHERE sessionId=? ORDER BY datetime(timestamp) DESC LIMIT 1`,
@@ -252,7 +281,7 @@ export class MemoryService {
     );
 
     return rows
-      .filter((r: any) => !isLowValue(r.content))
+      .filter((r: any) => !isLowValue(r.content) && !isGarbage(r.content))
       .slice(0, MAX_CONTEXT_MESSAGES)
       .reverse()
       .map((r: any) => ({
@@ -285,73 +314,44 @@ export class MemoryService {
       servicesDiscussed: safeParse(row.servicesDiscussed, []),
       leadScore: row.leadScore,
       stage: row.stage,
-
       budget: row.budget,
       timeline: row.timeline,
       decisionMaker: row.decisionMaker,
       interestLevel: row.interestLevel,
-
       lastUserProblem: row.lastUserProblem,
       lastDetectedServices: safeParse(row.lastDetectedServices, []),
       lastIntent: row.lastIntent,
-
       bantSignals: safeParse(row.bantSignals, {}),
-
       conversionProbability: row.conversionProbability,
       ctaReadiness: row.ctaReadiness,
       intentMomentum: row.intentMomentum,
-
       updatedAt: row.updatedAt,
       lastInteraction: last,
       isStale,
     };
   }
 
-  /* ---------- UPDATE MEMORY ---------- */
+  /* ✅ RESTORED (FIXES YOUR ERROR) */
   async updateStrategicMemory(
     sessionId: string,
     data: Partial<StrategicMemory>
   ) {
     const db = await this.db;
-
     const existing = await this.getStrategicMemory(sessionId);
 
-    // 🔥 SAFE MERGE (NO DATA LOSS)
+    if (
+      data.lastUserProblem &&
+      isContextShift(data.lastUserProblem, existing.industry)
+    ) {
+      await db.run(`DELETE FROM strategic_memory WHERE sessionId=?`, sessionId);
+    }
+
     const merged: StrategicMemory = {
       ...existing,
       ...data,
       updatedAt: new Date().toISOString(),
       lastInteraction: Date.now(),
-
-      conversionProbability:
-        data.leadScore !== undefined
-          ? Math.min(1, data.leadScore / 100 + 0.1)
-          : existing.conversionProbability ?? 0,
-
-      ctaReadiness:
-        data.stage === "decision"
-          ? 0.9
-          : data.stage === "consideration"
-          ? 0.6
-          : existing.ctaReadiness ?? 0.3,
-
-      intentMomentum:
-        Array.isArray(data.servicesDiscussed)
-          ? Math.min(1, data.servicesDiscussed.length * 0.15)
-          : existing.intentMomentum ?? 0,
     };
-
-    // ⚠️ SAFE RESET (only if clearly new context)
-    if (
-      data.lastUserProblem &&
-      isContextShift(data.lastUserProblem) &&
-      existing.businessType
-    ) {
-      await db.run(
-        `DELETE FROM strategic_memory WHERE sessionId=?`,
-        sessionId
-      );
-    }
 
     await db.run(
       `INSERT INTO strategic_memory VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

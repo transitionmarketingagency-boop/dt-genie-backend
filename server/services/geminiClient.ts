@@ -37,9 +37,10 @@ function cleanPrompt(prompt: string) {
 
 /* ================= VALIDATION ================= */
 function isValidResponse(text: string | null | undefined): text is string {
-  if (!text || text.length < 40) return false;
+  if (!text) return false;
 
-  const t = text.toLowerCase();
+  const t = text.trim();
+  if (t.length < 40) return false;
 
   const badPatterns = [
     "```",
@@ -50,25 +51,27 @@ function isValidResponse(text: string | null | undefined): text is string {
     "<|",
   ];
 
-  if (badPatterns.some((p) => t.includes(p))) return false;
+  const lower = t.toLowerCase();
+  if (badPatterns.some((p) => lower.includes(p))) return false;
 
   return true;
 }
 
 function fixSpacing(text: string): string {
-  return text
+  return (text || "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
 }
 
 function ensureComplete(text: string): string {
+  if (!text) return "";
   return /[.!?]$/.test(text) ? text : text + ".";
 }
 
 /* ================= INTENT ================= */
 function detectHighIntent(prompt: string): boolean {
-  const text = prompt.toLowerCase();
+  const text = (prompt || "").toLowerCase();
   return [
     "hire",
     "book",
@@ -89,6 +92,7 @@ export async function generateGemini(
   if (!API_KEY) return null;
 
   prompt = cleanPrompt(prompt);
+  if (!prompt) return null;
 
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
@@ -105,7 +109,9 @@ export async function generateGemini(
       contextText = `Stage: ${brainContext?.stage || "unknown"} | LeadScore: ${
         brainContext?.leadScore || 0
       }`;
-    } catch {}
+    } catch {
+      contextText = "";
+    }
   }
 
   const highIntent = detectHighIntent(prompt);
@@ -146,8 +152,6 @@ Answer:
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
-
     if (!res.ok) {
       console.error("[Gemini HTTP Error]", res.status);
       return null;
@@ -156,7 +160,7 @@ Answer:
     const data: any = await res.json();
 
     const raw =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text || null;
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
 
     if (!isValidResponse(raw)) return null;
 
@@ -167,9 +171,10 @@ Answer:
 
     return content;
   } catch (err: any) {
-    clearTimeout(timeout);
     console.warn("[Gemini Error]", err?.message || err);
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

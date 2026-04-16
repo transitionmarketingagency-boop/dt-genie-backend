@@ -32,19 +32,20 @@ function isValidResponse(text: string | null | undefined): text is string {
   if (!text) return false;
 
   const t = text.trim();
-
   if (t.length < 80) return false;
-  if (t.split(" ").length < 12) return false;
+
+  const words = t.split(/\s+/);
+  if (words.length < 12) return false;
+
   if (t.includes("undefined")) return false;
   if (t.includes("Something broke")) return false;
-  if (!/[.?!]$/.test(t)) return false;
 
   return true;
 }
 
 /* ================= FINAL NORMALIZER ================= */
 function finalize(text: string): string {
-  return text
+  return (text || "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
@@ -55,6 +56,11 @@ async function callOpenRouter(
   prompt: string,
   temperature: number
 ): Promise<string | null> {
+  if (!OPENROUTER_API_KEY) {
+    console.warn("[OpenRouter] Missing API Key");
+    return null;
+  }
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
@@ -74,8 +80,6 @@ async function callOpenRouter(
       signal: controller.signal,
     });
 
-    clearTimeout(timeout);
-
     if (!res.ok) {
       console.error("[OpenRouter HTTP Error]", res.status);
       return null;
@@ -92,15 +96,14 @@ async function callOpenRouter(
 
     return cleanResponse(raw);
   } catch (err: any) {
-    clearTimeout(timeout);
-
     if (err?.name === "AbortError") {
       console.warn("[OpenRouter] Timeout");
     } else {
       console.error("[OpenRouter] Error:", err);
     }
-
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -110,12 +113,16 @@ export async function generateOpenRouter(
   sessionId?: string
 ): Promise<string | null> {
   if (!OPENROUTER_API_KEY) {
-    throw new Error("Missing OpenRouter API Key");
+    console.warn("[OpenRouter] Disabled - missing key");
+    return null;
   }
 
   prompt = cleanPrompt(prompt);
 
+  if (!prompt) return null;
+
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
+
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
   let attempt = 0;
@@ -129,10 +136,8 @@ export async function generateOpenRouter(
       break;
     }
 
-    // retry with stronger instruction
     const retryPrompt =
-      prompt +
-      "\n\nIMPORTANT: Respond in complete structured sentences. No cutoff.";
+      prompt + "\n\nIMPORTANT: Respond in complete structured sentences.";
 
     const retry = await callOpenRouter(retryPrompt, 0.65);
 
