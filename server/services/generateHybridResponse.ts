@@ -121,6 +121,7 @@ export function buildHybridPrompt({
   vectorText,
   historyText,
   message,
+priorityInstruction,
 }: {
   brainContext: BrainContext;
   leadScoreValue: number;
@@ -128,6 +129,7 @@ export function buildHybridPrompt({
   vectorText: string;
   historyText: string;
   message: string;
+priorityInstruction?: string;
 }) {
 
   const hasVectorKnowledge =
@@ -198,7 +200,9 @@ IMPORTANT:
 
 --------------------------------------------------
 
-USER MESSAGE
+USER MESSAGE (HIGHEST PRIORITY)
+
+${priorityInstruction || ""}
 
 ${message}
 
@@ -299,9 +303,14 @@ function repairResponse(text: string): string {
 
   if (!fixed) return "";
 
-  if (!/[.?!]$/.test(fixed)) {
-    fixed += ".";
-  }
+if (!/[.?!]$/.test(fixed)) {
+  fixed += ".";
+}
+
+// 🔥 force completion feel
+if (fixed.length < 120) {
+  fixed += " This is the core idea — execution is what drives results.";
+}
 
   return fixed.replace(/\s+/g, " ").trim();
 }
@@ -384,6 +393,17 @@ const entryMode =
 
 // SAFE alias (no re-declaration risk, no TS narrowing issues)
 const finalEntryMode = entryMode;
+
+
+/* ================= HIGH INTENT OVERRIDE ================= */
+
+if (isHighIntent && !detectBookingRejection(message)) {
+  const closeResponse =
+    "Got it — you're ready to move forward. The fastest way is to get on a quick call so we can fix this properly based on your setup. I’ll walk you through exactly what we’d change and how we’d improve results.";
+
+  await memoryService.addMessage(sessionId, "assistant", closeResponse);
+  return closeResponse;
+}
 
 /* ================= SMART ONBOARDING SHORTCUT ================= */
 
@@ -476,7 +496,16 @@ const safeHistoryText =
       detectedIntentNames,
       vectorText: fusedChunksText,
       historyText: safeHistoryText,
-       message: message.trim(), // 🔥 ensure raw latest message
+     message: message.trim(),
+
+// 🔥 HARD PRIORITY SIGNAL
+// Ensures model NEVER answers previous question
+priorityInstruction: `
+IMPORTANT:
+- Answer ONLY the latest USER MESSAGE
+- Ignore previous questions unless explicitly referenced
+- Do NOT continue old answers
+`,
     });
 
     let response: string | null = null;
@@ -517,8 +546,8 @@ response =
   isGreeting
     ? "Tell me what you're trying to improve in your business right now."
     : message.length < 10
-    ? "Can you clarify your goal a bit more so I can give a precise answer?"
-    : "Let me give you a clear answer based on your situation.";
+    ? "Give me a bit more detail about your situation so I can give you a precise answer."
+    : `Based on your situation: ${message.slice(0, 80)} — here’s what matters most.`;
     }
 
     // ================= CLEANING =================
@@ -563,14 +592,18 @@ try {
 
   const lastBotMessage = lastMessages?.find((m: any) => m.role === "assistant")?.content;
 
-  if (
-    lastBotMessage &&
-    typeof response === "string" &&
-    response.slice(0, 100) === lastBotMessage.slice(0, 100)
-  ) {
-    // 🔥 force variation
-    response += " Let’s approach this from a slightly different angle.";
+if (lastBotMessage && typeof response === "string") {
+  const similarity =
+    response.slice(0, 120) === lastBotMessage.slice(0, 120);
+
+  if (similarity) {
+    response =
+      "Let me answer that more directly based on your situation.\n\n" +
+      response +
+      "\n\nThe key issue here is usually conversion or targeting mismatch — fixing that is where results come from.";
   }
+}
+
 } catch {}
 
 /* ================= CTA ENGINE (PHASE 5.5) ================= */
@@ -590,8 +623,9 @@ const shouldAddCTA =
   typeof response === "string" &&
   !detectBookingRejection(message) &&
   !isGreeting &&
-  leadScoreValue >= 0.5 &&
-  !/^(hi|hello|hey)\b/i.test(message);
+  leadScoreValue >= 0.6 && // 🔥 stricter
+  !/^(hi|hello|hey)\b/i.test(message) &&
+  !response.toLowerCase().includes("clarify your goal");
 
 if (shouldAddCTA) {
   response += "\n\n" + cta;
