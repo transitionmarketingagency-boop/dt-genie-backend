@@ -10,6 +10,20 @@ export type RoutedResponse = {
   qualityScore: number;
 };
 
+/* ================= VALIDATOR ================= */
+function isStrongResponse(text: string | null): boolean {
+  if (!text) return false;
+
+  const t = text.trim();
+
+  if (t.length < 80) return false;
+  if (t.split(" ").length < 12) return false;
+
+  if (/undefined|error|something broke/i.test(t)) return false;
+
+  return true;
+}
+
 /* ================= MAIN ORCHESTRATOR ================= */
 export async function modelRouter(params: {
   prompt: string;
@@ -19,71 +33,74 @@ export async function modelRouter(params: {
 
   if (!prompt) return null;
 
-  /* ================= STEP 1: OPENROUTER ================= */
-  let primary: string | null = null;
+  let openrouterRes: string | null = null;
+  let geminiRes: string | null = null;
 
+  /* ================= STEP 1: OPENROUTER ================= */
   try {
-    primary = await withTimeout(
+    openrouterRes = await withTimeout(
       generateOpenRouter(prompt, sessionId),
-      12000
+      9000
     );
   } catch {
-    primary = null;
+    openrouterRes = null;
   }
 
-  if (!primary) {
-    primary = "I couldn't generate a response right now. Please try again.";
+  /* ================= STEP 2: GEMINI ================= */
+  try {
+    geminiRes = await withTimeout(
+      generateGemini(prompt, sessionId),
+      9000
+    );
+  } catch {
+    geminiRes = null;
   }
 
-  /* ================= STEP 2: QUALITY CHECK ================= */
-  const quality = processResponse(primary);
+  /* ================= STEP 3: VALIDATION ================= */
+  const openValid = isStrongResponse(openrouterRes);
+  const geminiValid = isStrongResponse(geminiRes);
 
-  let finalText = quality.optimized;
+  let finalText = "";
   let usedModel: RoutedResponse["usedModel"] = "openrouter";
 
-  /* ================= STEP 3: GEMINI ESCALATION ================= */
-  if (quality.quality.isWeak) {
-    try {
-      const gemini = await withTimeout(
-        generateGemini(prompt, sessionId),
-        9000
-      );
+  /* ================= STEP 4: DECISION ================= */
 
-      if (gemini && gemini.length > finalText.length) {
-        finalText = gemini;
-        usedModel = "gemini";
-      } else if (gemini) {
-        // hybrid merge (best of both)
-        finalText = mergeResponses(finalText, gemini);
-        usedModel = "hybrid";
-      }
-    } catch {
-      // silent fail
-    }
+  if (geminiValid && !openValid) {
+    finalText = geminiRes!;
+    usedModel = "gemini";
+  } else if (openValid && !geminiValid) {
+    finalText = openrouterRes!;
+    usedModel = "openrouter";
+  } else if (openValid && geminiValid) {
+    // 🔥 pick better structured (longer but not bloated)
+    finalText =
+      geminiRes!.length > openrouterRes!.length
+        ? geminiRes!
+        : openrouterRes!;
+    usedModel = "hybrid";
+  } else {
+    finalText =
+      openrouterRes ||
+      geminiRes ||
+      "I couldn't generate a proper response. Try rephrasing.";
   }
 
-  /* ================= FINAL CLEANUP ================= */
-  finalText = processResponse(finalText).optimized;
+  /* ================= STEP 5: OPTIMIZATION ================= */
+  try {
+    const optimized = processResponse(finalText);
+
+    if (
+      optimized &&
+      typeof optimized.optimized === "string" &&
+      optimized.optimized.length > 40
+    ) {
+      finalText = optimized.optimized;
+    }
+  } catch {}
 
   return {
     text: finalText,
     usedModel,
-    qualityScore: quality.quality.score,
+    qualityScore: finalText.length / 100, // simple proxy
   };
-}
-
-/* ================= MERGE ENGINE ================= */
-function mergeResponses(a: string, b: string): string {
-  if (!a) return b;
-  if (!b) return a;
-
-  const aLen = a.length;
-  const bLen = b.length;
-
-  // keep more complete + structured answer
-  if (bLen > aLen && bLen > 200) return b;
-
-  if (aLen > bLen && aLen > 200) return a;
-
-  return a + "\n\n" + b;
 }

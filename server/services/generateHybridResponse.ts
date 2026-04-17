@@ -429,33 +429,41 @@ if (isFirstMessage && isGreeting) {
       Array.isArray(brainContext.detectedServices) &&
       brainContext.detectedServices.length > 0;
 
-    // ================= VECTOR =================
+// ================= VECTOR (SMART RETRIEVAL FIX) =================
 
-    let fusedChunksText = "";
+let fusedChunksText = "";
 
-    try {
-      const chunks = await getFusedChunks(message, 4);
+const shouldUseRetrieval =
+  message.length > 20 &&
+  !/^(hi|hello|hey|yo)\b/i.test(message) &&
+  !/(who are you|what do you do)/i.test(message);
 
-      fusedChunksText = (chunks || [])
-        .map((c: any) => c?.text)
-        .filter(Boolean)
-        .join("\n\n");
-    } catch {
-      fusedChunksText = "";
-    }
+if (shouldUseRetrieval) {
+  try {
+    const chunks = await getFusedChunks(message, 3); // 🔥 reduced from 4 → 3
+
+    fusedChunksText = (chunks || [])
+      .map((c: any) => c?.text)
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 1200); // 🔥 HARD LIMIT to prevent overload
+  } catch {
+    fusedChunksText = "";
+  }
+}
 
     // ================= CONTINUITY SIGNAL =================
 
-const hasContextContinuity =
-  typeof historyText === "string" &&
-  historyText.length > 80 &&
-  (
-    hasServiceContext ||
-    fusedChunksText.length > 80 ||
-    message.length > 25
-  );
-    if (hasContextContinuity) {
-    }
+// ================= CONTEXT CONTROL (ANTI-BLEED FIX) =================
+
+const isNewTopic =
+  shouldResetContext(message) ||
+  message.length > 40 && !message.toLowerCase().includes("that");
+
+const safeHistoryText =
+  isNewTopic || isGreeting
+    ? "" // 🔥 HARD RESET
+    : (historyText || "").slice(-800); // 🔥 LIMIT HISTORY
 
     // ================= PROMPT =================
 
@@ -467,8 +475,8 @@ const hasContextContinuity =
       leadScoreValue,
       detectedIntentNames,
       vectorText: fusedChunksText,
-      historyText,
-      message,
+      historyText: safeHistoryText,
+       message: message.trim(), // 🔥 ensure raw latest message
     });
 
     let response: string | null = null;
@@ -505,13 +513,12 @@ const hasContextContinuity =
     // ================= FINAL FALLBACK =================
 
     if (!response) {
-response = fusedChunksText
-  ? fusedChunksText.split("\n\n")[0]
-  : isFirstMessage && isGreeting
-  ? "Tell me what you're trying to improve in your business right now."
-  : brainContext?.detectedServices?.length
-  ? `To give you a precise answer, I need a bit more detail about your ${brainContext.detectedServices[0]} setup. What are you currently doing?`
-  : "Can you clarify your main goal or what you're trying to achieve?";
+response =
+  isGreeting
+    ? "Tell me what you're trying to improve in your business right now."
+    : message.length < 10
+    ? "Can you clarify your goal a bit more so I can give a precise answer?"
+    : "Let me give you a clear answer based on your situation.";
     }
 
     // ================= CLEANING =================
@@ -549,6 +556,23 @@ if (optimizer) {
 response = sanitizeFinalOutput(response || "");
 response = enforceBotName(response || "");
 
+// ================= DUPLICATE RESPONSE PROTECTION =================
+
+try {
+  const lastMessages = await memoryService.getRecentMessages(sessionId, 2);
+
+  const lastBotMessage = lastMessages?.find((m: any) => m.role === "assistant")?.content;
+
+  if (
+    lastBotMessage &&
+    typeof response === "string" &&
+    response.slice(0, 100) === lastBotMessage.slice(0, 100)
+  ) {
+    // 🔥 force variation
+    response += " Let’s approach this from a slightly different angle.";
+  }
+} catch {}
+
 /* ================= CTA ENGINE (PHASE 5.5) ================= */
 
 const cta = generateCTA({
@@ -559,12 +583,18 @@ const cta = generateCTA({
   executionMode: brainContext?.executionMode,
 });
 
-if (
+// ================= CTA CONTROL (ANTI-SPAM FIX) =================
+
+const shouldAddCTA =
   cta &&
   typeof response === "string" &&
-  !detectBookingRejection(message)
-) {
-  response += cta;
+  !detectBookingRejection(message) &&
+  !isGreeting &&
+  leadScoreValue >= 0.5 &&
+  !/^(hi|hello|hey)\b/i.test(message);
+
+if (shouldAddCTA) {
+  response += "\n\n" + cta;
 }
 
     // ================= SAVE =================

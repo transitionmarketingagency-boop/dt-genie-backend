@@ -293,6 +293,47 @@ export class MemoryService {
       }));
   }
 
+/* ---------- RECENT MESSAGES (CRITICAL FIX) ---------- */
+async getRecentMessages(
+  sessionId: string,
+  limit: number = 4
+): Promise<ChatMessage[]> {
+  const db = await this.db;
+
+  const rows = await db.all(
+    `SELECT * FROM chat_messages 
+     WHERE sessionId=? 
+     ORDER BY datetime(timestamp) DESC 
+     LIMIT ?`,
+    sessionId,
+    limit * 2 // 🔥 fetch extra to filter garbage
+  );
+
+  return rows
+    .filter((r: any) => {
+      if (!r?.content) return false;
+
+      const text = r.content.trim();
+
+      // ❌ remove garbage / system leaks
+      if (isGarbage(text)) return false;
+
+      // ❌ remove low-value noise
+      if (isLowValue(text)) return false;
+
+      return true;
+    })
+    .slice(0, limit)
+    .reverse()
+    .map((r: any) => ({
+      id: r.id,
+      sessionId: r.sessionId,
+      role: r.role,
+      content: r.content,
+      timestamp: new Date(r.timestamp),
+    }));
+}
+
   /* ---------- STRATEGIC MEMORY ---------- */
   async getStrategicMemory(sessionId: string): Promise<StrategicMemory> {
     const db = await this.db;
