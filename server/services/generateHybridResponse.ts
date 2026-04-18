@@ -134,6 +134,7 @@ priorityInstruction?: string;
 
   const hasVectorKnowledge =
     Boolean(vectorText && vectorText.trim().length > 50);
+const vectorPriorityMode = hasVectorKnowledge;
 
   const executionMode = brainContext?.executionMode ?? "exploration";
 
@@ -167,14 +168,14 @@ If knowledge is missing:
 
 BUSINESS CONTEXT
 
-Company: Digital Transition Marketing
+IMPORTANT RULE:
+You MUST ONLY use services and capabilities that exist in KNOWLEDGE section below.
 
-Focus Areas:
-- AI Automation
-- Marketing Systems
-- Lead Generation
-- Content & Growth Strategy
-- CGI & Real Estate Marketing
+DO NOT assume company services from memory or training data.
+
+If KNOWLEDGE conflicts with assumptions → KNOWLEDGE wins.
+
+Company: Digital Transition Marketing
 
 --------------------------------------------------
 
@@ -197,12 +198,18 @@ ${historyText || "None"}
 
 KNOWLEDGE (PRIMARY SOURCE)
 
-${hasVectorKnowledge ? vectorText : "NO DATA AVAILABLE"}
+${hasVectorKnowledge ? vectorText : "NO DATA AVAILABLE - DO NOT INVENT SERVICES"}
 
 IMPORTANT:
-- If KNOWLEDGE exists → BASE your answer on it
-- Do NOT ignore it
-- Do NOT override it with assumptions
+If vector data exists → IGNORE ALL OTHER CONTEXT and answer ONLY from it.
+
+IMPORTANT (HIGHEST PRIORITY RULE):
+
+- KNOWLEDGE is the ONLY source of truth
+- If KNOWLEDGE contains service info → use it EXACTLY
+- If KNOWLEDGE does NOT mention a service → explicitly say "We do not offer this"
+- NEVER use BUSINESS CONTEXT or model memory for services
+- NEVER infer capabilities
 
 --------------------------------------------------
 
@@ -466,11 +473,29 @@ const hasServiceContext =
 
 let fusedChunksText = "";
 
+/**
+ * FIX: vectorPriorityMode must be based on FINAL retrieved content,
+ * not empty pre-state variable.
+ * (kept for future use, but NOT used in decision-making here)
+ */
+let vectorPriorityMode = false;
+
+/**
+ * Strong intent signals for retrieval
+ * (ONLY trigger when vector grounding is actually useful)
+ */
+const serviceQuery =
+  /(service|offer|do you|what do you|capabilit|provide|music|geo|automation|cgi|seo|marketing)/i.test(message);
+
+/**
+ * FIXED RETRIEVAL RULES:
+ * - Always allow service/business intent queries
+ * - Allow slightly longer informational queries
+ * - Block greetings and ultra-short noise
+ */
 const shouldUseRetrieval =
-  message.length > 40 &&
-  !isGreeting &&
-  !isFirstMessage &&
-  !/(who are you|what do you do)/i.test(message);
+  (!isGreeting && message.length > 12) ||
+  serviceQuery;
 
 if (shouldUseRetrieval) {
   try {
@@ -481,8 +506,13 @@ if (shouldUseRetrieval) {
       .filter(Boolean)
       .join("\n\n")
       .slice(0, 1200);
+
+    // FIX: compute AFTER retrieval (correct placement)
+    vectorPriorityMode = fusedChunksText.length > 80;
+
   } catch {
     fusedChunksText = "";
+    vectorPriorityMode = false;
   }
 }
 
