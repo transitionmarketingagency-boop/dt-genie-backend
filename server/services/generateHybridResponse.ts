@@ -107,7 +107,7 @@ function removeForbiddenContent(text: string): string {
     // ❌ remove links
     .replace(/https?:\/\/\S+/gi, "")
     // ❌ remove tool mentions
-    .replace(/\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot)\b/gi, "")
+    .replace(/\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify apps|jasper|perplexity|sprout social)\b/gi, "")
     .trim();
 }
 
@@ -138,7 +138,13 @@ priorityInstruction?: string;
   const executionMode = brainContext?.executionMode ?? "exploration";
 
   return `
-You are an AI assistant representing Digital Transition Marketing.
+You are Neon Vision, the AI system of Digital Transition Marketing.
+
+- Neon Vision = the AI
+- Digital Transition Marketing = the company
+
+Never confuse the two.
+Never say your name is the company.
 
 Your role is to provide accurate, grounded, and business-relevant answers.
 
@@ -216,18 +222,29 @@ RESPONSE RULES
 - No unnecessary complexity
 - Keep it natural and human
 
-STRUCTURE:
+RESPONSE STYLE (VERY IMPORTANT)
 
-1. Direct answer to the question
-2. Short explanation (based on knowledge if available)
-3. Practical next step (only if useful)
+- Speak like a real human strategist, not a template
+- DO NOT follow rigid formats or numbered structures unless necessary
+- Avoid robotic phrasing like:
+  "1. Direct answer 2. Explanation 3. Next step"
+
+Instead:
+→ Answer naturally
+→ Be clear and direct
+→ Add explanation only if it adds value
+→ Suggest next steps only when it makes sense
+
+EXECUTION MODE:
 
 If executionMode = "execution":
-→ Give direct actionable steps
-→ Do NOT ask questions
+→ Be decisive and action-focused
+→ Give clear recommendations
+→ Do NOT ask questions unless absolutely necessary
 
 If executionMode = "exploration":
-→ You may ask ONE useful question if needed
+→ You may ask ONE smart, relevant question if it helps clarify
+→ Do NOT ask generic questions
 
 --------------------------------------------------
 
@@ -308,8 +325,8 @@ if (!/[.?!]$/.test(fixed)) {
 }
 
 // 🔥 force completion feel
-if (fixed.length < 120) {
-  fixed += " This is the core idea — execution is what drives results.";
+if (fixed.length < 80) {
+  fixed += " Let me know if you want me to go deeper on this.";
 }
 
   return fixed.replace(/\s+/g, " ").trim();
@@ -376,9 +393,8 @@ export async function executeHybridResponse({
 const isFirstMessage = !historyText || historyText.length < 10;
 const isGreeting = /^(hi|hello|hey|yo)\b/.test(msg);
 
-const isHighIntent =
-  leadScoreValue >= 0.6 ||
-  /(book|hire|call|schedule|appointment)/i.test(msg);
+// ✅ FIXED (removed broken trailing &&)
+const isHighIntent = leadScoreValue >= 0.7;
 
 /**
  * FINAL ENTRY MODE (IMMUTABLE)
@@ -395,16 +411,6 @@ const entryMode =
 const finalEntryMode = entryMode;
 
 
-/* ================= HIGH INTENT OVERRIDE ================= */
-
-if (isHighIntent && !detectBookingRejection(message)) {
-  const closeResponse =
-    "Got it — you're ready to move forward. The fastest way is to get on a quick call so we can fix this properly based on your setup. I’ll walk you through exactly what we’d change and how we’d improve results.";
-
-  await memoryService.addMessage(sessionId, "assistant", closeResponse);
-  return closeResponse;
-}
-
 /* ================= SMART ONBOARDING SHORTCUT ================= */
 
 if (isFirstMessage && isGreeting) {
@@ -416,38 +422,39 @@ if (isFirstMessage && isGreeting) {
 }
 
 
-    // ================= CONTEXT RESET =================
+// ================= CONTEXT RESET =================
 
-    const strongResetSignal =
-      message.length > 80 &&
-      /(new business|different business|start over|completely different)/i.test(
-        message
-      );
+const strongResetSignal =
+  message.length > 80 &&
+  /(new business|different business|start over|completely different)/i.test(
+    message
+  );
 
-    if (strongResetSignal) {
-      brainContext = {
-        ...brainContext,
-        detectedServices: [],
-        stage: "discovery",
-        hasSufficientContext: false,
-      };
-    }
+if (strongResetSignal) {
+  brainContext = {
+    ...brainContext,
+    detectedServices: [],
+    stage: "discovery",
+    hasSufficientContext: false,
+  };
+}
 
-    // ================= SERVICE DETECTION =================
+// ================= SERVICE DETECTION =================
 
-    try {
-      const detectedServices = await detectService(message);
+try {
+  const detectedServices = await detectService(message);
 
-      brainContext.detectedServices = Array.isArray(detectedServices)
-        ? detectedServices.filter((s: any) => typeof s === "string")
-        : [];
-    } catch {
-      brainContext.detectedServices = [];
-    }
+  brainContext.detectedServices = Array.isArray(detectedServices)
+    ? detectedServices.filter((s: any) => typeof s === "string")
+    : [];
+} catch {
+  brainContext.detectedServices = [];
+}
 
-    const hasServiceContext =
-      Array.isArray(brainContext.detectedServices) &&
-      brainContext.detectedServices.length > 0;
+const hasServiceContext =
+  Array.isArray(brainContext.detectedServices) &&
+  brainContext.detectedServices.length > 0;
+
 
 // ================= VECTOR (SMART RETRIEVAL FIX) =================
 
@@ -460,130 +467,137 @@ const shouldUseRetrieval =
 
 if (shouldUseRetrieval) {
   try {
-    const chunks = await getFusedChunks(message, 3); // 🔥 reduced from 4 → 3
+    const chunks = await getFusedChunks(message, 3);
 
     fusedChunksText = (chunks || [])
       .map((c: any) => c?.text)
       .filter(Boolean)
       .join("\n\n")
-      .slice(0, 1200); // 🔥 HARD LIMIT to prevent overload
+      .slice(0, 1200);
   } catch {
     fusedChunksText = "";
   }
 }
 
-    // ================= CONTINUITY SIGNAL =================
 
 // ================= CONTEXT CONTROL (ANTI-BLEED FIX) =================
 
 const isNewTopic =
   shouldResetContext(message) ||
-  message.length > 40 && !message.toLowerCase().includes("that");
+  (message.length > 40 && !message.toLowerCase().includes("that"));
 
 const safeHistoryText =
   isNewTopic || isGreeting
-    ? "" // 🔥 HARD RESET
-    : (historyText || "").slice(-800); // 🔥 LIMIT HISTORY
+    ? ""
+    : (historyText || "").slice(-800);
 
-    // ================= PROMPT =================
 
-    const prompt = buildHybridPrompt({
-      brainContext: {
-        ...brainContext,
-     entryMode: finalEntryMode,
-      },
-      leadScoreValue,
-      detectedIntentNames,
-      vectorText: fusedChunksText,
-      historyText: safeHistoryText,
-     message: message.trim(),
+// ================= PROMPT =================
 
-// 🔥 HARD PRIORITY SIGNAL
-// Ensures model NEVER answers previous question
-priorityInstruction: `
+const prompt = buildHybridPrompt({
+  brainContext: {
+    ...brainContext,
+    entryMode: finalEntryMode,
+  },
+  leadScoreValue,
+  detectedIntentNames,
+  vectorText: fusedChunksText,
+  historyText: safeHistoryText,
+  message: message.trim(),
+
+  priorityInstruction: `
 IMPORTANT:
 - Answer ONLY the latest USER MESSAGE
 - Ignore previous questions unless explicitly referenced
 - Do NOT continue old answers
 `,
-    });
+});
 
-    let response: string | null = null;
+let response: string | null = null;
 
-    // ================= PRIMARY MODEL =================
 
-    try {
-      const result = await withTimeout(
-        generateOpenRouter(prompt, sessionId),
-        9000
-      );
+// ================= PRIMARY MODEL =================
 
-      if (isGoodResponse(result)) {
-        response = result;
-      }
-    } catch {}
+try {
+  const result = await withTimeout(
+    generateOpenRouter(prompt, sessionId),
+    9000
+  );
 
-    // ================= GEMINI FALLBACK =================
+  if (isGoodResponse(result)) {
+    response = result;
+  }
+} catch {}
 
-    if (!response && GEMINI_ENABLED && canUseGemini()) {
-      try {
-        const result = await withTimeout(
-          generateGemini(prompt, sessionId),
-          7000
-        );
 
-        if (isGoodResponse(result)) {
-          response = result;
-          markGeminiUsed?.();
-        }
-      } catch {}
+// ================= GEMINI FALLBACK =================
+
+if (!response && GEMINI_ENABLED && canUseGemini()) {
+  try {
+    const result = await withTimeout(
+      generateGemini(prompt, sessionId),
+      7000
+    );
+
+    if (isGoodResponse(result)) {
+      response = result;
+      markGeminiUsed?.();
     }
+  } catch {}
+}
 
-    // ================= FINAL FALLBACK =================
 
-    if (!response) {
-response =
-  isGreeting
-    ? "Tell me what you're trying to improve in your business right now."
-    : message.length < 10
-    ? "Give me a bit more detail about your situation so I can give you a precise answer."
-    : `Based on your situation: ${message.slice(0, 80)} — here’s what matters most.`;
-    }
+// ================= FINAL FALLBACK =================
 
-    // ================= CLEANING =================
-
-    response = cleanHybridResponse(response);
-    response = repairResponse(response);
-
-    // ================= PHASE 2 OPTIMIZER =================
-
-    try {
-      const optimizer = await loadOptimizer();
-
-if (optimizer) {
-  const result = optimizer(response || "");
-
-  if (
-    result &&
-    typeof result === "object" &&
-    typeof result.optimized === "string" &&
-    isGoodResponse(result.optimized)
-  ) {
-    response = result.optimized;
+if (!response) {
+  if (isGreeting) {
+    response = "Hey — what are you trying to improve in your business right now?";
+  } else if (message.length < 10) {
+    response = "Can you give me a bit more detail so I can help properly?";
+  } else {
+    response = "Let me break this down properly based on what you shared.";
   }
 }
-    } catch {}
 
-    // ================= SAFETY =================
 
-    if (forceNoQuestions && typeof response === "string") {
-      response = response.replace(/\?/g, ".");
+// ================= CLEANING =================
+
+response = cleanHybridResponse(response);
+response = repairResponse(response);
+
+
+// ================= PHASE 2 OPTIMIZER =================
+
+try {
+  const optimizer = await loadOptimizer();
+
+  if (optimizer) {
+    const result = optimizer(response || "");
+
+    if (
+      result &&
+      typeof result === "object" &&
+      typeof result.optimized === "string" &&
+      isGoodResponse(result.optimized)
+    ) {
+      response = result.optimized;
     }
+  }
+} catch {}
 
-    // ================= BOT ENFORCEMENT =================
+
+// ================= SAFETY =================
+
+if (forceNoQuestions && typeof response === "string") {
+  response = response.replace(/\?/g, ".");
+}
+
+
+// ================= BOT ENFORCEMENT =================
 
 response = sanitizeFinalOutput(response || "");
 response = enforceBotName(response || "");
+
 
 // ================= DUPLICATE RESPONSE PROTECTION =================
 
@@ -592,52 +606,68 @@ try {
 
   const lastBotMessage = lastMessages?.find((m: any) => m.role === "assistant")?.content;
 
-if (lastBotMessage && typeof response === "string") {
-  const similarity =
-    response.slice(0, 120) === lastBotMessage.slice(0, 120);
+  if (lastBotMessage && typeof response === "string") {
+    const similarity =
+      response.slice(0, 120) === lastBotMessage.slice(0, 120);
 
-  if (similarity) {
-    response =
-      "Let me answer that more directly based on your situation.\n\n" +
-      response +
-      "\n\nThe key issue here is usually conversion or targeting mismatch — fixing that is where results come from.";
+    if (similarity) {
+      response =
+        "Let me answer that more clearly.\n\n" + response;
+    }
   }
-}
-
 } catch {}
 
-/* ================= CTA ENGINE (PHASE 5.5) ================= */
+
+// ================= CTA ENGINE =================
 
 const cta = generateCTA({
   message,
   stage: brainContext?.stage,
   leadScore: leadScoreValue,
   detectedServices: brainContext?.detectedServices,
-  executionMode: brainContext?.executionMode,
 });
 
-// ================= CTA CONTROL (ANTI-SPAM FIX) =================
+
+// ================= CTA CONTROL =================
+
+const normalizedMsg = (message || "").toLowerCase();
+
+const isHighIntentMessage =
+  /(book|hire|call|schedule|appointment|work with you|get started)/i.test(
+    normalizedMsg
+  );
+
+let safeResponse =
+  typeof response === "string" ? response : String(response || "");
 
 const shouldAddCTA =
-  cta &&
-  typeof response === "string" &&
+  typeof cta === "string" &&
+  cta.trim().length > 0 &&
+  safeResponse.length > 0 &&
   !detectBookingRejection(message) &&
   !isGreeting &&
-  leadScoreValue >= 0.6 && // 🔥 stricter
-  !/^(hi|hello|hey)\b/i.test(message) &&
-  !response.toLowerCase().includes("clarify your goal");
+  !/^(hi|hello|hey)\b/i.test(normalizedMsg) &&
+  !safeResponse.toLowerCase().includes(cta.toLowerCase()) &&
+  (
+    (leadScoreValue >= 0.7 &&
+      String(brainContext?.executionMode) === "execution") ||
+    isHighIntentMessage
+  );
 
 if (shouldAddCTA) {
-  response += "\n\n" + cta;
+  safeResponse = safeResponse.trim() + "\n\n" + cta.trim();
 }
 
-    // ================= SAVE =================
 
-    await memoryService.addMessage(sessionId, "assistant", response || "");
+// ================= SAVE =================
 
-    return response;
-  } catch (err) {
-    console.error("[Hybrid Fatal Error]:", err);
-    return "Something went wrong. Try rephrasing your question.";
-  }
+await memoryService.addMessage(sessionId, "assistant", safeResponse);
+
+return safeResponse;
+
+} catch (err) {
+  console.error("[Hybrid Fatal Error]:", err);
+
+  return "Something went wrong. Try rephrasing your question.";
+}
 }

@@ -1,5 +1,5 @@
 /* =====================================================
-   RESPONSE DECISION (FINAL STABLE VERSION)
+   RESPONSE DECISION (ANTI-SPAM + HUMAN FLOW FIX)
 ===================================================== */
 
 /* ================= NORMALIZE ================= */
@@ -12,16 +12,14 @@ function normalize(text: string): string {
 
 /* ================= REJECTION ================= */
 export function detectBookingRejection(message: string): boolean {
-  if (typeof message !== "string") return false;
-
   const msg = normalize(message);
 
-  return /(not now|dont want|don't want|later|no thanks|stop|just exploring|not interested|maybe later|busy)/i.test(
+  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later|busy)/i.test(
     msg
   );
 }
 
-/* ================= WEAK / LOW INTENT ================= */
+/* ================= LOW VALUE ================= */
 function isWeakMessage(message: string): boolean {
   const msg = normalize(message);
 
@@ -29,28 +27,28 @@ function isWeakMessage(message: string): boolean {
 
   if (msg.length < 4) return true;
 
-  if (/^(hi|hello|hey|yo|ok|yes|no|thanks|cool)$/i.test(msg)) return true;
+  if (/^(hi|hello|hey|yo|ok|yes|no|hmm)$/i.test(msg)) return true;
 
   return false;
 }
 
-/* ================= INFORMATIONAL FILTER ================= */
+/* ================= INFORMATIONAL ================= */
 function isInformational(message: string): boolean {
   const msg = normalize(message);
 
   return /(what|why|how|explain|tell me|guide|learn|difference)/i.test(msg);
 }
 
-/* ================= HIGH INTENT (FIXED) ================= */
+/* ================= HIGH INTENT ================= */
 function isHighIntent(message: string): boolean {
   const msg = normalize(message);
 
-  return /(hire|book|schedule|call|let's start|start working|i want to proceed|get started|work with you|i'm ready)/i.test(
+  return /(hire|start|book|schedule|work with you|i want results|i'm ready|get started)/i.test(
     msg
   );
 }
 
-/* ================= CTA ENGINE ================= */
+/* ================= CTA CONTROL ================= */
 export function shouldIncludeCTA(
   message: string,
   intentCategories: string[] = [],
@@ -59,31 +57,32 @@ export function shouldIncludeCTA(
 ): boolean {
   const msg = normalize(message);
 
-  /* ---------- HARD BLOCKS ---------- */
+  /* ❌ HARD BLOCKS */
   if (detectBookingRejection(msg)) return false;
 
   if (isWeakMessage(msg)) return false;
 
-  /* ❌ prevent spam CTA loops */
-  if (msg.includes("clarify your main goal")) return false;
-
-  /* ---------- INFORMATIONAL GUARD ---------- */
-  if (isInformational(msg) && leadScore < 0.6) return false;
-
-  /* ---------- HIGH INTENT PRIORITY ---------- */
-  if (isHighIntent(msg)) return true;
-
-  /* ---------- INTENT CATEGORY BOOST ---------- */
-  if (intentCategories.includes("buying") && leadScore >= 0.5) {
-    return true;
+  /* ❌ Prevent repetition spam */
+  if (
+    msg.includes("what should we do") ||
+    msg.includes("tell me more") ||
+    msg.includes("explain")
+  ) {
+    return false;
   }
 
-  /* ---------- STAGE + SCORE ---------- */
-  if (stage === "conversion" && leadScore >= 0.5) return true;
+  /* ❌ Informational guard */
+  if (isInformational(msg) && leadScore < 0.65) return false;
 
-  if (stage === "service" && leadScore >= 0.65) return true;
+  /* ✅ High intent always wins */
+  if (isHighIntent(msg)) return true;
 
-  if (stage === "strategy" && leadScore >= 0.75) return true;
+  /* ✅ Stage-based logic */
+  if (stage === "conversion") return true;
+
+  if (stage === "service" && leadScore >= 0.7) return true;
+
+  if (stage === "strategy" && leadScore >= 0.8) return true;
 
   return false;
 }

@@ -1,13 +1,7 @@
 /**
  * ==========================================
- * RESPONSE OPTIMIZER (PHASE 2 CORE LAYER)
+ * RESPONSE OPTIMIZER (PHASE 2 CORE LAYER - FIXED)
  * ==========================================
- *
- * Purpose:
- * - Score AI response quality
- * - Detect weak / generic / repetitive outputs
- * - Repair structure + completeness
- * - Upgrade response into "consultant-grade output"
  */
 
 export type ResponseQuality = {
@@ -29,11 +23,24 @@ export function scoreResponse(text: string): ResponseQuality {
 
   /* ===== LENGTH CHECK ===== */
   if (text.length < 120) {
-    score -= 0.4;
+    score -= 0.35;
     issues.push("too_short");
   }
 
-  /* ===== GENERIC PATTERNS ===== */
+  /* ===== GENERIC LOOP DETECTION (CRITICAL FIX) ===== */
+  const loopPatterns = [
+    "based on your situation",
+    "here’s what matters most",
+    "this is the core idea",
+    "execution is what drives results",
+  ];
+
+  if (loopPatterns.some((p) => lower.includes(p))) {
+    score -= 0.5;
+    issues.push("fallback_loop_detected");
+  }
+
+  /* ===== GENERIC LANGUAGE ===== */
   const genericPatterns = [
     "it depends",
     "here are some tips",
@@ -44,7 +51,7 @@ export function scoreResponse(text: string): ResponseQuality {
   ];
 
   if (genericPatterns.some((p) => lower.includes(p))) {
-    score -= 0.25;
+    score -= 0.2;
     issues.push("generic_language");
   }
 
@@ -57,16 +64,16 @@ export function scoreResponse(text: string): ResponseQuality {
     issues.push("repetition");
   }
 
-  /* ===== STRUCTURE CHECK ===== */
-  const hasSteps =
+  /* ===== STRUCTURE IS OPTIONAL (FIXED) ===== */
+  const hasStructure =
     /step\s*\d|first|second|then|finally|1\.|2\.|3\./i.test(text);
 
-  if (!hasSteps) {
-    score -= 0.15;
-    issues.push("no_structure");
+  if (!hasStructure && text.length > 500) {
+    score -= 0.1;
+    issues.push("missing_structure_long_answer");
   }
 
-  /* ===== ACTIONABILITY CHECK ===== */
+  /* ===== ACTIONABILITY (FIXED - SOFT SIGNAL ONLY) ===== */
   const actionWords = [
     "implement",
     "run",
@@ -75,16 +82,17 @@ export function scoreResponse(text: string): ResponseQuality {
     "build",
     "test",
     "optimize",
+    "fix",
   ];
 
   if (!actionWords.some((w) => lower.includes(w))) {
-    score -= 0.15;
+    score -= 0.05;
     issues.push("low_actionability");
   }
 
   return {
     score: Math.max(0, Math.min(1, score)),
-    isWeak: score < 0.6,
+    isWeak: score < 0.65,
     issues,
   };
 }
@@ -95,35 +103,28 @@ export function optimizeResponse(text: string): string {
 
   let output = text.trim();
 
-  /* ===== FIX INCOMPLETE SENTENCES ===== */
-  if (!/[.!?]$/.test(output)) {
-    output += ".";
-  }
+  /* ===== REMOVE LOOP PHRASES ===== */
+  output = output.replace(
+    /(based on your situation|this is the core idea|execution is what drives results)[^.!?]*\.?/gi,
+    ""
+  );
 
-  /* ===== FORCE STRUCTURE IF MISSING ===== */
-  const hasStructure =
-    /step|1\.|2\.|3\./i.test(output);
-
-  if (!hasStructure && output.length > 200) {
-    output =
-      "Here’s a structured breakdown:\n\n" +
-      "1. Identify the core issue\n" +
-      "2. Implement targeted solution\n" +
-      "3. Measure and optimize\n\n" +
-      output;
-  }
-
-  /* ===== REMOVE WEAK ENDINGS ===== */
+  /* ===== REMOVE WEAK CLOSINGS ===== */
   output = output.replace(
     /(hope this helps|let me know if you need anything).*$/i,
     ""
   );
 
-  /* ===== REMOVE REPETITIVE CLOSING PHRASES ===== */
+  /* ===== REMOVE GENERIC SUMMARIES ===== */
   output = output.replace(
     /(in conclusion|to summarize|overall),?\s*/gi,
     ""
   );
+
+  /* ===== FIX INCOMPLETE SENTENCE ===== */
+  if (!/[.!?]$/.test(output)) {
+    output += ".";
+  }
 
   /* ===== NORMALIZE SPACING ===== */
   output = output

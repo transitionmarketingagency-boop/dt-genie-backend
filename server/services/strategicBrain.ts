@@ -38,66 +38,48 @@ function normalize(text: string) {
   return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function isShortMessage(message: string) {
+  return message.length < 8;
+}
+
+function isGreeting(message: string) {
+  return /^(hi|hello|hey|yo)$/i.test(message);
+}
+
 function detectContextShift(message: string, memory: StrategicMemory): boolean {
-  if (!message) return false;
-
-  const strongSignals = [
-    "new business",
-    "different business",
-    "start over",
-    "completely different",
-    "reset",
-  ];
-
-  const weakSignals = [
-    "i run",
-    "i have",
-    "my business",
-    "my store",
-    "we are",
-    "our company",
-  ];
+  const strongSignals = ["new business", "different business", "reset"];
+  const weakSignals = ["i run", "we are", "my business", "my store"];
 
   const hasStrong = strongSignals.some((s) => message.includes(s));
   const hasWeak = weakSignals.some((s) => message.includes(s));
 
-  const hasExistingMemory =
+  const hasMemory =
     !!memory?.industry ||
     !!memory?.businessType ||
     (memory?.servicesDiscussed?.length ?? 0) > 0;
 
   if (hasStrong) return true;
-  if (hasWeak && hasExistingMemory) return true;
+  if (hasWeak && hasMemory) return true;
 
   return false;
 }
 
 /* ================= STAGE DETECTOR ================= */
 
-function detectStage(
-  message: string,
-  intentType?: string
-): BrainContext["stage"] {
-  const msg = message.toLowerCase();
-
+function detectStage(message: string, intentType?: string): BrainContext["stage"] {
   if (intentType === "greeting") return "greeting";
   if (intentType === "booking") return "conversion";
   if (intentType === "service_inquiry") return "service";
   if (intentType === "problem") return "strategy";
 
-  if (/(hire|book|schedule|call|start|work with you|consult)/i.test(msg))
-    return "conversion";
-
-  if (/(price|cost|service|offer|plan|package)/i.test(msg))
-    return "service";
-
-  if (/(how|improve|fix|scale|optimize|strategy|grow|increase)/i.test(msg))
-    return "strategy";
+  if (/(hire|book|start|work with you)/i.test(message)) return "conversion";
+  if (/(price|cost|service|offer)/i.test(message)) return "service";
+  if (/(how|fix|improve|scale|grow|increase)/i.test(message)) return "strategy";
 
   return "discovery";
 }
 
-/* ================= PHASE 5 DECISION ENGINE ================= */
+/* ================= EXECUTION LOGIC (FIXED) ================= */
 
 function computeExecutionSignals(params: {
   stage: BrainContext["stage"];
@@ -107,27 +89,33 @@ function computeExecutionSignals(params: {
 }) {
   const { stage, leadScore, highIntent, message } = params;
 
-  const isShort = message.length < 35;
+  const shortMsg = isShortMessage(message);
 
+  /* ✅ FIX: prevent execution mode on short / unclear inputs */
   const executionMode: ExecutionMode =
-    highIntent || stage === "conversion" || leadScore >= 0.65
+    highIntent && !shortMsg
+      ? "execution"
+      : leadScore >= 0.7 && stage !== "greeting"
       ? "execution"
       : "exploration";
 
+  /* ✅ FIX: CTA control */
   const shouldGiveCTA =
-    executionMode === "execution" ||
-    leadScore >= 0.75 ||
-    stage === "service";
+    !shortMsg &&
+    (highIntent ||
+      (leadScore >= 0.75 && stage !== "discovery") ||
+      stage === "conversion");
 
+  /* ✅ FIX: avoid dumb questioning loops */
   const shouldAskQuestion =
-    executionMode === "exploration" &&
+    !shortMsg &&
+    stage === "discovery" &&
     leadScore < 0.6 &&
-    !highIntent &&
-    !isShort;
+    !highIntent;
 
   const confidenceLevel = Math.min(
     1,
-    leadScore * 0.75 + (highIntent ? 0.25 : 0)
+    leadScore * 0.7 + (highIntent ? 0.3 : 0)
   );
 
   return {
@@ -135,10 +123,10 @@ function computeExecutionSignals(params: {
     shouldGiveCTA,
     shouldAskQuestion,
     confidenceLevel,
-  } as const;
+  };
 }
 
-/* ================= MAIN ENGINE ================= */
+/* ================= MAIN ================= */
 
 export async function strategicBrain(
   userMessage: string,
@@ -146,7 +134,6 @@ export async function strategicBrain(
 ): Promise<{ brainContext: BrainContext; chunks: [] }> {
   const message = normalize(userMessage);
 
-  /* ---------- MEMORY ---------- */
   let strategicMemory: StrategicMemory = {};
 
   if (sessionId) {
@@ -159,9 +146,7 @@ export async function strategicBrain(
   }
 
   /* ---------- CONTEXT SHIFT ---------- */
-  const hasShift = detectContextShift(message, strategicMemory);
-
-  if (hasShift) {
+  if (detectContextShift(message, strategicMemory)) {
     strategicMemory = {
       servicesDiscussed: [],
       industry: undefined,
@@ -171,7 +156,7 @@ export async function strategicBrain(
     };
   }
 
-  /* ---------- NEURAL INTENT ---------- */
+  /* ---------- INTENT ---------- */
   let intent: any = {};
 
   try {
@@ -188,8 +173,8 @@ export async function strategicBrain(
 
   try {
     const scoreResult = leadQualifier?.scoreLead?.(sessionId || "anon", {
-      need: intentType === "problem" ? 0.55 : 0.25,
-      authority: highIntent ? 0.75 : 0.25,
+      need: intentType === "problem" ? 0.6 : 0.3,
+      authority: highIntent ? 0.8 : 0.3,
     });
 
     leadScore = Number(scoreResult?.total ?? 0);
@@ -198,7 +183,9 @@ export async function strategicBrain(
   }
 
   /* ---------- STAGE ---------- */
-  const stage = detectStage(message, intentType);
+  const stage = isGreeting(message)
+    ? "greeting"
+    : detectStage(message, intentType);
 
   /* ---------- SIGNALS ---------- */
   const signals = computeExecutionSignals({
@@ -210,12 +197,8 @@ export async function strategicBrain(
 
   /* ---------- CONTEXT QUALITY ---------- */
   const hasSufficientContext =
-    message.length > 10 ||
-    intentType === "problem" ||
-    intentType === "service_inquiry" ||
-    highIntent;
+    message.length > 12 || highIntent || intentType === "problem";
 
-  /* ---------- FINAL OUTPUT ---------- */
   return {
     brainContext: {
       message: userMessage,
