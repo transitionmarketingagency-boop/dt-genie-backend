@@ -2,6 +2,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import * as dotenv from "dotenv";
 import crypto from "crypto";
+import { strategicBrain } from "./strategicBrain.js";
 
 /* ================= PATH ================= */
 const __filename = fileURLToPath(import.meta.url);
@@ -13,8 +14,8 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
 
-// ⚡ REDUCED (major latency win)
-const TIMEOUT = 5000;
+// ⚡ balanced latency
+const TIMEOUT = 5500;
 
 const BOT_NAME = "DT Genie";
 
@@ -52,16 +53,13 @@ function isValidResponse(text: string | null | undefined): text is string {
 
   const t = text.trim();
 
-  if (t.length < 80) return false;
-  if (t.split(/\s+/).length < 12) return false;
+  // ⚡ relaxed but safe threshold (fixes fallback spam)
+  if (t.length < 60) return false;
+  if (t.split(/\s+/).length < 10) return false;
 
-  // ❌ block incomplete endings
-  if (/(of|in|and|to|for|with|on|at)$/i.test(t)) return false;
-
-  if (!/[.?!]$/.test(t)) return false;
+  const lower = t.toLowerCase();
 
   const badPatterns = [
-    "```",
     "assistant:",
     "system:",
     "undefined",
@@ -69,8 +67,10 @@ function isValidResponse(text: string | null | undefined): text is string {
     "<|",
   ];
 
-  const lower = t.toLowerCase();
   if (badPatterns.some((p) => lower.includes(p))) return false;
+
+  // ❌ only reject TRUE truncation patterns
+  if (/(of|in|and|to|for|with|on|at)$/i.test(t)) return false;
 
   return true;
 }
@@ -85,7 +85,15 @@ function fixSpacing(text: string): string {
 
 function ensureComplete(text: string): string {
   if (!text) return "";
-  return /[.?!]$/.test(text) ? text : text + ".";
+
+  const trimmed = text.trim();
+
+  // ⚡ only force period if clearly incomplete
+  if (trimmed.length > 120 && !/[.?!]$/.test(trimmed)) {
+    return trimmed + ".";
+  }
+
+  return trimmed;
 }
 
 /* ================= INTENT ================= */
@@ -118,14 +126,33 @@ export async function generateGemini(
 
   const highIntent = detectHighIntent(prompt);
 
-  // 🔥 SIMPLIFIED (no strategicBrain = faster)
+  // ================= LIGHT CONTEXT (SAFE ADDITION) =================
+  let contextText = "";
+  try {
+    if (sessionId) {
+      const { brainContext } = await strategicBrain(
+        prompt.slice(0, 300),
+        sessionId
+      );
+
+      contextText = `Stage: ${brainContext?.stage || "unknown"} | LeadScore: ${
+        brainContext?.leadScore || 0
+      }`;
+    }
+  } catch {
+    contextText = "";
+  }
+
   const finalPrompt = `
 You are ${BOT_NAME}, a strategic marketing assistant.
 
 Rules:
 - Be clear, practical, and complete
 - No fluff, no repetition
-- Do not cut sentences mid-way
+- Do not cut answers mid-sentence
+
+Context:
+${contextText}
 
 User:
 ${prompt}
@@ -144,7 +171,7 @@ Answer:
         contents: [{ parts: [{ text: finalPrompt }] }],
         generationConfig: {
           temperature: highIntent ? 0.45 : 0.35,
-          maxOutputTokens: 700,
+          maxOutputTokens: 750,
           topP: 0.9,
         },
       }),

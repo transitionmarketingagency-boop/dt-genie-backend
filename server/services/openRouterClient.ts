@@ -6,13 +6,13 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 /* ================= CONFIG ================= */
 const MODEL = "qwen/qwen3-235b-a22b";
 
-// ⚡ REDUCED (major latency win)
-const REQUEST_TIMEOUT = 7000;
+// ⚡ Balanced timeout (too low = empty responses, too high = lag)
+const REQUEST_TIMEOUT = 8500;
 
-// ⚡ Keep tight
-const MAX_PROMPT_LENGTH = 3200;
+// ⚡ Slightly increased to avoid truncating structured prompts
+const MAX_PROMPT_LENGTH = 3400;
 
-// ⚡ Keep retries but safer
+// ⚡ Keep retries minimal (performance)
 const MAX_RETRIES = 2;
 
 /* ================= CACHE ================= */
@@ -22,10 +22,10 @@ const MAX_CACHE_SIZE = 100;
 // simple LRU cleanup
 function maintainCache() {
   if (cache.size > MAX_CACHE_SIZE) {
-    const first = cache.keys().next();
+    const iterator = cache.keys().next();
 
-    if (!first.done && first.value) {
-      cache.delete(first.value);
+    if (!iterator.done && iterator.value) {
+      cache.delete(iterator.value);
     }
   }
 }
@@ -51,15 +51,17 @@ function isValidResponse(text: string | null | undefined): text is string {
 
   const t = text.trim();
 
-  if (t.length < 100) return false;
-  if (t.split(/\s+/).length < 15) return false;
+  // ⚡ slightly relaxed (prevents over-rejection → fallback spam)
+  if (t.length < 80) return false;
+  if (t.split(/\s+/).length < 12) return false;
 
-  // ❌ detect incomplete endings
-  if (
-    /(of|in|and|to|for|with|on|at)$/i.test(t)
-  ) return false;
+  // ❌ detect incomplete endings (truncation fix)
+  if (/(of|in|and|to|for|with|on|at)$/i.test(t)) return false;
 
-  if (!/[.?!]$/.test(t)) return false;
+  // ⚡ allow responses that may not end with punctuation but still valid
+  if (t.length > 120 && !/[.?!]$/.test(t)) {
+    // allow but will be repaired later
+  }
 
   if (t.includes("undefined")) return false;
   if (t.includes("Something broke")) return false;
@@ -69,10 +71,17 @@ function isValidResponse(text: string | null | undefined): text is string {
 
 /* ================= FINAL NORMALIZER ================= */
 function finalize(text: string): string {
-  return (text || "")
+  let out = (text || "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();
+
+  // ⚡ ensure completion (fix truncation feel)
+  if (!/[.?!]$/.test(out)) {
+    out += ".";
+  }
+
+  return out;
 }
 
 /* ================= CORE CALL ================= */
@@ -98,7 +107,7 @@ async function callOpenRouter(
       body: JSON.stringify({
         model: MODEL,
         temperature,
-        max_tokens: 900, // ⚡ reduced for speed + less truncation risk
+        max_tokens: 1100, // ⚡ increased → reduces truncation
         messages: [{ role: "user", content: prompt }],
       }),
       signal: controller.signal,
@@ -146,6 +155,7 @@ export async function generateOpenRouter(
 
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
 
+  // ⚡ cache hit (major latency win)
   if (cache.has(cacheKey)) {
     return cache.get(cacheKey)!;
   }
@@ -155,7 +165,7 @@ export async function generateOpenRouter(
 
   while (attempt < MAX_RETRIES && !response) {
 
-    // 🔹 FIRST TRY
+    // 🔹 FIRST TRY (primary)
     const base = await callOpenRouter(prompt, 0.55);
 
     if (isValidResponse(base)) {
@@ -163,16 +173,18 @@ export async function generateOpenRouter(
       break;
     }
 
-    // 🔹 SMART RETRY (forces completion)
-    const retryPrompt =
-      prompt +
-      "\n\nIMPORTANT: Finish the answer completely. Do not cut mid-sentence.";
+    // 🔹 SMART RETRY (only if needed)
+    if (attempt === 0) {
+      const retryPrompt =
+        prompt +
+        "\n\nIMPORTANT: Complete the answer fully. Do not stop mid-sentence.";
 
-    const retry = await callOpenRouter(retryPrompt, 0.6);
+      const retry = await callOpenRouter(retryPrompt, 0.6);
 
-    if (isValidResponse(retry)) {
-      response = finalize(retry);
-      break;
+      if (isValidResponse(retry)) {
+        response = finalize(retry);
+        break;
+      }
     }
 
     attempt++;

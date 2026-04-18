@@ -20,12 +20,9 @@ type ProcessResponseFn = (text: string) => {
 };
 
 let processResponse: ProcessResponseFn | null = null;
-let optimizerLoaded = false; // ✅ FIX: prevent repeated dynamic imports
 
 async function loadOptimizer(): Promise<ProcessResponseFn | null> {
-  if (optimizerLoaded) return processResponse;
-
-  optimizerLoaded = true;
+  if (processResponse) return processResponse;
 
   try {
     const mod: any = await import("../../responseOptimizer.js");
@@ -38,35 +35,45 @@ async function loadOptimizer(): Promise<ProcessResponseFn | null> {
 
     processResponse = null;
     return null;
-  } catch {
+  } catch (err) {
     processResponse = null;
     return null;
   }
 }
 
 
-// Intent & Service detection
+// ===================== INTENT + SERVICE ===================== //
+
 import { detectIntent } from "./intentManager.js";
 import { detectService } from "./serviceDetector.js";
 
-// Strategic logic & lead handling
+
+// ===================== STRATEGIC LAYER ===================== //
+
 import { strategicBrain } from "./strategicBrain.js";
 import bookingFlow from "../bookingFlow.js";
 import { analyzeLeadSignals } from "./leadIntelligence.js";
 import { shouldTriggerBooking } from "./bookingTrigger.js";
 
-// Modular helpers
+
+// ===================== HELPERS ===================== //
+
 import { detectBookingRejection, shouldIncludeCTA } from "./responseDecision.js";
 import { compressContext } from "./responseUtilities.js";
+
 import {
   GEMINI_ENABLED,
   canUseGemini,
   markGeminiUsed,
 } from "./geminiManager.js";
+
 import { withTimeout } from "./timeoutHelper.js";
 
-// AI / reasoning layer
+
+// ===================== AI LAYER ===================== //
+
 import { neuralBrain } from "./neuralBrain.js";
+
 import {
   normalizeLeadScore,
   determineExecutionMode,
@@ -96,9 +103,25 @@ export interface BrainContext {
 
 function cleanHybridResponse(text: string): string {
   if (!text) return "";
+
   return typeof cleanResponse === "function"
     ? cleanResponse(text).trim()
     : text.trim();
+}
+
+
+// ⚡ PERFORMANCE FIX: only run heavy regex cleaning when needed
+function removeForbiddenContent(text: string): string {
+  if (!text || text.length < 20) return text || "";
+
+  return text
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i, "")
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(
+      /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify apps|jasper|perplexity|sprout social)\b/gi,
+      ""
+    )
+    .trim();
 }
 
 
@@ -122,15 +145,23 @@ export function buildHybridPrompt({
   priorityInstruction?: string;
 }) {
 
+  // ⚡ PERFORMANCE FIX: cheap check first
   const hasVectorKnowledge =
-    Boolean(vectorText && vectorText.trim().length > 50);
+    vectorText && vectorText.length > 50;
 
   const executionMode = brainContext?.executionMode ?? "exploration";
 
-  // ✅ FIX: prevent prompt overflow (truncation protection)
-  const safeHistory = (historyText || "").slice(-1000);
-  const safeVector = (vectorText || "").slice(0, 1200);
-  const safeMessage = (message || "").slice(0, 800);
+  // 🧠 CONTEXT BLEED FIX (LIGHT)
+  const safeHistory =
+    historyText && historyText.length > 800
+      ? historyText.slice(-800)
+      : historyText || "None";
+
+  // ✂️ TRUNCATION PREVENTION (PROMPT LEVEL)
+  const safeVector =
+    hasVectorKnowledge && vectorText.length > 1200
+      ? vectorText.slice(0, 1200)
+      : vectorText || "NO DATA AVAILABLE";
 
   return `
 You are Neon Vision, the AI system of Digital Transition Marketing.
@@ -139,6 +170,9 @@ You are Neon Vision, the AI system of Digital Transition Marketing.
 - Digital Transition Marketing = the company
 
 Never confuse the two.
+Never say your name is the company.
+
+Your role is to provide accurate, grounded, and business-relevant answers.
 
 --------------------------------------------------
 
@@ -146,11 +180,14 @@ CRITICAL RULES (STRICT)
 
 1. ONLY use the provided KNOWLEDGE when available
 2. DO NOT make up services, tools, data, or claims
-3. DO NOT invent services
-4. DO NOT give external links or contacts
+3. DO NOT mention tools, platforms, or software unless explicitly in knowledge
+4. DO NOT give contact details, emails, or external links
+5. DO NOT invent statistics, case studies, or numbers
+6. DO NOT act like a “guru” or “strategist personality”
+7. DO NOT ask repetitive or unnecessary questions
 
 If knowledge is missing:
-→ Give a safe, general answer
+→ Give a safe, general answer WITHOUT fabricating details
 
 --------------------------------------------------
 
@@ -173,11 +210,14 @@ Stage: ${brainContext?.stage ?? "unknown"}
 Intent: ${detectedIntentNames?.join(", ") || "general"}
 Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
 
+Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
+Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
+
 --------------------------------------------------
 
 CONVERSATION HISTORY
 
-${safeHistory || "None"}
+${safeHistory}
 
 --------------------------------------------------
 
@@ -187,38 +227,61 @@ ${hasVectorKnowledge ? safeVector : "NO DATA AVAILABLE"}
 
 IMPORTANT:
 - If KNOWLEDGE exists → BASE your answer on it
+- Do NOT ignore it
 - Do NOT override it with assumptions
 
 --------------------------------------------------
 
-USER MESSAGE
+USER MESSAGE (HIGHEST PRIORITY)
 
 ${priorityInstruction || ""}
 
-${safeMessage}
+${message}
 
 --------------------------------------------------
 
-RESPONSE STYLE
+RESPONSE RULES
 
-- Clear, direct, practical
-- No fluff
-- Natural human tone
+- Be clear, direct, and practical
+- No fluff, no hype language
+- No fake frameworks
+- No unnecessary complexity
+- Keep it natural and human
+
+RESPONSE STYLE (VERY IMPORTANT)
+
+- Speak like a real human strategist, not a template
+- DO NOT follow rigid formats or numbered structures unless necessary
+- Avoid robotic phrasing like:
+  "1. Direct answer 2. Explanation 3. Next step"
+
+Instead:
+→ Answer naturally
+→ Be clear and direct
+→ Add explanation only if it adds value
+→ Suggest next steps only when it makes sense
 
 EXECUTION MODE:
 
-${executionMode === "execution"
-  ? "→ Be decisive, give direct recommendations"
-  : "→ You may ask ONE smart question if needed"}
+If executionMode = "execution":
+→ Be decisive and action-focused
+→ Give clear recommendations
+→ Do NOT ask questions unless absolutely necessary
+
+If executionMode = "exploration":
+→ You may ask ONE smart, relevant question if it helps clarify
+→ Do NOT ask generic questions
 
 --------------------------------------------------
 
-FINAL CHECK
+FINAL CHECK BEFORE ANSWERING
 
-- Based on knowledge?
-- No hallucination?
-- Complete?
+- Is this based on knowledge?
+- Did I avoid making things up?
+- Is this relevant to the user’s question?
+- Is this complete and not cut off?
 
+If not → fix before responding.
 `.trim();
 }
 
@@ -257,12 +320,13 @@ function isGoodResponse(text: unknown): text is string {
 
   if (badPatterns.some((p) => lower.includes(p))) return false;
 
-  // 🔥 repetition guard
+  // 🔥 prevent repetition loops
   const sentences = clean.split(/[.!?]/).map(s => s.trim()).filter(Boolean);
   if (sentences.length >= 2 && sentences[0] === sentences[1]) return false;
 
   return true;
 }
+
 
 function shouldResetContext(message: string): boolean {
   const triggers = [
@@ -279,27 +343,23 @@ function shouldResetContext(message: string): boolean {
   return triggers.some((t) => lower.includes(t));
 }
 
+
 function repairResponse(text: string): string {
   let fixed = (text || "").trim();
   if (!fixed) return "";
 
-  // ✅ FIX: better truncation recovery
-  const looksCut =
-    fixed.endsWith("of") ||
-    fixed.endsWith("in") ||
-    fixed.endsWith("and") ||
-    fixed.length < 100;
-
-  if (!/[.?!]$/.test(fixed) || looksCut) {
+  if (!/[.?!]$/.test(fixed)) {
     fixed += ".";
   }
 
-  if (fixed.length < 80) {
+  // ✂️ TRUNCATION FIX (only extend if clearly incomplete)
+  if (fixed.length < 60) {
     fixed += " Let me know if you want me to go deeper on this.";
   }
 
   return fixed.replace(/\s+/g, " ").trim();
 }
+
 
 function sanitizeFinalOutput(text: string): string {
   if (!text) return "";
@@ -325,6 +385,7 @@ function sanitizeFinalOutput(text: string): string {
 
   return cleaned.trim();
 }
+
 
 export async function executeHybridResponse({
   sessionId,
@@ -357,12 +418,12 @@ export async function executeHybridResponse({
     const isFirstMessage = !historyText || historyText.length < 10;
     const isGreeting = /^(hi|hello|hey|yo)\b/.test(msg);
 
-    // ✅ FIX: prevent greeting loop
-    const lastUserMessage =
+    // 🔁 FIX: prevent greeting loops
+    const lastUserMsg =
       recentMessagesCache?.slice(-1)?.[0]?.content?.toLowerCase() || "";
 
     const isRepeatGreeting =
-      isGreeting && /^(hi|hello|hey|yo)\b/.test(lastUserMessage);
+      isGreeting && /^(hi|hello|hey|yo)\b/.test(lastUserMsg);
 
     const isHighIntent = leadScoreValue >= 0.7;
 
@@ -375,7 +436,7 @@ export async function executeHybridResponse({
 
     const finalEntryMode = entryMode;
 
-    // ✅ FIX: greeting only on FIRST message
+    // 🔁 FIXED GREETING HANDLER
     if (isFirstMessage && isGreeting && !isRepeatGreeting) {
       const reply =
         "Hey — tell me what you're trying to improve in your business right now.";
@@ -413,12 +474,12 @@ export async function executeHybridResponse({
       brainContext.detectedServices = [];
     }
 
-    // ================= VECTOR (PERFORMANCE SAFE) =================
+    // ================= VECTOR (RESTORED + STABLE) =================
 
     let fusedChunksText = "";
 
     const shouldUseRetrieval =
-      message.length > 20 &&
+      message.length > 15 &&
       !isGreeting &&
       !/(who are you|what do you do)/i.test(message);
 
@@ -426,11 +487,13 @@ export async function executeHybridResponse({
       try {
         const chunks = await getFusedChunks(message, 3);
 
-        fusedChunksText = (chunks || [])
-          .map((c: any) => c?.text)
-          .filter(Boolean)
-          .join("\n\n")
-          .slice(0, 1200);
+        if (Array.isArray(chunks) && chunks.length > 0) {
+          fusedChunksText = chunks
+            .map((c: any) => c?.text)
+            .filter(Boolean)
+            .join("\n\n")
+            .slice(0, 1200);
+        }
       } catch {
         fusedChunksText = "";
       }
@@ -440,12 +503,12 @@ export async function executeHybridResponse({
 
     const isNewTopic =
       shouldResetContext(message) ||
-      (message.length > 50 && !message.toLowerCase().includes("that"));
+      (message.length > 40 && !message.toLowerCase().includes("that"));
 
     const safeHistoryText =
       isNewTopic || isGreeting
         ? ""
-        : (historyText || "").slice(-1000); // balanced memory
+        : (historyText || "").slice(-800);
 
     // ================= PROMPT =================
 
@@ -480,10 +543,11 @@ IMPORTANT:
       if (typeof result === "string") {
         const trimmed = result.trim();
 
+        // ✂️ TRUNCATION FIX
         const looksCut =
           trimmed.endsWith("of") ||
-          trimmed.endsWith("in") ||
-          trimmed.endsWith("and");
+          trimmed.endsWith("and") ||
+          trimmed.endsWith("in");
 
         if (isGoodResponse(trimmed) && !looksCut) {
           response = trimmed;
@@ -507,7 +571,7 @@ IMPORTANT:
       } catch {}
     }
 
-    // ================= FINAL FALLBACK =================
+    // ================= FINAL FALLBACK (FIXED LOOP) =================
 
     if (!response) {
       if (isGreeting) {
@@ -517,8 +581,9 @@ IMPORTANT:
         response =
           "Can you give me a bit more detail so I can help properly?";
       } else {
+        // 🔥 FIX: removed generic loop phrase
         response =
-          "Let me break this down properly based on what you shared.";
+          "Here’s a clear answer based on what you asked.";
       }
     }
 
@@ -527,15 +592,10 @@ IMPORTANT:
     response = cleanHybridResponse(response);
     response = repairResponse(response);
 
-    if (response.length < 100) {
-      response += " Let me know if you want me to expand on this.";
-    }
-
-    // ================= OPTIMIZER (PERF FIX) =================
+    // ================= OPTIMIZER =================
 
     try {
-      const optimizer =
-        message.length > 40 ? await loadOptimizer() : null;
+      const optimizer = await loadOptimizer();
 
       if (optimizer) {
         const result = optimizer(response || "");
@@ -557,7 +617,7 @@ IMPORTANT:
       response = response.replace(/\?/g, ".");
     }
 
-    // ================= BOT ENFORCEMENT =================
+    // ================= FINAL CLEAN =================
 
     response = sanitizeFinalOutput(response || "");
     response = enforceBotName(response || "");
@@ -582,7 +642,7 @@ IMPORTANT:
       }
     } catch {}
 
-    // ================= CTA ENGINE =================
+    // ================= CTA =================
 
     const cta = generateCTA({
       message,
@@ -590,8 +650,6 @@ IMPORTANT:
       leadScore: leadScoreValue,
       detectedServices: brainContext?.detectedServices,
     });
-
-    // ================= CTA CONTROL =================
 
     const normalizedMsg = (message || "").toLowerCase();
 
@@ -628,9 +686,9 @@ IMPORTANT:
     await memoryService.addMessage(sessionId, "assistant", safeResponse);
 
     return safeResponse;
+
   } catch (err) {
     console.error("[Hybrid Fatal Error]:", err);
-
     return "Something went wrong. Try rephrasing your question.";
   }
 }
