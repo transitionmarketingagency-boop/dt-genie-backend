@@ -392,6 +392,12 @@ export async function executeHybridResponse({
 
 const isFirstMessage = !historyText || historyText.length < 10;
 const isGreeting = /^(hi|hello|hey|yo)\b/.test(msg);
+// Prevent repeated greeting loops
+const lastUserMessage =
+  recentMessagesCache?.slice(-1)?.[0]?.content?.toLowerCase() || "";
+
+const isRepeatGreeting =
+  isGreeting && /^(hi|hello|hey|yo)\b/.test(lastUserMessage);
 
 // ✅ FIXED (removed broken trailing &&)
 const isHighIntent = leadScoreValue >= 0.7;
@@ -413,7 +419,7 @@ const finalEntryMode = entryMode;
 
 /* ================= SMART ONBOARDING SHORTCUT ================= */
 
-if (isFirstMessage && isGreeting) {
+if (isGreeting && !isRepeatGreeting) {
   const reply =
     "Hey — tell me what you're trying to improve in your business right now.";
 
@@ -461,8 +467,9 @@ const hasServiceContext =
 let fusedChunksText = "";
 
 const shouldUseRetrieval =
-  message.length > 20 &&
-  !/^(hi|hello|hey|yo)\b/i.test(message) &&
+  message.length > 40 &&
+  !isGreeting &&
+  !isFirstMessage &&
   !/(who are you|what do you do)/i.test(message);
 
 if (shouldUseRetrieval) {
@@ -487,9 +494,9 @@ const isNewTopic =
   (message.length > 40 && !message.toLowerCase().includes("that"));
 
 const safeHistoryText =
-  isNewTopic || isGreeting
+  isNewTopic
     ? ""
-    : (historyText || "").slice(-800);
+    : (historyText || "").slice(-1200);
 
 
 // ================= PROMPT =================
@@ -524,15 +531,30 @@ try {
     9000
   );
 
-  if (isGoodResponse(result)) {
-    response = result;
+if (typeof result === "string") {
+  const trimmed = result.trim();
+
+  const looksCut =
+    trimmed.endsWith("of") ||
+    trimmed.endsWith("in") ||
+    trimmed.endsWith("and") ||
+    trimmed.length < 120;
+
+  if (isGoodResponse(trimmed) && !looksCut) {
+    response = trimmed;
   }
+}
 } catch {}
 
 
 // ================= GEMINI FALLBACK =================
 
-if (!response && GEMINI_ENABLED && canUseGemini()) {
+if (
+  !response &&
+  GEMINI_ENABLED &&
+  canUseGemini() &&
+  message.length > 20
+) {
   try {
     const result = await withTimeout(
       generateGemini(prompt, sessionId),
@@ -565,11 +587,16 @@ if (!response) {
 response = cleanHybridResponse(response);
 response = repairResponse(response);
 
+if (response.length < 100) {
+  response += " Let me know if you want me to expand on this.";
+}
+
 
 // ================= PHASE 2 OPTIMIZER =================
 
 try {
-  const optimizer = await loadOptimizer();
+const optimizer =
+  message.length > 40 ? await loadOptimizer() : null;
 
   if (optimizer) {
     const result = optimizer(response || "");
@@ -649,9 +676,8 @@ const shouldAddCTA =
   !/^(hi|hello|hey)\b/i.test(normalizedMsg) &&
   !safeResponse.toLowerCase().includes(cta.toLowerCase()) &&
   (
-    (leadScoreValue >= 0.7 &&
-      String(brainContext?.executionMode) === "execution") ||
-    isHighIntentMessage
+leadScoreValue >= 0.7 ||
+isHighIntentMessage
   );
 
 if (shouldAddCTA) {

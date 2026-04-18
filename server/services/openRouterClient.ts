@@ -5,12 +5,30 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 /* ================= CONFIG ================= */
 const MODEL = "qwen/qwen3-235b-a22b";
-const REQUEST_TIMEOUT = 12000;
-const MAX_PROMPT_LENGTH = 3500;
+
+// ⚡ REDUCED (major latency win)
+const REQUEST_TIMEOUT = 7000;
+
+// ⚡ Keep tight
+const MAX_PROMPT_LENGTH = 3200;
+
+// ⚡ Keep retries but safer
 const MAX_RETRIES = 2;
 
 /* ================= CACHE ================= */
 const cache = new Map<string, string>();
+const MAX_CACHE_SIZE = 100;
+
+// simple LRU cleanup
+function maintainCache() {
+  if (cache.size > MAX_CACHE_SIZE) {
+    const first = cache.keys().next();
+
+    if (!first.done && first.value) {
+      cache.delete(first.value);
+    }
+  }
+}
 
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
@@ -32,10 +50,16 @@ function isValidResponse(text: string | null | undefined): text is string {
   if (!text) return false;
 
   const t = text.trim();
-  if (t.length < 80) return false;
 
-  const words = t.split(/\s+/);
-  if (words.length < 12) return false;
+  if (t.length < 100) return false;
+  if (t.split(/\s+/).length < 15) return false;
+
+  // ❌ detect incomplete endings
+  if (
+    /(of|in|and|to|for|with|on|at)$/i.test(t)
+  ) return false;
+
+  if (!/[.?!]$/.test(t)) return false;
 
   if (t.includes("undefined")) return false;
   if (t.includes("Something broke")) return false;
@@ -74,7 +98,7 @@ async function callOpenRouter(
       body: JSON.stringify({
         model: MODEL,
         temperature,
-        max_tokens: 1400,
+        max_tokens: 900, // ⚡ reduced for speed + less truncation risk
         messages: [{ role: "user", content: prompt }],
       }),
       signal: controller.signal,
@@ -118,17 +142,20 @@ export async function generateOpenRouter(
   }
 
   prompt = cleanPrompt(prompt);
-
   if (!prompt) return null;
 
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
 
-  if (cache.has(cacheKey)) return cache.get(cacheKey)!;
+  if (cache.has(cacheKey)) {
+    return cache.get(cacheKey)!;
+  }
 
   let attempt = 0;
   let response: string | null = null;
 
   while (attempt < MAX_RETRIES && !response) {
+
+    // 🔹 FIRST TRY
     const base = await callOpenRouter(prompt, 0.55);
 
     if (isValidResponse(base)) {
@@ -136,10 +163,12 @@ export async function generateOpenRouter(
       break;
     }
 
+    // 🔹 SMART RETRY (forces completion)
     const retryPrompt =
-      prompt + "\n\nIMPORTANT: Respond in complete structured sentences.";
+      prompt +
+      "\n\nIMPORTANT: Finish the answer completely. Do not cut mid-sentence.";
 
-    const retry = await callOpenRouter(retryPrompt, 0.65);
+    const retry = await callOpenRouter(retryPrompt, 0.6);
 
     if (isValidResponse(retry)) {
       response = finalize(retry);
@@ -151,6 +180,7 @@ export async function generateOpenRouter(
 
   if (response) {
     cache.set(cacheKey, response);
+    maintainCache();
     return response;
   }
 

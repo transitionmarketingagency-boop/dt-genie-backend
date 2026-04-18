@@ -38,85 +38,88 @@ function normalize(text: string) {
   return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+/* ================= IMPROVED GREETING DETECTION ================= */
+function isGreeting(message: string) {
+  return /^(hi|hello|hey|yo|hi there|hello there|hey there)\b/i.test(message);
+}
+
 function isShortMessage(message: string) {
   return message.length < 8;
 }
 
-function isGreeting(message: string) {
-  return /^(hi|hello|hey|yo)$/i.test(message);
-}
-
+/* ================= IMPROVED CONTEXT SHIFT (FIXED STABILITY) ================= */
 function detectContextShift(message: string, memory: StrategicMemory): boolean {
-  const strongSignals = ["new business", "different business", "reset"];
-  const weakSignals = ["i run", "we are", "my business", "my store"];
+  const strongSignals = ["new business", "different business", "reset", "start over"];
 
   const hasStrong = strongSignals.some((s) => message.includes(s));
-  const hasWeak = weakSignals.some((s) => message.includes(s));
 
   const hasMemory =
     !!memory?.industry ||
     !!memory?.businessType ||
     (memory?.servicesDiscussed?.length ?? 0) > 0;
 
-  if (hasStrong) return true;
-  if (hasWeak && hasMemory) return true;
-
-  return false;
+  // 🔥 FIX: ONLY reset on explicit instruction (no weak resets anymore)
+  return hasStrong && hasMemory;
 }
 
-/* ================= STAGE DETECTOR ================= */
+/* ================= STAGE DETECTOR (STABILIZED) ================= */
 
-function detectStage(message: string, intentType?: string): BrainContext["stage"] {
+function detectStage(
+  message: string,
+  intentType?: string
+): BrainContext["stage"] {
   if (intentType === "greeting") return "greeting";
   if (intentType === "booking") return "conversion";
   if (intentType === "service_inquiry") return "service";
   if (intentType === "problem") return "strategy";
 
-  if (/(hire|book|start|work with you)/i.test(message)) return "conversion";
-  if (/(price|cost|service|offer)/i.test(message)) return "service";
-  if (/(how|fix|improve|scale|grow|increase)/i.test(message)) return "strategy";
+  if (/(hire|book|start|work with you|get started)/i.test(message)) return "conversion";
+
+  if (/(price|cost|service|offer|package)/i.test(message)) return "service";
+
+  if (/(how|fix|improve|scale|grow|increase|optimize)/i.test(message)) {
+    return "strategy";
+  }
 
   return "discovery";
 }
 
-/* ================= EXECUTION LOGIC (FIXED) ================= */
+/* ================= EXECUTION SIGNALS (FIXED LOGIC) ================= */
 
 function computeExecutionSignals(params: {
   stage: BrainContext["stage"];
   leadScore: number;
   highIntent: boolean;
   message: string;
+  confidence: number;
 }) {
-  const { stage, leadScore, highIntent, message } = params;
+  const { stage, leadScore, highIntent, message, confidence } = params;
 
   const shortMsg = isShortMessage(message);
 
-  /* ✅ FIX: prevent execution mode on short / unclear inputs */
+  /* 🔥 FIX: execution now requires CONFIDENCE + intent */
   const executionMode: ExecutionMode =
-    highIntent && !shortMsg
+    highIntent && confidence > 0.6 && !shortMsg
       ? "execution"
-      : leadScore >= 0.7 && stage !== "greeting"
+      : leadScore >= 0.75 && confidence > 0.7 && stage !== "greeting"
       ? "execution"
       : "exploration";
 
-  /* ✅ FIX: CTA control */
+  /* 🔥 FIX: CTA is more conservative */
   const shouldGiveCTA =
     !shortMsg &&
-    (highIntent ||
-      (leadScore >= 0.75 && stage !== "discovery") ||
-      stage === "conversion");
+    confidence > 0.6 &&
+    (highIntent || leadScore >= 0.8 || stage === "conversion");
 
-  /* ✅ FIX: avoid dumb questioning loops */
+  /* 🔥 FIX: avoid unnecessary questioning */
   const shouldAskQuestion =
     !shortMsg &&
     stage === "discovery" &&
-    leadScore < 0.6 &&
+    leadScore < 0.65 &&
+    confidence < 0.6 &&
     !highIntent;
 
-  const confidenceLevel = Math.min(
-    1,
-    leadScore * 0.7 + (highIntent ? 0.3 : 0)
-  );
+  const confidenceLevel = Math.min(1, confidence);
 
   return {
     executionMode,
@@ -145,7 +148,7 @@ export async function strategicBrain(
     }
   }
 
-  /* ---------- CONTEXT SHIFT ---------- */
+  /* ---------- CONTEXT SHIFT (SAFE) ---------- */
   if (detectContextShift(message, strategicMemory)) {
     strategicMemory = {
       servicesDiscussed: [],
@@ -168,7 +171,7 @@ export async function strategicBrain(
   const intentType = intent?.type || "general";
   const highIntent = Boolean(intent?.highIntent);
 
-  /* ---------- LEAD SCORE ---------- */
+  /* ---------- LEAD SCORE (STABILIZED) ---------- */
   let leadScore = 0;
 
   try {
@@ -187,12 +190,19 @@ export async function strategicBrain(
     ? "greeting"
     : detectStage(message, intentType);
 
+  /* ---------- CONFIDENCE (NOW PROPERLY USED) ---------- */
+  const confidence = Math.min(
+    1,
+    leadScore * 0.6 + (highIntent ? 0.3 : 0.1)
+  );
+
   /* ---------- SIGNALS ---------- */
   const signals = computeExecutionSignals({
     stage,
     leadScore,
     highIntent,
     message,
+    confidence,
   });
 
   /* ---------- CONTEXT QUALITY ---------- */

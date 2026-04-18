@@ -1,7 +1,6 @@
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import * as dotenv from "dotenv";
-import { strategicBrain } from "./strategicBrain.js";
 import crypto from "crypto";
 
 /* ================= PATH ================= */
@@ -13,12 +12,24 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
-const TIMEOUT = 12000;
+
+// ⚡ REDUCED (major latency win)
+const TIMEOUT = 5000;
 
 const BOT_NAME = "DT Genie";
 
 /* ================= CACHE ================= */
 const cache = new Map<string, string>();
+const MAX_CACHE_SIZE = 100;
+
+function maintainCache() {
+  if (cache.size > MAX_CACHE_SIZE) {
+    const first = cache.keys().next();
+    if (!first.done && first.value) {
+      cache.delete(first.value);
+    }
+  }
+}
 
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
@@ -31,7 +42,7 @@ function cleanPrompt(prompt: string) {
       ?.replace(/\s+/g, " ")
       .replace(/\x00/g, "")
       .trim()
-      .slice(0, 4000) || ""
+      .slice(0, 3500) || ""
   );
 }
 
@@ -40,7 +51,14 @@ function isValidResponse(text: string | null | undefined): text is string {
   if (!text) return false;
 
   const t = text.trim();
-  if (t.length < 40) return false;
+
+  if (t.length < 80) return false;
+  if (t.split(/\s+/).length < 12) return false;
+
+  // ❌ block incomplete endings
+  if (/(of|in|and|to|for|with|on|at)$/i.test(t)) return false;
+
+  if (!/[.?!]$/.test(t)) return false;
 
   const badPatterns = [
     "```",
@@ -57,6 +75,7 @@ function isValidResponse(text: string | null | undefined): text is string {
   return true;
 }
 
+/* ================= HELPERS ================= */
 function fixSpacing(text: string): string {
   return (text || "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -66,7 +85,7 @@ function fixSpacing(text: string): string {
 
 function ensureComplete(text: string): string {
   if (!text) return "";
-  return /[.!?]$/.test(text) ? text : text + ".";
+  return /[.?!]$/.test(text) ? text : text + ".";
 }
 
 /* ================= INTENT ================= */
@@ -97,36 +116,16 @@ export async function generateGemini(
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
-  let contextText = "";
-
-  if (sessionId) {
-    try {
-      const { brainContext } = await strategicBrain(
-        prompt.slice(0, 300),
-        sessionId
-      );
-
-      contextText = `Stage: ${brainContext?.stage || "unknown"} | LeadScore: ${
-        brainContext?.leadScore || 0
-      }`;
-    } catch {
-      contextText = "";
-    }
-  }
-
   const highIntent = detectHighIntent(prompt);
 
+  // 🔥 SIMPLIFIED (no strategicBrain = faster)
   const finalPrompt = `
 You are ${BOT_NAME}, a strategic marketing assistant.
 
 Rules:
-- Be precise and practical
-- Avoid fluff
-- No repetition
-- Give actionable answers only
-
-Context:
-${contextText}
+- Be clear, practical, and complete
+- No fluff, no repetition
+- Do not cut sentences mid-way
 
 User:
 ${prompt}
@@ -145,7 +144,7 @@ Answer:
         contents: [{ parts: [{ text: finalPrompt }] }],
         generationConfig: {
           temperature: highIntent ? 0.45 : 0.35,
-          maxOutputTokens: 900,
+          maxOutputTokens: 700,
           topP: 0.9,
         },
       }),
@@ -168,10 +167,15 @@ Answer:
     content = ensureComplete(content);
 
     cache.set(cacheKey, content);
+    maintainCache();
 
     return content;
   } catch (err: any) {
-    console.warn("[Gemini Error]", err?.message || err);
+    if (err?.name === "AbortError") {
+      console.warn("[Gemini Timeout]");
+    } else {
+      console.warn("[Gemini Error]", err?.message || err);
+    }
     return null;
   } finally {
     clearTimeout(timeout);
