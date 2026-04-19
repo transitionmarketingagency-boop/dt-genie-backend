@@ -93,44 +93,60 @@ const CTA_TEMPLATES = {
   },
 };
 
+
 /* ================= SHOULD SHOW CTA ================= */
 function shouldShowCTA(input: CTAInput): boolean {
   const { message, stage, leadScore } = input;
 
   const msg = normalize(message);
 
-  /* HARD BLOCKS */
-  if (detectRejection(msg)) return false;
-  if (isWeakMessage(msg)) return false;
+  // ================= HARD CTA SAFETY =================
+
+  // ❌ block weak / empty / greeting-level inputs
+  if (isWeakMessage(message)) return false;
   if (stage === "greeting") return false;
 
-  /* REMOVE OVER-AGGRESSIVE STAGE TRIGGERS */
-  const stageAllowed = stage === "service" || stage === "conversion";
+  // ❌ block explicit rejection always
+  if (detectRejection(msg)) return false;
 
-  /* INTENT DETECTION */
+  // ❌ prevent CTA spam in pure informational low-intent queries
+  const isInformational =
+    /(what|why|how|explain|tell me|guide|learn|help|difference)/i.test(msg);
+
+  if (isInformational && leadScore < 0.65) return false;
+
+  // ================= INTENT DETECTION =================
+
   const strongIntent =
-    /(hire|start|book|schedule|call|work with you|get started|pricing|cost)/i.test(
+    /(hire|start|book|schedule|call|appointment|work with you|get started|pricing|cost)/i.test(
       msg
     );
 
-  /* INFORMATIONAL CONTROL (FIXED) */
-  const isInformational =
-    /(what|why|how|explain|tell me|guide|learn|help)/i.test(msg);
+  const highIntentMessage =
+    /(hire|book|schedule|call|work with you|get started)/i.test(msg);
 
-  // FIX: only block informational when LOW intent
-  if (isInformational && leadScore < 0.7 && !strongIntent) return false;
+  // ================= STAGE CONTROL =================
 
-  /* STRONG INTENT ALWAYS TRUE */
-  if (strongIntent) return true;
+  const isValidStage =
+    stage === "service" || stage === "strategy" || stage === "conversion";
 
-  /* SCORE GATE (TIGHTER) */
-  if (leadScore >= 0.75) return true;
+  // ================= FINAL CTA RULE ENGINE =================
 
-  /* STAGE GATE (NOW SAFE) */
-  if (stageAllowed && leadScore >= 0.6) return true;
+  // 1. Strong intent ALWAYS gets CTA
+  if (strongIntent || highIntentMessage) return true;
+
+  // 2. High lead score execution mode
+  if (leadScore >= 0.75 && isValidStage) return true;
+
+  // 3. Mid-score + service context
+  if (leadScore >= 0.7 && stage === "service") return true;
+
+  // 4. Conversion stage override (but still safe-gated above)
+  if (stage === "conversion" && leadScore >= 0.6) return true;
 
   return false;
 }
+
 
 /* ================= INTENSITY ================= */
 function getCTAIntensity(input: CTAInput): "soft" | "strong" {

@@ -202,7 +202,10 @@ CRITICAL RULES (STRICT)
 7. DO NOT ask repetitive or unnecessary questions
 
 If knowledge is missing:
-→ Give a safe, general answer WITHOUT fabricating details
+→ Answer naturally using general business reasoning
+→ Do NOT mention missing data
+→ Do NOT mention knowledge availability
+→ Do NOT apologize or explain limitations
 
 --------------------------------------------------
 
@@ -361,17 +364,24 @@ function repairResponse(text: string): string {
 
   if (!fixed) return "";
 
-if (!/[.?!]$/.test(fixed)) {
-  fixed += ".";
+  // Normalize spacing
+  fixed = fixed.replace(/\s+/g, " ").trim();
+
+  // Ensure sentence completion ONLY if needed
+  if (!/[.?!]$/.test(fixed)) {
+    fixed += ".";
+  }
+
+  // ❌ FIX: only add filler if response is TOO short AND not CTA
+  const isCTA = /(call|book|schedule|get started)/i.test(fixed);
+
+  if (fixed.length < 70 && !isCTA) {
+    fixed += " Let me know if you want me to go deeper on this.";
+  }
+
+  return fixed;
 }
 
-// 🔥 force completion feel
-if (fixed.length < 80) {
-  fixed += " Let me know if you want me to go deeper on this.";
-}
-
-  return fixed.replace(/\s+/g, " ").trim();
-}
 
 function sanitizeFinalOutput(text: string): string {
   if (!text) return "";
@@ -588,15 +598,40 @@ if (!response && GEMINI_ENABLED && canUseGemini()) {
 }
 
 
-// ================= FINAL FALLBACK =================
+// ================= FINAL FALLBACK (FIXED BOOKING-AWARE MODE) =================
 
-if (!response) {
-  if (isGreeting) {
-    response = "Hey — what are you trying to improve in your business right now?";
-  } else if (message.length < 10) {
-    response = "Can you give me a bit more detail so I can help properly?";
-  } else {
-    response = "Let me break this down properly based on what you shared.";
+if (!response || typeof response !== "string" || response.trim().length === 0) {
+
+  const msg = (message || "").toLowerCase();
+
+  const isBookingIntent =
+    /(book|call|schedule|appointment|hire|get started|work with you)/i.test(msg);
+
+  const isShortMessage = message.length < 10;
+
+  const isVeryShortGreeting =
+    /^(hi|hello|hey|yo)$/i.test(msg.trim());
+
+  if (isVeryShortGreeting) {
+    response =
+      "Hey — what are you trying to improve in your business right now?";
+  }
+
+  else if (isShortMessage && !isBookingIntent) {
+    response =
+      "Can you share a bit more detail so I can help you properly?";
+  }
+
+  else if (isBookingIntent) {
+    // 🔥 DIRECT HANDOFF TO BOOKING FLOW (NO OVER-EXPLANATION)
+    response =
+      "Got it — I can help you with that. Let’s take this into a quick call setup.";
+  }
+
+  else {
+    // 🔥 SAFE INTELLIGENT FALLBACK (NO GENERIC FLUFF)
+    response =
+      "Let me understand this properly so I can guide you in the right direction.";
   }
 }
 
@@ -675,6 +710,7 @@ try {
 } catch {}
 
 
+
 // ================= CTA ENGINE =================
 
 const cta = generateCTA({
@@ -685,31 +721,72 @@ const cta = generateCTA({
 });
 
 
-// ================= CTA CONTROL =================
+// ================= CTA CONTROL (FIXED AUTHORITY LAYER) =================
 
 const normalizedMsg = (message || "").toLowerCase();
 
+/**
+ * High intent detection (user wants action)
+ */
 const isHighIntentMessage =
   /(book|hire|call|schedule|appointment|work with you|get started)/i.test(
     normalizedMsg
   );
 
+/**
+ * Safe response normalization
+ */
 let safeResponse =
   typeof response === "string" ? response : String(response || "");
 
+/**
+ * Detect booking intent (prevents CTA conflict with booking system)
+ */
+const isBookingIntent =
+  typeof shouldTriggerBooking === "function"
+    ? shouldTriggerBooking?.(
+        sessionId,
+        "service",
+        leadScoreValue,
+        message
+      )
+    : false ||
+      /(book|schedule|call|appointment|hire|get started)/i.test(normalizedMsg);
+
+/**
+ * Prevent CTA on weak or incomplete responses
+ */
+const isIncompleteResponse =
+  !safeResponse || safeResponse.trim().length < 60;
+
+/**
+ * Prevent duplicate CTA injection
+ */
+const alreadyHasCTA =
+  typeof cta === "string" &&
+  cta.trim().length > 0 &&
+  safeResponse.toLowerCase().includes(cta.toLowerCase());
+
+/**
+ * FINAL CTA GUARD (STRICT + STABLE)
+ */
 const shouldAddCTA =
   typeof cta === "string" &&
   cta.trim().length > 0 &&
-  safeResponse.length > 0 &&
   !detectBookingRejection(message) &&
   !isGreeting &&
-  !/^(hi|hello|hey)\b/i.test(normalizedMsg) &&
-  !safeResponse.toLowerCase().includes(cta.toLowerCase()) &&
+  !isBookingIntent &&          // 🔥 prevents conflict with booking flow
+  !isIncompleteResponse &&     // 🔥 prevents CTA on broken outputs
+  !alreadyHasCTA &&            // 🔥 prevents duplication
+  safeResponse.length > 60 &&
   (
-    (leadScoreValue >= 0.7 &&
+    (leadScoreValue >= 0.75 &&
       String(brainContext?.executionMode) === "execution") ||
     isHighIntentMessage
   );
+
+
+// ================= APPLY CTA =================
 
 if (shouldAddCTA) {
   safeResponse = safeResponse.trim() + "\n\n" + cta.trim();
