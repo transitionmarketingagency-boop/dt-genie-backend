@@ -1,6 +1,6 @@
 /**
  * ==========================================
- * CTA ENGINE (PHASE 6 — FIXED PRODUCTION)
+ * CTA ENGINE (PHASE 6 — FIXED PRODUCTION v2)
  * ==========================================
  */
 
@@ -26,9 +26,9 @@ function normalize(text: string): string {
   return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/* ================= REJECTION (FIXED STRONGER) ================= */
+/* ================= REJECTION ================= */
 function detectRejection(message: string): boolean {
-  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later|busy|i will book later|stop)/i.test(
+  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later|busy|i will book later|stop|leave me)/i.test(
     message
   );
 }
@@ -38,7 +38,6 @@ function isWeakMessage(message: string): boolean {
   const msg = normalize(message);
 
   if (!msg) return true;
-
   if (msg.length < 4) return true;
 
   if (/^(hi|hello|hey|yo|ok|yes|no|hmm|thanks)$/i.test(msg)) return true;
@@ -69,27 +68,28 @@ function detectPrimaryService(services: string[] = []): string {
 const CTA_TEMPLATES = {
   general: {
     soft: "If it makes sense, I can map a clear strategy for your setup.",
-    strong: "We can turn this into a working system — want me to break it down?",
+    strong:
+      "We can structure a clear plan for this — want me to map it properly?",
   },
 
   ai_automation: {
     soft: "I can outline a simple automation flow for your business.",
-    strong: "We can build this automation system — want a breakdown?",
+    strong: "We can design an automation system for this — want the structure?",
   },
 
   performance_marketing: {
     soft: "I can show how to improve your ad performance step by step.",
-    strong: "We can fix your ad performance system — want the structure?",
+    strong: "We can fix your ad system structure — want the breakdown?",
   },
 
   ai_search_domination_geo: {
     soft: "I can show how to improve your AI search visibility.",
-    strong: "We can position your brand in AI search results — want the method?",
+    strong: "We can position you in AI search results — want the method?",
   },
 
   cgi_tours: {
     soft: "I can show how CGI improves conversion rates.",
-    strong: "We can build high-conversion CGI creatives — want the plan?",
+    strong: "We can design CGI assets for higher conversion — want the plan?",
   },
 };
 
@@ -104,23 +104,30 @@ function shouldShowCTA(input: CTAInput): boolean {
   if (isWeakMessage(msg)) return false;
   if (stage === "greeting") return false;
 
-  /* INFORMATIONAL CONTROL */
+  /* REMOVE OVER-AGGRESSIVE STAGE TRIGGERS */
+  const stageAllowed = stage === "service" || stage === "conversion";
+
+  /* INTENT DETECTION */
+  const strongIntent =
+    /(hire|start|book|schedule|call|work with you|get started|pricing|cost)/i.test(
+      msg
+    );
+
+  /* INFORMATIONAL CONTROL (FIXED) */
   const isInformational =
     /(what|why|how|explain|tell me|guide|learn|help)/i.test(msg);
 
-  if (isInformational && leadScore < 0.65) return false;
+  // FIX: only block informational when LOW intent
+  if (isInformational && leadScore < 0.7 && !strongIntent) return false;
 
-  /* STRONG INTENT */
-  if (/(hire|start|book|schedule|call|work with you|get started)/i.test(msg)) {
-    return true;
-  }
+  /* STRONG INTENT ALWAYS TRUE */
+  if (strongIntent) return true;
 
-  /* SCORE + STAGE */
-  if (leadScore >= 0.7) return true;
+  /* SCORE GATE (TIGHTER) */
+  if (leadScore >= 0.75) return true;
 
-  if (stage === "service") return true;
-
-  if (stage === "conversion") return true;
+  /* STAGE GATE (NOW SAFE) */
+  if (stageAllowed && leadScore >= 0.6) return true;
 
   return false;
 }
@@ -130,9 +137,7 @@ function getCTAIntensity(input: CTAInput): "soft" | "strong" {
   const { leadScore, stage, executionMode } = input;
 
   if (executionMode === "execution") return "strong";
-
-  if (leadScore >= 0.8) return "strong";
-
+  if (leadScore >= 0.85) return "strong";
   if (stage === "conversion") return "strong";
 
   return "soft";
@@ -151,7 +156,16 @@ export function generateCTA(input: CTAInput): string {
       CTA_TEMPLATES[service as keyof typeof CTA_TEMPLATES] ||
       CTA_TEMPLATES.general;
 
-    return `\n\n${templates[intensity] || ""}`;
+    const cta = templates[intensity] || "";
+
+    // SAFETY: ensure no booking hallucination language leaks
+    if (
+      /(booked|scheduled|calendar|confirmed|email sent)/i.test(cta)
+    ) {
+      return "";
+    }
+
+    return `\n\n${cta}`;
   } catch {
     return "";
   }

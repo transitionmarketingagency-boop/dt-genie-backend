@@ -46,40 +46,59 @@ function isGreeting(message: string) {
   return /^(hi|hello|hey|yo)$/i.test(message);
 }
 
-function detectContextShift(message: string, memory: StrategicMemory): boolean {
+/* ================= CONTEXT SHIFT (FIXED & STABILIZED) ================= */
+
+function detectContextShift(
+  message: string,
+  memory: StrategicMemory
+): boolean {
+  const msg = normalize(message);
+
   const strongSignals = ["new business", "different business", "reset"];
   const weakSignals = ["i run", "we are", "my business", "my store"];
 
-  const hasStrong = strongSignals.some((s) => message.includes(s));
-  const hasWeak = weakSignals.some((s) => message.includes(s));
+  const hasStrong = strongSignals.some((s) => msg.includes(s));
+  const hasWeak = weakSignals.some((s) => msg.includes(s));
 
   const hasMemory =
     !!memory?.industry ||
     !!memory?.businessType ||
     (memory?.servicesDiscussed?.length ?? 0) > 0;
 
+  // ❌ FIX: only reset on STRONG intent OR strong+clear context mismatch
   if (hasStrong) return true;
-  if (hasWeak && hasMemory) return true;
+
+  // ❌ FIX: prevent false resets on normal statements like "my business does X"
+  if (hasWeak && hasMemory && msg.length > 40) return true;
 
   return false;
 }
 
 /* ================= STAGE DETECTOR ================= */
 
-function detectStage(message: string, intentType?: string): BrainContext["stage"] {
+function detectStage(
+  message: string,
+  intentType?: string
+): BrainContext["stage"] {
+  const msg = normalize(message);
+
   if (intentType === "greeting") return "greeting";
   if (intentType === "booking") return "conversion";
   if (intentType === "service_inquiry") return "service";
   if (intentType === "problem") return "strategy";
 
-  if (/(hire|book|start|work with you)/i.test(message)) return "conversion";
-  if (/(price|cost|service|offer)/i.test(message)) return "service";
-  if (/(how|fix|improve|scale|grow|increase)/i.test(message)) return "strategy";
+  if (/(hire|book|start|work with you|get started)/i.test(msg))
+    return "conversion";
+
+  if (/(price|cost|service|offer)/i.test(msg)) return "service";
+
+  if (/(how|fix|improve|scale|grow|increase)/i.test(msg))
+    return "strategy";
 
   return "discovery";
 }
 
-/* ================= EXECUTION LOGIC (FIXED) ================= */
+/* ================= EXECUTION LOGIC (STABILIZED) ================= */
 
 function computeExecutionSignals(params: {
   stage: BrainContext["stage"];
@@ -91,31 +110,31 @@ function computeExecutionSignals(params: {
 
   const shortMsg = isShortMessage(message);
 
-  /* ✅ FIX: prevent execution mode on short / unclear inputs */
+  // ❌ FIX: prevent unstable execution mode flips from neuralBrain noise
+  const safeHighIntent = highIntent && message.length > 10;
+
   const executionMode: ExecutionMode =
-    highIntent && !shortMsg
+    safeHighIntent && !shortMsg
       ? "execution"
-      : leadScore >= 0.7 && stage !== "greeting"
+      : leadScore >= 0.75 && stage !== "greeting"
       ? "execution"
       : "exploration";
 
-  /* ✅ FIX: CTA control */
   const shouldGiveCTA =
     !shortMsg &&
-    (highIntent ||
-      (leadScore >= 0.75 && stage !== "discovery") ||
+    (safeHighIntent ||
+      (leadScore >= 0.78 && stage !== "discovery") ||
       stage === "conversion");
 
-  /* ✅ FIX: avoid dumb questioning loops */
   const shouldAskQuestion =
     !shortMsg &&
     stage === "discovery" &&
     leadScore < 0.6 &&
-    !highIntent;
+    !safeHighIntent;
 
   const confidenceLevel = Math.min(
     1,
-    leadScore * 0.7 + (highIntent ? 0.3 : 0)
+    leadScore * 0.75 + (safeHighIntent ? 0.25 : 0)
   );
 
   return {
@@ -156,28 +175,41 @@ export async function strategicBrain(
     };
   }
 
-  /* ---------- INTENT ---------- */
+  /* ---------- INTENT (STABILIZED) ---------- */
   let intent: any = {};
 
   try {
-    intent = neuralBrain?.(message) || {};
+    const rawIntent = neuralBrain?.(message) || {};
+
+    // ❌ FIX: sanitize unstable neural outputs
+    intent = {
+      type: typeof rawIntent?.type === "string" ? rawIntent.type : "general",
+      highIntent: Boolean(rawIntent?.highIntent),
+    };
   } catch {
-    intent = {};
+    intent = { type: "general", highIntent: false };
   }
 
-  const intentType = intent?.type || "general";
-  const highIntent = Boolean(intent?.highIntent);
+  const intentType = intent.type;
+  const highIntent = Boolean(intent.highIntent);
 
-  /* ---------- LEAD SCORE ---------- */
+  /* ---------- LEAD SCORE (STABILIZED) ---------- */
   let leadScore = 0;
 
   try {
-    const scoreResult = leadQualifier?.scoreLead?.(sessionId || "anon", {
-      need: intentType === "problem" ? 0.6 : 0.3,
-      authority: highIntent ? 0.8 : 0.3,
-    });
+    const scoreResult = leadQualifier?.scoreLead?.(
+      sessionId || "anon",
+      {
+        need: intentType === "problem" ? 0.6 : 0.3,
+        authority: highIntent ? 0.8 : 0.3,
+      }
+    );
 
     leadScore = Number(scoreResult?.total ?? 0);
+
+    // ❌ FIX: clamp invalid values
+    if (isNaN(leadScore) || leadScore < 0) leadScore = 0;
+    if (leadScore > 1) leadScore = 1;
   } catch {
     leadScore = 0;
   }

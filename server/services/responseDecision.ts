@@ -1,5 +1,5 @@
 /* =====================================================
-   RESPONSE DECISION (ANTI-SPAM + HUMAN FLOW FIX)
+   RESPONSE DECISION (ANTI-SPAM + HUMAN FLOW FIX v2)
 ===================================================== */
 
 /* ================= NORMALIZE ================= */
@@ -14,7 +14,7 @@ function normalize(text: string): string {
 export function detectBookingRejection(message: string): boolean {
   const msg = normalize(message);
 
-  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later|busy)/i.test(
+  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later|busy|stop|leave me)/i.test(
     msg
   );
 }
@@ -24,10 +24,9 @@ function isWeakMessage(message: string): boolean {
   const msg = normalize(message);
 
   if (!msg) return true;
-
   if (msg.length < 4) return true;
 
-  if (/^(hi|hello|hey|yo|ok|yes|no|hmm)$/i.test(msg)) return true;
+  if (/^(hi|hello|hey|yo|ok|yes|no|hmm|thanks)$/i.test(msg)) return true;
 
   return false;
 }
@@ -36,15 +35,20 @@ function isWeakMessage(message: string): boolean {
 function isInformational(message: string): boolean {
   const msg = normalize(message);
 
-  return /(what|why|how|explain|tell me|guide|learn|difference)/i.test(msg);
+  return /(what|why|how|explain|tell me|guide|learn|difference|help)/i.test(msg);
 }
 
-/* ================= HIGH INTENT ================= */
+/* ================= HIGH INTENT (FIXED STRONGER) ================= */
 function isHighIntent(message: string): boolean {
   const msg = normalize(message);
 
-  return /(hire|start|book|schedule|work with you|i want results|i'm ready|get started)/i.test(
-    msg
+  return (
+    /(hire|start|book|schedule|work with you|get started|i want results|i'm ready)/i.test(
+      msg
+    ) ||
+    /(pricing|cost|budget|roas|leads|ads not working|wasting money|not converting)/i.test(
+      msg
+    )
   );
 }
 
@@ -59,30 +63,34 @@ export function shouldIncludeCTA(
 
   /* ❌ HARD BLOCKS */
   if (detectBookingRejection(msg)) return false;
-
   if (isWeakMessage(msg)) return false;
 
-  /* ❌ Prevent repetition spam */
+  /* ❌ Prevent repetitive informational spam triggers */
   if (
-    msg.includes("what should we do") ||
-    msg.includes("tell me more") ||
-    msg.includes("explain")
+    msg === "what should we do" ||
+    msg === "tell me more" ||
+    msg === "explain"
   ) {
     return false;
   }
 
-  /* ❌ Informational guard */
-  if (isInformational(msg) && leadScore < 0.65) return false;
+  /* ❌ STRONG informational guard (FIXED) */
+  const informational = isInformational(msg);
+  if (informational && leadScore < 0.7 && !isHighIntent(msg)) return false;
 
-  /* ✅ High intent always wins */
+  /* ✅ HIGH INTENT ALWAYS WINS */
   if (isHighIntent(msg)) return true;
 
-  /* ✅ Stage-based logic */
-  if (stage === "conversion") return true;
+  /* ✅ STAGE LOGIC (FIXED SAFE GATING) */
+  if (stage === "conversion" && leadScore >= 0.65) return true;
 
   if (stage === "service" && leadScore >= 0.7) return true;
 
   if (stage === "strategy" && leadScore >= 0.8) return true;
 
+  /* ✅ INTENT CATEGORY BOOST */
+  if (intentCategories?.length > 0 && leadScore >= 0.75) return true;
+
+  /* ❌ DEFAULT BLOCK */
   return false;
 }

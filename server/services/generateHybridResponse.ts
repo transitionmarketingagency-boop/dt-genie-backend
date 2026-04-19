@@ -112,6 +112,47 @@ function removeForbiddenContent(text: string): string {
 }
 
 
+function removePricing(text: string): string {
+  if (!text) return "";
+
+  return text
+    .replace(/\$\s?\d+(\.\d+)?\s?(\/\s?(month|mo|year))?/gi, "")
+    .replace(/€\s?\d+(\.\d+)?/gi, "")
+    .replace(/£\s?\d+(\.\d+)?/gi, "")
+    .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "")
+    .trim();
+}
+
+
+function removeIdentitySpam(text: string): string {
+  if (!text) return "";
+
+  return text.replace(
+    /hello!? i('|’)m neon vision[^.]*\./gi,
+    ""
+  ).trim();
+}
+
+
+function enforceBookingOnly(text: string): string {
+  if (!text) return "";
+
+  // remove fake confirmations
+  let cleaned = text
+    .replace(/calendar invite[^.]*\./gi, "")
+    .replace(/check your inbox[^.]*\./gi, "")
+    .replace(/i('|’)ve (booked|scheduled)[^.]*\./gi, "");
+
+  // remove contact phrases
+  cleaned = cleaned.replace(
+    /(email|phone|contact us|reach out)[^.]*\./gi,
+    ""
+  );
+
+  return cleaned.trim();
+}
+
+
 // ===================== PROMPT BUILDER ===================== //
 
 export function buildHybridPrompt({
@@ -391,7 +432,7 @@ export async function executeHybridResponse({
 // ================= ENTRY INTELLIGENCE (FINAL STABLE FIX) =================
 
 const isFirstMessage = !historyText || historyText.length < 10;
-const isGreeting = /^(hi|hello|hey|yo)\b/.test(msg);
+const isGreeting = /^(hi|hello|hey|yo)$/i.test(msg.trim());
 
 // ✅ FIXED (removed broken trailing &&)
 const isHighIntent = leadScoreValue >= 0.7;
@@ -563,8 +604,18 @@ if (!response) {
 // ================= CLEANING =================
 
 response = cleanHybridResponse(response);
-response = repairResponse(response);
 
+// 1. Remove system + tool leakage
+response = removeForbiddenContent(response);
+
+// 2. Remove pricing / monetary leaks
+response = removePricing(response);
+
+// 3. Final safety cleanup pass (IMPORTANT BEFORE REPAIR)
+response = sanitizeFinalOutput(response);
+
+// 4. Final grammar + flow fix
+response = repairResponse(response);
 
 // ================= PHASE 2 OPTIMIZER =================
 
@@ -596,8 +647,14 @@ if (forceNoQuestions && typeof response === "string") {
 // ================= BOT ENFORCEMENT =================
 
 response = sanitizeFinalOutput(response || "");
-response = enforceBotName(response || "");
 
+// ✅ NEW FIX: remove fake booking + contact behavior
+response = enforceBookingOnly(response);
+
+// ✅ REMOVE IDENTITY SPAM
+response = removeIdentitySpam(response);
+
+response = enforceBotName(response || "");
 
 // ================= DUPLICATE RESPONSE PROTECTION =================
 
