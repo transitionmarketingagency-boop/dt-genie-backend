@@ -25,7 +25,9 @@ async function loadOptimizer(): Promise<ProcessResponseFn | null> {
   if (processResponse) return processResponse;
 
   try {
+    // ✅ FIXED: correct NodeNext relative path from server/services → root
     const mod: any = await import("../../responseOptimizer.js");
+
     const fn = mod?.processResponse;
 
     if (typeof fn === "function") {
@@ -41,39 +43,28 @@ async function loadOptimizer(): Promise<ProcessResponseFn | null> {
   }
 }
 
-
-// ===================== INTENT + SERVICE ===================== //
-
+// Intent & Service detection
 import { detectIntent } from "./intentManager.js";
 import { detectService } from "./serviceDetector.js";
 
-
-// ===================== STRATEGIC LAYER ===================== //
-
+// Strategic logic & lead handling
 import { strategicBrain } from "./strategicBrain.js";
 import bookingFlow from "../bookingFlow.js";
 import { analyzeLeadSignals } from "./leadIntelligence.js";
 import { shouldTriggerBooking } from "./bookingTrigger.js";
 
-
-// ===================== HELPERS ===================== //
-
+// Modular helpers
 import { detectBookingRejection, shouldIncludeCTA } from "./responseDecision.js";
 import { compressContext } from "./responseUtilities.js";
-
 import {
   GEMINI_ENABLED,
   canUseGemini,
   markGeminiUsed,
 } from "./geminiManager.js";
-
 import { withTimeout } from "./timeoutHelper.js";
 
-
-// ===================== AI LAYER ===================== //
-
+// AI / reasoning layer
 import { neuralBrain } from "./neuralBrain.js";
-
 import {
   normalizeLeadScore,
   determineExecutionMode,
@@ -81,7 +72,6 @@ import {
 
 
 // ===================== TYPES ===================== //
-
 export interface BrainContext {
   stage?: string;
   intent?: string;
@@ -103,24 +93,21 @@ export interface BrainContext {
 
 function cleanHybridResponse(text: string): string {
   if (!text) return "";
-
   return typeof cleanResponse === "function"
     ? cleanResponse(text).trim()
     : text.trim();
 }
 
-
-// ⚡ PERFORMANCE FIX: only run heavy regex cleaning when needed
 function removeForbiddenContent(text: string): string {
-  if (!text || text.length < 20) return text || "";
+  if (!text) return "";
 
   return text
+    // ❌ remove emails
     .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i, "")
+    // ❌ remove links
     .replace(/https?:\/\/\S+/gi, "")
-    .replace(
-      /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify apps|jasper|perplexity|sprout social)\b/gi,
-      ""
-    )
+    // ❌ remove tool mentions
+    .replace(/\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify apps|jasper|perplexity|sprout social)\b/gi, "")
     .trim();
 }
 
@@ -134,7 +121,7 @@ export function buildHybridPrompt({
   vectorText,
   historyText,
   message,
-  priorityInstruction,
+priorityInstruction,
 }: {
   brainContext: BrainContext;
   leadScoreValue: number;
@@ -142,26 +129,13 @@ export function buildHybridPrompt({
   vectorText: string;
   historyText: string;
   message: string;
-  priorityInstruction?: string;
+priorityInstruction?: string;
 }) {
 
-  // ⚡ PERFORMANCE FIX: cheap check first
   const hasVectorKnowledge =
-    vectorText && vectorText.length > 50;
+    Boolean(vectorText && vectorText.trim().length > 50);
 
   const executionMode = brainContext?.executionMode ?? "exploration";
-
-  // 🧠 CONTEXT BLEED FIX (LIGHT)
-  const safeHistory =
-    historyText && historyText.length > 800
-      ? historyText.slice(-800)
-      : historyText || "None";
-
-  // ✂️ TRUNCATION PREVENTION (PROMPT LEVEL)
-  const safeVector =
-    hasVectorKnowledge && vectorText.length > 1200
-      ? vectorText.slice(0, 1200)
-      : vectorText || "NO DATA AVAILABLE";
 
   return `
 You are Neon Vision, the AI system of Digital Transition Marketing.
@@ -217,13 +191,13 @@ Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
 
 CONVERSATION HISTORY
 
-${safeHistory}
+${historyText || "None"}
 
 --------------------------------------------------
 
 KNOWLEDGE (PRIMARY SOURCE)
 
-${hasVectorKnowledge ? safeVector : "NO DATA AVAILABLE"}
+${hasVectorKnowledge ? vectorText : "NO DATA AVAILABLE"}
 
 IMPORTANT:
 - If KNOWLEDGE exists → BASE your answer on it
@@ -286,7 +260,6 @@ If not → fix before responding.
 }
 
 
-
 // ===================== HYBRID EXECUTION ===================== //
 
 function isGoodResponse(text: unknown): text is string {
@@ -320,13 +293,12 @@ function isGoodResponse(text: unknown): text is string {
 
   if (badPatterns.some((p) => lower.includes(p))) return false;
 
-  // 🔥 prevent repetition loops
+  // 🔥 prevent garbage repetition / loops
   const sentences = clean.split(/[.!?]/).map(s => s.trim()).filter(Boolean);
   if (sentences.length >= 2 && sentences[0] === sentences[1]) return false;
 
   return true;
 }
-
 
 function shouldResetContext(message: string): boolean {
   const triggers = [
@@ -343,29 +315,29 @@ function shouldResetContext(message: string): boolean {
   return triggers.some((t) => lower.includes(t));
 }
 
-
 function repairResponse(text: string): string {
   let fixed = (text || "").trim();
+
   if (!fixed) return "";
 
-  if (!/[.?!]$/.test(fixed)) {
-    fixed += ".";
-  }
+if (!/[.?!]$/.test(fixed)) {
+  fixed += ".";
+}
 
-  // ✂️ TRUNCATION FIX (only extend if clearly incomplete)
-  if (fixed.length < 60) {
-    fixed += " Let me know if you want me to go deeper on this.";
-  }
+// 🔥 force completion feel
+if (fixed.length < 80) {
+  fixed += " Let me know if you want me to go deeper on this.";
+}
 
   return fixed.replace(/\s+/g, " ").trim();
 }
-
 
 function sanitizeFinalOutput(text: string): string {
   if (!text) return "";
 
   let cleaned = text;
 
+  // remove dataset / vector leaks
   if (
     cleaned.includes('"intent"') ||
     cleaned.includes('"examples"') ||
@@ -376,8 +348,10 @@ function sanitizeFinalOutput(text: string): string {
     return "Let me give you a clear answer based on your situation.\n\nCan you clarify your main goal right now?";
   }
 
+  // remove fake system outputs
   cleaned = cleaned.replace(/system is now operational.*$/i, "");
 
+  // remove tool mentions again (double safety)
   cleaned = cleaned.replace(
     /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini)\b/gi,
     ""
@@ -413,282 +387,287 @@ export async function executeHybridResponse({
   try {
     const msg = (message || "").trim().toLowerCase();
 
-    // ================= ENTRY INTELLIGENCE =================
 
-    const isFirstMessage = !historyText || historyText.length < 10;
-    const isGreeting = /^(hi|hello|hey|yo)\b/.test(msg);
+// ================= ENTRY INTELLIGENCE (FINAL STABLE FIX) =================
 
-    // 🔁 FIX: prevent greeting loops
-    const lastUserMsg =
-      recentMessagesCache?.slice(-1)?.[0]?.content?.toLowerCase() || "";
+const isFirstMessage = !historyText || historyText.length < 10;
+const isGreeting = /^(hi|hello|hey|yo)\b/.test(msg);
 
-    const isRepeatGreeting =
-      isGreeting && /^(hi|hello|hey|yo)\b/.test(lastUserMsg);
+// ✅ FIXED (removed broken trailing &&)
+const isHighIntent = leadScoreValue >= 0.7;
 
-    const isHighIntent = leadScoreValue >= 0.7;
+/**
+ * FINAL ENTRY MODE (IMMUTABLE)
+ * We keep it SIMPLE to avoid TS narrowing bugs
+ */
+const entryMode =
+  isFirstMessage && isGreeting
+    ? "onboarding"
+    : isHighIntent
+    ? "execution"
+    : "continuation";
 
-    const entryMode =
-      isFirstMessage && isGreeting
-        ? "onboarding"
-        : isHighIntent
-        ? "execution"
-        : "continuation";
+// SAFE alias (no re-declaration risk, no TS narrowing issues)
+const finalEntryMode = entryMode;
 
-    const finalEntryMode = entryMode;
 
-    // 🔁 FIXED GREETING HANDLER
-    if (isFirstMessage && isGreeting && !isRepeatGreeting) {
-      const reply =
-        "Hey — tell me what you're trying to improve in your business right now.";
+/* ================= SMART ONBOARDING SHORTCUT ================= */
 
-      await memoryService.addMessage(sessionId, "assistant", reply);
-      return reply;
-    }
+if (isFirstMessage && isGreeting) {
+  const reply =
+    "Hey — tell me what you're trying to improve in your business right now.";
 
-    // ================= CONTEXT RESET =================
+  await memoryService.addMessage(sessionId, "assistant", reply);
+  return reply;
+}
 
-    const strongResetSignal =
-      message.length > 80 &&
-      /(new business|different business|start over|completely different)/i.test(
-        message
-      );
 
-    if (strongResetSignal) {
-      brainContext = {
-        ...brainContext,
-        detectedServices: [],
-        stage: "discovery",
-        hasSufficientContext: false,
-      };
-    }
+// ================= CONTEXT RESET =================
 
-    // ================= SERVICE DETECTION =================
+const strongResetSignal =
+  message.length > 80 &&
+  /(new business|different business|start over|completely different)/i.test(
+    message
+  );
 
-    try {
-      const detectedServices = await detectService(message);
+if (strongResetSignal) {
+  brainContext = {
+    ...brainContext,
+    detectedServices: [],
+    stage: "discovery",
+    hasSufficientContext: false,
+  };
+}
 
-      brainContext.detectedServices = Array.isArray(detectedServices)
-        ? detectedServices.filter((s: any) => typeof s === "string")
-        : [];
-    } catch {
-      brainContext.detectedServices = [];
-    }
+// ================= SERVICE DETECTION =================
 
-    // ================= VECTOR (RESTORED + STABLE) =================
+try {
+  const detectedServices = await detectService(message);
 
-    let fusedChunksText = "";
+  brainContext.detectedServices = Array.isArray(detectedServices)
+    ? detectedServices.filter((s: any) => typeof s === "string")
+    : [];
+} catch {
+  brainContext.detectedServices = [];
+}
 
-    const shouldUseRetrieval =
-      message.length > 15 &&
-      !isGreeting &&
-      !/(who are you|what do you do)/i.test(message);
+const hasServiceContext =
+  Array.isArray(brainContext.detectedServices) &&
+  brainContext.detectedServices.length > 0;
 
-    if (shouldUseRetrieval) {
-      try {
-        const chunks = await getFusedChunks(message, 3);
 
-        if (Array.isArray(chunks) && chunks.length > 0) {
-          fusedChunksText = chunks
-            .map((c: any) => c?.text)
-            .filter(Boolean)
-            .join("\n\n")
-            .slice(0, 1200);
-        }
-      } catch {
-        fusedChunksText = "";
-      }
-    }
+// ================= VECTOR (SMART RETRIEVAL FIX) =================
 
-    // ================= CONTEXT CONTROL (LIGHT FIX) =================
+let fusedChunksText = "";
 
-    const isNewTopic =
-      shouldResetContext(message) ||
-      (message.length > 40 && !message.toLowerCase().includes("that"));
+const shouldUseRetrieval =
+  message.length > 20 &&
+  !/^(hi|hello|hey|yo)\b/i.test(message) &&
+  !/(who are you|what do you do)/i.test(message);
 
-    const safeHistoryText =
-      isNewTopic || isGreeting
-        ? ""
-        : (historyText || "").slice(-800);
+if (shouldUseRetrieval) {
+  try {
+    const chunks = await getFusedChunks(message, 3);
 
-    // ================= PROMPT =================
+    fusedChunksText = (chunks || [])
+      .map((c: any) => c?.text)
+      .filter(Boolean)
+      .join("\n\n")
+      .slice(0, 1200);
+  } catch {
+    fusedChunksText = "";
+  }
+}
 
-    const prompt = buildHybridPrompt({
-      brainContext: {
-        ...brainContext,
-        entryMode: finalEntryMode,
-      },
-      leadScoreValue,
-      detectedIntentNames,
-      vectorText: fusedChunksText,
-      historyText: safeHistoryText,
-      message: message.trim(),
-      priorityInstruction: `
+
+// ================= CONTEXT CONTROL (ANTI-BLEED FIX) =================
+
+const isNewTopic =
+  shouldResetContext(message) ||
+  (message.length > 40 && !message.toLowerCase().includes("that"));
+
+const safeHistoryText =
+  isNewTopic || isGreeting
+    ? ""
+    : (historyText || "").slice(-800);
+
+
+// ================= PROMPT =================
+
+const prompt = buildHybridPrompt({
+  brainContext: {
+    ...brainContext,
+    entryMode: finalEntryMode,
+  },
+  leadScoreValue,
+  detectedIntentNames,
+  vectorText: fusedChunksText,
+  historyText: safeHistoryText,
+  message: message.trim(),
+
+  priorityInstruction: `
 IMPORTANT:
 - Answer ONLY the latest USER MESSAGE
 - Ignore previous questions unless explicitly referenced
 - Do NOT continue old answers
 `,
-    });
+});
 
-    let response: string | null = null;
+let response: string | null = null;
 
-    // ================= PRIMARY MODEL =================
 
-    try {
-      const result = await withTimeout(
-        generateOpenRouter(prompt, sessionId),
-        9000
-      );
+// ================= PRIMARY MODEL =================
 
-      if (typeof result === "string") {
-        const trimmed = result.trim();
+try {
+  const result = await withTimeout(
+    generateOpenRouter(prompt, sessionId),
+    9000
+  );
 
-        // ✂️ TRUNCATION FIX
-        const looksCut =
-          trimmed.endsWith("of") ||
-          trimmed.endsWith("and") ||
-          trimmed.endsWith("in");
-
-        if (isGoodResponse(trimmed) && !looksCut) {
-          response = trimmed;
-        }
-      }
-    } catch {}
-
-    // ================= GEMINI FALLBACK =================
-
-    if (!response && GEMINI_ENABLED && canUseGemini()) {
-      try {
-        const result = await withTimeout(
-          generateGemini(prompt, sessionId),
-          7000
-        );
-
-        if (isGoodResponse(result)) {
-          response = result;
-          markGeminiUsed?.();
-        }
-      } catch {}
-    }
-
-    // ================= FINAL FALLBACK (FIXED LOOP) =================
-
-    if (!response) {
-      if (isGreeting) {
-        response =
-          "Hey — what are you trying to improve in your business right now?";
-      } else if (message.length < 10) {
-        response =
-          "Can you give me a bit more detail so I can help properly?";
-      } else {
-        // 🔥 FIX: removed generic loop phrase
-        response =
-          "Here’s a clear answer based on what you asked.";
-      }
-    }
-
-    // ================= CLEANING =================
-
-    response = cleanHybridResponse(response);
-    response = repairResponse(response);
-
-    // ================= OPTIMIZER =================
-
-    try {
-      const optimizer = await loadOptimizer();
-
-      if (optimizer) {
-        const result = optimizer(response || "");
-
-        if (
-          result &&
-          typeof result === "object" &&
-          typeof result.optimized === "string" &&
-          isGoodResponse(result.optimized)
-        ) {
-          response = result.optimized;
-        }
-      }
-    } catch {}
-
-    // ================= SAFETY =================
-
-    if (forceNoQuestions && typeof response === "string") {
-      response = response.replace(/\?/g, ".");
-    }
-
-    // ================= FINAL CLEAN =================
-
-    response = sanitizeFinalOutput(response || "");
-    response = enforceBotName(response || "");
-
-    // ================= DUPLICATE PROTECTION =================
-
-    try {
-      const lastMessages = await memoryService.getRecentMessages(sessionId, 2);
-
-      const lastBotMessage = lastMessages?.find(
-        (m: any) => m.role === "assistant"
-      )?.content;
-
-      if (lastBotMessage && typeof response === "string") {
-        const similarity =
-          response.slice(0, 120) === lastBotMessage.slice(0, 120);
-
-        if (similarity) {
-          response =
-            "Let me answer that more clearly.\n\n" + response;
-        }
-      }
-    } catch {}
-
-    // ================= CTA =================
-
-    const cta = generateCTA({
-      message,
-      stage: brainContext?.stage,
-      leadScore: leadScoreValue,
-      detectedServices: brainContext?.detectedServices,
-    });
-
-    const normalizedMsg = (message || "").toLowerCase();
-
-    const isHighIntentMessage =
-      /(book|hire|call|schedule|appointment|work with you|get started)/i.test(
-        normalizedMsg
-      );
-
-    let safeResponse =
-      typeof response === "string"
-        ? response
-        : String(response || "");
-
-    const shouldAddCTA =
-      typeof cta === "string" &&
-      cta.trim().length > 0 &&
-      safeResponse.length > 0 &&
-      !detectBookingRejection(message) &&
-      !isGreeting &&
-      !/^(hi|hello|hey)\b/i.test(normalizedMsg) &&
-      !safeResponse.toLowerCase().includes(cta.toLowerCase()) &&
-      (
-        (leadScoreValue >= 0.7 &&
-          String(brainContext?.executionMode) === "execution") ||
-        isHighIntentMessage
-      );
-
-    if (shouldAddCTA) {
-      safeResponse = safeResponse.trim() + "\n\n" + cta.trim();
-    }
-
-    // ================= SAVE =================
-
-    await memoryService.addMessage(sessionId, "assistant", safeResponse);
-
-    return safeResponse;
-
-  } catch (err) {
-    console.error("[Hybrid Fatal Error]:", err);
-    return "Something went wrong. Try rephrasing your question.";
+  if (isGoodResponse(result)) {
+    response = result;
   }
+} catch {}
+
+
+// ================= GEMINI FALLBACK =================
+
+if (!response && GEMINI_ENABLED && canUseGemini()) {
+  try {
+    const result = await withTimeout(
+      generateGemini(prompt, sessionId),
+      7000
+    );
+
+    if (isGoodResponse(result)) {
+      response = result;
+      markGeminiUsed?.();
+    }
+  } catch {}
+}
+
+
+// ================= FINAL FALLBACK =================
+
+if (!response) {
+  if (isGreeting) {
+    response = "Hey — what are you trying to improve in your business right now?";
+  } else if (message.length < 10) {
+    response = "Can you give me a bit more detail so I can help properly?";
+  } else {
+    response = "Let me break this down properly based on what you shared.";
+  }
+}
+
+
+// ================= CLEANING =================
+
+response = cleanHybridResponse(response);
+response = repairResponse(response);
+
+
+// ================= PHASE 2 OPTIMIZER =================
+
+try {
+  const optimizer = await loadOptimizer();
+
+  if (optimizer) {
+    const result = optimizer(response || "");
+
+    if (
+      result &&
+      typeof result === "object" &&
+      typeof result.optimized === "string" &&
+      isGoodResponse(result.optimized)
+    ) {
+      response = result.optimized;
+    }
+  }
+} catch {}
+
+
+// ================= SAFETY =================
+
+if (forceNoQuestions && typeof response === "string") {
+  response = response.replace(/\?/g, ".");
+}
+
+
+// ================= BOT ENFORCEMENT =================
+
+response = sanitizeFinalOutput(response || "");
+response = enforceBotName(response || "");
+
+
+// ================= DUPLICATE RESPONSE PROTECTION =================
+
+try {
+  const lastMessages = await memoryService.getRecentMessages(sessionId, 2);
+
+  const lastBotMessage = lastMessages?.find((m: any) => m.role === "assistant")?.content;
+
+  if (lastBotMessage && typeof response === "string") {
+    const similarity =
+      response.slice(0, 120) === lastBotMessage.slice(0, 120);
+
+    if (similarity) {
+      response =
+        "Let me answer that more clearly.\n\n" + response;
+    }
+  }
+} catch {}
+
+
+// ================= CTA ENGINE =================
+
+const cta = generateCTA({
+  message,
+  stage: brainContext?.stage,
+  leadScore: leadScoreValue,
+  detectedServices: brainContext?.detectedServices,
+});
+
+
+// ================= CTA CONTROL =================
+
+const normalizedMsg = (message || "").toLowerCase();
+
+const isHighIntentMessage =
+  /(book|hire|call|schedule|appointment|work with you|get started)/i.test(
+    normalizedMsg
+  );
+
+let safeResponse =
+  typeof response === "string" ? response : String(response || "");
+
+const shouldAddCTA =
+  typeof cta === "string" &&
+  cta.trim().length > 0 &&
+  safeResponse.length > 0 &&
+  !detectBookingRejection(message) &&
+  !isGreeting &&
+  !/^(hi|hello|hey)\b/i.test(normalizedMsg) &&
+  !safeResponse.toLowerCase().includes(cta.toLowerCase()) &&
+  (
+    (leadScoreValue >= 0.7 &&
+      String(brainContext?.executionMode) === "execution") ||
+    isHighIntentMessage
+  );
+
+if (shouldAddCTA) {
+  safeResponse = safeResponse.trim() + "\n\n" + cta.trim();
+}
+
+
+// ================= SAVE =================
+
+await memoryService.addMessage(sessionId, "assistant", safeResponse);
+
+return safeResponse;
+
+} catch (err) {
+  console.error("[Hybrid Fatal Error]:", err);
+
+  return "Something went wrong. Try rephrasing your question.";
+}
 }

@@ -1,6 +1,6 @@
 /**
  * ==========================================
- * CTA ENGINE (PHASE 6 — FINAL STABLE)
+ * CTA ENGINE (PHASE 6 — FIXED PRODUCTION)
  * ==========================================
  */
 
@@ -26,9 +26,9 @@ function normalize(text: string): string {
   return (text || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-/* ================= REJECTION ================= */
+/* ================= REJECTION (FIXED STRONGER) ================= */
 function detectRejection(message: string): boolean {
-  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later|busy|stop)/i.test(
+  return /(not now|later|no thanks|dont want|don't want|just exploring|not interested|maybe later|busy|i will book later|stop)/i.test(
     message
   );
 }
@@ -38,20 +38,12 @@ function isWeakMessage(message: string): boolean {
   const msg = normalize(message);
 
   if (!msg) return true;
+
   if (msg.length < 4) return true;
 
   if (/^(hi|hello|hey|yo|ok|yes|no|hmm|thanks)$/i.test(msg)) return true;
 
   return false;
-}
-
-/* ================= HIGH INTENT DETECTION (FIXED) ================= */
-function isHighIntent(message: string): boolean {
-  const msg = normalize(message);
-
-  return /(hire|start|book|schedule|call|work with you|get started|we need help|can you handle|can we start|ready to move|lets begin)/i.test(
-    msg
-  );
 }
 
 /* ================= SERVICE PRIORITY ================= */
@@ -72,38 +64,38 @@ function detectPrimaryService(services: string[] = []): string {
   return "general";
 }
 
-/* ================= CTA TEMPLATES (UPGRADED) ================= */
+/* ================= CTA TEMPLATES ================= */
 
 const CTA_TEMPLATES = {
   general: {
-    soft: "If you want, I can map a clear next step based on your setup.",
-    strong: "We can move forward with this — want me to map the exact next steps?",
+    soft: "If it makes sense, I can map a clear strategy for your setup.",
+    strong: "We can turn this into a working system — want me to break it down?",
   },
 
   ai_automation: {
-    soft: "I can outline a simple automation setup for your workflow.",
-    strong: "We can build this system for you — want me to break down the rollout?",
+    soft: "I can outline a simple automation flow for your business.",
+    strong: "We can build this automation system — want a breakdown?",
   },
 
   performance_marketing: {
-    soft: "I can show you exactly where your ads are leaking performance.",
-    strong: "We can fix your ad system end-to-end — want the exact plan?",
+    soft: "I can show how to improve your ad performance step by step.",
+    strong: "We can fix your ad performance system — want the structure?",
   },
 
   ai_search_domination_geo: {
-    soft: "I can show how to improve your visibility in AI search.",
-    strong: "We can position your brand in AI search results — want the execution plan?",
+    soft: "I can show how to improve your AI search visibility.",
+    strong: "We can position your brand in AI search results — want the method?",
   },
 
   cgi_tours: {
-    soft: "I can show how this improves conversion for listings.",
-    strong: "We can build high-conversion visuals for your properties — want the breakdown?",
+    soft: "I can show how CGI improves conversion rates.",
+    strong: "We can build high-conversion CGI creatives — want the plan?",
   },
 };
 
-/* ================= SHOULD SHOW CTA (STRICT CONTROL) ================= */
+/* ================= SHOULD SHOW CTA ================= */
 function shouldShowCTA(input: CTAInput): boolean {
-  const { message, stage, leadScore, executionMode } = input;
+  const { message, stage, leadScore } = input;
 
   const msg = normalize(message);
 
@@ -112,20 +104,21 @@ function shouldShowCTA(input: CTAInput): boolean {
   if (isWeakMessage(msg)) return false;
   if (stage === "greeting") return false;
 
-  /* HIGH INTENT → ALWAYS ALLOW */
-  if (isHighIntent(msg)) return true;
-
-  /* EXECUTION MODE PRIORITY */
-  if (executionMode === "execution" && leadScore >= 0.65) return true;
-
-  /* INFORMATIONAL FILTER (STRICT) */
+  /* INFORMATIONAL CONTROL */
   const isInformational =
-    /(what|why|how|explain|tell me|guide|learn)/i.test(msg);
+    /(what|why|how|explain|tell me|guide|learn|help)/i.test(msg);
 
-  if (isInformational && leadScore < 0.75) return false;
+  if (isInformational && leadScore < 0.65) return false;
 
-  /* MID STAGE CONTROL */
-  if (stage === "service" && leadScore >= 0.7) return true;
+  /* STRONG INTENT */
+  if (/(hire|start|book|schedule|call|work with you|get started)/i.test(msg)) {
+    return true;
+  }
+
+  /* SCORE + STAGE */
+  if (leadScore >= 0.7) return true;
+
+  if (stage === "service") return true;
 
   if (stage === "conversion") return true;
 
@@ -134,9 +127,7 @@ function shouldShowCTA(input: CTAInput): boolean {
 
 /* ================= INTENSITY ================= */
 function getCTAIntensity(input: CTAInput): "soft" | "strong" {
-  const { leadScore, stage, executionMode, message } = input;
-
-  if (isHighIntent(message)) return "strong";
+  const { leadScore, stage, executionMode } = input;
 
   if (executionMode === "execution") return "strong";
 
@@ -160,11 +151,7 @@ export function generateCTA(input: CTAInput): string {
       CTA_TEMPLATES[service as keyof typeof CTA_TEMPLATES] ||
       CTA_TEMPLATES.general;
 
-    const cta = templates[intensity];
-
-    if (!cta) return "";
-
-    return `\n\n${cta}`;
+    return `\n\n${templates[intensity] || ""}`;
   } catch {
     return "";
   }

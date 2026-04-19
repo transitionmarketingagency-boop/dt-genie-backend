@@ -1,8 +1,8 @@
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import * as dotenv from "dotenv";
-import crypto from "crypto";
 import { strategicBrain } from "./strategicBrain.js";
+import crypto from "crypto";
 
 /* ================= PATH ================= */
 const __filename = fileURLToPath(import.meta.url);
@@ -13,24 +13,12 @@ dotenv.config({ path: join(__dirname, "../../.env") });
 
 const MODEL = "models/gemini-2.5-flash";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1/${MODEL}:generateContent`;
-
-// ⚡ balanced latency
-const TIMEOUT = 5500;
+const TIMEOUT = 12000;
 
 const BOT_NAME = "DT Genie";
 
 /* ================= CACHE ================= */
 const cache = new Map<string, string>();
-const MAX_CACHE_SIZE = 100;
-
-function maintainCache() {
-  if (cache.size > MAX_CACHE_SIZE) {
-    const first = cache.keys().next();
-    if (!first.done && first.value) {
-      cache.delete(first.value);
-    }
-  }
-}
 
 function hash(text: string) {
   return crypto.createHash("sha256").update(text).digest("hex");
@@ -43,7 +31,7 @@ function cleanPrompt(prompt: string) {
       ?.replace(/\s+/g, " ")
       .replace(/\x00/g, "")
       .trim()
-      .slice(0, 3500) || ""
+      .slice(0, 4000) || ""
   );
 }
 
@@ -52,14 +40,10 @@ function isValidResponse(text: string | null | undefined): text is string {
   if (!text) return false;
 
   const t = text.trim();
-
-  // ⚡ relaxed but safe threshold (fixes fallback spam)
-  if (t.length < 60) return false;
-  if (t.split(/\s+/).length < 10) return false;
-
-  const lower = t.toLowerCase();
+  if (t.length < 40) return false;
 
   const badPatterns = [
+    "```",
     "assistant:",
     "system:",
     "undefined",
@@ -67,15 +51,12 @@ function isValidResponse(text: string | null | undefined): text is string {
     "<|",
   ];
 
+  const lower = t.toLowerCase();
   if (badPatterns.some((p) => lower.includes(p))) return false;
-
-  // ❌ only reject TRUE truncation patterns
-  if (/(of|in|and|to|for|with|on|at)$/i.test(t)) return false;
 
   return true;
 }
 
-/* ================= HELPERS ================= */
 function fixSpacing(text: string): string {
   return (text || "")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -85,15 +66,7 @@ function fixSpacing(text: string): string {
 
 function ensureComplete(text: string): string {
   if (!text) return "";
-
-  const trimmed = text.trim();
-
-  // ⚡ only force period if clearly incomplete
-  if (trimmed.length > 120 && !/[.?!]$/.test(trimmed)) {
-    return trimmed + ".";
-  }
-
-  return trimmed;
+  return /[.!?]$/.test(text) ? text : text + ".";
 }
 
 /* ================= INTENT ================= */
@@ -124,12 +97,10 @@ export async function generateGemini(
   const cacheKey = `${sessionId || "global"}:${hash(prompt)}`;
   if (cache.has(cacheKey)) return cache.get(cacheKey)!;
 
-  const highIntent = detectHighIntent(prompt);
-
-  // ================= LIGHT CONTEXT (SAFE ADDITION) =================
   let contextText = "";
-  try {
-    if (sessionId) {
+
+  if (sessionId) {
+    try {
       const { brainContext } = await strategicBrain(
         prompt.slice(0, 300),
         sessionId
@@ -138,18 +109,21 @@ export async function generateGemini(
       contextText = `Stage: ${brainContext?.stage || "unknown"} | LeadScore: ${
         brainContext?.leadScore || 0
       }`;
+    } catch {
+      contextText = "";
     }
-  } catch {
-    contextText = "";
   }
+
+  const highIntent = detectHighIntent(prompt);
 
   const finalPrompt = `
 You are ${BOT_NAME}, a strategic marketing assistant.
 
 Rules:
-- Be clear, practical, and complete
-- No fluff, no repetition
-- Do not cut answers mid-sentence
+- Be precise and practical
+- Avoid fluff
+- No repetition
+- Give actionable answers only
 
 Context:
 ${contextText}
@@ -171,7 +145,7 @@ Answer:
         contents: [{ parts: [{ text: finalPrompt }] }],
         generationConfig: {
           temperature: highIntent ? 0.45 : 0.35,
-          maxOutputTokens: 750,
+          maxOutputTokens: 900,
           topP: 0.9,
         },
       }),
@@ -194,15 +168,10 @@ Answer:
     content = ensureComplete(content);
 
     cache.set(cacheKey, content);
-    maintainCache();
 
     return content;
   } catch (err: any) {
-    if (err?.name === "AbortError") {
-      console.warn("[Gemini Timeout]");
-    } else {
-      console.warn("[Gemini Error]", err?.message || err);
-    }
+    console.warn("[Gemini Error]", err?.message || err);
     return null;
   } finally {
     clearTimeout(timeout);
