@@ -303,8 +303,7 @@ If not → fix before responding.
 `.trim();
 }
 
-
-// ===================== HYBRID EXECUTION ===================== //
+// ===================== HYBRID EXECUTION =====================
 
 function isGoodResponse(text: unknown): text is string {
   if (typeof text !== "string") return false;
@@ -312,12 +311,11 @@ function isGoodResponse(text: unknown): text is string {
   const clean = text.trim();
   const lower = clean.toLowerCase();
 
-  if (clean.length < 80) return false;
-  if (clean.split(" ").length < 12) return false;
+  // ✅ RELAXED (THIS FIXES SPEED)
+  if (clean.length < 40) return false;
+  if (clean.split(" ").length < 6) return false;
 
   const badPatterns = [
-    "you're trying to",
-    "traffic conversions leads",
     "something broke",
     "undefined",
     "i am an ai",
@@ -337,7 +335,7 @@ function isGoodResponse(text: unknown): text is string {
 
   if (badPatterns.some((p) => lower.includes(p))) return false;
 
-  // 🔥 prevent garbage repetition / loops
+  // ✅ SIMPLE repetition guard (not aggressive)
   const sentences = clean.split(/[.!?]/).map(s => s.trim()).filter(Boolean);
   if (sentences.length >= 2 && sentences[0] === sentences[1]) return false;
 
@@ -581,9 +579,14 @@ try {
 } catch {}
 
 
-// ================= GEMINI FALLBACK =================
+// ================= GEMINI FALLBACK (STRICT - HARD FAILURE ONLY) =================
 
-if (!response && GEMINI_ENABLED && canUseGemini()) {
+const isHardFailure =
+  !response ||
+  typeof response !== "string" ||
+  response.trim().length < 20;
+
+if (isHardFailure && GEMINI_ENABLED && canUseGemini()) {
   try {
     const result = await withTimeout(
       generateGemini(prompt, sessionId),
@@ -597,17 +600,18 @@ if (!response && GEMINI_ENABLED && canUseGemini()) {
   } catch {}
 }
 
+// ================= FINAL FALLBACK (HARD FAIL ONLY - NO LOOPS) =================
 
-// ================= FINAL FALLBACK (FIXED BOOKING-AWARE MODE) =================
+const isHardFail =
+  !response ||
+  typeof response !== "string" ||
+  response.trim().length < 20;
 
-if (!response || typeof response !== "string" || response.trim().length === 0) {
-
+if (isHardFail) {
   const msg = (message || "").toLowerCase();
 
   const isBookingIntent =
     /(book|call|schedule|appointment|hire|get started|work with you)/i.test(msg);
-
-  const isShortMessage = message.length < 10;
 
   const isVeryShortGreeting =
     /^(hi|hello|hey|yo)$/i.test(msg.trim());
@@ -617,28 +621,21 @@ if (!response || typeof response !== "string" || response.trim().length === 0) {
       "Hey — what are you trying to improve in your business right now?";
   }
 
-  else if (isShortMessage && !isBookingIntent) {
-    response =
-      "Can you share a bit more detail so I can help you properly?";
-  }
-
   else if (isBookingIntent) {
-    // 🔥 DIRECT HANDOFF TO BOOKING FLOW (NO OVER-EXPLANATION)
     response =
       "Got it — I can help you with that. Let’s take this into a quick call setup.";
   }
 
   else {
-    // 🔥 SAFE INTELLIGENT FALLBACK (NO GENERIC FLUFF)
+    // ✅ ONLY ONE fallback (no rotation, no loops)
     response =
-      "Let me understand this properly so I can guide you in the right direction.";
+      "I need a bit more clarity to guide you properly. What exactly are you trying to improve?";
   }
 }
 
-
 // ================= CLEANING =================
 
-response = cleanHybridResponse(response);
+response = cleanHybridResponse(response || "");
 
 // 1. Remove system + tool leakage
 response = removeForbiddenContent(response);
