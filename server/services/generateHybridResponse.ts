@@ -304,40 +304,30 @@ If not → fix before responding.
 }
 
 // ===================== HYBRID EXECUTION =====================
-
 function isGoodResponse(text: unknown): text is string {
   if (typeof text !== "string") return false;
 
   const clean = text.trim();
+  if (!clean) return false;
+
   const lower = clean.toLowerCase();
 
-  // ✅ RELAXED (THIS FIXES SPEED)
-  if (clean.length < 40) return false;
-  if (clean.split(" ").length < 6) return false;
+  // ✅ VERY LIGHT FILTER (DO NOT BLOCK GOOD RESPONSES)
+  if (clean.length < 20) return false;
 
   const badPatterns = [
-    "something broke",
     "undefined",
-    "i am an ai",
-    "i'm an ai",
     "error occurred",
-    "@",
-    "http",
-    "www.",
     "intent:",
     "examples:",
     "response:",
-    "faq [",
-    "source:",
     "{",
     "}",
+    "@",
+    "http"
   ];
 
-  if (badPatterns.some((p) => lower.includes(p))) return false;
-
-  // ✅ SIMPLE repetition guard (not aggressive)
-  const sentences = clean.split(/[.!?]/).map(s => s.trim()).filter(Boolean);
-  if (sentences.length >= 2 && sentences[0] === sentences[1]) return false;
+  if (badPatterns.some(p => lower.includes(p))) return false;
 
   return true;
 }
@@ -510,9 +500,8 @@ const hasServiceContext =
 let fusedChunksText = "";
 
 const shouldUseRetrieval =
-  message.length > 20 &&
-  !/^(hi|hello|hey|yo)\b/i.test(message) &&
-  !/(who are you|what do you do)/i.test(message);
+  message.length > 8 && // 🔥 KEY FIX
+  !/^(hi|hello|hey|yo)\b/i.test(message);
 
 if (shouldUseRetrieval) {
   try {
@@ -584,7 +573,7 @@ try {
 const isHardFailure =
   !response ||
   typeof response !== "string" ||
-  response.trim().length < 20;
+  response.trim().length < 10;
 
 if (isHardFailure && GEMINI_ENABLED && canUseGemini()) {
   try {
