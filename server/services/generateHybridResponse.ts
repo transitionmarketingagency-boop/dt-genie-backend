@@ -657,18 +657,26 @@ if (isHardFail) {
   }
 }
 
-// ================= PRICING GUARD (SINGLE SOURCE OF TRUTH) =================
+// ================= PRICING GUARD (FINAL STABLE FIX) =================
 
 const isPricingIntent =
-  /(price|pricing|cost|costs|budget|how much|fees|fee|plans?|plan|tiers?|tier|cheapest|premium)/i.test(
-    message
-  );
+  /(price|pricing|cost|costs|budget|how much|fees|fee|plans?|tiers?|cheapest|premium)/i.test(message);
 
-if (isPricingIntent) {
+if (isPricingIntent && (!response || response.length < 40)) {
+  const pricingResponses = [
+    "It depends on what you're trying to build — pricing is structured around your setup and goals.",
+    "There isn’t a fixed number because everything is tailored to the scope and systems involved.",
+    "Pricing varies based on what you actually need and how far you want to scale this.",
+    "It’s not one-size-fits-all — the structure depends on your business and the level of execution required."
+  ];
+
+  const random =
+    pricingResponses[Math.floor(Math.random() * pricingResponses.length)];
+
   response =
-    "Pricing depends on your specific goals and setup, so we don’t provide fixed numbers here. The best way to get accurate details is a quick 20-minute discovery call where we map everything properly, or you can explore the service tiers on our website for a general overview.";
+    random +
+    "\n\nBest way to get exact numbers is a quick 20-minute discovery call where everything is mapped properly, or you can explore the service tiers on the website for a general overview.";
 }
-
 
 // ================= CLEANING =================
 
