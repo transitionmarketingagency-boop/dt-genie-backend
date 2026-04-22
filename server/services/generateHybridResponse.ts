@@ -243,10 +243,15 @@ KNOWLEDGE (PRIMARY SOURCE)
 
 ${hasVectorKnowledge ? vectorText : "NO DATA AVAILABLE"}
 
-IMPORTANT:
-- If KNOWLEDGE exists → BASE your answer on it
-- Do NOT ignore it
-- Do NOT override it with assumptions
+IMPORTANT (STRICT ENFORCEMENT):
+
+- If KNOWLEDGE exists → you MUST use it
+- Your answer MUST come primarily from KNOWLEDGE
+- Do NOT answer from general knowledge if KNOWLEDGE is present
+- Do NOT ignore or partially use it
+- If KNOWLEDGE conflicts with assumptions → KNOWLEDGE wins
+
+Failure to follow this = incorrect response
 
 --------------------------------------------------
 
@@ -505,24 +510,34 @@ const shouldUseRetrieval =
 if (shouldUseRetrieval) {
   try {
     const result: unknown = await Promise.race([
-      getFusedChunks(message, 3),
+      getFusedChunks(message, 6),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error("vector-timeout")), 2500)
       ),
     ]);
 
     // ✅ HARD TYPE SAFETY (fixes TS + runtime)
-    const safeChunks = Array.isArray(result) ? result : [];
+const safeChunks = Array.isArray(result) ? result : [];
 
-    fusedChunksText = safeChunks
-      .map((c: any) => c?.text)
-      .filter((t: any) => typeof t === "string" && t.trim().length > 0)
-      .join("\n\n")
-      .slice(0, 1200);
+// 🔥 prioritize stronger chunks
+const cleanedChunks = safeChunks
+  .map((c: any) => (typeof c?.text === "string" ? c.text.trim() : ""))
+  .filter((t: string) => t.length > 40); // 🔥 remove weak noise
+
+// 🔥 ensure minimum knowledge presence
+fusedChunksText =
+  cleanedChunks.length > 0
+    ? cleanedChunks.join("\n\n").slice(0, 1800) // 🔥 increased context
+    : "";
+
 
   } catch (err: any) {
     // ✅ DO NOT BLOCK RESPONSE
-    fusedChunksText = "";
+// 🔥 fallback to upstream vectorText if available
+fusedChunksText =
+  typeof vectorText === "string" && vectorText.length > 50
+    ? vectorText.slice(0, 1200)
+    : "";
 
     // ✅ OPTIONAL DEBUG (SAFE - won't break prod)
     if (process.env.NODE_ENV !== "production") {
@@ -541,6 +556,20 @@ const safeHistoryText =
   isNewTopic || isGreeting
     ? ""
     : (historyText || "").slice(-800);
+
+
+
+// ================= VECTOR INTELLIGENCE BOOST (PATCH 5) =================
+
+const hasStrongVector =
+  typeof fusedChunksText === "string" &&
+  fusedChunksText.length > 120;
+
+// 🔥 force execution when knowledge is strong
+if (hasStrongVector) {
+  brainContext.executionMode = "execution";
+}
+
 
 
 // ================= PROMPT =================
@@ -610,7 +639,7 @@ const isHardFail =
   typeof response !== "string" ||
   response.trim().length < 20;
 
-if (isHardFail) {
+if (isHardFail && (!fusedChunksText || fusedChunksText.length < 50)) {
   const msg = (message || "").toLowerCase();
 
   const isBookingIntent =
