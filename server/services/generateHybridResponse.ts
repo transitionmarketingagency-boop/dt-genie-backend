@@ -115,12 +115,22 @@ function removeForbiddenContent(text: string): string {
 function removePricing(text: string): string {
   if (!text) return "";
 
-  return text
+  let cleaned = text;
+
+  // ❌ remove numeric pricing
+  cleaned = cleaned
     .replace(/\$\s?\d+(\.\d+)?\s?(\/\s?(month|mo|year))?/gi, "")
     .replace(/€\s?\d+(\.\d+)?/gi, "")
     .replace(/£\s?\d+(\.\d+)?/gi, "")
-    .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "")
-    .trim();
+    .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "");
+
+  // ❌ remove pricing phrases
+  cleaned = cleaned.replace(
+    /\b(pricing|price|cost|costs|budget|fee|fees|per month|per year|subscription|tier|plan)\b[^.]*\./gi,
+    ""
+  );
+
+  return cleaned.trim();
 }
 
 
@@ -198,8 +208,12 @@ CRITICAL RULES (STRICT)
 3. DO NOT mention tools, platforms, or software unless explicitly in knowledge
 4. DO NOT give contact details, emails, or external links
 5. DO NOT invent statistics, case studies, or numbers
-6. DO NOT act like a “guru” or “strategist personality”
-7. DO NOT ask repetitive or unnecessary questions
+6. DO NOT mention pricing, costs, budgets, or monetary values under any circumstances
+7. If user asks about pricing:
+   → Do NOT answer with numbers
+   → Politely guide them to a discovery call or website
+8. DO NOT act like a “guru” or “strategist personality”
+9. DO NOT ask repetitive or unnecessary questions
 
 If knowledge is missing:
 → Answer naturally using general business reasoning
@@ -635,6 +649,18 @@ if (isHardFail) {
       "I need a bit more clarity to guide you properly. What exactly are you trying to improve?";
   }
 }
+
+// ================= PRICING GUARD (HARD BLOCK) =================
+
+const isPricingIntent =
+  /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
+
+if (isPricingIntent) {
+  response =
+    "Pricing depends on your specific goals and setup, so it’s best handled properly rather than guessing.\n\nWe can walk you through exact options in a quick 20-minute discovery call, or you can explore the service tiers directly on our website to get a general idea.";
+
+}
+
 
 // ================= CLEANING =================
 
