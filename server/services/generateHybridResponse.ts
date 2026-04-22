@@ -154,6 +154,14 @@ function enforceBookingOnly(text: string): string {
 }
 
 
+function detectPricingIntent(message: string): boolean {
+  if (!message) return false;
+
+  return /(\bprice\b|\bpricing\b|\bcost\b|\bcosts\b|\bhow much\b|\bcheapest\b|\bpremium\b|\bplan\b|\btier\b|\bfee\b)/i.test(
+    message
+  );
+}
+
 // ===================== PROMPT BUILDER ===================== //
 
 export function buildHybridPrompt({
@@ -608,6 +616,14 @@ const result = await withTimeout(
   } catch {}
 }
 
+
+const pricingIntent = detectPricingIntent(message);
+
+if (pricingIntent) {
+  response =
+    "Pricing depends on your specific goals and setup, so we don’t lock numbers without understanding your needs. The best next step is a quick 20-minute discovery call where we map everything properly, or you can explore the service tiers on our website for a general breakdown.";
+}
+
 // ================= FINAL FALLBACK (HARD FAIL ONLY - NO LOOPS) =================
 
 const isHardFail =
@@ -641,27 +657,16 @@ if (isHardFail) {
   }
 }
 
-// ================= PRICING GUARD (HARD BLOCK) =================
-
-// ================= PRICING GUARD (SMART VARIATION) =================
+// ================= PRICING GUARD (SINGLE SOURCE OF TRUTH) =================
 
 const isPricingIntent =
-  /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
+  /(price|pricing|cost|costs|budget|how much|fees|fee|plans?|plan|tiers?|tier|cheapest|premium)/i.test(
+    message
+  );
 
 if (isPricingIntent) {
-  const pricingResponses = [
-    "Pricing depends on what you're trying to achieve, so it’s handled properly in a quick discovery call rather than guessing here.",
-    "It really depends on your setup and goals — the best way to get exact numbers is through a short discovery call.",
-    "We don’t throw out generic pricing because it varies based on scope — a quick call will give you exact clarity.",
-    "Costs vary depending on how everything is structured, so it’s best mapped out in a quick 20-minute call.",
-  ];
-
-  const random =
-    pricingResponses[Math.floor(Math.random() * pricingResponses.length)];
-
   response =
-    random +
-    "\n\nYou can also explore the service tiers on the website for a general overview.";
+    "Pricing depends on your specific goals and setup, so we don’t provide fixed numbers here. The best way to get accurate details is a quick 20-minute discovery call where we map everything properly, or you can explore the service tiers on our website for a general overview.";
 }
 
 
