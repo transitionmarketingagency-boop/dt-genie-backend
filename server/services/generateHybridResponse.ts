@@ -115,23 +115,14 @@ function removeForbiddenContent(text: string): string {
 function removePricing(text: string): string {
   if (!text) return "";
 
-  let cleaned = text;
-
-  // ❌ remove numeric pricing
-  cleaned = cleaned
-    .replace(/\$\s?\d+(\.\d+)?\s?(\/\s?(month|mo|year))?/gi, "")
+  return text
+    // ✅ ONLY remove numeric values (SAFE)
+    .replace(/\$\s?\d+(\.\d+)?/gi, "")
     .replace(/€\s?\d+(\.\d+)?/gi, "")
     .replace(/£\s?\d+(\.\d+)?/gi, "")
-    .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "");
-
-  // ❌ remove pricing phrases
-  cleaned = cleaned.replace(
-    /\b(pricing|price|cost|costs|budget|fee|fees|per month|per year|subscription|tier|plan)\b[^.]*\./gi,
-    ""
-  );
-
-  return cleaned.trim();
-}
+    .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "")
+    .trim();
+} 
 
 
 function removeIdentitySpam(text: string): string {
@@ -652,13 +643,25 @@ if (isHardFail) {
 
 // ================= PRICING GUARD (HARD BLOCK) =================
 
+// ================= PRICING GUARD (SMART VARIATION) =================
+
 const isPricingIntent =
   /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
 
 if (isPricingIntent) {
-  response =
-    "Pricing depends on your specific goals and setup, so it’s best handled properly rather than guessing.\n\nWe can walk you through exact options in a quick 20-minute discovery call, or you can explore the service tiers directly on our website to get a general idea.";
+  const pricingResponses = [
+    "Pricing depends on what you're trying to achieve, so it’s handled properly in a quick discovery call rather than guessing here.",
+    "It really depends on your setup and goals — the best way to get exact numbers is through a short discovery call.",
+    "We don’t throw out generic pricing because it varies based on scope — a quick call will give you exact clarity.",
+    "Costs vary depending on how everything is structured, so it’s best mapped out in a quick 20-minute call.",
+  ];
 
+  const random =
+    pricingResponses[Math.floor(Math.random() * pricingResponses.length)];
+
+  response =
+    random +
+    "\n\nYou can also explore the service tiers on the website for a general overview.";
 }
 
 
@@ -728,7 +731,10 @@ try {
 const similarity =
   response.slice(0, 80) === lastBotMessage.slice(0, 80);
 
-if (similarity) {
+const isPricingIntentMsg =
+  /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
+
+if (similarity && !isPricingIntentMsg) {
   response =
     response +
     "\n\nLet me approach this from a slightly different angle.";
