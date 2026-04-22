@@ -313,7 +313,7 @@ function isGoodResponse(text: unknown): text is string {
   const lower = clean.toLowerCase();
 
   // ✅ VERY LIGHT FILTER (DO NOT BLOCK GOOD RESPONSES)
-  if (clean.length < 20) return false;
+  if (clean.length < 12) return false;
 
   const badPatterns = [
     "undefined",
@@ -496,27 +496,40 @@ const hasServiceContext =
 
 
 // ================= VECTOR (SMART RETRIEVAL FIX) =================
-
 let fusedChunksText = "";
 
 const shouldUseRetrieval =
-  message.length > 8 && // 🔥 KEY FIX
+  message.length > 8 &&
   !/^(hi|hello|hey|yo)\b/i.test(message);
 
 if (shouldUseRetrieval) {
   try {
-    const chunks = await getFusedChunks(message, 3);
+    const result: unknown = await Promise.race([
+      getFusedChunks(message, 3),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("vector-timeout")), 2500)
+      ),
+    ]);
 
-    fusedChunksText = (chunks || [])
+    // ✅ HARD TYPE SAFETY (fixes TS + runtime)
+    const safeChunks = Array.isArray(result) ? result : [];
+
+    fusedChunksText = safeChunks
       .map((c: any) => c?.text)
-      .filter(Boolean)
+      .filter((t: any) => typeof t === "string" && t.trim().length > 0)
       .join("\n\n")
       .slice(0, 1200);
-  } catch {
+
+  } catch (err: any) {
+    // ✅ DO NOT BLOCK RESPONSE
     fusedChunksText = "";
+
+    // ✅ OPTIONAL DEBUG (SAFE - won't break prod)
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[Vector Retrieval Failed]:", err?.message);
+    }
   }
 }
-
 
 // ================= CONTEXT CONTROL (ANTI-BLEED FIX) =================
 
@@ -557,10 +570,10 @@ let response: string | null = null;
 // ================= PRIMARY MODEL =================
 
 try {
-  const result = await withTimeout(
-    generateOpenRouter(prompt, sessionId),
-    9000
-  );
+const result = await withTimeout(
+  generateOpenRouter(prompt, sessionId),
+  14000 // 🔥 prevents cut responses
+);
 
   if (isGoodResponse(result)) {
     response = result;
@@ -577,10 +590,11 @@ const isHardFailure =
 
 if (isHardFailure && GEMINI_ENABLED && canUseGemini()) {
   try {
-    const result = await withTimeout(
-      generateGemini(prompt, sessionId),
-      7000
-    );
+
+const result = await withTimeout(
+  generateGemini(prompt, sessionId),
+  5000
+);
 
     if (isGoodResponse(result)) {
       response = result;
@@ -685,13 +699,15 @@ try {
   const lastBotMessage = lastMessages?.find((m: any) => m.role === "assistant")?.content;
 
   if (lastBotMessage && typeof response === "string") {
-    const similarity =
-      response.slice(0, 120) === lastBotMessage.slice(0, 120);
+const similarity =
+  response.slice(0, 80) === lastBotMessage.slice(0, 80);
 
-    if (similarity) {
-      response =
-        "Let me answer that more clearly.\n\n" + response;
-    }
+if (similarity) {
+  response =
+    response +
+    "\n\nLet me approach this from a slightly different angle.";
+}
+
   }
 } catch {}
 
