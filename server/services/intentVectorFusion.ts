@@ -18,13 +18,13 @@ type VectorChunk = {
 };
 
 /* ======================= CONFIG ======================= */
-const VECTOR_WEIGHT = 0.72;
-const INTENT_WEIGHT = 0.22;
-const KEYWORD_WEIGHT = 0.12;
+const VECTOR_WEIGHT = 0.78; // 🔥 increased dominance
+const INTENT_WEIGHT = 0.16; // 🔥 reduced (fix hallucination)
+const KEYWORD_WEIGHT = 0.10;
 
-const SERVICE_BOOST = 0.06;
-const PRICING_BOOST = 0.10;
-const BOOKING_BOOST = 0.09;
+const SERVICE_BOOST = 0.05;
+const PRICING_BOOST = 0.08;
+const BOOKING_BOOST = 0.08;
 
 /* ======================= HELPERS ======================= */
 
@@ -58,17 +58,16 @@ function dynamicThreshold(message: string): number {
 
   let base = 0.30;
 
-  if (/(price|cost|pricing)/.test(msg)) base -= 0.08;
-  if (/(book|call|meeting|schedule|appointment)/.test(msg)) base -= 0.10;
+  if (/(price|cost|pricing)/.test(msg)) base -= 0.07;
+  if (/(book|call|meeting|schedule|appointment)/.test(msg)) base -= 0.09;
   if (/(service|agency|offer|solution)/.test(msg)) base -= 0.05;
-
-  // NEW: stronger intent → better retrieval sensitivity
   if (/(how|help|need|want|suggest)/.test(msg)) base -= 0.05;
 
-  return Math.max(0.22, Math.min(0.45, base));
+  return Math.max(0.22, Math.min(0.42, base));
 }
 
-/* ======================= INTENT SCORE ======================= */
+/* ================= INTENT SCORE (CLEANED) ================= */
+
 function calculateIntentKeywordScore(
   message: string,
   chunkText: string,
@@ -88,16 +87,16 @@ function calculateIntentKeywordScore(
 
     if (match) {
       const overlap = keywordOverlap(msgTokens, new Set(kwTokens));
-      score += overlap * 0.18;
+      score += overlap * 0.15;
     }
 
-    if (score > 0.35) break;
+    if (score > 0.28) break;
   }
 
-  return Math.min(score, 0.35);
+  return Math.min(score, 0.28);
 }
 
-/* ======================= BOOST SYSTEM ======================= */
+/* ================= BOOST SYSTEM ================= */
 
 function serviceBoost(text: string): number {
   return /service|agency|solution/i.test(text) ? SERVICE_BOOST : 0;
@@ -113,40 +112,23 @@ function bookingBoost(text: string, message: string): number {
   return /book|schedule|call/i.test(text) ? BOOKING_BOOST : 0;
 }
 
-/* ======================= SYNERGY BOOST (NEW CORE FIX) ======================= */
-function synergyBoost(
-  intentBoost: number,
-  vectorScore: number,
-  keywordScore: number
-): number {
-  let boost = 0;
+/* ================= CHUNK VALIDATION ================= */
 
-  if (intentBoost > 0.15 && vectorScore > 0.4) {
-    boost += 0.08;
-  }
-
-  if (keywordScore > 0.25 && intentBoost > 0.1) {
-    boost += 0.05;
-  }
-
-  return boost;
-}
-
-/* ======================= CHUNK VALIDATION ======================= */
 function isValidChunk(text: string): boolean {
   if (!text) return false;
 
   const clean = normalize(text);
 
-  if (clean.length < 20) return false;
-  if (clean.split(" ").length < 5) return false;
+  if (clean.length < 25) return false;
+  if (clean.split(" ").length < 6) return false;
 
   if (/undefined|null|error|loading/i.test(clean)) return false;
 
   return true;
 }
 
-/* ======================= DEDUPE ======================= */
+/* ================= DEDUPE ================= */
+
 function dedupeChunks(chunks: VectorChunk[]): VectorChunk[] {
   const seen = new Set<string>();
 
@@ -161,7 +143,8 @@ function dedupeChunks(chunks: VectorChunk[]): VectorChunk[] {
   });
 }
 
-/* ======================= MAIN FUSION ======================= */
+/* ================= MAIN FUSION ENGINE ================= */
+
 export async function getFusedChunks(
   userMessage: string,
   baseTopN: number = 5
@@ -176,7 +159,7 @@ export async function getFusedChunks(
   let vectorChunks: VectorChunk[] = [];
 
   try {
-    vectorChunks = await getTopChunks(userMessage, baseTopN + 8, 0.45);
+    vectorChunks = await getTopChunks(userMessage, baseTopN + 6, 0.45);
   } catch (err) {
     console.error("Vector fetch failed:", err);
     return [];
@@ -184,10 +167,10 @@ export async function getFusedChunks(
 
   if (!vectorChunks?.length) return [];
 
-  /* ---------- CLEAN ---------- */
-  vectorChunks = dedupeChunks(vectorChunks).filter((c) =>
-    isValidChunk(c.text)
-  );
+  /* ---------- CLEAN + HARD VECTOR FLOOR ---------- */
+  vectorChunks = dedupeChunks(vectorChunks)
+    .filter((c) => isValidChunk(c.text))
+    .filter((c) => (c.score ?? 0) > 0.20); // 🔥 CRITICAL FIX
 
   /* ---------- INTENT DETECTION ---------- */
   let detectedIntents: { intent: Intent; score?: number }[] = [];
@@ -200,7 +183,7 @@ export async function getFusedChunks(
 
   const intentScores: Record<string, number> = {};
   for (const d of detectedIntents) {
-    intentScores[d.intent.name] = d.score ?? 0.2;
+    intentScores[d.intent.name] = Math.min(d.score ?? 0.2, 0.18);
   }
 
   const intentKeywordMap: Record<string, string[]> = {};
@@ -215,6 +198,7 @@ export async function getFusedChunks(
 
   /* ---------- SCORING ---------- */
   const threshold = dynamicThreshold(userMessage);
+  const adjustedThreshold = threshold * 0.88; // 🔥 SAFE RELAXATION
 
   const fused: FusedChunk[] = vectorChunks.map((chunk) => {
 
@@ -225,7 +209,7 @@ export async function getFusedChunks(
     const vectorScore = Math.min(chunk.score ?? 0, 1);
     const keywordScore = keywordOverlap(messageTokens, chunkTokens);
 
-    /* INTENT BOOST */
+    /* ---------- INTENT BOOST (CONTROLLED) ---------- */
     let intentBoost = 0;
 
     for (const name of intentNames) {
@@ -237,11 +221,11 @@ export async function getFusedChunks(
       });
 
       if (match) {
-        intentBoost += (intentScores[name] ?? 0.15) * 1.4;
+        intentBoost += Math.min(intentScores[name] ?? 0.12, 0.08);
       }
     }
 
-    /* INTENT TEXT SCORE */
+    /* ---------- INTENT TEXT SCORE ---------- */
     let intentTextScore = 0;
 
     for (const name of intentNames) {
@@ -252,23 +236,25 @@ export async function getFusedChunks(
       );
     }
 
-    intentTextScore = Math.min(intentTextScore, 0.35);
+    intentTextScore = Math.min(intentTextScore, 0.25);
 
-    const synergy = synergyBoost(
-      intentBoost,
-      vectorScore,
-      keywordScore
-    );
+    /* ---------- VECTOR-FIRST FUSION (FIXED CORE) ---------- */
+
+    const vectorCore = vectorScore * 1.25; // 🔥 PRIMARY AUTHORITY
+    const intentCore = intentBoost * 0.55;
+    const keywordCore = keywordScore * 0.35;
+
+    const systemBoosts =
+      Math.min(serviceBoost(chunkText), 0.03) +
+      Math.min(pricingBoost(chunkText, normalizedMessage), 0.04) +
+      Math.min(bookingBoost(chunkText, normalizedMessage), 0.04);
 
     const fusionScore =
-      VECTOR_WEIGHT * vectorScore +
-      INTENT_WEIGHT * intentBoost +
-      KEYWORD_WEIGHT * keywordScore +
-      intentTextScore +
-      serviceBoost(chunkText) +
-      pricingBoost(chunkText, normalizedMessage) +
-      bookingBoost(chunkText, normalizedMessage) +
-      synergy;
+      vectorCore +
+      intentCore +
+      keywordCore +
+      intentTextScore * 0.5 +
+      systemBoosts;
 
     return {
       text: rawText,
@@ -287,8 +273,7 @@ export async function getFusedChunks(
   const finalChunks = fused.filter((c) => {
     if (!c.text) return false;
 
-    const relaxedThreshold = threshold - 0.05;
-    if (c.fusionScore < relaxedThreshold) return false;
+    if (c.fusionScore < adjustedThreshold) return false;
 
     const key = normalize(c.text).slice(0, 120);
     if (used.has(key)) return false;
