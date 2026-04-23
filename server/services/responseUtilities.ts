@@ -45,20 +45,62 @@ export function compressResponse(text: string): string {
 export function sanitizeTools(text: string): string {
   if (typeof text !== "string") return "";
 
+  let cleaned = text;
+
+  // ================= EXACT TOOL REPLACEMENTS =================
   const toolMap: Record<string, string> = {
+    // Content / Ads
+    "AdCreative.ai": "AI ad optimization systems",
+    Jasper: "AI content systems",
+    "Copy.ai": "AI content systems",    
+
+    // Automation / CRM
+    Zapier: "automation systems",
+    HubSpot: "CRM systems",
+    Salesforce: "CRM systems",
+    Klaviyo: "email automation systems",
+    Mailchimp: "email systems",
+
+    // AI / Models
+    OpenAI: "AI systems",
+    ChatGPT: "AI systems",
+    Gemini: "AI systems",
+    Claude: "AI systems",
+
+    // Video / Media
+    Synthesia: "AI video systems",
+    Runway: "AI video systems",
+    Descript: "AI media systems",
+
+    // Social / Analytics
+    "Sprout Social": "social media systems",
+    "Meta Ads Manager": "ad management systems",
+
+    // Misc
     Creatify: "AI content systems",
     Wisepops: "AI marketing tools",
-    "AdCreative.ai": "AI ad optimization systems",
     "AIclicks.io": "AI performance tracking tools",
-    OpenAI: "AI systems",
     Midjourney: "AI visual systems",
   };
-
-  let cleaned = text;
 
   for (const [tool, replacement] of Object.entries(toolMap)) {
     cleaned = cleaned.replace(new RegExp(`\\b${tool}\\b`, "gi"), replacement);
   }
+
+  // ================= REMOVE "Tool: XYZ" STRUCTURES =================
+  cleaned = cleaned.replace(/Tool:\s*[A-Za-z0-9.\- ]+/gi, "AI system");
+
+  // ================= REMOVE RANDOM TOOL-LIKE PATTERNS =================
+  cleaned = cleaned.replace(
+    /\b([A-Z][a-zA-Z0-9]+(?:\.[a-zA-Z]+)?(?:\s[A-Z][a-zA-Z0-9]+)?)\b(?=.*(tool|platform|software))/gi,
+    "AI system"
+  );
+
+  // ================= CLEAN LEFTOVER BRAND DOMAINS =================
+  cleaned = cleaned.replace(/\b[a-z0-9.-]+\.(com|ai|io|app)\b/gi, "");
+
+  // ================= FINAL NORMALIZATION =================
+  cleaned = cleaned.replace(/\s+/g, " ").trim();
 
   return cleaned;
 }
