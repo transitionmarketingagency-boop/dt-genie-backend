@@ -103,11 +103,23 @@ function removeForbiddenContent(text: string): string {
 
   return text
     // ❌ remove emails
-    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i, "")
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "")
+
     // ❌ remove links
     .replace(/https?:\/\/\S+/gi, "")
-    // ❌ remove tool mentions
-    .replace(/\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify apps|jasper|perplexity|sprout social)\b/gi, "")
+
+    // ❌ remove tool/platform mentions
+    .replace(
+      /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify\s?apps?|jasper|perplexity|sprout\s?social|spark\s?toro|sparktoro|firecrawl|ad\s?creative(\.ai)?|synthesia|apollo|instantly|mailchimp|sendgrid|brevo|runway|pika|leonardo|elevenlabs|descript|riverside)\b/gi,
+      "AI systems"
+    )
+
+    // ❌ remove "Tool: xyz"
+    .replace(/tool:\s*[a-z0-9.\-]+/gi, "")
+
+    // ❌ remove "Platform: xyz"
+    .replace(/platform:\s*[a-z0-9.\-]+/gi, "")
+
     .trim();
 }
 
@@ -204,7 +216,8 @@ CRITICAL RULES (STRICT)
 
 1. ONLY use the provided KNOWLEDGE when available
 2. DO NOT make up services, tools, data, or claims
-3. DO NOT mention tools, platforms, or software unless explicitly in knowledge
+3. NEVER mention specific tools, platforms, or software names
+   → Always describe them as systems, infrastructure, or technology layers
 4. DO NOT give contact details, emails, or external links
 5. DO NOT invent statistics, case studies, or numbers
 6. DO NOT mention pricing, costs, budgets, or monetary values under any circumstances
@@ -389,7 +402,7 @@ function sanitizeFinalOutput(text: string): string {
 
   let cleaned = text;
 
-  // remove dataset / vector leaks
+  // 🔒 Remove dataset / vector leaks
   if (
     cleaned.includes('"intent"') ||
     cleaned.includes('"examples"') ||
@@ -397,19 +410,22 @@ function sanitizeFinalOutput(text: string): string {
     cleaned.includes("FAQ [") ||
     cleaned.includes("Source:")
   ) {
-    return "Let me give you a clear answer based on your situation.\n\nCan you clarify your main goal right now?";
+    return "Let me give you a clear answer based on your situation.";
   }
 
-  // remove fake system outputs
+  // 🔒 Remove system artifacts
   cleaned = cleaned.replace(/system is now operational.*$/i, "");
 
-  // remove tool mentions again (double safety)
+  // 🔒 HARD REMOVE ALL TOOL / PLATFORM NAMES (SAFE SINGLE-LINE REGEX)
   cleaned = cleaned.replace(
-    /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini)\b/gi,
+    /\b(spark\s?toro|sparktoro|firecrawl|ad\s?creative(\.ai)?|jasper|zapier|hubspot|klaviyo|synthesia|instantly|apollo|tiktok|instagram|meta\s?ads\s?manager|chatgpt|openai|gemini|salesforce|shopify\s?apps?)\b/gi,
     ""
   );
 
-  return cleaned.trim();
+  // 🔒 Cleanup spacing
+  cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
+
+  return cleaned;
 }
 
 
