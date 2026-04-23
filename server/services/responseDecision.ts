@@ -1,5 +1,5 @@
-/* =====================================================
-   RESPONSE DECISION (ANTI-SPAM + HUMAN FLOW FIX v2)
+ /* =====================================================
+   RESPONSE DECISION (ANTI-SPAM + HUMAN FLOW FIX v3)
 ===================================================== */
 
 /* ================= NORMALIZE ================= */
@@ -26,29 +26,36 @@ function isWeakMessage(message: string): boolean {
   if (!msg) return true;
   if (msg.length < 4) return true;
 
-  if (/^(hi|hello|hey|yo|ok|yes|no|hmm|thanks)$/i.test(msg)) return true;
-
-  return false;
+  return /^(hi|hello|hey|yo|ok|hmm|thanks)$/i.test(msg);
 }
 
 /* ================= INFORMATIONAL ================= */
 function isInformational(message: string): boolean {
   const msg = normalize(message);
 
-  return /(what|why|how|explain|tell me|guide|learn|difference|help)/i.test(msg);
+  // reduced aggression (FIXED)
+  return /(explain|guide|learn|difference|help me understand)/i.test(msg);
 }
 
-/* ================= HIGH INTENT (FIXED STRONGER) ================= */
+/* ================= HIGH INTENT ================= */
 function isHighIntent(message: string): boolean {
   const msg = normalize(message);
 
   return (
-    /(hire|start|book|schedule|work with you|get started|i want results|i'm ready)/i.test(
-      msg
-    ) ||
-    /(pricing|cost|budget|roas|leads|ads not working|wasting money|not converting)/i.test(
-      msg
-    )
+    /(hire|start|book|schedule|work with you|get started|i'm ready)/i.test(msg) ||
+    /(ads not working|not converting|wasting money|low roas|no leads)/i.test(msg)
+  );
+}
+
+/* ================= CATEGORY MATCH ================= */
+function hasRelevantCategory(
+  intentCategories: string[] = [],
+  keywords: string[]
+): boolean {
+  const cats = intentCategories.map(c => normalize(c));
+
+  return keywords.some(k =>
+    cats.some(c => c.includes(normalize(k)))
   );
 }
 
@@ -59,38 +66,42 @@ export function shouldIncludeCTA(
   leadScore: number = 0,
   stage: string = "discovery"
 ): boolean {
+
   const msg = normalize(message);
 
   /* ❌ HARD BLOCKS */
   if (detectBookingRejection(msg)) return false;
   if (isWeakMessage(msg)) return false;
 
-  /* ❌ Prevent repetitive informational spam triggers */
+  /* ❌ prevent micro queries */
+  if (msg.length < 6) return false;
+
+  /* ❌ informational suppression (FIXED) */
   if (
-    msg === "what should we do" ||
-    msg === "tell me more" ||
-    msg === "explain"
+    isInformational(msg) &&
+    leadScore < 0.72 &&
+    !isHighIntent(msg)
   ) {
     return false;
   }
 
-  /* ❌ STRONG informational guard (FIXED) */
-  const informational = isInformational(msg);
-  if (informational && leadScore < 0.7 && !isHighIntent(msg)) return false;
-
   /* ✅ HIGH INTENT ALWAYS WINS */
   if (isHighIntent(msg)) return true;
 
-  /* ✅ STAGE LOGIC (FIXED SAFE GATING) */
-  if (stage === "conversion" && leadScore >= 0.65) return true;
+  /* ✅ STAGE BASED LOGIC (tightened) */
+  if (stage === "conversion" && leadScore >= 0.7) return true;
+  if (stage === "strategy" && leadScore >= 0.78) return true;
+  if (stage === "service" && leadScore >= 0.82) return true;
 
-  if (stage === "service" && leadScore >= 0.7) return true;
+  /* ✅ CATEGORY INTENT MATCH (IMPROVED) */
+  if (
+    intentCategories?.length > 0 &&
+    leadScore >= 0.78 &&
+    hasRelevantCategory(intentCategories, ["service", "ads", "automation", "seo"])
+  ) {
+    return true;
+  }
 
-  if (stage === "strategy" && leadScore >= 0.8) return true;
-
-  /* ✅ INTENT CATEGORY BOOST */
-  if (intentCategories?.length > 0 && leadScore >= 0.75) return true;
-
-  /* ❌ DEFAULT BLOCK */
+  /* ❌ DEFAULT */
   return false;
 }

@@ -1,5 +1,5 @@
 /* =====================================================
-   SERVICE DETECTOR — FINAL PRODUCTION STABLE
+   SERVICE DETECTOR — FINAL PRODUCTION STABLE (WIRED FIX)
 ===================================================== */
 
 export type DetectedIntent = {
@@ -30,21 +30,23 @@ function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/* ================= KEYWORD MATCH ================= */
+/* ================= MATCH ENGINE ================= */
 function matchKeyword(text: string, keyword: string): number {
-  const normalizedText = normalize(text);
-  const kw = normalize(keyword);
+  const t = normalize(text);
+  const k = normalize(keyword);
 
-  if (!kw) return 0;
+  if (!k) return 0;
 
-  const exactRegex = new RegExp(`\\b${escapeRegex(kw)}\\b`, "i");
-  if (exactRegex.test(normalizedText)) return 1;
+  // exact match (strong signal)
+  if (t.includes(k)) return 1;
 
-  const words = kw.split(" ").filter(Boolean);
+  // token match (partial signal)
+  const words = k.split(" ").filter(Boolean);
+  if (!words.length) return 0;
+
   let hits = 0;
-
   for (const w of words) {
-    if (normalizedText.includes(w)) hits++;
+    if (t.includes(w)) hits++;
   }
 
   return (hits / words.length) * 0.6;
@@ -68,116 +70,62 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
     keywords: [
       "ppc",
       "ads",
-      "performance marketing",
       "facebook ads",
       "google ads",
-      "increase roas",
-      "lower cac",
+      "performance marketing",
+      "roas",
+      "cac",
     ],
     weight: 1.3,
   },
 
   content_marketing: {
-    keywords: [
-      "content marketing",
-      "copywriting",
-      "blogs",
-      "lead magnets",
-      "seo content",
-    ],
+    keywords: ["content marketing", "copywriting", "blogs", "seo content"],
     weight: 1,
   },
 
   social_media: {
-    keywords: [
-      "instagram",
-      "tiktok",
-      "linkedin",
-      "social media",
-      "grow followers",
-    ],
+    keywords: ["instagram", "tiktok", "linkedin", "social media"],
     weight: 1,
   },
 
   website_design: {
-    keywords: [
-      "website",
-      "web design",
-      "shopify",
-      "woocommerce",
-      "landing page",
-      "conversion website",
-    ],
+    keywords: ["website", "web design", "shopify", "landing page"],
     weight: 1,
   },
 
   email_marketing: {
-    keywords: [
-      "email marketing",
-      "email automation",
-      "klaviyo",
-      "newsletter",
-      "cold email",
-    ],
+    keywords: ["email marketing", "klaviyo", "newsletter", "cold email"],
     weight: 1,
   },
 
   cgi_marketing: {
-    keywords: [
-      "cgi",
-      "3d ads",
-      "product render",
-      "visual ads",
-      "3d marketing",
-    ],
+    keywords: ["cgi", "3d ads", "product render", "3d marketing"],
     weight: 1.1,
   },
 
   video_audio: {
-    keywords: [
-      "video editing",
-      "video production",
-      "audio production",
-      "reels",
-      "youtube content",
-    ],
+    keywords: ["video editing", "video production", "reels", "youtube"],
     weight: 1,
   },
 
   seo_geo: {
-    keywords: [
-      "seo",
-      "ai seo",
-      "geo",
-      "chatgpt ranking",
-      "gemini ranking",
-      "search ranking",
-    ],
+    keywords: ["seo", "geo", "ai seo", "chatgpt ranking", "search ranking"],
     weight: 1,
   },
 
   virtual_tours: {
-    keywords: [
-      "virtual tours",
-      "360 tours",
-      "real estate tours",
-      "3d tours",
-    ],
+    keywords: ["virtual tours", "360 tours", "real estate tours"],
     weight: 1,
   },
 
   predictive_analytics: {
-    keywords: [
-      "analytics",
-      "data insights",
-      "forecasting",
-      "prediction",
-    ],
+    keywords: ["analytics", "data insights", "forecasting", "prediction"],
     weight: 1,
   },
 };
 
-/* ================= PROBLEM SIGNALS ================= */
+/* ================= SIGNALS ================= */
 const problemSignals = [
   "low roas",
   "no sales",
@@ -187,29 +135,26 @@ const problemSignals = [
   "traffic but no sales",
 ];
 
-/* ================= GENERIC ================= */
 const leadIntent = ["get more clients", "generate leads"];
 const pricingIntent = ["price", "cost", "pricing"];
 const consultationIntent = ["book call", "schedule call"];
 const marketingGoals = ["grow business", "increase sales", "scale"];
 
 /* ================= SERVICE SCORING ================= */
-export async function detectServiceScores(
-  text: string
-): Promise<Record<string, number>> {
+export function detectServiceScores(text: string): Record<string, number> {
   const scores: Record<string, number> = {};
+  const t = normalize(text);
 
   for (const [service, config] of Object.entries(services)) {
     let score = 0;
 
     for (const kw of config.keywords) {
-      score += matchKeyword(text, kw);
+      score += matchKeyword(t, kw);
     }
 
-    score =
-      config.keywords.length > 0
-        ? (score / config.keywords.length) * config.weight
-        : 0;
+    if (config.keywords.length > 0) {
+      score = (score / config.keywords.length) * config.weight;
+    }
 
     if (score > 0.2) {
       scores[service] = Math.min(score, 1);
@@ -220,21 +165,27 @@ export async function detectServiceScores(
 }
 
 /* ================= MAIN DETECTOR ================= */
-export async function detectIntents(
-  message: string
-): Promise<DetectedIntent[]> {
+export function detectIntents(message: string): DetectedIntent[] {
   const text = normalize(message);
   const results: DetectedIntent[] = [];
 
-  /* PROBLEMS */
+  if (!text) {
+    return [{ type: "general", value: "general", confidence: 0.3 }];
+  }
+
+  /* ---------------- PROBLEMS ---------------- */
   for (const p of problemSignals) {
     if (text.includes(normalize(p))) {
-      results.push({ type: "problem", value: p, confidence: 0.9 });
+      results.push({
+        type: "problem",
+        value: p,
+        confidence: 0.9,
+      });
     }
   }
 
-  /* SERVICES */
-  const serviceScores = await detectServiceScores(text);
+  /* ---------------- SERVICES ---------------- */
+  const serviceScores = detectServiceScores(text);
 
   for (const [service, score] of Object.entries(serviceScores)) {
     results.push({
@@ -244,7 +195,7 @@ export async function detectIntents(
     });
   }
 
-  /* GENERIC */
+  /* ---------------- GENERIC INTENTS ---------------- */
   const pushIfMatch = (
     list: string[],
     type: DetectedIntent["type"],
@@ -252,7 +203,11 @@ export async function detectIntents(
   ) => {
     for (const kw of list) {
       if (matchKeyword(text, kw) > 0.7) {
-        results.push({ type, value: kw, confidence: conf });
+        results.push({
+          type,
+          value: kw,
+          confidence: conf,
+        });
       }
     }
   };
@@ -262,32 +217,28 @@ export async function detectIntents(
   pushIfMatch(consultationIntent, "consultation", 0.9);
   pushIfMatch(marketingGoals, "marketing_goal", 0.75);
 
-  if (!results.length) {
-    results.push({
-      type: "general",
-      value: "general",
-      confidence: 0.3,
-    });
+  /* ---------------- FALLBACK ---------------- */
+  if (results.length === 0) {
+    return [
+      {
+        type: "general",
+        value: "general",
+        confidence: 0.3,
+      },
+    ];
   }
 
+  /* ---------------- SORT ---------------- */
   return results.sort((a, b) => b.confidence - a.confidence);
 }
 
-/* ================= EXPORTS (CRITICAL FIX) ================= */
-
-// ✅ REQUIRED by bookingFlow + other scripts
-export async function detectMultipleServices(
-  message: string
-): Promise<string[]> {
-  const intents = await detectIntents(message);
-  return intents
+/* ================= PUBLIC API ================= */
+export function detectMultipleServices(message: string): string[] {
+  return detectIntents(message)
     .filter((i) => i.type === "service")
     .map((i) => i.value);
 }
 
-// ✅ REQUIRED by generateHybridResponse
-export async function detectService(
-  message: string
-): Promise<string[]> {
+export function detectService(message: string): string[] {
   return detectMultipleServices(message);
 }
