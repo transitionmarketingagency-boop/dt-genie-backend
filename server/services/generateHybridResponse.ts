@@ -128,19 +128,21 @@ function removePricing(text: string): string {
   if (!text) return "";
 
   return text
-    // remove currency values safely
-    .replace(/[$€£]\s?\d+(\.\d+)?/gi, "")
-    .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "")
+    // remove currency symbols + full numbers correctly
+    .replace(/[$€£]\s?\d{1,3}(?:,\d{3})*(\.\d+)?/gi, "")
+    .replace(/\b\d{1,3}(?:,\d{3})*(\.\d+)?\s?(usd|eur|gbp)\b/gi, "")
+
+    // remove standalone broken numeric fragments like ",250" or ",850"
+    .replace(/\b,\d{2,4}\b/g, "")
+
+    // remove standalone K formats safely
     .replace(/\b\d+(k|K)\b/g, "")
 
-    // remove ONLY explicit pricing labels (not sentences)
+    // remove pricing words only when attached to numbers
     .replace(
-      /\b(starting from|starts at|from|as low as|minimum budget|priced at)\b\s*\$?\d*\.?\d*\s*(per month|monthly|yearly|per year|per week|weekly)?/gi,
+      /\b(starting from|starts at|from|as low as|minimum budget|priced at)\b\s*\$?\d*.*?(per month|monthly|yearly|per year|per week|weekly)?/gi,
       ""
     )
-
-    // remove isolated pricing words ONLY when standalone
-    .replace(/\b(costs?|pricing|price|quote)\b\s*[:\-]?\s*\d*/gi, "")
 
     // cleanup spacing
     .replace(/\s{2,}/g, " ")
