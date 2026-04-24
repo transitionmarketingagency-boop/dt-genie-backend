@@ -423,9 +423,32 @@ function sanitizeFinalOutput(text: string): string {
   );
 
   // 🔒 Cleanup spacing
-  cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
+// 🔒 OWNERSHIP ENFORCEMENT (CRITICAL FIX)
+if (/digital transition marketing/i.test(cleaned)) {
+  cleaned = cleaned
+    .replace(/\bthey\b/gi, "we")
+    .replace(/\btheir\b/gi, "our")
+    .replace(/\bthem\b/gi, "us")
+    .replace(/\bthe company\b/gi, "we")
+    .replace(/\bthis company\b/gi, "we")
+    .replace(/\bthat company\b/gi, "we")
+    .replace(/\bthe agency\b/gi, "we");
+}
 
-  return cleaned;
+// 🔒 Fix specific high-risk phrases
+cleaned = cleaned
+  .replace(/\btheir website\b/gi, "our website")
+  .replace(/\bvisit their website\b/gi, "visit our website")
+  .replace(/\bcheck their website\b/gi, "check our website")
+  .replace(/\bthey offer\b/gi, "we offer")
+  .replace(/\bthey provide\b/gi, "we provide")
+  .replace(/\bthey can\b/gi, "we can");
+
+// 🔒 Cleanup spacing
+cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
+
+return cleaned;
+
 }
 
 
@@ -747,7 +770,13 @@ response = enforceBookingOnly(response);
 // ✅ REMOVE IDENTITY SPAM
 response = removeIdentitySpam(response);
 
-response = enforceBotName(response || "");
+// 🔥 FINAL OWNERSHIP FAILSAFE (LAST LINE OF DEFENSE)
+if (typeof response === "string") {
+  response = response
+    .replace(/\bthey\b/gi, "we")
+    .replace(/\btheir\b/gi, "our")
+    .replace(/\bthem\b/gi, "us");
+}
 
 // ================= DUPLICATE RESPONSE PROTECTION =================
 
