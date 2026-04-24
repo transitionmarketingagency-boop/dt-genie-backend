@@ -128,13 +128,25 @@ function removePricing(text: string): string {
   if (!text) return "";
 
   return text
-    // ✅ ONLY remove numeric values (SAFE)
-    .replace(/\$\s?\d+(\.\d+)?/gi, "")
-    .replace(/€\s?\d+(\.\d+)?/gi, "")
-    .replace(/£\s?\d+(\.\d+)?/gi, "")
+    // 💰 Remove currency + numbers
+    .replace(/[$€£]\s?\d+(\.\d+)?/gi, "")
     .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "")
+    .replace(/\b\d+(k|K)\b/g, "") // 5k, 10K
+
+    // 💰 Remove monthly/yearly phrases
+    .replace(/\b(per\s?(month|year|week)|monthly|yearly|weekly)\b/gi, "")
+
+    // 💰 Remove pricing language patterns
+    .replace(/\b(starting from|starts at|from|as low as|minimum budget)\b[^.]*\.?/gi, "")
+
+    // 💰 Remove leftover "costs/price is" fragments
+    .replace(/\b(costs?|price is|priced at)\b\s*/gi, "")
+
+    // Cleanup broken spacing
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+\./g, ".")
     .trim();
-} 
+}
 
 
 function removeIdentitySpam(text: string): string {
@@ -169,8 +181,8 @@ function enforceBookingOnly(text: string): string {
 function detectPricingIntent(message: string): boolean {
   if (!message) return false;
 
-  return /(\bprice\b|\bpricing\b|\bcost\b|\bcosts\b|\bhow much\b|\bcheapest\b|\bpremium\b|\bplan\b|\btier\b|\bfee\b)/i.test(
-    message
+  return /\b(price|pricing|cost|costs|how much|budget|quote|rate|rates|charge|charges|cheapest|premium|plan|tier|fee|what do you charge)\b/i.test(
+    message.toLowerCase()
   );
 }
 
@@ -656,12 +668,6 @@ const result = await withTimeout(
 }
 
 
-const pricingIntent = detectPricingIntent(message);
-
-if (pricingIntent) {
-  response =
-    "Pricing depends on your specific goals and setup, so we don’t lock numbers without understanding your needs. The best next step is a quick 20-minute discovery call where we map everything properly, or you can explore the service tiers on our website for a general breakdown.";
-}
 
 // ================= FINAL FALLBACK (HARD FAIL ONLY - NO LOOPS) =================
 
@@ -698,23 +704,48 @@ if (isHardFail) {
 
 // ================= PRICING GUARD (FINAL STABLE FIX) =================
 
-const isPricingIntent =
-  /(price|pricing|cost|costs|budget|how much|fees|fee|plans?|tiers?|cheapest|premium)/i.test(message);
+// ================= PRICING INTENT DETECTION =================
+const pricingIntent = detectPricingIntent(message);
 
-if (isPricingIntent && (!response || response.length < 40)) {
-  const pricingResponses = [
-    "It depends on what you're trying to build — pricing is structured around your setup and goals.",
-    "There isn’t a fixed number because everything is tailored to the scope and systems involved.",
-    "Pricing varies based on what you actually need and how far you want to scale this.",
-    "It’s not one-size-fits-all — the structure depends on your business and the level of execution required."
+// ================= PRICING GUARD (FINAL STABLE FIX) =================
+if (pricingIntent) {
+  const services = brainContext?.detectedServices || [];
+  const stage = brainContext?.stage || "discovery";
+
+  let contextHint = "";
+
+  // 🔥 Inject context dynamically
+  if (services.length > 0) {
+    contextHint = `For something like ${services.slice(0, 2).join(" and ")}, `;
+  } else if (stage === "execution") {
+    contextHint = "At the execution level, ";
+  } else if (stage === "strategy") {
+    contextHint = "At a strategy level, ";
+  }
+
+
+const dynamicOpeners = [
+  `${contextHint}it really depends on what you're trying to build and how deep you want to go.`,
+  `${contextHint}there isn’t a fixed number because everything is structured around your setup.`,
+  `${contextHint}it’s not one-size-fits-all — it changes based on your goals and scale.`,
+];
+
+  const dynamicClosers = [
+    "The best way to get exact numbers is a quick call where everything is mapped properly.",
+    "Once we understand your setup, we can give you a clear and precise structure.",
+    "After seeing your current system, it becomes very straightforward to define.",
   ];
 
-  const random =
-    pricingResponses[Math.floor(Math.random() * pricingResponses.length)];
+  const opener =
+    dynamicOpeners[Math.floor(Math.random() * dynamicOpeners.length)];
 
-  response =
-    random +
-    "\n\nBest way to get exact numbers is a quick 20-minute discovery call where everything is mapped properly, or you can explore the service tiers on the website for a general overview.";
+  const closer =
+    dynamicClosers[Math.floor(Math.random() * dynamicClosers.length)];
+
+  // 🔥 ONLY override if response is weak OR model didn't handle pricing properly
+  if (!response || response.length < 60 || !/price|cost|structure/i.test(response)) {
+    response = `${opener} ${closer}`;
+  }
 }
 
 // ================= CLEANING =================
