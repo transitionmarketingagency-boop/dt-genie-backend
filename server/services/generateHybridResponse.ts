@@ -181,9 +181,9 @@ function enforceBookingOnly(text: string): string {
 function detectPricingIntent(message: string): boolean {
   if (!message) return false;
 
-  return /\b(price|pricing|cost|costs|how much|budget|quote|rate|rates|charge|charges|cheapest|premium|plan|tier|fee|what do you charge)\b/i.test(
-    message.toLowerCase()
-  );
+return /\b(price|pricing|cost|costs|how much|budget|quote|rate|rates|charge|charges|cheapest|premium|fee)\b|\bwhat\s+do\s+you\s+charge\b/i.test(
+  message
+);
 }
 
 // ===================== PROMPT BUILDER ===================== //
@@ -707,44 +707,48 @@ if (isHardFail) {
 // ================= PRICING INTENT DETECTION =================
 const pricingIntent = detectPricingIntent(message);
 
-// ================= PRICING GUARD (FINAL STABLE FIX) =================
+// ================= PRICING GUARD (SAFE HYBRID FIX) =================
 if (pricingIntent) {
   const services = brainContext?.detectedServices || [];
   const stage = brainContext?.stage || "discovery";
 
   let contextHint = "";
 
-  // 🔥 Inject context dynamically
   if (services.length > 0) {
     contextHint = `For something like ${services.slice(0, 2).join(" and ")}, `;
   } else if (stage === "execution") {
     contextHint = "At the execution level, ";
   } else if (stage === "strategy") {
-    contextHint = "At a strategy level, ";
+    contextHint = "At a strategic level, ";
   }
 
-
-const dynamicOpeners = [
-  `${contextHint}it really depends on what you're trying to build and how deep you want to go.`,
-  `${contextHint}there isn’t a fixed number because everything is structured around your setup.`,
-  `${contextHint}it’s not one-size-fits-all — it changes based on your goals and scale.`,
-];
-
-  const dynamicClosers = [
-    "The best way to get exact numbers is a quick call where everything is mapped properly.",
-    "Once we understand your setup, we can give you a clear and precise structure.",
-    "After seeing your current system, it becomes very straightforward to define.",
+  const responses = [
+    `${contextHint}it really depends on the scope and depth of what you're trying to build.`,
+    `${contextHint}it varies based on how advanced the setup and execution needs to be.`,
+    `${contextHint}there’s no fixed number because every system requires different levels of work.`,
+    `${contextHint}it depends on your current setup and the outcome you're targeting.`,
   ];
 
-  const opener =
-    dynamicOpeners[Math.floor(Math.random() * dynamicOpeners.length)];
+  const followUps = [
+    "Once I understand your setup, I can break it down clearly.",
+    "If you share your goal, I can map the right structure for it.",
+    "We can define it properly after reviewing your current situation.",
+    "I can give you a precise direction once I understand your needs better.",
+  ];
 
-  const closer =
-    dynamicClosers[Math.floor(Math.random() * dynamicClosers.length)];
+  const opener = responses[Math.floor(Math.random() * responses.length)];
+  const closer = followUps[Math.floor(Math.random() * followUps.length)];
 
-  // 🔥 ONLY override if response is weak OR model didn't handle pricing properly
-  if (!response || response.length < 60 || !/price|cost|structure/i.test(response)) {
-    response = `${opener} ${closer}`;
+  const generated = `${opener} ${closer}`;
+
+  // 🔥 ONLY OVERRIDE IF MODEL FAILED OR IS TOO GENERIC
+  const modelBad =
+    !response ||
+    response.length < 60 ||
+    /one-size-fits-all|it depends|pricing depends/i.test(response);
+
+  if (modelBad) {
+    response = generated;
   }
 }
 

@@ -63,7 +63,7 @@ export function cleanResponse(raw: string): string {
   }
 
   /* ================= LENGTH GUARDS ================= */
-  if (text.length < 25) return "";
+  if (text.length < 18) return "";
 
   if (text.length > 2000) {
     text = text.slice(0, 2000).trim();
