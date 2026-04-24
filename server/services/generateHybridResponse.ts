@@ -128,21 +128,21 @@ function removePricing(text: string): string {
   if (!text) return "";
 
   return text
-    // 💰 Remove currency + numbers
+    // remove currency values safely
     .replace(/[$€£]\s?\d+(\.\d+)?/gi, "")
     .replace(/\b\d+\s?(usd|eur|gbp)\b/gi, "")
-    .replace(/\b\d+(k|K)\b/g, "") // 5k, 10K
+    .replace(/\b\d+(k|K)\b/g, "")
 
-    // 💰 Remove monthly/yearly phrases
-    .replace(/\b(per\s?(month|year|week)|monthly|yearly|weekly)\b/gi, "")
+    // remove ONLY explicit pricing labels (not sentences)
+    .replace(
+      /\b(starting from|starts at|from|as low as|minimum budget|priced at)\b\s*\$?\d*\.?\d*\s*(per month|monthly|yearly|per year|per week|weekly)?/gi,
+      ""
+    )
 
-    // 💰 Remove pricing language patterns
-    .replace(/\b(starting from|starts at|from|as low as|minimum budget)\b[^.]*\.?/gi, "")
+    // remove isolated pricing words ONLY when standalone
+    .replace(/\b(costs?|pricing|price|quote)\b\s*[:\-]?\s*\d*/gi, "")
 
-    // 💰 Remove leftover "costs/price is" fragments
-    .replace(/\b(costs?|price is|priced at)\b\s*/gi, "")
-
-    // Cleanup broken spacing
+    // cleanup spacing
     .replace(/\s{2,}/g, " ")
     .replace(/\s+\./g, ".")
     .trim();
@@ -181,10 +181,17 @@ function enforceBookingOnly(text: string): string {
 function detectPricingIntent(message: string): boolean {
   if (!message) return false;
 
-return /\b(price|pricing|cost|costs|how much|budget|quote|rate|rates|charge|charges|cheapest|premium|fee)\b|\bwhat\s+do\s+you\s+charge\b/i.test(
-  message
-);
+  const msg = message.toLowerCase();
+
+  return (
+    /\b(price|pricing|cost|costs|budget|quote|rate|rates|charge|charges|fee|fees|cheapest|premium|plan|tier)\b/.test(
+      msg
+    ) ||
+    /\bwhat\s+do\s+you\s+charge\b/.test(msg) ||
+    /\bhow\s+much\b/.test(msg)
+  );
 }
+
 
 // ===================== PROMPT BUILDER ===================== //
 
@@ -702,12 +709,10 @@ if (isHardFail) {
   }
 }
 
-// ================= PRICING GUARD (FINAL STABLE FIX) =================
+// ================= PRICING GUARD (STABLE HUMANIZED FIX) =================
 
-// ================= PRICING INTENT DETECTION =================
 const pricingIntent = detectPricingIntent(message);
 
-// ================= PRICING GUARD (SAFE HYBRID FIX) =================
 if (pricingIntent) {
   const services = brainContext?.detectedServices || [];
   const stage = brainContext?.stage || "discovery";
@@ -717,40 +722,44 @@ if (pricingIntent) {
   if (services.length > 0) {
     contextHint = `For something like ${services.slice(0, 2).join(" and ")}, `;
   } else if (stage === "execution") {
-    contextHint = "At the execution level, ";
+    contextHint = "At an execution level, ";
   } else if (stage === "strategy") {
     contextHint = "At a strategic level, ";
   }
 
-  const responses = [
-    `${contextHint}it really depends on the scope and depth of what you're trying to build.`,
-    `${contextHint}it varies based on how advanced the setup and execution needs to be.`,
-    `${contextHint}there’s no fixed number because every system requires different levels of work.`,
-    `${contextHint}it depends on your current setup and the outcome you're targeting.`,
+  const openers = [
+    `${contextHint}it depends on the scope and how advanced the system needs to be.`,
+    `${contextHint}pricing varies based on what you're trying to achieve and build.`,
+    `${contextHint}there isn’t a fixed number because every setup is different.`,
+    `${contextHint}it changes based on the depth of implementation required.`,
   ];
 
-  const followUps = [
-    "Once I understand your setup, I can break it down clearly.",
-    "If you share your goal, I can map the right structure for it.",
-    "We can define it properly after reviewing your current situation.",
-    "I can give you a precise direction once I understand your needs better.",
+  const closers = [
+    "Once I understand your setup, I can give you a precise breakdown.",
+    "If you share your goals, I can map the right structure for you.",
+    "We can define everything clearly after reviewing your current situation.",
+    "I can give you a much more accurate direction once I understand your needs.",
   ];
 
-  const opener = responses[Math.floor(Math.random() * responses.length)];
-  const closer = followUps[Math.floor(Math.random() * followUps.length)];
+  const opener = openers[Math.floor(Math.random() * openers.length)];
+  const closer = closers[Math.floor(Math.random() * closers.length)];
 
-  const generated = `${opener} ${closer}`;
+  const generatedResponse = `${opener} ${closer}`;
 
-  // 🔥 ONLY OVERRIDE IF MODEL FAILED OR IS TOO GENERIC
-  const modelBad =
+  // ✅ ONLY override if model response is weak or missing
+  const isBadModelResponse =
     !response ||
-    response.length < 60 ||
-    /one-size-fits-all|it depends|pricing depends/i.test(response);
+    response.length < 50 ||
+    /one-size-fits-all|it depends|pricing depends|not fixed/i.test(
+      response.toLowerCase()
+    );
 
-  if (modelBad) {
-    response = generated;
+  // ✅ SAFE override only when needed
+  if (isBadModelResponse) {
+    response = generatedResponse;
   }
 }
+
 
 // ================= CLEANING =================
 
