@@ -163,19 +163,35 @@ function removeIdentitySpam(text: string): string {
 function enforceBookingOnly(text: string): string {
   if (!text) return "";
 
-  // remove fake confirmations
-  let cleaned = text
-    .replace(/calendar invite[^.]*\./gi, "")
-    .replace(/check your inbox[^.]*\./gi, "")
-    .replace(/i('|’)ve (booked|scheduled)[^.]*\./gi, "");
+  let cleaned = text;
 
-  // remove contact phrases
-  cleaned = cleaned.replace(
-    /(email|phone|contact us|reach out)[^.]*\./gi,
-    ""
-  );
+  // ❌ REMOVE ANY FAKE BOOKING / CONFIRMATION LANGUAGE
+  cleaned = cleaned
+    .replace(/(your booking (is )?(confirmed|scheduled)[^.]*\.)/gi, "")
+    .replace(/(we (have )?(booked|scheduled)[^.]*\.)/gi, "")
+    .replace(/(it('?s| has been) (booked|scheduled)[^.]*\.)/gi, "")
+    .replace(/(calendar invite[^.]*\.)/gi, "")
+    .replace(/(check your inbox[^.]*\.)/gi, "")
+    .replace(/(you('?ll| will) receive[^.]*\.)/gi, "")
+    .replace(/(confirmation (has been )?sent[^.]*\.)/gi, "");
 
-  return cleaned.trim();
+  // ❌ REMOVE AUTOMATION CLAIMS
+  cleaned = cleaned
+    .replace(/(our (ai )?(system|infrastructure)[^.]*\.)/gi, "")
+    .replace(/(processed (automatically)?[^.]*\.)/gi, "");
+
+  // ❌ REMOVE CONTACT / EMAIL COLLECTION LANGUAGE
+  cleaned = cleaned
+    .replace(/(email|phone|contact us|reach out)[^.]*\./gi, "");
+
+  cleaned = cleaned.trim();
+
+  // ✅ IF RESPONSE BECOMES EMPTY → FORCE SAFE FALLBACK
+  if (!cleaned || cleaned.length < 40) {
+    return "To book a call, just choose a time on our website — it takes less than a minute.";
+  }
+
+  return cleaned;
 }
 
 
@@ -761,6 +777,38 @@ if (pricingIntent) {
   }
 }
 
+
+// ================= SMART BOOKING RESPONSE OVERRIDE (FIXED) =================
+
+// ✅ SAFE LOCAL NORMALIZATION (prevents TS scope errors)
+const bookingMsg = (message || "").toLowerCase();
+
+// ✅ TRUE booking intent (strict)
+const strongBookingIntent =
+  /(book a call|schedule a call|book a meeting|schedule a meeting|let'?s talk|let'?s connect)/i.test(bookingMsg);
+
+// ✅ hiring intent (separate)
+const hiringIntent =
+  /(i want to hire|work with you|start working|get started)/i.test(bookingMsg);
+
+// ✅ rejection (VERY IMPORTANT)
+const bookingRejection =
+  /(not ready|maybe later|just exploring|not interested)/i.test(bookingMsg);
+
+// ✅ apply ONLY when appropriate
+if ((strongBookingIntent || hiringIntent) && !bookingRejection) {
+
+  const responses = [
+    "Best next step is to book a quick call through our website — we’ll map everything out there.",
+    "Makes sense — just pick a time on our website and we’ll take it from there.",
+    "Let’s get this moving — choose a time on our website and we’ll handle the rest.",
+    "You can book a call directly on our website — quick and straightforward.",
+  ];
+
+  // ✅ prevent repetition
+  const randomIndex = Math.floor(Math.random() * responses.length);
+  response = responses[randomIndex];
+}
 
 
 // ================= CLEANING =================
