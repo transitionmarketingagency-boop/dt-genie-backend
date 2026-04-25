@@ -849,7 +849,8 @@ if (similarity && !isPricingIntentMsg) {
 
 
 
-// ================= CTA ENGINE =================
+
+/* ================= CTA ENGINE ================= */
 
 const cta = generateCTA({
   message,
@@ -858,38 +859,15 @@ const cta = generateCTA({
   detectedServices: brainContext?.detectedServices,
 });
 
-
-// ================= CTA CONTROL (FIXED AUTHORITY LAYER) =================
+/* ================= CTA CONTROL (CLEAN ARCHITECTURE FIX) ================= */
 
 const normalizedMsg = (message || "").toLowerCase();
-
-/**
- * High intent detection (user wants action)
- */
-const isHighIntentMessage =
-  /(book|hire|call|schedule|appointment|work with you|get started)/i.test(
-    normalizedMsg
-  );
 
 /**
  * Safe response normalization
  */
 let safeResponse =
   typeof response === "string" ? response : String(response || "");
-
-/**
- * Detect booking intent (prevents CTA conflict with booking system)
- */
-const isBookingIntent =
-  typeof shouldTriggerBooking === "function"
-    ? shouldTriggerBooking?.(
-        sessionId,
-        "service",
-        leadScoreValue,
-        message
-      )
-    : false ||
-      /(book|schedule|call|appointment|hire|get started)/i.test(normalizedMsg);
 
 /**
  * Prevent CTA on weak or incomplete responses
@@ -903,33 +881,27 @@ const isIncompleteResponse =
 const alreadyHasCTA =
   typeof cta === "string" &&
   cta.trim().length > 0 &&
-  safeResponse.toLowerCase().includes(cta.toLowerCase());
+  safeResponse.includes(cta.trim());
 
 /**
- * FINAL CTA GUARD (STRICT + STABLE)
+ * FINAL CTA GUARD (STRICT + CLEAN)
  */
 const shouldAddCTA =
   typeof cta === "string" &&
   cta.trim().length > 0 &&
   !detectBookingRejection(message) &&
   !isGreeting &&
-  !isBookingIntent &&          // 🔥 prevents conflict with booking flow
-  !isIncompleteResponse &&     // 🔥 prevents CTA on broken outputs
-  !alreadyHasCTA &&            // 🔥 prevents duplication
+  !isIncompleteResponse &&
+  !alreadyHasCTA &&
   safeResponse.length > 60 &&
-  (
-    (leadScoreValue >= 0.75 &&
-      String(brainContext?.executionMode) === "execution") ||
-    isHighIntentMessage
-  );
+  leadScoreValue >= 0.75 &&
+  String(brainContext?.executionMode) === "execution";
 
-
-// ================= APPLY CTA =================
+/* ================= APPLY CTA ================= */
 
 if (shouldAddCTA) {
   safeResponse = safeResponse.trim() + "\n\n" + cta.trim();
 }
-
 
 // ================= SAVE =================
 

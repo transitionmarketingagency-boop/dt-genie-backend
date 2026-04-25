@@ -107,31 +107,34 @@ async function ask(): Promise<void> {
       /* ---------- SAVE AI RESPONSE ---------- */
       await memoryService.saveMessage(SESSION_ID, "assistant", response);
 
-      /* ---------- SMART BOOKING (AFTER RESPONSE) ---------- */
-      const triggerBooking = await shouldTriggerBooking(
-        SESSION_ID,
-        stage,
-        leadScore,
-        message
-      );
 
-      if (triggerBooking) {
-        const isBookingActive = await bookingFlow.isBookingActive(SESSION_ID);
+/* ---------- SMART BOOKING (UI ONLY SYSTEM) ---------- */
 
-        const bookingResponse = isBookingActive
-          ? await bookingFlow.handleStep(SESSION_ID, message)
-          : await bookingFlow.startBookingFlow(SESSION_ID, message);
+// 1. Let bookingFlow decide if UI should open
+const bookingResult = await bookingFlow.trigger(
+  SESSION_ID,
+  message,
+  leadScore || 0
+);
 
-        console.log("\n ~V AI:", response);
-        console.log("\n📅", bookingResponse.response, "\n");
+// 2. If UI should open → STOP CHAT FLOW
+if (bookingResult.shouldOpenUI) {
+  console.log("⚡ Booking UI Triggered");
 
-        if (bookingResponse.calendlyLink) {
-          console.log("⚡ Booking link:", bookingResponse.calendlyLink);
-        }
+  if (bookingResult.detectedServices?.length) {
+    console.log("Detected services:", bookingResult.detectedServices);
+  }
 
-        ask();
-        return;
-      }
+  ask();
+  return;
+}
+
+// 3. Otherwise continue normal AI response
+console.log("\n ~V AI:", response, "\n");
+
+ask();
+return;
+
 
       /* ---------- NORMAL OUTPUT ---------- */
       console.log("\n ~V AI:", response, "\n");
