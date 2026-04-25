@@ -602,23 +602,6 @@ const finalEntryMode = entryMode;
 // SAFE LOCAL NORMALIZATION (prevents duplicate dependency issues)
 const intentMsg = (message || "").toLowerCase();
 
-// ================= BOOKING INTENT DETECTION =================
-const isBookingIntent =
-  /(book a call|schedule a call|book a meeting|schedule a meeting|book|meeting|appointment|work with you|get started)/i.test(
-    intentMsg
-  );
-
-// ================= HIGH INTENT CHECK =================
-const isHighIntentAction = typeof leadScoreValue === "number" && leadScoreValue >= 0.75;
-
-// ================= SAFE EXECUTION SWITCH =================
-// ONLY escalate to execution mode when BOTH conditions are true
-if (isBookingIntent && isHighIntentAction) {
-  brainContext.executionMode = "execution";
-
-  // optional routing flag (used by CTA / booking layers)
-  (brainContext as any).forceActionMode = "booking";
-}
 
 /* ================= SMART ONBOARDING SHORTCUT ================= */
 
@@ -1015,10 +998,6 @@ let safeResponse =
   typeof response === "string" ? response : String(response || "");
 
 
-// ✅ HARD DISABLE booking flow trigger
-const isBookingIntent =
-  /(book|schedule|call|appointment|hire|get started)/i.test(normalizedMsg);
-
 
 /**
  * Prevent CTA on weak or incomplete responses
@@ -1042,7 +1021,7 @@ const shouldAddCTA =
   cta.trim().length > 0 &&
   !detectBookingRejection(message) &&
   !isGreeting &&
-  !isBookingIntent &&          // 🔥 prevents conflict with booking flow
+  !strongBookingIntent &&      // 🔥 prevents conflict with booking flow
   !isIncompleteResponse &&     // 🔥 prevents CTA on broken outputs
   !alreadyHasCTA &&            // 🔥 prevents duplication
   safeResponse.length > 60 &&
