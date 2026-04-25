@@ -762,6 +762,22 @@ if (pricingIntent) {
 }
 
 
+// ================= BOOKING RESPONSE OVERRIDE (HUMANIZED FIX) =================
+
+const isBookingIntentMessage =
+  /(book|call|schedule|appointment|hire|work with you|get started)/i.test(message.toLowerCase());
+
+if (isBookingIntentMessage) {
+  const responses = [
+    "Makes sense — easiest way is to just pick a time on our website and we’ll take it from there.",
+    "Perfect — you can grab a time directly on our website. Takes less than a minute.",
+    "Let’s do it — just choose a time that works for you on our website and we’ll get started.",
+    "Best way to move forward is to book a quick call through our website — we’ll map everything out there.",
+  ];
+
+  response = responses[Math.floor(Math.random() * responses.length)];
+}
+
 // ================= CLEANING =================
 
 response = cleanHybridResponse(response || "");
