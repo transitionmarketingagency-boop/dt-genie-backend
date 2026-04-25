@@ -762,37 +762,6 @@ if (pricingIntent) {
 }
 
 
-// ================= SMART BOOKING RESPONSE OVERRIDE (FIXED) =================
-
-// ✅ SAFE LOCAL NORMALIZATION (prevents TS scope errors)
-const bookingMsg = (message || "").toLowerCase();
-
-// ✅ TRUE booking intent (strict)
-const strongBookingIntent =
-  /(book a call|schedule a call|book a meeting|schedule a meeting|let'?s talk|let'?s connect)/i.test(bookingMsg);
-
-// ✅ hiring intent (separate)
-const hiringIntent =
-  /(i want to hire|work with you|start working|get started)/i.test(bookingMsg);
-
-// ✅ rejection (VERY IMPORTANT)
-const bookingRejection =
-  /(not ready|maybe later|just exploring|not interested)/i.test(bookingMsg);
-
-// ✅ apply ONLY when appropriate
-if ((strongBookingIntent || hiringIntent) && !bookingRejection) {
-
-  const responses = [
-    "Best next step is to book a quick call through our website — we’ll map everything out there.",
-    "Makes sense — just pick a time on our website and we’ll take it from there.",
-    "Let’s get this moving — choose a time on our website and we’ll handle the rest.",
-    "You can book a call directly on our website — quick and straightforward.",
-  ];
-
-  // ✅ prevent repetition
-  const randomIndex = Math.floor(Math.random() * responses.length);
-  response = responses[randomIndex];
-}
 
 // ================= CLEANING =================
 
