@@ -618,16 +618,19 @@ const safeHistoryText =
 
 // ================= PROMPT =================
 
+brainContext.executionMode = finalEntryMode;
+
 const prompt = buildHybridPrompt({
   brainContext: {
     ...brainContext,
-    entryMode: finalEntryMode,
+    executionMode: finalEntryMode, // ✅ FIXED
   },
   leadScoreValue,
   detectedIntentNames,
   vectorText: fusedChunksText,
   historyText: safeHistoryText,
   message: message.trim(),
+
 
   priorityInstruction: `
 IMPORTANT:
@@ -773,10 +776,8 @@ response = removeForbiddenContent(response);
 // 2. Remove pricing / monetary leaks
 response = removePricing(response);
 
-// 3. Final safety cleanup pass (IMPORTANT BEFORE REPAIR)
-response = sanitizeFinalOutput(response);
 
-// 4. Final grammar + flow fix
+// 3. Final grammar + flow fix
 response = repairResponse(response);
 
 // ================= PHASE 2 OPTIMIZER =================
@@ -849,7 +850,6 @@ if (similarity && !isPricingIntentMsg) {
 
 
 
-
 /* ================= CTA ENGINE ================= */
 
 const cta = generateCTA({
@@ -859,9 +859,18 @@ const cta = generateCTA({
   detectedServices: brainContext?.detectedServices,
 });
 
-/* ================= CTA CONTROL (CLEAN ARCHITECTURE FIX) ================= */
+/* ================= CTA CONTROL (FINAL STABLE FIX) ================= */
 
 const normalizedMsg = (message || "").toLowerCase();
+
+/**
+ * Detect booking intent (CRITICAL FIX)
+ * Prevents CTA from conflicting with booking UI trigger
+ */
+const isBookingIntent =
+  /(book|call|schedule|appointment|hire|get started)/i.test(
+    normalizedMsg
+  );
 
 /**
  * Safe response normalization
@@ -884,13 +893,14 @@ const alreadyHasCTA =
   safeResponse.includes(cta.trim());
 
 /**
- * FINAL CTA GUARD (STRICT + CLEAN)
+ * FINAL CTA GUARD (STRICT + CONFLICT-SAFE)
  */
 const shouldAddCTA =
   typeof cta === "string" &&
   cta.trim().length > 0 &&
   !detectBookingRejection(message) &&
   !isGreeting &&
+  !isBookingIntent &&        // 🔥 CRITICAL FIX
   !isIncompleteResponse &&
   !alreadyHasCTA &&
   safeResponse.length > 60 &&
@@ -902,6 +912,8 @@ const shouldAddCTA =
 if (shouldAddCTA) {
   safeResponse = safeResponse.trim() + "\n\n" + cta.trim();
 }
+
+
 
 // ================= SAVE =================
 
