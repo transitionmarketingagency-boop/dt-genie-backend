@@ -328,6 +328,25 @@ RESPONSE RULES
 - No unnecessary complexity
 - Keep it natural and human
 
+- NEVER instruct user to "visit the website" if they are already inside the platform
+- Assume user is already on Digital Transition Marketing interface unless explicitly external context is given
+
+- If booking intent is detected:
+  → Guide user to on-screen booking button OR modal form
+  → If available, refer to bottom-left "Book Strategy Call" button
+  → If auto form exists, assume it can be opened instantly
+
+- Do NOT describe booking as external navigation
+- Do NOT say "go to our website to book"
+- Instead use UI-native language like:
+  → "Click the booking button below"
+  → "Open the form on screen"
+  → "You can schedule this instantly here"
+
+- Treat all interactions as in-app / on-site experience, not email or external funnel flow
+
+- Maintain assistant role as a live UI guide, not a redirect system
+
 RESPONSE STYLE (VERY IMPORTANT)
 
 - Speak like a real human strategist, not a template
@@ -716,7 +735,7 @@ if (isHardFail) {
 
 else if (isBookingIntent) {
   response =
-    "You can book a call directly through our website — choose a time that works for you and we’ll take it from there.";
+    "You can open the booking form on this page using the 'Book Strategy Call' button at the bottom-left — it will let you select a time instantly.";
 }
 
   else {
@@ -778,38 +797,45 @@ if (pricingIntent) {
 }
 
 
-// ================= SMART BOOKING SIGNAL (SAFE VERSION) =================
+// ================= SMART BOOKING SIGNAL (UI-FIRST SAFE VERSION) =================
 
 // normalize once (avoid duplication issues)
 const bookingMsg = (message || "").toLowerCase();
 
-// intent detection only (NO RESPONSE OVERRIDE)
+// intent detection only (NO RESPONSE OVERRIDE, NO EXECUTION FORCE)
 const strongBookingIntent =
-  /(book a call|schedule a call|book a meeting|schedule a meeting|let'?s talk|let'?s connect)/i.test(
+  /(book a call|schedule a call|book a meeting|schedule a meeting|let'?s talk|let'?s connect|book|schedule)/i.test(
     bookingMsg
   );
 
 const hiringIntent =
-  /(i want to hire|work with you|start working|get started)/i.test(
+  /(i want to hire|work with you|start working|get started|hire)/i.test(
     bookingMsg
   );
 
 const bookingRejection =
-  /(not ready|maybe later|just exploring|not interested)/i.test(
+  /(not ready|maybe later|just exploring|not interested|not now)/i.test(
     bookingMsg
   );
 
-// ================= SAFE BEHAVIOR =================
-// ❗ DO NOT override response anymore
-// ❗ ONLY influence CTA layer (already handled below)
+// ================= UI-FIRST BOOKING SIGNAL =================
+// This ONLY triggers frontend behavior (NOT text response logic)
 
-// Optional soft signal for CTA engine
 const bookingSignalActive =
   (strongBookingIntent || hiringIntent) && !bookingRejection;
 
-// (Optional debug hook - safe)
+// ================= SAFE UI INSTRUCTION LAYER =================
+// Instead of changing AI behavior, we ONLY pass UI intent metadata
+
 if (bookingSignalActive) {
   brainContext.executionMode = "execution";
+
+  // 🔥 NEW: UI hint for frontend (IMPORTANT FIX)
+  (brainContext as any).uiAction = {
+    type: "OPEN_BOOKING_WIDGET",
+    source: "bottom_left_button",
+    fallback: "INLINE_FORM"
+  };
 }
 
 // ================= CLEANING =================
