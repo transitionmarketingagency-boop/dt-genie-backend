@@ -49,7 +49,6 @@ import { detectService } from "./serviceDetector.js";
 
 // Strategic logic & lead handling
 import { strategicBrain } from "./strategicBrain.js";
-import bookingFlow from "../bookingFlow.js";
 import { analyzeLeadSignals } from "./leadIntelligence.js";
 import { shouldTriggerBooking } from "./bookingTrigger.js";
 
@@ -699,10 +698,10 @@ if (isHardFail) {
       "Hey — what are you trying to improve in your business right now?";
   }
 
-  else if (isBookingIntent) {
-    response =
-      "Got it — I can help you with that. Let’s take this into a quick call setup.";
-  }
+else if (isBookingIntent) {
+  response =
+    "You can book a call directly through our website — choose a time that works for you and we’ll take it from there.";
+}
 
   else {
     // ✅ ONLY ONE fallback (no rotation, no loops)
@@ -877,19 +876,11 @@ const isHighIntentMessage =
 let safeResponse =
   typeof response === "string" ? response : String(response || "");
 
-/**
- * Detect booking intent (prevents CTA conflict with booking system)
- */
+
+// ✅ HARD DISABLE booking flow trigger
 const isBookingIntent =
-  typeof shouldTriggerBooking === "function"
-    ? shouldTriggerBooking?.(
-        sessionId,
-        "service",
-        leadScoreValue,
-        message
-      )
-    : false ||
-      /(book|schedule|call|appointment|hire|get started)/i.test(normalizedMsg);
+  /(book|schedule|call|appointment|hire|get started)/i.test(normalizedMsg);
+
 
 /**
  * Prevent CTA on weak or incomplete responses
