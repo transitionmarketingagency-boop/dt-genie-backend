@@ -299,16 +299,33 @@ CONVERSATION HISTORY
 
 ${historyText || "None"}
 
+
 --------------------------------------------------
 
 KNOWLEDGE (PRIMARY SOURCE)
 
 ${hasVectorKnowledge ? vectorText : "NO DATA AVAILABLE"}
 
-IMPORTANT:
-- If KNOWLEDGE exists → BASE your answer on it
-- Do NOT ignore it
-- Do NOT override it with assumptions
+--------------------------------------------------
+
+IMPORTANT KNOWLEDGE USAGE RULES
+
+- If KNOWLEDGE exists → it is the primary context source
+- Use it ONLY for informational or strategic questions
+- Do NOT fabricate or extend beyond it
+
+// ================= CRITICAL OVERRIDE RULE =================
+
+- IF USER MESSAGE IS A BOOKING INTENT:
+  → IGNORE KNOWLEDGE BLOCK COMPLETELY
+  → DO NOT USE CASE STUDIES
+  → DO NOT USE PILOT PROGRAM LOGIC
+  → DO NOT USE SERVICE DESCRIPTIONS
+  → DO NOT USE MARKETING EXPLANATIONS
+
+  → ONLY RESPOND WITH UI ACTION GUIDANCE:
+     "Use the Book Strategy Call button on screen"
+     "Open the booking form here"
 
 --------------------------------------------------
 
@@ -320,6 +337,8 @@ ${message}
 
 --------------------------------------------------
 
+// ================= RESPONSE RULES =================
+
 RESPONSE RULES
 
 - Be clear, direct, and practical
@@ -328,24 +347,44 @@ RESPONSE RULES
 - No unnecessary complexity
 - Keep it natural and human
 
-- NEVER instruct user to "visit the website" if they are already inside the platform
-- Assume user is already on Digital Transition Marketing interface unless explicitly external context is given
+- NEVER instruct user to "visit the website" or "go to our website"
+  → Assume user is already inside Digital Transition Marketing interface
+  → Treat all interactions as in-app experience
+
+- NEVER describe booking as external navigation or email-based flow
+
+// ================= BOOKING INTENT BEHAVIOR =================
 
 - If booking intent is detected:
-  → Guide user to on-screen booking button OR modal form
-  → If available, refer to bottom-left "Book Strategy Call" button
-  → If auto form exists, assume it can be opened instantly
+  → DO NOT explain systems, infrastructure, or process
+  → DO NOT mention marketing strategy, pilots, or services
+  → DO NOT add business context or persuasion
 
-- Do NOT describe booking as external navigation
-- Do NOT say "go to our website to book"
-- Instead use UI-native language like:
-  → "Click the booking button below"
-  → "Open the form on screen"
-  → "You can schedule this instantly here"
+  → ONLY trigger UI-native guidance:
 
-- Treat all interactions as in-app / on-site experience, not email or external funnel flow
+    Examples (allowed):
+    - "Use the Book Strategy Call button below"
+    - "Open the booking form on this screen"
+    - "You can schedule this instantly using the button on your screen"
+    - "Click the booking button in the bottom-left corner"
 
-- Maintain assistant role as a live UI guide, not a redirect system
+- Keep booking responses:
+  → Maximum 1–2 lines
+  → Action-focused only
+  → No explanations
+
+// ================= UI-FIRST ASSUMPTION =================
+
+- Treat platform as fully interactive UI (not external website)
+- Assume booking button and modal form are always available
+- Prefer UI instructions over text explanations
+
+// ================= ASSISTANT ROLE =================
+
+- You are a live UI assistant guiding user actions inside the platform
+- Not a redirect system
+- Not a consultant describing processes during booking flow
+
 
 RESPONSE STYLE (VERY IMPORTANT)
 
@@ -556,6 +595,30 @@ const entryMode =
 // SAFE alias (no re-declaration risk, no TS narrowing issues)
 const finalEntryMode = entryMode;
 
+
+
+// ================= INTENT SHORT-CIRCUIT (BOOKING CONTROL LAYER) =================
+
+// SAFE LOCAL NORMALIZATION (prevents duplicate dependency issues)
+const intentMsg = (message || "").toLowerCase();
+
+// ================= BOOKING INTENT DETECTION =================
+const isBookingIntent =
+  /(book a call|schedule a call|book a meeting|schedule a meeting|book|meeting|appointment|work with you|get started)/i.test(
+    intentMsg
+  );
+
+// ================= HIGH INTENT CHECK =================
+const isHighIntentAction = typeof leadScoreValue === "number" && leadScoreValue >= 0.75;
+
+// ================= SAFE EXECUTION SWITCH =================
+// ONLY escalate to execution mode when BOTH conditions are true
+if (isBookingIntent && isHighIntentAction) {
+  brainContext.executionMode = "execution";
+
+  // optional routing flag (used by CTA / booking layers)
+  (brainContext as any).forceActionMode = "booking";
+}
 
 /* ================= SMART ONBOARDING SHORTCUT ================= */
 
