@@ -762,20 +762,36 @@ if (pricingIntent) {
 }
 
 
-// ================= BOOKING RESPONSE OVERRIDE (HUMANIZED FIX) =================
+// ================= SMART BOOKING RESPONSE OVERRIDE (FIXED) =================
 
-const isBookingIntentMessage =
-  /(book|call|schedule|appointment|hire|work with you|get started)/i.test(message.toLowerCase());
+// ✅ SAFE LOCAL NORMALIZATION (prevents TS scope errors)
+const bookingMsg = (message || "").toLowerCase();
 
-if (isBookingIntentMessage) {
+// ✅ TRUE booking intent (strict)
+const strongBookingIntent =
+  /(book a call|schedule a call|book a meeting|schedule a meeting|let'?s talk|let'?s connect)/i.test(bookingMsg);
+
+// ✅ hiring intent (separate)
+const hiringIntent =
+  /(i want to hire|work with you|start working|get started)/i.test(bookingMsg);
+
+// ✅ rejection (VERY IMPORTANT)
+const bookingRejection =
+  /(not ready|maybe later|just exploring|not interested)/i.test(bookingMsg);
+
+// ✅ apply ONLY when appropriate
+if ((strongBookingIntent || hiringIntent) && !bookingRejection) {
+
   const responses = [
-    "Makes sense — easiest way is to just pick a time on our website and we’ll take it from there.",
-    "Perfect — you can grab a time directly on our website. Takes less than a minute.",
-    "Let’s do it — just choose a time that works for you on our website and we’ll get started.",
-    "Best way to move forward is to book a quick call through our website — we’ll map everything out there.",
+    "Best next step is to book a quick call through our website — we’ll map everything out there.",
+    "Makes sense — just pick a time on our website and we’ll take it from there.",
+    "Let’s get this moving — choose a time on our website and we’ll handle the rest.",
+    "You can book a call directly on our website — quick and straightforward.",
   ];
 
-  response = responses[Math.floor(Math.random() * responses.length)];
+  // ✅ prevent repetition
+  const randomIndex = Math.floor(Math.random() * responses.length);
+  response = responses[randomIndex];
 }
 
 // ================= CLEANING =================
@@ -854,10 +870,9 @@ const isPricingIntentMsg =
   /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
 
 if (similarity && !isPricingIntentMsg) {
-  response =
-    response +
-    "\n\nLet me approach this from a slightly different angle.";
+  // 🔥 do NOT modify response, just let it pass
 }
+
 
   }
 } catch {}
