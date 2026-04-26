@@ -477,11 +477,6 @@ function sanitizeFinalOutput(text: string): string {
   );
 
 
-cleaned = cleaned.replace(
-  /\b(visit|check|go to)\s+(our\s+)?website\b[^.]*\./gi,
-  'You can use the "Book a Strategy Call" button at the bottom-left corner of this page.'
-);
-
 
   // 🔒 Cleanup spacing
 // 🔒 OWNERSHIP ENFORCEMENT (CRITICAL FIX)
