@@ -179,8 +179,6 @@ function enforceBookingOnly(text: string): string {
     .replace(/i('|’)ve (booked|scheduled|confirmed)[^.]*\./gi, "")
     .replace(/your booking (is )?confirmed[^.]*\./gi, "")
     .replace(/we('|’)ll confirm[^.]*\./gi, "")
-    .replace(/let us know your availability[^.]*\./gi, "")
-    .replace(/share your availability[^.]*\./gi, "");
 
   // ❌ Remove contact methods
   cleaned = cleaned.replace(
@@ -189,13 +187,15 @@ function enforceBookingOnly(text: string): string {
   );
 
   // ✅ FORCE CORRECT BOOKING INSTRUCTION
-  const bookingIntent =
-    /(book|schedule|call|appointment|get started)/i.test(cleaned);
+const bookingIntent =
+  /^(i want to book|book a call|schedule a call|schedule a meeting|confirm booking|let'?s schedule|i want to schedule)$/i.test(
+    cleaned.trim().toLowerCase()
+  );
 
-  if (bookingIntent) {
-    cleaned =
-      "You can book a strategy call directly using the **\"Book a Strategy Call\"** button at the bottom-left corner of this page. That’s the fastest way to get started.";
-  }
+if (bookingIntent && cleaned.length < 200) {
+  cleaned =
+    "You can book a strategy call directly using the **\"Book a Strategy Call\"** button at the bottom-left corner of this page. That’s the fastest way to get started.";
+}
 
   return cleaned.trim();
 }
@@ -855,6 +855,18 @@ if (forceNoQuestions && typeof response === "string") {
 
 response = sanitizeFinalOutput(response || "");
 
+// ================= BOOKING UI OVERRIDE (STRICT FIX) =================
+
+const strictBookingIntent =
+  /^(i want to book|book a call|schedule a call|schedule a meeting|confirm booking|let'?s schedule|i want to schedule)$/i.test(
+    (message || "").trim().toLowerCase()
+  );
+
+if (strictBookingIntent) {
+  response =
+    "You can book a strategy call directly using the **\"Book a Strategy Call\"** button at the bottom-left corner of this page. That’s the fastest way to get started.";
+}
+
 // ✅ NEW FIX: remove fake booking + contact behavior
 response = enforceBookingOnly(response);
 
@@ -883,10 +895,10 @@ const similarity =
 const isPricingIntentMsg =
   /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
 
-if (similarity && !isPricingIntentMsg) {
+if (similarity && !isPricingIntentMsg && response.length > 120) {
   response =
     response +
-    "\n\nLet me approach this from a slightly different angle.";
+    "\n\nHere’s another angle that might help.";
 }
 
   }
@@ -911,9 +923,10 @@ const normalizedMsg = (message || "").toLowerCase();
  * Detect booking intent (CRITICAL FIX)
  * Prevents CTA from conflicting with booking UI trigger
  */
+
 const isBookingIntent =
-  /(book|call|schedule|appointment|hire|get started)/i.test(
-    normalizedMsg
+  /^(i want to book|book a call|schedule a call|schedule a meeting|confirm booking|let'?s schedule|i want to schedule)$/i.test(
+    normalizedMsg.trim()
   );
 
 /**
