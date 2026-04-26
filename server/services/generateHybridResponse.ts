@@ -114,6 +114,13 @@ function removeForbiddenContent(text: string): string {
       "AI systems"
     )
 
+// 🔧 FIX 2 — HARD BLOCK FAKE STATS
+.replace(/\b\d{1,3}%\s*(of\s*)?(clients?|users?)\b/gi, "")
+.replace(/\b\d{1,3}%\+?\s*(improvement|increase|results?)\b/gi, "")
+.replace(/\bmost clients see\b[^.]*\./gi, "")
+
+
+
 // ❌ remove unsafe / blackhat suggestions
 .replace(
   /\b(device fingerprint spoofing|bypass algorithms?|hack|scrape accounts?|fake engagement)\b/gi,
@@ -171,6 +178,14 @@ function enforceBookingOnly(text: string): string {
   if (!text) return "";
 
   let cleaned = text;
+
+// 🔧 FIX 1 — KILL FAKE BOOKING CONTEXT (CRITICAL)
+cleaned = cleaned
+  .replace(/i('|’)ll (reserve|book|schedule)[^.]*\./gi, "")
+  .replace(/we('|’)ll (prepare|schedule|confirm)[^.]*\./gi, "")
+  .replace(/since you('|’)ve already scheduled[^.]*\./gi, "")
+  .replace(/see you (then|there)[^.]*\./gi, "")
+  .replace(/i('|’)ll make sure[^.]*\./gi, "");
 
   // ❌ Remove fake confirmations
   cleaned = cleaned
@@ -539,6 +554,23 @@ export async function executeHybridResponse({
     const msg = (message || "").trim().toLowerCase();
 
 
+// ================= INVALID INPUT GUARD =================
+
+const isGibberish =
+  msg.length < 3 ||
+  /^[^a-zA-Z0-9\s]+$/.test(msg) ||
+  /^[asdfghjklqwertyuiop]+$/i.test(msg);
+
+if (isGibberish) {
+  const fallback =
+    "I didn’t quite catch that — can you rephrase what you’re trying to do?";
+
+  await memoryService.addMessage(sessionId, "assistant", fallback);
+  return fallback;
+}
+
+
+
 // ================= ENTRY INTELLIGENCE (FINAL STABLE FIX) =================
 
 const isFirstMessage = !historyText || historyText.length < 10;
@@ -546,6 +578,20 @@ const isGreeting = /^(hi|hello|hey|yo)$/i.test(msg.trim());
 
 // ✅ FIXED (removed broken trailing &&)
 const isHighIntent = leadScoreValue >= 0.7;
+
+
+// 🔥 FIX 5 — STRICT BOOKING OVERRIDE (CRITICAL)
+const strictBookingIntent =
+  /(book a call|schedule a call|book call|schedule call|book a meeting|schedule a meeting)/i.test(msg);
+
+if (strictBookingIntent) {
+  const response =
+    "You can book a strategy call directly using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
+
+  await memoryService.addMessage(sessionId, "assistant", response);
+  return response;
+}
+
 
 /**
  * FINAL ENTRY MODE (IMMUTABLE)
@@ -748,8 +794,9 @@ if (isHardFail) {
 
   else {
     // ✅ ONLY ONE fallback (no rotation, no loops)
-    response =
-      "I need a bit more clarity to guide you properly. What exactly are you trying to improve?";
+response =
+  "Got it — here’s how I’d approach this based on what you’re trying to do.";
+
   }
 }
 
@@ -852,15 +899,6 @@ response = sanitizeFinalOutput(response || "");
 
 // ================= BOOKING UI OVERRIDE (STRICT FIX) =================
 
-const strictBookingIntent =
-  /^(i want to book|book a call|schedule a call|schedule a meeting|confirm booking|let'?s schedule|i want to schedule)$/i.test(
-    (message || "").trim().toLowerCase()
-  );
-
-if (strictBookingIntent) {
-  response =
-    "You can book a strategy call directly using the **\"Book a Strategy Call\"** button at the bottom-left corner of this page. That’s the fastest way to get started.";
-}
 
 // ✅ NEW FIX: remove fake booking + contact behavior
 response = enforceBookingOnly(response);
@@ -891,9 +929,7 @@ const isPricingIntentMsg =
   /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
 
 if (similarity && !isPricingIntentMsg && response.length > 120) {
-  response =
-    response +
-    "\n\nHere’s another angle that might help.";
+  // do nothing — avoid repeating same response
 }
 
   }
@@ -919,10 +955,6 @@ const normalizedMsg = (message || "").toLowerCase();
  * Prevents CTA from conflicting with booking UI trigger
  */
 
-const isBookingIntent =
-  /^(i want to book|book a call|schedule a call|schedule a meeting|confirm booking|let'?s schedule|i want to schedule)$/i.test(
-    normalizedMsg.trim()
-  );
 
 /**
  * Safe response normalization
@@ -952,7 +984,6 @@ const shouldAddCTA =
   cta.trim().length > 0 &&
   !detectBookingRejection(message) &&
   !isGreeting &&
-  !isBookingIntent &&        // 🔥 CRITICAL FIX
   !isIncompleteResponse &&
   !alreadyHasCTA &&
   safeResponse.length > 60 &&
