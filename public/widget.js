@@ -77,28 +77,39 @@
     localStorage.setItem('dtGenieSessionData', JSON.stringify(sessionData));
   }
 
-  function addMessage(role, content) {
-    const container = document.getElementById('dt-genie-messages');
-    const div = document.createElement('div');
-    div.className = `dt-message ${role}`;
+function addMessage(role, content) {
+  const container = document.getElementById('dt-genie-messages');
+  const div = document.createElement('div');
+  div.className = `dt-message ${role}`;
 
-    const bubble = document.createElement('div');
-    bubble.className = 'dt-message-bubble';
-    bubble.innerText = content;
+  const bubble = document.createElement('div');
+  bubble.className = 'dt-message-bubble';
+  bubble.innerText = content;
 
-    div.appendChild(bubble);
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
+  div.appendChild(bubble);
+  container.appendChild(div);
+
+  // ✅ Smooth scroll ONLY for assistant messages (top-aligned)
+  if (role === 'assistant') {
+    requestAnimationFrame(() => {
+      div.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    });
   }
+}
 
-  function showTyping() {
-    const container = document.getElementById('dt-genie-messages');
-    const div = document.createElement('div');
-    div.id = 'dt-genie-typing';
-    div.innerText = 'Typing...';
-    container.appendChild(div);
-    container.scrollTop = container.scrollHeight;
-  }
+function showTyping() {
+  const container = document.getElementById('dt-genie-messages');
+  const div = document.createElement('div');
+  div.id = 'dt-genie-typing';
+  div.innerText = 'Typing...';
+
+  container.appendChild(div);
+
+  // ❌ Removed forced scroll
+}
 
   function hideTyping() {
     const el = document.getElementById('dt-genie-typing');
