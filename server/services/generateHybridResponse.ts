@@ -559,7 +559,9 @@ export async function executeHybridResponse({
 const isGibberish =
   msg.length < 3 ||
   /^[^a-zA-Z0-9\s]+$/.test(msg) ||
-  /^[asdfghjklqwertyuiop]+$/i.test(msg);
+  // only treat as gibberish if it's keyboard spam (repeated patterns)
+  /(.)\1{5,}/.test(msg) ||                  // e.g. "aaaaaa"
+  /^[asdfghjklqwertyuiop]{6,}$/i.test(msg); // only long mashing strings like "asdfghjklasdf"
 
 if (isGibberish) {
   const fallback =
