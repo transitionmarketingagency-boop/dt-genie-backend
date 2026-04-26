@@ -89,15 +89,18 @@ function addMessage(role, content) {
   div.appendChild(bubble);
   container.appendChild(div);
 
-  // ✅ Smooth scroll ONLY for assistant messages (top-aligned)
-  if (role === 'assistant') {
-    requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    if (role === 'assistant') {
+      // ✅ Show full response from top
       div.scrollIntoView({
         behavior: 'smooth',
         block: 'start'
       });
-    });
-  }
+    } else {
+      // ✅ Ensure user sees their own message immediately
+      container.scrollTop = container.scrollHeight;
+    }
+  });
 }
 
 function showTyping() {
