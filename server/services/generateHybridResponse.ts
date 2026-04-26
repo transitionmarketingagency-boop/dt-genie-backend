@@ -114,6 +114,12 @@ function removeForbiddenContent(text: string): string {
       "AI systems"
     )
 
+// ❌ remove unsafe / blackhat suggestions
+.replace(
+  /\b(device fingerprint spoofing|bypass algorithms?|hack|scrape accounts?|fake engagement)\b/gi,
+  ""
+)
+
     // ❌ remove "Tool: xyz"
     .replace(/tool:\s*[a-z0-9.\-]+/gi, "")
 
@@ -164,17 +170,32 @@ function removeIdentitySpam(text: string): string {
 function enforceBookingOnly(text: string): string {
   if (!text) return "";
 
-  // remove fake confirmations
-  let cleaned = text
+  let cleaned = text;
+
+  // ❌ Remove fake confirmations
+  cleaned = cleaned
     .replace(/calendar invite[^.]*\./gi, "")
     .replace(/check your inbox[^.]*\./gi, "")
-    .replace(/i('|’)ve (booked|scheduled)[^.]*\./gi, "");
+    .replace(/i('|’)ve (booked|scheduled|confirmed)[^.]*\./gi, "")
+    .replace(/your booking (is )?confirmed[^.]*\./gi, "")
+    .replace(/we('|’)ll confirm[^.]*\./gi, "")
+    .replace(/let us know your availability[^.]*\./gi, "")
+    .replace(/share your availability[^.]*\./gi, "");
 
-  // remove contact phrases
+  // ❌ Remove contact methods
   cleaned = cleaned.replace(
     /(email|phone|contact us|reach out)[^.]*\./gi,
     ""
   );
+
+  // ✅ FORCE CORRECT BOOKING INSTRUCTION
+  const bookingIntent =
+    /(book|schedule|call|appointment|get started)/i.test(cleaned);
+
+  if (bookingIntent) {
+    cleaned =
+      "You can book a strategy call directly using the **\"Book a Strategy Call\"** button at the bottom-left corner of this page. That’s the fastest way to get started.";
+  }
 
   return cleaned.trim();
 }
@@ -319,6 +340,9 @@ RESPONSE STYLE (VERY IMPORTANT)
 - DO NOT follow rigid formats or numbered structures unless necessary
 - Avoid robotic phrasing like:
   "1. Direct answer 2. Explanation 3. Next step"
+- Avoid generic frameworks like “3 steps”, “structured approach”, or “key areas”
+- Give specific, situation-based advice instead of templates
+
 
 Instead:
 → Answer naturally
@@ -403,9 +427,18 @@ function repairResponse(text: string): string {
   fixed = fixed.replace(/\s+/g, " ").trim();
 
   // Ensure sentence completion ONLY if needed
-  if (!/[.?!]$/.test(fixed)) {
-    fixed += ".";
-  }
+// ❌ detect broken endings
+if (
+  fixed.length < 80 ||
+  /(:|-|\b(e\.g|for example)\b)$/i.test(fixed)
+) {
+  fixed += " Let me know if you want me to break this down step-by-step.";
+}
+
+// ensure proper ending
+if (!/[.?!]$/.test(fixed)) {
+  fixed += ".";
+}
 
   // ❌ FIX: only add filler if response is TOO short AND not CTA
   const isCTA = /(call|book|schedule|get started)/i.test(fixed);
@@ -443,6 +476,13 @@ function sanitizeFinalOutput(text: string): string {
     ""
   );
 
+
+cleaned = cleaned.replace(
+  /\b(visit|check|go to)\s+(our\s+)?website\b[^.]*\./gi,
+  'You can use the "Book a Strategy Call" button at the bottom-left corner of this page.'
+);
+
+
   // 🔒 Cleanup spacing
 // 🔒 OWNERSHIP ENFORCEMENT (CRITICAL FIX)
 if (/digital transition marketing/i.test(cleaned)) {
@@ -464,6 +504,10 @@ cleaned = cleaned
   .replace(/\bthey offer\b/gi, "we offer")
   .replace(/\bthey provide\b/gi, "we provide")
   .replace(/\bthey can\b/gi, "we can");
+
+// 🔧 FIX: identity grammar bug ("we’s" → "our")
+cleaned = cleaned.replace(/\bwe’s\b/gi, "our");
+
 
 // 🔒 Cleanup spacing
 cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
