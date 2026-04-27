@@ -113,6 +113,71 @@ function addMessage(role, content) {
   });
 }
 
+
+function renderQuickActions() {
+  const container = document.getElementById('dt-genie-messages');
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'dt-quick-actions';
+
+  const actions = [
+    "Fix my ads",
+    "Get more leads",
+    "Automate my business",
+    "Book a call"
+  ];
+
+  actions.forEach(text => {
+    const btn = document.createElement('button');
+    btn.className = 'dt-quick-btn';
+    btn.innerText = text;
+
+    btn.onclick = () => {
+      sendMessage(text);
+      wrapper.remove(); // remove after click
+    };
+
+    wrapper.appendChild(btn);
+  });
+
+  container.appendChild(wrapper);
+
+  container.scrollTop = container.scrollHeight;
+}
+
+
+/* ================= QUICK ACTION BUTTONS ================= */
+
+.dt-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dt-quick-btn {
+  padding: 8px 12px;
+  border-radius: 18px;
+  font-size: 13px;
+  cursor: pointer;
+
+  background: rgba(0,225,255,0.08);
+  border: 1px solid rgba(0,225,255,0.5);
+  color: #fff;
+
+  transition: all 0.2s ease;
+}
+
+.dt-quick-btn:hover {
+  background: rgba(255,122,24,0.15);
+  border-color: var(--neon-orange);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 8px rgba(0,225,255,0.6),
+    0 0 14px rgba(255,122,24,0.4);
+}
+
+
 function showTyping() {
   const container = document.getElementById('dt-genie-messages');
   const div = document.createElement('div');
@@ -150,6 +215,9 @@ function showTyping() {
 
       addMessage('assistant', data.reply || 'No response received.');
       messageHistory.push({ role: 'assistant', content: data.reply });
+
+sessionData.lastUserIntent = message;
+saveSession();
 
       /* Calendly trigger preserved exactly */
       const bookingKeywords = ["book", "schedule", "strategy call", "meeting", "call", "consultation"];
@@ -195,23 +263,35 @@ function showTyping() {
       panel.classList.add('open');
 
 
-if (!sessionData.introShown && messageHistory.length === 0) {
-  addMessage(
-    'assistant',
-`👋 Welcome to NeonVision
-
-I help businesses grow using AI-powered marketing systems.
-
-⚡ Choose what you want to improve:
-• Fix my ads
-• Get more leads
-• Automate my business
-• Book a strategy call`
-  );
+if (!sessionData.introShown) {
 
   sessionData.introShown = true;
   saveSession();
+
+  // 🔥 Typing delay (feels alive)
+  showTyping();
+
+  setTimeout(() => {
+    hideTyping();
+
+    const introText = sessionData.lastUserIntent
+      ? "Welcome back — still working on your growth?"
+      : "Welcome to NeonVision";
+
+    addMessage(
+      'assistant',
+`${introText}
+
+I help businesses scale using AI-powered marketing systems.
+
+⚡ What do you want to fix right now?`
+    );
+
+    renderQuickActions();
+
+  }, 900);
 }
+
 
     } else {
       panel.classList.remove('open');
