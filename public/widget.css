@@ -461,6 +461,8 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 6px;
+  align-self: flex-start;
+  opacity: 1;
 }
 
 .dt-quick-btn {

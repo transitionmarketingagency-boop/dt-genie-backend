@@ -142,7 +142,13 @@ function renderQuickActions() {
 
   container.appendChild(wrapper);
 
-  container.scrollTop = container.scrollHeight;
+requestAnimationFrame(() => {
+  const last = container.lastElementChild;
+  if (last) {
+    last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+});
+
 }
 
 
@@ -250,17 +256,16 @@ addMessage(
   'assistant',
 `${introText}
 
-Digital Transition Marketing (DTM) builds AI-powered growth engines — not generic advice, not theory.
+DTM builds AI-powered growth systems — not advice, not templates.
 
-We engineer 14 AI systems across marketing, automation, search, ads, and predictive growth.
-
-⚡ What do you want to improve today?
-
-• Generate qualified leads (AI Lead Systems)
-• Fix underperforming ads (AI Performance + Ad Warfare)
-• Automate operations (AI Agents & Workflows)
+We help businesses:
+• Generate qualified leads
+• Fix underperforming ads
+• Automate operations
 • Dominate search visibility (Voice + GEO / AI SEO)
-• Scale faster with lower cost (Predictive Growth Systems)`
+• Scale faster with AI systems
+
+⚡ What do you want to improve today?`
 );
 
       }, 650);
