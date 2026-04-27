@@ -121,33 +121,31 @@ function renderQuickActions() {
   wrapper.className = 'dt-quick-actions';
 
   const actions = [
-    "🚀 Fix my ads",
-    "🎯 Get more leads",
-    "⚙️ Automate my business",
-    "📞 Book a strategy call"
+    { text: "🚀 Fix ads", value: "Fix my ads" },
+    { text: "🎯 Get leads", value: "Get more leads" },
+    { text: "⚙️ Automate", value: "Automate my business" },
+    { text: "📞 Book call", value: "Book a strategy call" }
   ];
 
-  actions.forEach(text => {
+  actions.forEach(a => {
     const btn = document.createElement('button');
     btn.className = 'dt-quick-btn';
-    btn.innerText = text;
+    btn.innerText = a.text;
 
-    btn.onclick = () => {
-      sendMessage(text);
-      wrapper.remove();
-    };
-
+    btn.onclick = () => sendMessage(a.value);
     wrapper.appendChild(btn);
   });
 
-  container.appendChild(wrapper);
+  // 🔥 CRITICAL FIX: wrap inside message block
+  const block = document.createElement('div');
+  block.className = 'dt-message assistant';
+  block.appendChild(wrapper);
 
-  // 🔥 IMPORTANT FIX: ensure visibility AFTER render
+  container.appendChild(block);
+
+  // force visibility after paint
   requestAnimationFrame(() => {
-    wrapper.scrollIntoView({
-      behavior: 'smooth',
-      block: 'end'
-    });
+    container.scrollTop = container.scrollHeight;
   });
 }
 
@@ -239,6 +237,18 @@ function togglePanel(force) {
   if (isOpen) {
     panel.classList.add('open');
 
+setTimeout(() => {
+  const container = document.getElementById('dt-genie-messages');
+
+  // if empty OR no quick actions exist → force render
+  if (
+    container.children.length === 0 ||
+    !container.querySelector('.dt-quick-actions')
+  ) {
+    renderQuickActions();
+  }
+}, 500);
+
     // ✅ FIX: show intro based on EMPTY CHAT, not memory flag
     if (container.children.length === 0) {
 
@@ -247,23 +257,25 @@ function togglePanel(force) {
       setTimeout(() => {
         hideTyping();
 
-const introText = sessionData.lastUserIntent
-  ? "Welcome back — your growth system is still evolving inside NeonVision."
-  : "NeonVision is now active in your business growth layer.";
 
+const introText = sessionData.lastUserIntent
+  ? "Welcome back. Ready to continue scaling?"
+  : "NeonVision is active.";
 
 addMessage(
   'assistant',
 `${introText}
 
-I’m NeonVision — your AI growth system by Digital Transition Marketing.
+DTM builds 14 AI growth systems for leads, ads, automation & search.
 
-I help you get more leads, better ads, and automated growth.
-
-⚡ Tell me what you want to fix — or pick an option below.`
+⚡ Pick an action below or just tell me your goal.`
 );
 
-      }, 650);
+// 🔥 CRITICAL: always render quick actions AFTER intro
+setTimeout(() => {
+  renderQuickActions();
+}, 150);
+
     }
 
   } else {
