@@ -454,6 +454,37 @@
 }
 
 
+/* ================= QUICK ACTION BUTTONS ================= */
+
+.dt-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dt-quick-btn {
+  padding: 8px 12px;
+  border-radius: 18px;
+  font-size: 13px;
+  cursor: pointer;
+
+  background: rgba(0,225,255,0.08);
+  border: 1px solid rgba(0,225,255,0.5);
+  color: #fff;
+
+  transition: all 0.2s ease;
+}
+
+.dt-quick-btn:hover {
+  background: rgba(255,122,24,0.15);
+  border-color: var(--neon-orange);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 8px rgba(0,225,255,0.6),
+    0 0 14px rgba(255,122,24,0.4);
+}
+
 /* ================= MOBILE TAP GLITCH FIX ================= */
 
 /* Remove mobile grey/blue tap highlight */

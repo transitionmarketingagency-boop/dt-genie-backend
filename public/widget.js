@@ -146,37 +146,6 @@ function renderQuickActions() {
 }
 
 
-/* ================= QUICK ACTION BUTTONS ================= */
-
-.dt-quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.dt-quick-btn {
-  padding: 8px 12px;
-  border-radius: 18px;
-  font-size: 13px;
-  cursor: pointer;
-
-  background: rgba(0,225,255,0.08);
-  border: 1px solid rgba(0,225,255,0.5);
-  color: #fff;
-
-  transition: all 0.2s ease;
-}
-
-.dt-quick-btn:hover {
-  background: rgba(255,122,24,0.15);
-  border-color: var(--neon-orange);
-  transform: translateY(-2px);
-  box-shadow:
-    0 0 8px rgba(0,225,255,0.6),
-    0 0 14px rgba(255,122,24,0.4);
-}
-
 
 function showTyping() {
   const container = document.getElementById('dt-genie-messages');
@@ -268,30 +237,28 @@ if (!sessionData.introShown) {
   sessionData.introShown = true;
   saveSession();
 
-  // 🔥 Typing delay (feels alive)
   showTyping();
 
   setTimeout(() => {
     hideTyping();
 
     const introText = sessionData.lastUserIntent
-      ? "Welcome back — still working on your growth?"
+      ? "Welcome back — ready to scale harder?"
       : "Welcome to NeonVision";
 
     addMessage(
       'assistant',
 `${introText}
 
-I help businesses scale using AI-powered marketing systems.
+I build AI-powered growth systems for businesses.
 
-⚡ What do you want to fix right now?`
+⚡ What do you want to improve right now?`
     );
 
     renderQuickActions();
 
-  }, 900);
+  }, 700);
 }
-
 
     } else {
       panel.classList.remove('open');
