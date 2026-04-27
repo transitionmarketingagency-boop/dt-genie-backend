@@ -194,14 +194,26 @@ function showTyping() {
     if (isOpen) {
       panel.classList.add('open');
 
-      if (!sessionData.introShown) {
-        addMessage(
-          'assistant',
-          "Hello! I'm NeonVision, your AI assistant from the DTM team. How can I help you today?"
-        );
-        sessionData.introShown = true;
-        saveSession();
-      }
+
+if (!sessionData.introShown) {
+  addMessage(
+    'assistant',
+`👋 Welcome to NeonVision
+
+I help businesses grow using AI-powered marketing systems.
+
+You can ask me things like:
+• "My ads aren’t converting"
+• "I want more leads"
+• "How do I rank on ChatGPT or Google?"
+• "I need automation for my business"
+
+Tell me what you're trying to improve — I’ll map out exactly what you need.`
+  );
+
+  sessionData.introShown = true;
+  saveSession();
+}
 
     } else {
       panel.classList.remove('open');
