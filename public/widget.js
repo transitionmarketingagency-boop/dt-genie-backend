@@ -224,46 +224,46 @@ saveSession();
     }
   }
 
-  function togglePanel(force) {
-    const panel = document.getElementById('dt-genie-panel');
-    isOpen = force !== undefined ? force : !isOpen;
 
-    if (isOpen) {
-      panel.classList.add('open');
+function togglePanel(force) {
+  const panel = document.getElementById('dt-genie-panel');
+  const container = document.getElementById('dt-genie-messages');
 
+  isOpen = force !== undefined ? force : !isOpen;
 
-if (!sessionData.introShown) {
+  if (isOpen) {
+    panel.classList.add('open');
 
-  sessionData.introShown = true;
-  saveSession();
+    // ✅ FIX: show intro based on EMPTY CHAT, not memory flag
+    if (container.children.length === 0) {
 
-  showTyping();
+      showTyping();
 
-  setTimeout(() => {
-    hideTyping();
+      setTimeout(() => {
+        hideTyping();
 
-    const introText = sessionData.lastUserIntent
-      ? "Welcome back — ready to scale harder?"
-      : "Welcome to NeonVision";
+        const introText = sessionData.lastUserIntent
+          ? "Welcome back — ready to scale harder?"
+          : "Welcome to NeonVision";
 
-    addMessage(
-      'assistant',
+        addMessage(
+          'assistant',
 `${introText}
 
 I build AI-powered growth systems for businesses.
 
 ⚡ What do you want to improve right now?`
-    );
+        );
 
-    renderQuickActions();
+        renderQuickActions();
 
-  }, 700);
-}
-
-    } else {
-      panel.classList.remove('open');
+      }, 650);
     }
+
+  } else {
+    panel.classList.remove('open');
   }
+}
 
   function init() {
     createWidget();
