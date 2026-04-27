@@ -253,23 +253,22 @@ if (container.children.length === 0) {
   setTimeout(() => {
     hideTyping();
 
-    const introText = sessionData.lastUserIntent
-      ? "Welcome back. Ready to continue scaling?"
-      : "NeonVision is active.";
 
-    addMessage(
-      'assistant',
-`${introText}
+addMessage(
+  'assistant',
+`Welcome to Digital Transition Marketing. I’m NeonVision — your AI growth system.
 
-DTM builds 14 AI growth systems for leads, ads, automation & search.
+DTM builds 14 AI growth systems for leads, ads, automation, AI search and more.
 
-⚡ Pick an action below or just tell me your goal.`
-    );
+⚡ Pick an action below or tell me what you want to improve.
 
-    // ✅ SINGLE CONTROLLED RENDER (IMPORTANT)
-    requestAnimationFrame(() => {
-      renderQuickActions();
-    });
+);
+
+// ✅ SINGLE CONTROLLED RENDER (IMPORTANT)
+requestAnimationFrame(() => {
+  renderQuickActions();
+});
+
 
   }, 650);
 }
