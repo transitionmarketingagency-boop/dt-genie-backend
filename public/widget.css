@@ -448,3 +448,41 @@
   #dt-genie-curved-text { width:120px; height:120px; }
   #dt-genie-panel { bottom:100px; right:16px; width: calc(100vw - 32px); height: calc(100vh - 130px); }
 }
+
+
+/* ================= MOBILE TAP GLITCH FIX ================= */
+
+/* Remove mobile grey/blue tap highlight */
+#dt-genie-send,
+#dt-genie-button,
+#dt-genie-close {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -ms-user-select: none;
+}
+
+/* Remove focus outline + ghost box */
+#dt-genie-send:focus,
+#dt-genie-button:focus,
+#dt-genie-close:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Kill mobile press overlay flash */
+#dt-genie-send:active,
+#dt-genie-button:active,
+#dt-genie-close:active {
+  background-color: transparent !important;
+  transform: none !important;
+}
+
+/* Remove default button styling (Android fix) */
+#dt-genie-send,
+#dt-genie-close {
+  -webkit-appearance: none;
+  appearance: none;
+  border: none;
+}
