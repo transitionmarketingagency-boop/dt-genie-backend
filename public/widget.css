@@ -349,19 +349,22 @@
 }
 
 
-/* ================= NEON SEND BUTTON UPGRADE ================= */
+
+/* ================= ULTRA NEON SEND BUTTON (V2) ================= */
 
 #dt-genie-send {
-  width: 48px;
-  height: 48px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
 
-  background: linear-gradient(135deg, rgba(0,225,255,0.15), rgba(255,122,24,0.15));
-  border: 1px solid rgba(0,225,255,0.4);
+  /* 🔥 MORE VIBRANT CORE */
+  background: radial-gradient(circle at 30% 30%,
+    rgba(0, 225, 255, 0.35),
+    rgba(255, 122, 24, 0.25),
+    rgba(10, 10, 20, 0.9)
+  );
 
-  color: #fff;
-  font-size: 18px;
-  font-weight: 600;
+  border: 1px solid rgba(0, 225, 255, 0.7);
 
   display: flex;
   align-items: center;
@@ -371,68 +374,120 @@
   position: relative;
   overflow: hidden;
 
-  /* Glass + neon glow */
+  /* 🔥 STRONGER NEON DEPTH */
   box-shadow:
-    inset 0 0 10px rgba(0,225,255,0.25),
-    0 0 12px rgba(0,225,255,0.5),
-    0 0 24px rgba(255,122,24,0.25);
+    0 0 10px rgba(0, 225, 255, 0.7),
+    0 0 25px rgba(0, 225, 255, 0.4),
+    0 0 45px rgba(255, 122, 24, 0.25),
+    inset 0 0 10px rgba(0, 225, 255, 0.35);
 
-  transition: all 0.25s ease;
+  transition: all 0.2s ease;
 }
 
-/* Icon scaling */
+/* ================= ICON (NO TEXT ANYMORE) ================= */
 #dt-genie-send svg {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
+
+  fill: none;
+  stroke: #00E1FF;
+  stroke-width: 2.2;
+
+  filter:
+    drop-shadow(0 0 6px #00E1FF)
+    drop-shadow(0 0 12px #FF7A18);
+
   z-index: 2;
+  transition: all 0.2s ease;
 }
 
-/* Animated neon pulse layer */
+/* ================= ENERGY WAVE GLOW ================= */
 #dt-genie-send::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -2px;
   border-radius: 50%;
-  background: linear-gradient(120deg, var(--neon-blue), var(--neon-orange));
-  opacity: 0.15;
-  filter: blur(8px);
-  animation: neonPulse 2.5s infinite ease-in-out;
+
+  background: conic-gradient(
+    from 0deg,
+    #00E1FF,
+    #FF7A18,
+    #00E1FF
+  );
+
+  filter: blur(10px);
+  opacity: 0.6;
+
+  animation: neonSpin 3s linear infinite;
 }
 
-/* Hover = energy boost */
+/* ================= INNER CORE PULSE ================= */
+#dt-genie-send::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+
+  background: radial-gradient(circle,
+    rgba(0, 225, 255, 0.25),
+    transparent 70%
+  );
+
+  animation: corePulse 2s ease-in-out infinite;
+}
+
+/* ================= HOVER STATE ================= */
 #dt-genie-send:hover:not(:disabled) {
-  transform: scale(1.12);
-  border-color: var(--neon-orange);
+  transform: scale(1.15);
 
   box-shadow:
-    inset 0 0 12px rgba(255,122,24,0.35),
-    0 0 20px rgba(0,225,255,0.8),
-    0 0 40px rgba(255,122,24,0.6);
+    0 0 18px rgba(0, 225, 255, 0.9),
+    0 0 35px rgba(0, 225, 255, 0.6),
+    0 0 70px rgba(255, 122, 24, 0.5),
+    inset 0 0 14px rgba(0, 225, 255, 0.4);
 }
 
-/* Click feedback */
+/* icon boost on hover */
+#dt-genie-send:hover svg {
+  stroke: #FF7A18;
+  filter:
+    drop-shadow(0 0 8px #FF7A18)
+    drop-shadow(0 0 16px #00E1FF);
+}
+
+/* ================= CLICK FEEDBACK ================= */
 #dt-genie-send:active:not(:disabled) {
   transform: scale(0.92);
+
   box-shadow:
-    inset 0 0 14px rgba(0,225,255,0.6),
-    0 0 10px rgba(0,225,255,0.4);
+    0 0 8px rgba(0, 225, 255, 0.6),
+    inset 0 0 20px rgba(0, 225, 255, 0.5);
 }
 
-/* Disabled */
+/* ================= DISABLED ================= */
 #dt-genie-send:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
-  box-shadow: none;
+  filter: grayscale(1);
 }
 
-/* Neon breathing animation */
-@keyframes neonPulse {
+/* ================= ANIMATIONS ================= */
+@keyframes neonSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes corePulse {
   0%, 100% {
-    opacity: 0.15;
+    opacity: 0.4;
     transform: scale(1);
   }
   50% {
-    opacity: 0.35;
+    opacity: 0.8;
     transform: scale(1.1);
   }
 }
