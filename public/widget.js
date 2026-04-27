@@ -242,20 +242,26 @@ function togglePanel(force) {
       setTimeout(() => {
         hideTyping();
 
-        const introText = sessionData.lastUserIntent
-          ? "Welcome back — ready to scale harder?"
-          : "Welcome to NeonVision";
+const introText = sessionData.lastUserIntent
+  ? "Welcome back — your growth system is still evolving inside NeonVision."
+  : "NeonVision is now active in your business growth layer.";
 
-        addMessage(
-          'assistant',
+addMessage(
+  'assistant',
 `${introText}
 
-I build AI-powered growth systems for businesses.
+Digital Transition Marketing (DTM) builds AI-powered growth engines — not generic advice, not theory.
 
-⚡ What do you want to improve right now?`
-        );
+We engineer 14 AI systems across marketing, automation, search, ads, and predictive growth.
 
-        renderQuickActions();
+⚡ What do you want to improve today?
+
+• Generate qualified leads (AI Lead Systems)
+• Fix underperforming ads (AI Performance + Ad Warfare)
+• Automate operations (AI Agents & Workflows)
+• Dominate search visibility (Voice + GEO / AI SEO)
+• Scale faster with lower cost (Predictive Growth Systems)`
+);
 
       }, 650);
     }
