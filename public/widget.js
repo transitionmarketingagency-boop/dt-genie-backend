@@ -121,10 +121,10 @@ function renderQuickActions() {
   wrapper.className = 'dt-quick-actions';
 
   const actions = [
-    "Fix my ads",
-    "Get more leads",
-    "Automate my business",
-    "Book a call"
+    "🚀 Fix my ads",
+    "🎯 Get more leads",
+    "⚙️ Automate my business",
+    "📞 Book a strategy call"
   ];
 
   actions.forEach(text => {
@@ -134,7 +134,7 @@ function renderQuickActions() {
 
     btn.onclick = () => {
       sendMessage(text);
-      wrapper.remove(); // remove after click
+      wrapper.remove();
     };
 
     wrapper.appendChild(btn);
@@ -142,15 +142,14 @@ function renderQuickActions() {
 
   container.appendChild(wrapper);
 
-requestAnimationFrame(() => {
-  const last = container.lastElementChild;
-  if (last) {
-    last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-});
-
+  // 🔥 IMPORTANT FIX: ensure visibility AFTER render
+  requestAnimationFrame(() => {
+    wrapper.scrollIntoView({
+      behavior: 'smooth',
+      block: 'end'
+    });
+  });
 }
-
 
 
 function showTyping() {
@@ -252,20 +251,16 @@ const introText = sessionData.lastUserIntent
   ? "Welcome back — your growth system is still evolving inside NeonVision."
   : "NeonVision is now active in your business growth layer.";
 
+
 addMessage(
   'assistant',
 `${introText}
 
-DTM builds AI-powered growth systems — not advice, not templates.
+I’m NeonVision — your AI growth system by Digital Transition Marketing.
 
-We help businesses:
-• Generate qualified leads
-• Fix underperforming ads
-• Automate operations
-• Dominate search visibility (Voice + GEO / AI SEO)
-• Scale faster with AI systems
+I help you get more leads, better ads, and automated growth.
 
-⚡ What do you want to improve today?`
+⚡ Tell me what you want to fix — or pick an option below.`
 );
 
       }, 650);

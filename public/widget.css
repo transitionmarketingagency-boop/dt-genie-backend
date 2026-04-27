@@ -463,6 +463,9 @@
   margin-top: 6px;
   align-self: flex-start;
   opacity: 1;
+  padding: 4px 0;
+  position: relative;
+  z-index: 5;
 }
 
 .dt-quick-btn {
