@@ -246,9 +246,7 @@ function togglePanel(force) {
     panel.classList.add('open');
 
     // ✅ ONLY RUN ON FIRST OPEN (SAFE + CLEAN)
-const isFirstLoad = !sessionData.introShown;
-sessionData.introShown = true;
-saveSession();
+const isFirstLoad = container.children.length === 0;
 
     if (isFirstLoad) {
       showTyping();
