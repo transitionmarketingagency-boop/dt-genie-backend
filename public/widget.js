@@ -64,7 +64,17 @@
           <div id="dt-genie-input-container">
             <div id="dt-genie-input-wrapper">
               <textarea id="dt-genie-input" placeholder="Type your message..."></textarea>
-              <button id="dt-genie-send">Send</button>
+<button id="dt-genie-send" aria-label="Send message">
+  <svg viewBox="0 0 24 24" fill="none">
+    <path
+      d="M3 12L21 3L13 21L11 13L3 12Z"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linejoin="round"
+    />
+  </svg>
+</button>
+
             </div>
           </div>
         </div>

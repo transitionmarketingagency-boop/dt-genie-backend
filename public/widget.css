@@ -350,21 +350,22 @@
 
 
 
-/* ================= ULTRA NEON SEND BUTTON (V2) ================= */
+
+/* ================= ULTRA CLEAN NEON SEND BUTTON (V4 SHARP FUTURE UI) ================= */
 
 #dt-genie-send {
-  width: 50px;
-  height: 50px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
 
-  /* 🔥 MORE VIBRANT CORE */
-  background: radial-gradient(circle at 30% 30%,
-    rgba(0, 225, 255, 0.35),
-    rgba(255, 122, 24, 0.25),
-    rgba(10, 10, 20, 0.9)
+  /* 🔥 HIGH CONTRAST CORE (NO BLUR LOOK) */
+  background: linear-gradient(135deg,
+    #00E1FF 0%,
+    #009DFF 45%,
+    #FF7A18 100%
   );
 
-  border: 1px solid rgba(0, 225, 255, 0.7);
+  border: 1px solid rgba(0, 225, 255, 0.95);
 
   display: flex;
   align-items: center;
@@ -372,96 +373,60 @@
 
   cursor: pointer;
   position: relative;
-  overflow: hidden;
 
-  /* 🔥 STRONGER NEON DEPTH */
+  /* 🔥 CLEAN SHARP GLOW (NO FOG) */
   box-shadow:
-    0 0 10px rgba(0, 225, 255, 0.7),
-    0 0 25px rgba(0, 225, 255, 0.4),
-    0 0 45px rgba(255, 122, 24, 0.25),
-    inset 0 0 10px rgba(0, 225, 255, 0.35);
+    0 0 8px rgba(0, 225, 255, 0.9),
+    0 0 14px rgba(255, 122, 24, 0.6);
 
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
-/* ================= ICON (NO TEXT ANYMORE) ================= */
+/* ================= ICON (CRISP FUTURISTIC ARROW) ================= */
 #dt-genie-send svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 
+  stroke: #ffffff;
+  stroke-width: 2.6;
   fill: none;
-  stroke: #00E1FF;
-  stroke-width: 2.2;
 
+  /* 🔥 HARD NEON EDGE (NO BLUR GLOW) */
   filter:
-    drop-shadow(0 0 6px #00E1FF)
-    drop-shadow(0 0 12px #FF7A18);
+    drop-shadow(0 0 3px #00E1FF)
+    drop-shadow(0 0 5px #FF7A18);
 
-  z-index: 2;
-  transition: all 0.2s ease;
-}
-
-/* ================= ENERGY WAVE GLOW ================= */
-#dt-genie-send::before {
-  content: "";
-  position: absolute;
-  inset: -2px;
-  border-radius: 50%;
-
-  background: conic-gradient(
-    from 0deg,
-    #00E1FF,
-    #FF7A18,
-    #00E1FF
-  );
-
-  filter: blur(10px);
-  opacity: 0.6;
-
-  animation: neonSpin 3s linear infinite;
-}
-
-/* ================= INNER CORE PULSE ================= */
-#dt-genie-send::after {
-  content: "";
-  position: absolute;
-  inset: 6px;
-  border-radius: 50%;
-
-  background: radial-gradient(circle,
-    rgba(0, 225, 255, 0.25),
-    transparent 70%
-  );
-
-  animation: corePulse 2s ease-in-out infinite;
+  transition: all 0.18s ease;
 }
 
 /* ================= HOVER STATE ================= */
 #dt-genie-send:hover:not(:disabled) {
-  transform: scale(1.15);
+  transform: scale(1.10);
+
+  background: linear-gradient(135deg,
+    #00F0FF 0%,
+    #00A3FF 40%,
+    #FF5E00 100%
+  );
 
   box-shadow:
-    0 0 18px rgba(0, 225, 255, 0.9),
-    0 0 35px rgba(0, 225, 255, 0.6),
-    0 0 70px rgba(255, 122, 24, 0.5),
-    inset 0 0 14px rgba(0, 225, 255, 0.4);
+    0 0 12px rgba(0, 225, 255, 1),
+    0 0 22px rgba(255, 122, 24, 0.9);
 }
 
-/* icon boost on hover */
+/* icon shift */
 #dt-genie-send:hover svg {
   stroke: #FF7A18;
   filter:
-    drop-shadow(0 0 8px #FF7A18)
-    drop-shadow(0 0 16px #00E1FF);
+    drop-shadow(0 0 5px #FF7A18)
+    drop-shadow(0 0 8px #00E1FF);
 }
 
 /* ================= CLICK FEEDBACK ================= */
 #dt-genie-send:active:not(:disabled) {
   transform: scale(0.92);
-
   box-shadow:
-    0 0 8px rgba(0, 225, 255, 0.6),
-    inset 0 0 20px rgba(0, 225, 255, 0.5);
+    0 0 6px rgba(0, 225, 255, 0.7);
 }
 
 /* ================= DISABLED ================= */
@@ -471,26 +436,8 @@
   filter: grayscale(1);
 }
 
-/* ================= ANIMATIONS ================= */
-@keyframes neonSpin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes corePulse {
-  0%, 100% {
-    opacity: 0.4;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.1);
-  }
-}
+/* ================= NO OVERLAYS / NO BLUR LAYERS ================= */
+/* intentionally removed ::before and ::after for sharp UI */
 
 
 /* Mobile */
