@@ -158,6 +158,7 @@ if (!container) return;
   });
 }
 
+
 function showTyping() {
   const container = document.getElementById('dt-genie-messages');
   if (!container) return;
@@ -172,12 +173,23 @@ function showTyping() {
   const typing = document.createElement('div');
   typing.className = 'dt-typing';
 
-  // (NO dots — your CSS handles visuals now)
+  // ✅ REQUIRED: 3 neon dots
+  for (let i = 0; i < 3; i++) {
+    const dot = document.createElement('span');
+    dot.className = 'dt-typing-dot';
+    typing.appendChild(dot);
+  }
 
   bubble.appendChild(typing);
   wrapper.appendChild(bubble);
   container.appendChild(wrapper);
+
+  // optional smooth scroll
+  requestAnimationFrame(() => {
+    container.scrollTop = container.scrollHeight;
+  });
 }
+
 
   function hideTyping() {
     const el = document.getElementById('dt-genie-typing');
