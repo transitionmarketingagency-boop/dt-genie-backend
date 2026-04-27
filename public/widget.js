@@ -116,6 +116,10 @@ function addMessage(role, content) {
 
 function renderQuickActions() {
   const container = document.getElementById('dt-genie-messages');
+  if (!container) return;
+
+  // prevent duplicates
+  if (container.querySelector('.dt-quick-actions')) return;
 
   const wrapper = document.createElement('div');
   wrapper.className = 'dt-quick-actions';
@@ -133,22 +137,25 @@ function renderQuickActions() {
     btn.innerText = a.text;
 
     btn.onclick = () => sendMessage(a.value);
+
     wrapper.appendChild(btn);
   });
 
-  // 🔥 CRITICAL FIX: wrap inside message block
   const block = document.createElement('div');
   block.className = 'dt-message assistant';
-  block.appendChild(wrapper);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'dt-message-bubble';
+
+  bubble.appendChild(wrapper);
+  block.appendChild(bubble);
 
   container.appendChild(block);
 
-  // force visibility after paint
   requestAnimationFrame(() => {
     container.scrollTop = container.scrollHeight;
   });
 }
-
 
 function showTyping() {
   const container = document.getElementById('dt-genie-messages');
@@ -237,46 +244,35 @@ function togglePanel(force) {
   if (isOpen) {
     panel.classList.add('open');
 
-setTimeout(() => {
-  const container = document.getElementById('dt-genie-messages');
-
-  // if empty OR no quick actions exist → force render
-  if (
-    container.children.length === 0 ||
-    !container.querySelector('.dt-quick-actions')
-  ) {
-    renderQuickActions();
-  }
-}, 500);
 
     // ✅ FIX: show intro based on EMPTY CHAT, not memory flag
-    if (container.children.length === 0) {
 
-      showTyping();
+if (container.children.length === 0) {
+  showTyping();
 
-      setTimeout(() => {
-        hideTyping();
+  setTimeout(() => {
+    hideTyping();
 
+    const introText = sessionData.lastUserIntent
+      ? "Welcome back. Ready to continue scaling?"
+      : "NeonVision is active.";
 
-const introText = sessionData.lastUserIntent
-  ? "Welcome back. Ready to continue scaling?"
-  : "NeonVision is active.";
-
-addMessage(
-  'assistant',
+    addMessage(
+      'assistant',
 `${introText}
 
 DTM builds 14 AI growth systems for leads, ads, automation & search.
 
 ⚡ Pick an action below or just tell me your goal.`
-);
+    );
 
-// 🔥 CRITICAL: always render quick actions AFTER intro
-setTimeout(() => {
-  renderQuickActions();
-}, 150);
+    // ✅ SINGLE CONTROLLED RENDER (IMPORTANT)
+    requestAnimationFrame(() => {
+      renderQuickActions();
+    });
 
-    }
+  }, 650);
+}
 
   } else {
     panel.classList.remove('open');
