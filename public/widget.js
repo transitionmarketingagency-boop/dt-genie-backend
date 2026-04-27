@@ -162,19 +162,21 @@ function showTyping() {
   const container = document.getElementById('dt-genie-messages');
   if (!container) return;
 
-  const div = document.createElement('div');
-  div.id = 'dt-genie-typing';
-  div.className = 'dt-message assistant';
+  const wrapper = document.createElement('div');
+  wrapper.id = 'dt-genie-typing';
+  wrapper.className = 'dt-message assistant';
 
-  div.innerHTML = `
-    <div class="dt-typing">
-      <span class="dt-typing-dot"></span>
-      <span class="dt-typing-dot"></span>
-      <span class="dt-typing-dot"></span>
-    </div>
-  `;
+  const bubble = document.createElement('div');
+  bubble.className = 'dt-message-bubble';
 
-  container.appendChild(div);
+  const typing = document.createElement('div');
+  typing.className = 'dt-typing';
+
+  // (NO dots — your CSS handles visuals now)
+
+  bubble.appendChild(typing);
+  wrapper.appendChild(bubble);
+  container.appendChild(wrapper);
 }
 
   function hideTyping() {
