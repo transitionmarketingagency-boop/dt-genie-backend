@@ -215,19 +215,48 @@
   transform: rotate(90deg);
 }
 
-/* Messages */
+
 #dt-genie-messages {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+
   padding: 18px;
-  display:flex;
-  flex-direction:column;
-  gap:14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #00E1FF rgba(255,255,255,0.05);
 }
-#dt-genie-messages::-webkit-scrollbar { display: none; }
+
+/* Chrome, Edge, Safari */
+#dt-genie-messages::-webkit-scrollbar {
+  width: 6px;
+}
+
+#dt-genie-messages::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+}
+
+#dt-genie-messages::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #00E1FF, #7A5CFF);
+  border-radius: 10px;
+  box-shadow:
+    0 0 8px rgba(0, 225, 255, 0.6),
+    0 0 16px rgba(122, 92, 255, 0.4);
+  transition: all 0.2s ease;
+}
+
+#dt-genie-messages::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #00E1FF, #FF7A18);
+  box-shadow:
+    0 0 12px rgba(0, 225, 255, 0.9),
+    0 0 24px rgba(255, 122, 24, 0.6);
+}
+
 
 .dt-message { display:flex; gap:10px; animation: fadeIn .28s ease-out; }
 @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
