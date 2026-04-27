@@ -195,20 +195,18 @@ function showTyping() {
       panel.classList.add('open');
 
 
-if (!sessionData.introShown) {
+if (!sessionData.introShown && messageHistory.length === 0) {
   addMessage(
     'assistant',
 `👋 Welcome to NeonVision
 
 I help businesses grow using AI-powered marketing systems.
 
-You can ask me things like:
-• "My ads aren’t converting"
-• "I want more leads"
-• "How do I rank on ChatGPT or Google?"
-• "I need automation for my business"
-
-Tell me what you're trying to improve — I’ll map out exactly what you need.`
+⚡ Choose what you want to improve:
+• Fix my ads
+• Get more leads
+• Automate my business
+• Book a strategy call`
   );
 
   sessionData.introShown = true;
