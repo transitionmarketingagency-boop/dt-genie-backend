@@ -216,15 +216,19 @@
 }
 
 
+
 #dt-genie-messages {
   flex: 1;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
 
   padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+
+  /* 🔥 CRITICAL FIXES */
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
 
   /* Firefox */
   scrollbar-width: thin;
