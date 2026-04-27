@@ -160,13 +160,21 @@ if (!container) return;
 
 function showTyping() {
   const container = document.getElementById('dt-genie-messages');
+  if (!container) return;
+
   const div = document.createElement('div');
   div.id = 'dt-genie-typing';
-  div.innerText = 'Typing...';
+  div.className = 'dt-message assistant';
+
+  div.innerHTML = `
+    <div class="dt-typing">
+      <span class="dt-typing-dot"></span>
+      <span class="dt-typing-dot"></span>
+      <span class="dt-typing-dot"></span>
+    </div>
+  `;
 
   container.appendChild(div);
-
-  // ❌ Removed forced scroll
 }
 
   function hideTyping() {
