@@ -174,12 +174,22 @@ function removeIdentitySpam(text: string): string {
   ).trim();
 }
 
+
 function enforceDTMStyle(text: string): string {
   if (!text) return "";
 
   return text
+    // normalize spacing
     .replace(/\s+/g, " ")
     .replace(/\.\s*\./g, ".")
+
+    // remove conversational tone leftovers
+    .replace(/\b(As an AI|As a language model)\b/gi, "")
+    .replace(/\bI think\b/gi, "")
+    .replace(/\bI believe\b/gi, "")
+    .replace(/\bIn my opinion\b/gi, "")
+
+    // final cleanup
     .trim()
     .replace(/^./, (c) => c.toUpperCase());
 }
@@ -268,6 +278,32 @@ function removeGenericPhrases(text: string): string {
   return cleaned.trim();
 }
 
+
+function toneSanitizer(text: string): string {
+  if (!text) return "";
+
+  return text
+    // remove strategist voice
+    .replace(/\bI recommend\b/gi, "")
+    .replace(/\bI suggest\b/gi, "")
+    .replace(/\bwe recommend\b/gi, "")
+    .replace(/\bbased on your (situation|case|context)\b/gi, "")
+    .replace(/\bhere’s how I’d\b/gi, "")
+    .replace(/\bI’d approach this\b/gi, "")
+
+    // remove consulting tone
+    .replace(/\blet me know\b[^.]*\./gi, "")
+    .replace(/\bfeel free to\b[^.]*\./gi, "")
+    .replace(/\byou might want to\b/gi, "")
+    .replace(/\bwe can\b/gi, "you can")
+
+    // remove soft agency framing
+    .replace(/\bour team\b/gi, "the system")
+    .replace(/\bwe specialize\b/gi, "it specializes")
+    .replace(/\bwe help\b/gi, "it helps")
+
+    .trim();
+}
 
 
 // ===================== PROMPT BUILDER ===================== //
@@ -382,19 +418,26 @@ ${message}
 
 RESPONSE RULES
 
-- Be clear, direct, and practical
-- No fluff, no hype language
-- No fake frameworks
-- No unnecessary complexity
-- Keep it natural and human
+- Be clear, direct, and business-neutral
+- No personality, no consulting tone, no strategist framing
+- No motivational or advisory language
+- No conversational fillers or soft transitions
+- Avoid implying opinion ("I think", "I recommend", "I suggest")
+- Output should feel like a system response, not a human consultant
 
 RESPONSE STYLE (VERY IMPORTANT)
 
-- Speak like a real human strategist, not a template
-- DO NOT follow rigid formats or numbered structures unless necessary
-- Avoid robotic phrasing like:
-  "1. Direct answer 2. Explanation 3. Next step"
-- Avoid generic frameworks like “3 steps”, “structured approach”, or “key areas”
+- Speak in a neutral business assistant tone
+- Do NOT simulate personality (no strategist voice, no advisor persona)
+- Do NOT use motivational, sales, or consulting language
+- Avoid phrases like:
+  "here’s how I’d approach this"
+  "based on your situation"
+  "I recommend"
+  "we suggest"
+- Do NOT structure responses like frameworks or consulting outputs
+- Do NOT add soft conversational fillers
+- Be direct, factual, and minimal
 - Give specific, situation-based advice instead of templates
 
 
@@ -912,6 +955,9 @@ response = removePricing(response);
 
 // 4. Repair structure
 response = repairResponse(response);
+
+// 4.1 TONE HARD SANITIZATION (NEW CRITICAL LAYER)
+response = toneSanitizer(response);
 
 // 5. ENFORCE BRAND STYLE
 response = enforceDTMStyle(response);
