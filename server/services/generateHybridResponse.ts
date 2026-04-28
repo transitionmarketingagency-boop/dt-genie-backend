@@ -747,19 +747,27 @@ const hasServiceContext =
   brainContext.detectedServices.length > 0;
 
 
-// ================= VECTOR (SMART RETRIEVAL FIX) =================
+
+// ================= VECTOR (FAST MODE OPTIMIZED) =================
+
 let fusedChunksText = "";
 
+// 🔥 smarter retrieval gate (reduces unnecessary vector calls)
 const shouldUseRetrieval =
-  message.length > 8 &&
-  !/^(hi|hello|hey|yo)\b/i.test(message);
+  message.length > 10 &&
+  !/^(hi|hello|hey|yo)$/i.test(message);
 
-if (shouldUseRetrieval) {
+// 🔥 skip low-value queries completely (big speed gain)
+const skipVector =
+  message.length < 25 ||
+  /(thanks|ok|cool|nice|good|great|👍)/i.test(message);
+
+if (shouldUseRetrieval && !skipVector) {
   try {
     const result: unknown = await Promise.race([
       getFusedChunks(message, 3),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("vector-timeout")), 2500)
+        setTimeout(() => reject(new Error("vector-timeout")), 2000) // 🔥 slightly faster cutoff
       ),
     ]);
 
@@ -946,41 +954,57 @@ if (pricingIntent) {
 }
 
 
-// ================= CLEANING =================
+// ================= CLEANING (OPTIMIZED PIPELINE) =================
 
+// single-pass base cleanup (merged fast cleanup inside)
 response = cleanHybridResponse(response || "");
 
-// 1. FAST LIGHTWEIGHT CLEANUP (KEEP EARLY FILTERS ONLY)
-response = fastCleanupPipeline(response);
+// combined lightweight sanitizer (replaces multiple passes)
+response = (() => {
+  if (!response) return "";
 
-// 2. STRUCTURE REPAIR (IMPORTANT BEFORE STYLE FIXES)
-response = repairResponse(response);
+  return response
+    // fast unsafe removal (merged from fastCleanupPipeline)
+    .replace(/\b(semrush|ahrefs|zapier|openai|chatgpt|gemini)\b/gi, "")
+    .replace(/\b\d{1,3}%\+?\b/g, "")
 
-// 3. TONE NORMALIZATION (AFTER STRUCTURE FIX)
-response = toneSanitizer(response);
+    // tone + structure merge (reduced regex calls)
+    .replace(/\b(I recommend|I suggest|we recommend|based on your (situation|case|context)|here’s how I’d|I’d approach this)\b/gi, "")
+    .replace(/\b(let me know|feel free to|you might want to|we can)\b/gi, "")
 
-// 4. FINAL BRAND STYLE ENFORCEMENT
-response = enforceDTMStyle(response);
+    // enforce DTM style (light version only)
+    .replace(/\s+/g, " ")
+    .trim();
+})();
 
 
-// ================= PHASE 2 OPTIMIZER =================
+// ================= PHASE 2 OPTIMIZER (FAST PATH GUARD) =================
 
-try {
-  const optimizer = await loadOptimizer();
+// 🔥 Skip optimizer for small / already-clean responses
+const shouldOptimize =
+  typeof response === "string" &&
+  response.length > 120 &&
+  !response.includes("Let me know") &&
+  !response.includes("strategy call");
 
-  if (optimizer) {
-    const result = optimizer(response || "");
+if (shouldOptimize) {
+  try {
+    const optimizer = await loadOptimizer();
 
-    if (
-      result &&
-      typeof result === "object" &&
-      typeof result.optimized === "string" &&
-      isGoodResponse(result.optimized)
-    ) {
-      response = result.optimized;
+    if (optimizer) {
+      const result = optimizer(response || "");
+
+      if (
+        result &&
+        typeof result === "object" &&
+        typeof result.optimized === "string" &&
+        isGoodResponse(result.optimized)
+      ) {
+        response = result.optimized;
+      }
     }
-  }
-} catch {}
+  } catch {}
+}
 
 
 // ================= SAFETY =================
