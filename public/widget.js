@@ -24,6 +24,8 @@
   let messageHistory = [];
   let isOpen = false;
   let isProcessing = false;
+let userIsScrolling = false;
+let scrollTimeout;
 
   /* --------------------------------------------------- */
   function createWidget() {
@@ -99,18 +101,19 @@ function addMessage(role, content) {
   div.appendChild(bubble);
   container.appendChild(div);
 
-  requestAnimationFrame(() => {
-    if (role === 'assistant') {
-      // ✅ Show full response from top
-      div.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
-      });
-    } else {
-      // ✅ Ensure user sees their own message immediately
-      container.scrollTop = container.scrollHeight;
-    }
-  });
+
+requestAnimationFrame(() => {
+  const container = document.getElementById('dt-genie-messages');
+  if (!container) return;
+
+  const isNearBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+
+  if (!userIsScrolling && isNearBottom) {
+    container.scrollTop = container.scrollHeight;
+  }
+});
+
 }
 
 
@@ -154,7 +157,12 @@ if (!container) return;
   container.appendChild(block);
 
   requestAnimationFrame(() => {
+if (!userIsScrolling) {
+  const container = document.getElementById('dt-genie-messages');
+  if (container) {
     container.scrollTop = container.scrollHeight;
+  }
+}
   });
 }
 
@@ -186,7 +194,12 @@ function showTyping() {
 
   // optional smooth scroll
   requestAnimationFrame(() => {
+if (!userIsScrolling) {
+  requestAnimationFrame(() => {
     container.scrollTop = container.scrollHeight;
+  });
+}
+
   });
 }
 
@@ -298,34 +311,54 @@ DTM builds 14 AI growth systems for leads, ads, automation, AI search, and busin
   }
 }
 
-  function init() {
-    createWidget();
 
-    const input = document.getElementById('dt-genie-input');
-    const sendBtn = document.getElementById('dt-genie-send');
+function attachScrollListener() {
+  const container = document.getElementById('dt-genie-messages');
+  if (!container) return;
 
-    function sendAndClear() {
-      const msg = input.value;
-      sendMessage(msg);
-      input.value = '';
+  container.addEventListener('wheel', () => {
+    userIsScrolling = true;
+
+    clearTimeout(scrollTimeout);
+    scrollTimeout = setTimeout(() => {
+      userIsScrolling = false;
+    }, 1500);
+  }, { passive: true });
+}
+
+
+function init() {
+  createWidget();
+
+  const input = document.getElementById('dt-genie-input');
+  const sendBtn = document.getElementById('dt-genie-send');
+
+  function sendAndClear() {
+    const msg = input.value;
+    sendMessage(msg);
+    input.value = '';
+  }
+
+  document.getElementById('dt-genie-button').onclick = () => togglePanel();
+  document.getElementById('dt-genie-close').onclick = () => togglePanel(false);
+  sendBtn.onclick = sendAndClear;
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendAndClear();
     }
+  });
 
-    document.getElementById('dt-genie-button').onclick = () => togglePanel();
-    document.getElementById('dt-genie-close').onclick = () => togglePanel(false);
-    sendBtn.onclick = sendAndClear;
+  // ✅ CRITICAL: attach scroll safety AFTER DOM exists
+  attachScrollListener();
+}
 
-    input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendAndClear();
-      }
-    });
-  }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 
 })();
