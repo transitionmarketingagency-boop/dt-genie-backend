@@ -245,29 +245,41 @@ function detectPricingIntent(message: string): boolean {
 function removeGenericPhrases(text: string): string {
   if (!text) return "";
 
-  const garbage = [
-    "tell me your goals",
-    "share your challenges",
-    "let me know if you'd like",
-    "we recommend scheduling",
-    "discovery session",
-    "could you clarify",
-    "it seems like your message",
-    "how can i assist you",
-    "feel free to share",
-    "happy to explore",
-  ];
-
   let cleaned = text;
 
-  garbage.forEach(p => {
-    const regex = new RegExp(p, "gi");
+  // 🔥 HARD STRIP CONSULTANT LANGUAGE
+  const patterns = [
+    /\btypically\b/gi,
+    /\bgenerally\b/gi,
+    /\borganizations?\b/gi,
+    /\bbusinesses often\b/gi,
+    /\bit depends\b/gi,
+    /\bin many cases\b/gi,
+    /\bcommon approach\b/gi,
+    /\bbest practice(s)?\b/gi,
+    /\bindustry standard(s)?\b/gi,
+    /\bfeasibility depends\b/gi,
+    /\bexecution requires\b/gi,
+    /\bphased approach\b/gi,
+  ];
+
+  patterns.forEach((regex) => {
     cleaned = cleaned.replace(regex, "");
   });
 
+  // 🔥 REMOVE WEAK OPENINGS
+  cleaned = cleaned.replace(
+    /^(to (help|improve|achieve)[^.]*\.)/gi,
+    ""
+  );
+
+  cleaned = cleaned.replace(
+    /^(this (means|involves)[^.]*\.)/gi,
+    ""
+  );
+
   return cleaned.trim();
 }
-
 
 
 // ===================== PROMPT BUILDER ===================== //
@@ -295,7 +307,42 @@ priorityInstruction?: string;
 
   const executionMode = brainContext?.executionMode ?? "exploration";
 
-  return `
+const HARD_RULES = `
+CRITICAL TONE ENFORCEMENT:
+
+- NO generic consulting language
+- NO corporate tone
+- NO passive phring
+
+STRICTLY FORBIDDEN WORDS / PATTERNS:
+- typically
+- generally
+- organizations
+- businesses often
+- it depends
+- in many cases
+- common approach
+- best practice
+- industry standard
+- feasibility depends
+- execution requires
+- phased approach
+
+RESPONSE STYLE (MANDATORY):
+
+- Be direct
+- Be decisive
+- Be specific to the user's situation
+- Give applied advice, not explanations
+- No vague frameworks
+- No theory-first answers
+
+If the response sounds like a consultant → REWRITE IT.
+`;
+
+return `
+${HARD_RULES}
+
 You are Neon Vision, the AI system of Digital Transition Marketing.
 
 - Neon Vision = the AI
