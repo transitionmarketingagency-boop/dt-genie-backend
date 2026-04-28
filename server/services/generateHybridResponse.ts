@@ -477,29 +477,51 @@ function repairResponse(text: string): string {
 
   if (!fixed) return "";
 
-  // Normalize spacing
+  // =============================
+  // 1. NORMALIZE SPACING
+  // =============================
   fixed = fixed.replace(/\s+/g, " ").trim();
 
-  // Ensure sentence completion ONLY if needed
-// ❌ detect broken endings
-if (
-  fixed.length < 80 ||
-  /(:|-|\b(e\.g|for example)\b)$/i.test(fixed)
-) {
-  fixed += " Let me know if you want me to break this down step-by-step.";
-}
+  // =============================
+  // 2. DETECT CUT-OFF RESPONSES
+  // =============================
+  const isCutOff =
+    /(\b(and|or|to|for|with|of|the|a|an)\s*)$/i.test(fixed) || // ends mid-phrase
+    /(\s[A-Za-z]{1,2})$/.test(fixed) || // broken word tail
+    /[:\-]$/.test(fixed); // ends with ":" or "-"
 
-// ensure proper ending
-if (!/[.?!]$/.test(fixed)) {
-  fixed += ".";
-}
-
-  // ❌ FIX: only add filler if response is TOO short AND not CTA
-  const isCTA = /(call|book|schedule|get started)/i.test(fixed);
-
-  if (fixed.length < 70 && !isCTA) {
-    fixed += " Let me know if you want me to go deeper on this.";
+  if (isCutOff) {
+    fixed += " Let me know if you want the full breakdown.";
   }
+
+  // =============================
+  // 3. ENSURE PROPER ENDING
+  // =============================
+  if (!/[.?!]$/.test(fixed)) {
+    fixed += ".";
+  }
+
+  // =============================
+  // 4. SMART SHORT RESPONSE FIX
+  // =============================
+  const isCTA = /(call|book|schedule|get started|strategy call)/i.test(fixed);
+
+  const isTooShort =
+    fixed.length < 80 &&
+    !isCTA &&
+    !fixed.toLowerCase().includes("let me know");
+
+  if (isTooShort) {
+    fixed += " Let me know if you want a more detailed breakdown.";
+  }
+
+  // =============================
+  // 5. FINAL SAFETY CLEANUP
+  // =============================
+  fixed = fixed
+    .replace(/\s{2,}/g, " ")
+    .replace(/\.\s*\./g, ".")
+    .trim();
 
   return fixed;
 }
