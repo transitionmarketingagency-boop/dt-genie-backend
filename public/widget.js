@@ -126,12 +126,15 @@ function addMessage(role, content) {
 
 
 function renderQuickActions() {
-const container = document.getElementById('dt-genie-messages');
-if (!container) return;
+  const container = document.getElementById('dt-genie-messages');
   if (!container) return;
 
   // prevent duplicates
   if (container.querySelector('.dt-quick-actions')) return;
+
+  // ✅ capture BEFORE DOM change
+  const wasNearBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight < 200;
 
   const wrapper = document.createElement('div');
   wrapper.className = 'dt-quick-actions';
@@ -147,9 +150,7 @@ if (!container) return;
     const btn = document.createElement('button');
     btn.className = 'dt-quick-btn';
     btn.innerText = a.text;
-
     btn.onclick = () => sendMessage(a.value);
-
     wrapper.appendChild(btn);
   });
 
@@ -161,31 +162,23 @@ if (!container) return;
 
   bubble.appendChild(wrapper);
   block.appendChild(bubble);
-
   container.appendChild(block);
 
-const container = document.getElementById('dt-genie-messages');
-if (!container) return;
-
-// ✅ capture BEFORE DOM changes (this line MUST be before append in your function)
-const wasNearBottom =
-  container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-
-requestAnimationFrame(() => {
-  const container = document.getElementById('dt-genie-messages');
-  if (!container) return;
-
-  if (!userIsScrolling && wasNearBottom) {
-    container.scrollTop = container.scrollHeight;
-  }
-});
-
+  requestAnimationFrame(() => {
+    if (!userIsScrolling && wasNearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  });
 }
 
 
 function showTyping() {
   const container = document.getElementById('dt-genie-messages');
   if (!container) return;
+
+  // ✅ capture BEFORE DOM change
+  const wasNearBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight < 200;
 
   const wrapper = document.createElement('div');
   wrapper.id = 'dt-genie-typing';
@@ -197,7 +190,6 @@ function showTyping() {
   const typing = document.createElement('div');
   typing.className = 'dt-typing';
 
-  // ✅ REQUIRED: 3 neon dots
   for (let i = 0; i < 3; i++) {
     const dot = document.createElement('span');
     dot.className = 'dt-typing-dot';
@@ -208,19 +200,10 @@ function showTyping() {
   wrapper.appendChild(bubble);
   container.appendChild(wrapper);
 
-  // optional smooth scroll
-requestAnimationFrame(() => {
-  const container = document.getElementById('dt-genie-messages');
-  if (!container) return;
-
-  const wasNearBottom =
-    container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-
-  if (!userIsScrolling && wasNearBottom) {
-    container.scrollTop = container.scrollHeight;
-  }
-});
-
+  requestAnimationFrame(() => {
+    if (!userIsScrolling && wasNearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
   });
 }
 
