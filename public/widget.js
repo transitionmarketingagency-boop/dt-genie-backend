@@ -89,11 +89,12 @@ let scrollTimeout;
     localStorage.setItem('dtGenieSessionData', JSON.stringify(sessionData));
   }
 
+
 function addMessage(role, content) {
   const container = document.getElementById('dt-genie-messages');
   if (!container) return;
 
-  // ✅ CAPTURE position BEFORE DOM change (CRITICAL FIX)
+  // ✅ Capture position BEFORE DOM change
   const wasNearBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight < 200;
 
@@ -111,15 +112,23 @@ function addMessage(role, content) {
     const container = document.getElementById('dt-genie-messages');
     if (!container) return;
 
-    // 🔥 ALWAYS scroll for user messages
+    // ✅ ALWAYS scroll for user messages
     if (role === 'user') {
       container.scrollTop = container.scrollHeight;
       return;
     }
 
-    // 🔥 USE PREVIOUS POSITION (FIXED)
+    // ✅ SMART scroll for assistant messages
     if (!userIsScrolling && wasNearBottom) {
-      container.scrollTop = container.scrollHeight;
+      if (role === 'assistant') {
+        // 🔥 Scroll to START of AI message (FIXED)
+        div.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
     }
   });
 }
