@@ -106,6 +106,13 @@ requestAnimationFrame(() => {
   const container = document.getElementById('dt-genie-messages');
   if (!container) return;
 
+  // 🔥 ALWAYS scroll when USER sends message
+  if (role === 'user') {
+    container.scrollTop = container.scrollHeight;
+    return;
+  }
+
+  // 🔥 CONDITIONAL scroll for AI responses
   const isNearBottom =
     container.scrollHeight - container.scrollTop - container.clientHeight < 200;
 
@@ -113,6 +120,7 @@ requestAnimationFrame(() => {
     container.scrollTop = container.scrollHeight;
   }
 });
+
 
 }
 
