@@ -188,6 +188,8 @@ function enforceDTMStyle(text: string): string {
     .replace(/\bI think\b/gi, "")
     .replace(/\bI believe\b/gi, "")
     .replace(/\bIn my opinion\b/gi, "")
+// 🔥 REMOVE SYSTEM/AI EXCESS LANGUAGE
+.replace(/\b(system|infrastructure|technology layers)\b/gi, "")
 
     // final cleanup
     .trim()
@@ -632,6 +634,16 @@ cleaned = cleaned.replace(/\bwe’s\b/gi, "our");
 // 🔒 Cleanup spacing
 cleaned = cleaned.replace(/\s{2,}/g, " ").trim();
 
+// 🔥 HARD IDENTITY LOCK (NEW)
+cleaned = cleaned
+  .replace(/\bthe company\b/gi, "the system")
+  .replace(/\bthis company\b/gi, "the system")
+  .replace(/\bDTM\b/g, "the system")
+  .replace(/\bleverages\b/gi, "uses")
+  .replace(/\benables\b/gi, "supports")
+  .replace(/\bprovides\b/gi, "delivers");
+
+
 return cleaned;
 
 }
@@ -680,12 +692,11 @@ const strictBookingIntent =
 
 if (strictBookingIntent) {
   const response =
-    "You can book a strategy call directly using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
+    "You can book a strategy call using the \"Book a Strategy Call\" button on this page. That is the only booking method available.";
 
   await memoryService.addMessage(sessionId, "assistant", response);
   return response;
 }
-
 
 /**
  * FINAL ENTRY MODE (IMMUTABLE)
@@ -889,10 +900,6 @@ if (isHardFail) {
       "Hey — what are you trying to improve in your business right now?";
   }
 
-  else if (isBookingIntent) {
-    response =
-      "Got it — I can help you with that. Let’s take this into a quick call setup.";
-  }
 
   else {
     // ✅ ONLY ONE fallback (no rotation, no loops)
@@ -920,12 +927,13 @@ if (pricingIntent) {
     contextHint = "At a strategic level, ";
   }
 
-  const openers = [
-    `${contextHint}it depends on the scope and how advanced the system needs to be.`,
-    `${contextHint}pricing varies based on what you're trying to achieve and build.`,
-    `${contextHint}there isn’t a fixed number because every setup is different.`,
-    `${contextHint}it changes based on the depth of implementation required.`,
-  ];
+const openers = [
+  `${contextHint}this is handled through a scoped evaluation based on your requirements.`,
+  `${contextHint}the setup is defined after understanding your goals and current system.`,
+  `${contextHint}this is not fixed upfront and depends on implementation scope.`,
+  `${contextHint}final structure is determined once the use case is mapped.`,
+];
+
 
   const closers = [
     "Once I understand your setup, I can give you a precise breakdown.",
@@ -1100,6 +1108,9 @@ const alreadyHasCTA =
 /**
  * FINAL CTA GUARD (STRICT + CONFLICT-SAFE)
  */
+const isPricingQuery =
+  /(price|pricing|cost|budget|how much|fees|quote|charge)/i.test(message);
+
 const shouldAddCTA =
   typeof cta === "string" &&
   cta.trim().length > 0 &&
@@ -1107,9 +1118,10 @@ const shouldAddCTA =
   !isGreeting &&
   !isIncompleteResponse &&
   !alreadyHasCTA &&
-  safeResponse.length > 60 &&
-  leadScoreValue >= 0.75 &&
-  String(brainContext?.executionMode) === "execution";
+  safeResponse.length > 80 &&
+  leadScoreValue >= 0.78 &&
+  String(brainContext?.executionMode) === "execution" &&
+  !isPricingQuery;
 
 /* ================= APPLY CTA ================= */
 
