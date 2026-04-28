@@ -109,10 +109,11 @@ function removeForbiddenContent(text: string): string {
     .replace(/https?:\/\/\S+/gi, "")
 
     // ❌ remove tool/platform mentions
-    .replace(
-      /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify\s?apps?|jasper|perplexity|sprout\s?social|spark\s?toro|sparktoro|firecrawl|ad\s?creative(\.ai)?|synthesia|apollo|instantly|mailchimp|sendgrid|brevo|runway|pika|leonardo|elevenlabs|descript|riverside)\b/gi,
-      "AI systems"
-    )
+.replace(
+  /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify\s?apps?|jasper|perplexity|sprout\s?social|spark\s?toro|sparktoro|firecrawl|ad\s?creative(\.ai)?|synthesia|apollo|instantly|mailchimp|sendgrid|brevo|runway|pika|leonardo|elevenlabs|descript|riverside)\b/gi,
+  ""
+)
+
 
 // 🔧 FIX 2 — HARD BLOCK FAKE STATS
 .replace(/\b\d{1,3}%\s*(of\s*)?(clients?|users?)\b/gi, "")
@@ -173,6 +174,16 @@ function removeIdentitySpam(text: string): string {
   ).trim();
 }
 
+function enforceDTMStyle(text: string): string {
+  if (!text) return "";
+
+  return text
+    .replace(/\s+/g, " ")
+    .replace(/\.\s*\./g, ".")
+    .trim()
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
 
 function enforceBookingOnly(text: string): string {
   if (!text) return "";
@@ -229,6 +240,34 @@ function detectPricingIntent(message: string): boolean {
     /\bhow\s+much\b/.test(msg)
   );
 }
+
+
+function removeGenericPhrases(text: string): string {
+  if (!text) return "";
+
+  const garbage = [
+    "tell me your goals",
+    "share your challenges",
+    "let me know if you'd like",
+    "we recommend scheduling",
+    "discovery session",
+    "could you clarify",
+    "it seems like your message",
+    "how can i assist you",
+    "feel free to share",
+    "happy to explore",
+  ];
+
+  let cleaned = text;
+
+  garbage.forEach(p => {
+    const regex = new RegExp(p, "gi");
+    cleaned = cleaned.replace(regex, "");
+  });
+
+  return cleaned.trim();
+}
+
 
 
 // ===================== PROMPT BUILDER ===================== //
@@ -843,12 +882,17 @@ response = cleanHybridResponse(response || "");
 // 1. Remove system + tool leakage
 response = removeForbiddenContent(response);
 
-// 2. Remove pricing / monetary leaks
+// 2. REMOVE GENERIC GARBAGE
+response = removeGenericPhrases(response);
+
+// 3. Remove pricing / monetary leaks
 response = removePricing(response);
 
-
-// 3. Final grammar + flow fix
+// 4. Repair structure
 response = repairResponse(response);
+
+// 5. ENFORCE BRAND STYLE
+response = enforceDTMStyle(response);
 
 // ================= PHASE 2 OPTIMIZER =================
 
