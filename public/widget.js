@@ -107,7 +107,7 @@ requestAnimationFrame(() => {
   if (!container) return;
 
   const isNearBottom =
-    container.scrollHeight - container.scrollTop - container.clientHeight < 120;
+    container.scrollHeight - container.scrollTop - container.clientHeight < 200;
 
   if (!userIsScrolling && isNearBottom) {
     container.scrollTop = container.scrollHeight;
@@ -313,17 +313,31 @@ DTM builds 14 AI growth systems for leads, ads, automation, AI search, and busin
 
 
 function attachScrollListener() {
-  const container = document.getElementById('dt-genie-messages');
-  if (!container) return;
+  const tryAttach = () => {
+    const container = document.getElementById('dt-genie-messages');
+    if (!container) return false;
 
-  container.addEventListener('wheel', () => {
-    userIsScrolling = true;
+    container.addEventListener('wheel', () => {
+      userIsScrolling = true;
 
-    clearTimeout(scrollTimeout);
-    scrollTimeout = setTimeout(() => {
-      userIsScrolling = false;
-    }, 1500);
-  }, { passive: true });
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        userIsScrolling = false;
+      }, 1500);
+    }, { passive: true });
+
+    return true;
+  };
+
+  // try immediately
+  if (tryAttach()) return;
+
+  // retry until DOM exists (CRITICAL FIX)
+  const interval = setInterval(() => {
+    if (tryAttach()) {
+      clearInterval(interval);
+    }
+  }, 500);
 }
 
 
