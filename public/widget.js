@@ -91,6 +91,12 @@ let scrollTimeout;
 
 function addMessage(role, content) {
   const container = document.getElementById('dt-genie-messages');
+  if (!container) return;
+
+  // ✅ CAPTURE position BEFORE DOM change (CRITICAL FIX)
+  const wasNearBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+
   const div = document.createElement('div');
   div.className = `dt-message ${role}`;
 
@@ -101,27 +107,21 @@ function addMessage(role, content) {
   div.appendChild(bubble);
   container.appendChild(div);
 
+  requestAnimationFrame(() => {
+    const container = document.getElementById('dt-genie-messages');
+    if (!container) return;
 
-requestAnimationFrame(() => {
-  const container = document.getElementById('dt-genie-messages');
-  if (!container) return;
+    // 🔥 ALWAYS scroll for user messages
+    if (role === 'user') {
+      container.scrollTop = container.scrollHeight;
+      return;
+    }
 
-  // 🔥 ALWAYS scroll when USER sends message
-  if (role === 'user') {
-    container.scrollTop = container.scrollHeight;
-    return;
-  }
-
-  // 🔥 CONDITIONAL scroll for AI responses
-  const isNearBottom =
-    container.scrollHeight - container.scrollTop - container.clientHeight < 200;
-
-  if (!userIsScrolling && isNearBottom) {
-    container.scrollTop = container.scrollHeight;
-  }
-});
-
-
+    // 🔥 USE PREVIOUS POSITION (FIXED)
+    if (!userIsScrolling && wasNearBottom) {
+      container.scrollTop = container.scrollHeight;
+    }
+  });
 }
 
 
@@ -164,14 +164,22 @@ if (!container) return;
 
   container.appendChild(block);
 
-  requestAnimationFrame(() => {
-if (!userIsScrolling) {
+const container = document.getElementById('dt-genie-messages');
+if (!container) return;
+
+// ✅ capture BEFORE DOM changes (this line MUST be before append in your function)
+const wasNearBottom =
+  container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+
+requestAnimationFrame(() => {
   const container = document.getElementById('dt-genie-messages');
-  if (container) {
+  if (!container) return;
+
+  if (!userIsScrolling && wasNearBottom) {
     container.scrollTop = container.scrollHeight;
   }
-}
-  });
+});
+
 }
 
 
@@ -201,12 +209,17 @@ function showTyping() {
   container.appendChild(wrapper);
 
   // optional smooth scroll
-  requestAnimationFrame(() => {
-if (!userIsScrolling) {
-  requestAnimationFrame(() => {
+requestAnimationFrame(() => {
+  const container = document.getElementById('dt-genie-messages');
+  if (!container) return;
+
+  const wasNearBottom =
+    container.scrollHeight - container.scrollTop - container.clientHeight < 200;
+
+  if (!userIsScrolling && wasNearBottom) {
     container.scrollTop = container.scrollHeight;
-  });
-}
+  }
+});
 
   });
 }
