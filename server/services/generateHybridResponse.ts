@@ -278,6 +278,16 @@ function removeGenericPhrases(text: string): string {
   return cleaned.trim();
 }
 
+function fastCleanupPipeline(text: string): string {
+  if (!text) return "";
+
+  return text
+    .replace(/\b(semrush|ahrefs|zapier|openai|chatgpt|gemini)\b/gi, "")
+    .replace(/\b\d{1,3}%\+?\b/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 
 function toneSanitizer(text: string): string {
   if (!text) return "";
@@ -515,58 +525,54 @@ function shouldResetContext(message: string): boolean {
   return triggers.some((t) => lower.includes(t));
 }
 
+
 function repairResponse(text: string): string {
   let fixed = (text || "").trim();
-
   if (!fixed) return "";
 
   // =============================
-  // 1. NORMALIZE SPACING
+  // 1. NORMALIZE SPACING (FAST PATH)
   // =============================
   fixed = fixed.replace(/\s+/g, " ").trim();
 
   // =============================
-  // 2. DETECT CUT-OFF RESPONSES
+  // 2. ONLY FIX TRUE CUT-OFFS (SAFE DETECTION)
   // =============================
-  const isCutOff =
-    /(\b(and|or|to|for|with|of|the|a|an)\s*)$/i.test(fixed) || // ends mid-phrase
-    /(\s[A-Za-z]{1,2})$/.test(fixed) || // broken word tail
-    /[:\-]$/.test(fixed); // ends with ":" or "-"
 
-  if (isCutOff) {
-    fixed += " Let me know if you want the full breakdown.";
+  const words = fixed.split(" ");
+  const lastWord = words[words.length - 1]?.toLowerCase() || "";
+
+  const isHardCut =
+    fixed.length > 120 &&
+    /^[a-z]{1,2}$/.test(lastWord); // only real broken word
+
+  const endsWithConnector =
+    /\b(and|or|with|for|to|of|the)\s*$/i.test(fixed);
+
+  if (isHardCut || endsWithConnector) {
+    fixed += ".";
   }
 
   // =============================
-  // 3. ENSURE PROPER ENDING
+  // 3. ENSURE PROPER ENDING (SAFE)
   // =============================
   if (!/[.?!]$/.test(fixed)) {
     fixed += ".";
   }
 
   // =============================
-  // 4. SMART SHORT RESPONSE FIX
+  // 4. LIGHT WEIGHT SHORT FIX ONLY
   // =============================
-  const isCTA = /(call|book|schedule|get started|strategy call)/i.test(fixed);
+  const isCTA = /(call|book|schedule|get started)/i.test(fixed);
 
-  const isTooShort =
-    fixed.length < 80 &&
-    !isCTA &&
-    !fixed.toLowerCase().includes("let me know");
-
-  if (isTooShort) {
-    fixed += " Let me know if you want a more detailed breakdown.";
+  if (fixed.length < 60 && !isCTA) {
+    fixed += " Let me know if you'd like more detail.";
   }
 
   // =============================
-  // 5. FINAL SAFETY CLEANUP
+  // 5. FINAL CLEANUP (ONLY ONCE)
   // =============================
-  fixed = fixed
-    .replace(/\s{2,}/g, " ")
-    .replace(/\.\s*\./g, ".")
-    .trim();
-
-  return fixed;
+  return fixed.replace(/\s{2,}/g, " ").trim();
 }
 
 
@@ -944,23 +950,18 @@ if (pricingIntent) {
 
 response = cleanHybridResponse(response || "");
 
-// 1. Remove system + tool leakage
-response = removeForbiddenContent(response);
+// 1. FAST LIGHTWEIGHT CLEANUP (KEEP EARLY FILTERS ONLY)
+response = fastCleanupPipeline(response);
 
-// 2. REMOVE GENERIC GARBAGE
-response = removeGenericPhrases(response);
-
-// 3. Remove pricing / monetary leaks
-response = removePricing(response);
-
-// 4. Repair structure
+// 2. STRUCTURE REPAIR (IMPORTANT BEFORE STYLE FIXES)
 response = repairResponse(response);
 
-// 4.1 TONE HARD SANITIZATION (NEW CRITICAL LAYER)
+// 3. TONE NORMALIZATION (AFTER STRUCTURE FIX)
 response = toneSanitizer(response);
 
-// 5. ENFORCE BRAND STYLE
+// 4. FINAL BRAND STYLE ENFORCEMENT
 response = enforceDTMStyle(response);
+
 
 // ================= PHASE 2 OPTIMIZER =================
 
@@ -1095,6 +1096,13 @@ if (shouldAddCTA) {
 
 
 // ================= SAVE =================
+
+safeResponse = safeResponse.trim();
+
+// prevent mid-sentence cut feel
+if (safeResponse.length > 200 && !/[.?!]$/.test(safeResponse)) {
+  safeResponse += ".";
+}
 
 await memoryService.addMessage(sessionId, "assistant", safeResponse);
 
