@@ -4,80 +4,72 @@ export function isBookingIntent(message: string): boolean {
   const msg = message.toLowerCase().trim();
 
   // =============================
-  // 1. STRONG INTENT (DIRECT COMMANDS)
+  // ❌ NEGATIVE CONTEXT (BLOCK FALSE TRIGGERS)
   // =============================
-  const strongPatterns = [
-    "book a call",
-    "schedule a call",
-    "book a meeting",
-    "schedule a meeting",
-    "let's schedule",
-    "i want to book",
-    "i want to schedule",
-    "set up a call",
-    "set up a meeting",
-    "can we schedule",
-    "can i book",
-    "let’s talk",
-    "i want to talk",
+  const negativeContexts = [
+    "call my team",
+    "call the team",
+    "api",
+    "function",
+    "code",
+    "bookkeeping",
+    "call center",
+    "phone",
+    "callback",
+    "support call",
   ];
 
-  if (strongPatterns.some(p => msg.includes(p))) {
+  if (negativeContexts.some(p => msg.includes(p))) {
+    return false;
+  }
+
+  // =============================
+  // ✅ STRONG BOOKING INTENT
+  // =============================
+  const strongPatterns = [
+    /book (a )?(call|meeting)/,
+    /schedule (a )?(call|meeting)/,
+    /set up (a )?(call|meeting)/,
+    /let'?s (talk|connect)/,
+    /i want to (talk|speak|connect)/,
+    /can we (talk|connect)/,
+    /speak with you/,
+  ];
+
+  if (strongPatterns.some(p => p.test(msg))) {
     return true;
   }
 
   // =============================
-  // 2. WEAK WORD PRESENCE
+  // ⚠️ WEAK WORDS (NEED CONTEXT)
   // =============================
-  const weakWords = ["call", "book", "meeting"];
+  const weakWords = ["call", "book", "schedule", "meeting", "talk"];
 
   const hasWeakWord = weakWords.some(w => msg.includes(w));
 
   if (!hasWeakWord) return false;
 
   // =============================
-  // 3. FILTER NON-BOOKING CONTEXTS
-  // =============================
-  const nonBookingContexts = [
-    "cold call",
-    "cold calling",
-    "sales call",
-    "call center",
-    "call tracking",
-    "api call",
-    "function call",
-    "phone call",
-    "call conversion",
-    "zoom call issue",
-    "book marketing",
-    "book strategy",
-    "reading a book",
-  ];
-
-  if (nonBookingContexts.some(p => msg.includes(p))) {
-    return false;
-  }
-
-  // =============================
-  // 4. LENGTH CONTROL (CRITICAL)
-  // =============================
-  const wordCount = msg.split(/\s+/).length;
-
-  if (wordCount > 10) return false;
-
-  // =============================
-  // 5. INTENT SIGNAL CHECK
+  // 🧠 CONTEXT CHECK (ANTI-SPAM)
   // =============================
   const intentSignals = [
-    "book",
-    "schedule",
-    "setup",
-    "set up",
-    "connect",
-    "talk",
+    "you",
+    "with you",
+    "with someone",
+    "with your team",
+    "discuss",
+    "about this",
+    "regarding",
   ];
 
   const hasIntentSignal = intentSignals.some(w => msg.includes(w));
 
-  return hasIntentSignal;
+  const wordCount = msg.split(/\s+/).length;
+
+  // Require enough context to avoid spam triggers
+  if (hasIntentSignal && wordCount >= 3) {
+    return true;
+  }
+
+  return false;
 }

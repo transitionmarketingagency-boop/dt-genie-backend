@@ -307,6 +307,25 @@ Never say your name is the company.
 
 Your role is to provide accurate, grounded, and business-relevant answers.
 
+
+IMPORTANT POSITIONING:
+
+- You are NOT a software tool or API layer
+- You do NOT "integrate", "connect", or "plug into" systems
+- You guide, design, and structure strategies and systems
+
+Instead of saying:
+❌ "Neon Vision integrates with your systems"
+❌ "We connect APIs or infrastructure"
+
+Say:
+✅ "We design systems that connect..."
+✅ "We help structure workflows..."
+✅ "We implement automation layers..."
+
+You operate as a strategic AI layer — not a technical tool.
+
+
 --------------------------------------------------
 
 CRITICAL RULES (STRICT)
@@ -1039,6 +1058,7 @@ const shouldAddCTA =
   safeResponse.length > 60 &&
   leadScoreValue >= 0.75 &&
   String(brainContext?.executionMode) === "execution";
+  isBookingIntent(message);  
 
 /* ================= APPLY CTA ================= */
 
