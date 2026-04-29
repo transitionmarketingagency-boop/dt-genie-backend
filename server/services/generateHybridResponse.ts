@@ -87,6 +87,8 @@ export interface BrainContext {
   };
   executionMode?: string;
   isFresh?: boolean;
+
+primaryService?: string;
 }
 
 
@@ -375,6 +377,7 @@ Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
 Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
 Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
 
+Primary Service: ${brainContext?.primaryService ?? "none"}
 --------------------------------------------------
 
 CONVERSATION HISTORY
@@ -717,6 +720,15 @@ try {
     : [];
 } catch {
   brainContext.detectedServices = [];
+}
+
+// ================= PRIMARY SERVICE LOCK (ADD HERE) =================
+
+// 🔒 LOCK PRIMARY SERVICE (CRITICAL)
+if (brainContext.detectedServices.length > 0) {
+  brainContext.primaryService = brainContext.detectedServices[0];
+} else {
+  brainContext.primaryService = "none";
 }
 
 const hasServiceContext =

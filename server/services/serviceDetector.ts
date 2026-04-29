@@ -54,75 +54,63 @@ if (t.includes(k)) return 1.2; // 🔥 boost exact matches
 
 /* ================= SERVICES CONFIG ================= */
 const services: Record<string, { keywords: string[]; weight: number }> = {
+
+  // 1. AI AUTOMATION
   ai_automation: {
     keywords: [
       "ai automation",
       "ai agents",
       "workflow automation",
       "crm automation",
-      "chatbot automation",
-      "lead automation",
       "automate business",
       "automation system",
+      "replace manual work",
     ],
-    weight: 1.2,
+    weight: 1.3,
   },
 
+  // 2. PERFORMANCE MARKETING
   performance_marketing: {
     keywords: [
       "ppc",
       "ads",
       "facebook ads",
       "google ads",
-      "performance marketing",
       "roas",
       "cac",
-      "ad campaigns",
-      "paid ads",
+      "ad performance",
+      "fix ads",
+    ],
+    weight: 1.4,
+  },
+
+  // 3. EMAIL MARKETING
+  email_marketing: {
+    keywords: [
+      "email marketing",
+      "klaviyo",
+      "newsletter",
+      "cold email",
+      "abandoned cart",
+      "email flows",
+      "open rates",
     ],
     weight: 1.3,
   },
 
+  // 4. YOUTUBE ADS
   youtube_ads: {
     keywords: [
       "youtube ads",
-      "youtube advertising",
+      "youtube marketing",
       "video ads",
-      "skippable ads",
-      "youtube campaign",
       "scale youtube",
+      "youtube funnel",
     ],
     weight: 1.3,
   },
 
-  content_marketing: {
-    keywords: [
-      "content marketing",
-      "copywriting",
-      "blogs",
-      "seo content",
-      "lead magnets",
-      "case studies",
-    ],
-    weight: 1,
-  },
-
-  social_domination: {
-    keywords: [
-      "instagram",
-      "tiktok",
-      "linkedin",
-      "social media",
-      "shadowban",
-      "instagram reach",
-      "reels reach",
-      "tiktok growth",
-      "linkedin growth",
-      "social growth",
-    ],
-    weight: 1.1,
-  },
-
+  // 5. WEBSITE DESIGN
   website_design: {
     keywords: [
       "website",
@@ -131,99 +119,11 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
       "landing page",
       "website redesign",
       "fast website",
-      "mobile first",
-    ],
-    weight: 1,
-  },
-
-  email_marketing: {
-    keywords: [
-      "email marketing",
-      "newsletter",
-      "cold email",
-      "email automation",
-      "email flows",
-      "abandoned cart",
-    ],
-    weight: 1,
-  },
-
-  cgi_marketing: {
-    keywords: [
-      "cgi",
-      "3d ads",
-      "product render",
-      "3d marketing",
-      "cgi ads",
-      "3d animation",
-      "product animation",
-    ],
-    weight: 1.1,
-  },
-
-  video_audio: {
-    keywords: [
-      "video editing",
-      "video production",
-      "ai video",
-      "audio production",
-      "voiceover",
-      "spatial audio",
-      "dolby atmos",
-    ],
-    weight: 1.1,
-  },
-
-  music_production: {
-    keywords: [
-      "music production",
-      "audio production",
-      "song production",
-      "beat",
-      "mixing",
-      "mastering",
-      "sound design",
-      "ghost producer",
     ],
     weight: 1.2,
   },
 
-  seo_geo: {
-    keywords: [
-      "seo",
-      "search ranking",
-      "google ranking",
-      "organic traffic",
-    ],
-    weight: 1,
-  },
-
-  ai_search_domination: {
-    keywords: [
-      "geo",
-      "ai seo",
-      "rank on chatgpt",
-      "rank on ai",
-      "ai search",
-      "generative search",
-      "answer engine",
-    ],
-    weight: 1.2,
-  },
-
-  voice_search_optimization: {
-    keywords: [
-      "voice search",
-      "vso",
-      "siri search",
-      "alexa search",
-      "position zero",
-      "featured snippets",
-      "near me search",
-    ],
-    weight: 1.1,
-  },
-
+  // 6. VIRTUAL TOURS
   virtual_tours: {
     keywords: [
       "virtual tours",
@@ -232,22 +132,109 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
       "property tour",
       "virtual staging",
     ],
-    weight: 1,
+    weight: 1.2,
   },
 
+  // 7. CGI MARKETING
+  cgi_marketing: {
+    keywords: [
+      "cgi",
+      "3d ads",
+      "product render",
+      "cgi ads",
+      "3d animation",
+    ],
+    weight: 1.3,
+  },
+
+  // 8. VIDEO / AUDIO
+  video_audio: {
+    keywords: [
+      "video editing",
+      "video production",
+      "reels",
+      "youtube video",
+      "audio production",
+      "voiceover",
+    ],
+    weight: 1.1,
+  },
+
+  // 9. CONTENT
+  content_marketing: {
+    keywords: [
+      "content marketing",
+      "copywriting",
+      "blogs",
+      "lead magnets",
+      "case studies",
+    ],
+    weight: 1.1,
+  },
+
+  // 10. SOCIAL
+  social_media: {
+    keywords: [
+      "instagram",
+      "tiktok",
+      "linkedin",
+      "social media",
+      "shadowban",
+      "reach",
+    ],
+    weight: 1.1,
+  },
+
+  // 11. GEO / AI SEO
+  seo_geo: {
+    keywords: [
+      "seo",
+      "geo",
+      "ai seo",
+      "chatgpt ranking",
+      "voice search",
+      "near me search",
+    ],
+    weight: 1.2,
+  },
+
+  // 12. VSO (SEPARATE SIGNAL BOOST)
+  voice_search: {
+    keywords: [
+      "voice search",
+      "alexa search",
+      "siri search",
+      "position zero",
+      "featured snippets",
+      "near me",
+    ],
+    weight: 1.3,
+  },
+
+  // 13. MUSIC PRODUCTION
+  music_production: {
+    keywords: [
+      "music production",
+      "mixing",
+      "mastering",
+      "track production",
+      "ghost producer",
+    ],
+    weight: 1.0,
+  },
+
+  // 14. PREDICTIVE ANALYTICS
   predictive_analytics: {
     keywords: [
       "analytics",
-      "data insights",
       "forecasting",
       "prediction",
-      "market analysis",
+      "market trends",
       "sentiment analysis",
     ],
-    weight: 1,
+    weight: 1.2,
   },
 };
-
 
 /* ================= SIGNALS ================= */
 const problemSignals = [
@@ -312,13 +299,35 @@ export function detectIntents(message: string): DetectedIntent[] {
   /* ---------------- SERVICES ---------------- */
   const serviceScores = detectServiceScores(text);
 
-  for (const [service, score] of Object.entries(serviceScores)) {
-    results.push({
-      type: "service",
-      value: service,
-      confidence: Number(score.toFixed(2)),
-    });
+// ================= TOP SERVICE FILTER (CRITICAL FIX) =================
+
+// Keep ONLY top 2 strongest services
+const topServices = Object.entries(serviceScores)
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 2)
+  .filter(([_, score]) => score > 0.35);
+
+for (const [service, score] of topServices) {
+
+  // ================= GEO HARD GUARD =================
+  if (
+    service === "seo_geo" &&
+    !text.includes("seo") &&
+    !text.includes("geo") &&
+    !text.includes("ranking") &&
+    !text.includes("search") &&
+    !text.includes("chatgpt")
+  ) {
+    continue; // ❌ block false GEO activation
   }
+
+  // ================= NORMAL SERVICE PUSH =================
+  results.push({
+    type: "service",
+    value: service,
+    confidence: Number(score.toFixed(2)),
+  });
+}
 
   /* ---------------- GENERIC INTENTS ---------------- */
   const pushIfMatch = (
