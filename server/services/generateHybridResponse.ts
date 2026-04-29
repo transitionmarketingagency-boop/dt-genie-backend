@@ -52,6 +52,7 @@ import { strategicBrain } from "./strategicBrain.js";
 import bookingFlow from "../bookingFlow.js";
 import { analyzeLeadSignals } from "./leadIntelligence.js";
 import { shouldTriggerBooking } from "./bookingTrigger.js";
+import { isBookingIntent } from "./bookingIntentDetector.js";
 
 // Modular helpers
 import { detectBookingRejection, shouldIncludeCTA } from "./responseDecision.js";
@@ -626,8 +627,7 @@ const isHighIntent = leadScoreValue >= 0.7;
 
 
 // 🔥 FIX 5 — STRICT BOOKING OVERRIDE (CRITICAL)
-const strictBookingIntent =
-  /(book a call|schedule a call|book call|schedule call|book a meeting|schedule a meeting)/i.test(msg);
+const strictBookingIntent = isBookingIntent(message);
 
 if (strictBookingIntent) {
   const response =
@@ -840,7 +840,7 @@ if (isHardFail) {
   else {
     // ✅ ONLY ONE fallback (no rotation, no loops)
 response =
-  "Got it — here’s how I’d approach this based on what you’re trying to do.";
+  "Something’s missing in the context. Tell me what you're actually trying to achieve or fix — I’ll give you a precise direction.";
 
   }
 }
@@ -913,7 +913,7 @@ response = removePricing(response);
 // 4. Repair structure
 response = repairResponse(response);
 
-// 5. ENFORCE BRAND STYLE
+// 5. ENFORCE BRAND STYLEimport { isBookingIntent } from "./bookingIntentDetector.js";
 response = enforceDTMStyle(response);
 
 // ================= PHASE 2 OPTIMIZER =================
