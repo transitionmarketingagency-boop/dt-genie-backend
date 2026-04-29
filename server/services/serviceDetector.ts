@@ -38,7 +38,7 @@ function matchKeyword(text: string, keyword: string): number {
   if (!k) return 0;
 
   // exact match (strong signal)
-  if (t.includes(k)) return 1;
+if (t.includes(k)) return 1.2; // 🔥 boost exact matches
 
   // token match (partial signal)
   const words = k.split(" ").filter(Boolean);
@@ -62,6 +62,8 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
       "crm automation",
       "chatbot automation",
       "lead automation",
+      "automate business",
+      "automation system",
     ],
     weight: 1.2,
   },
@@ -75,55 +77,177 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
       "performance marketing",
       "roas",
       "cac",
+      "ad campaigns",
+      "paid ads",
+    ],
+    weight: 1.3,
+  },
+
+  youtube_ads: {
+    keywords: [
+      "youtube ads",
+      "youtube advertising",
+      "video ads",
+      "skippable ads",
+      "youtube campaign",
+      "scale youtube",
     ],
     weight: 1.3,
   },
 
   content_marketing: {
-    keywords: ["content marketing", "copywriting", "blogs", "seo content"],
+    keywords: [
+      "content marketing",
+      "copywriting",
+      "blogs",
+      "seo content",
+      "lead magnets",
+      "case studies",
+    ],
     weight: 1,
   },
 
-  social_media: {
-    keywords: ["instagram", "tiktok", "linkedin", "social media"],
-    weight: 1,
+  social_domination: {
+    keywords: [
+      "instagram",
+      "tiktok",
+      "linkedin",
+      "social media",
+      "shadowban",
+      "instagram reach",
+      "reels reach",
+      "tiktok growth",
+      "linkedin growth",
+      "social growth",
+    ],
+    weight: 1.1,
   },
 
   website_design: {
-    keywords: ["website", "web design", "shopify", "landing page"],
+    keywords: [
+      "website",
+      "web design",
+      "shopify",
+      "landing page",
+      "website redesign",
+      "fast website",
+      "mobile first",
+    ],
     weight: 1,
   },
 
   email_marketing: {
-    keywords: ["email marketing", "klaviyo", "newsletter", "cold email"],
+    keywords: [
+      "email marketing",
+      "newsletter",
+      "cold email",
+      "email automation",
+      "email flows",
+      "abandoned cart",
+    ],
     weight: 1,
   },
 
   cgi_marketing: {
-    keywords: ["cgi", "3d ads", "product render", "3d marketing"],
+    keywords: [
+      "cgi",
+      "3d ads",
+      "product render",
+      "3d marketing",
+      "cgi ads",
+      "3d animation",
+      "product animation",
+    ],
     weight: 1.1,
   },
 
   video_audio: {
-    keywords: ["video editing", "video production", "reels", "youtube"],
-    weight: 1,
+    keywords: [
+      "video editing",
+      "video production",
+      "ai video",
+      "audio production",
+      "voiceover",
+      "spatial audio",
+      "dolby atmos",
+    ],
+    weight: 1.1,
+  },
+
+  music_production: {
+    keywords: [
+      "music production",
+      "audio production",
+      "song production",
+      "beat",
+      "mixing",
+      "mastering",
+      "sound design",
+      "ghost producer",
+    ],
+    weight: 1.2,
   },
 
   seo_geo: {
-    keywords: ["seo", "geo", "ai seo", "chatgpt ranking", "search ranking"],
+    keywords: [
+      "seo",
+      "search ranking",
+      "google ranking",
+      "organic traffic",
+    ],
     weight: 1,
   },
 
+  ai_search_domination: {
+    keywords: [
+      "geo",
+      "ai seo",
+      "rank on chatgpt",
+      "rank on ai",
+      "ai search",
+      "generative search",
+      "answer engine",
+    ],
+    weight: 1.2,
+  },
+
+  voice_search_optimization: {
+    keywords: [
+      "voice search",
+      "vso",
+      "siri search",
+      "alexa search",
+      "position zero",
+      "featured snippets",
+      "near me search",
+    ],
+    weight: 1.1,
+  },
+
   virtual_tours: {
-    keywords: ["virtual tours", "360 tours", "real estate tours"],
+    keywords: [
+      "virtual tours",
+      "360 tours",
+      "real estate tours",
+      "property tour",
+      "virtual staging",
+    ],
     weight: 1,
   },
 
   predictive_analytics: {
-    keywords: ["analytics", "data insights", "forecasting", "prediction"],
+    keywords: [
+      "analytics",
+      "data insights",
+      "forecasting",
+      "prediction",
+      "market analysis",
+      "sentiment analysis",
+    ],
     weight: 1,
   },
 };
+
 
 /* ================= SIGNALS ================= */
 const problemSignals = [
@@ -156,9 +280,10 @@ export function detectServiceScores(text: string): Record<string, number> {
       score = (score / config.keywords.length) * config.weight;
     }
 
-    if (score > 0.2) {
-      scores[service] = Math.min(score, 1);
-    }
+if (score > 0.35) {
+  scores[service] = Math.min(score, 1);
+}
+
   }
 
   return scores;
@@ -236,9 +361,18 @@ export function detectIntents(message: string): DetectedIntent[] {
 export function detectMultipleServices(message: string): string[] {
   return detectIntents(message)
     .filter((i) => i.type === "service")
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 2) // 🔥 LIMIT = better precision
     .map((i) => i.value);
 }
 
 export function detectService(message: string): string[] {
+  const text = normalize(message);
+
+  // 🔥 HARD OVERRIDE — MUSIC (CRITICAL FIX)
+  if (/(music|song|beat|mixing|mastering|audio)/i.test(text)) {
+    return ["music_production"];
+  }
+
   return detectMultipleServices(message);
 }

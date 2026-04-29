@@ -191,13 +191,15 @@ function enforceBookingOnly(text: string): string {
 
   let cleaned = text;
 
-// 🔧 FIX 1 — KILL FAKE BOOKING CONTEXT (CRITICAL)
+// 🔥 HARD KILL — full + cut sentences
 cleaned = cleaned
-  .replace(/i('|’)ll (reserve|book|schedule)[^.]*\./gi, "")
-  .replace(/we('|’)ll (prepare|schedule|confirm)[^.]*\./gi, "")
-  .replace(/since you('|’)ve already scheduled[^.]*\./gi, "")
-  .replace(/see you (then|there)[^.]*\./gi, "")
-  .replace(/i('|’)ll make sure[^.]*\./gi, "");
+  .replace(/i('|’)ll[^.]*$/gi, "")
+  .replace(/we('|’)ll[^.]*$/gi, "")
+  .replace(/i('|’)ve[^.]*$/gi, "")
+  .replace(/your booking[^.]*$/gi, "")
+  .replace(/calendar[^.]*$/gi, "")
+  .replace(/confirm[^.]*$/gi, "");
+
 
   // ❌ Remove fake confirmations
   cleaned = cleaned
@@ -458,19 +460,19 @@ function isGoodResponse(text: unknown): text is string {
   const lower = clean.toLowerCase();
 
   // ✅ VERY LIGHT FILTER (DO NOT BLOCK GOOD RESPONSES)
-  if (clean.length < 12) return false;
 
-  const badPatterns = [
-    "undefined",
-    "error occurred",
-    "intent:",
-    "examples:",
-    "response:",
-    "{",
-    "}",
-    "@",
-    "http"
-  ];
+if (clean.length < 8) return false;
+
+const badPatterns = [
+  "undefined",
+  "error occurred",
+  "intent:",
+  "examples:",
+  "response:",
+  "@@@@",
+  "http://",
+  "https://"
+];
 
   if (badPatterns.some(p => lower.includes(p))) return false;
 
@@ -513,6 +515,11 @@ function repairResponse(text: string): string {
   if (isCutOff) {
     fixed += " Let me know if you want the full breakdown.";
   }
+
+// 🔥 HARD CUT FIX (action verbs)
+if (/(\b(send|trigger|update|connect|build|create)\s*)$/i.test(fixed)) {
+  fixed += " the full workflow continues based on your system setup.";
+}
 
   // =============================
   // 3. ENSURE PROPER ENDING
@@ -783,9 +790,10 @@ const prompt = buildHybridPrompt({
 
   priorityInstruction: `
 IMPORTANT:
-- Answer ONLY the latest USER MESSAGE
-- Ignore previous questions unless explicitly referenced
-- Do NOT continue old answers
+- Focus on the latest USER MESSAGE
+- Use previous context when it improves accuracy
+- Do NOT repeat previous answers unless necessary
+
 `,
 });
 
@@ -859,7 +867,7 @@ if (isHardFail) {
   else {
     // ✅ ONLY ONE fallback (no rotation, no loops)
 response =
-  "Something’s missing in the context. Tell me what you're actually trying to achieve or fix — I’ll give you a precise direction.";
+  "I need a bit more clarity on what you're trying to achieve — tell me the goal and I’ll give you a precise direction.";
 
   }
 }
@@ -998,7 +1006,8 @@ const isPricingIntentMsg =
   /(price|pricing|cost|budget|how much|fees|plans?|tiers?)/i.test(message);
 
 if (similarity && !isPricingIntentMsg && response.length > 120) {
-  // do nothing — avoid repeating same response
+  response =
+    "Let’s take this a step deeper — what part of this are you trying to implement right now?";
 }
 
   }
@@ -1057,8 +1066,8 @@ const shouldAddCTA =
   !alreadyHasCTA &&
   safeResponse.length > 60 &&
   leadScoreValue >= 0.75 &&
-  String(brainContext?.executionMode) === "execution";
-  isBookingIntent(message);  
+  String(brainContext?.executionMode) === "execution" &&
+  !isBookingIntent(message);
 
 /* ================= APPLY CTA ================= */
 
