@@ -217,14 +217,11 @@ cleaned = cleaned
   );
 
   // ✅ FORCE CORRECT BOOKING INSTRUCTION
-const bookingIntent =
-  /^(i want to book|book a call|schedule a call|schedule a meeting|confirm booking|let'?s schedule|i want to schedule)$/i.test(
-    cleaned.trim().toLowerCase()
-  );
+// 🔧 FIX — ONLY enforce booking UI for TRUE STRONG INTENT
+const strictIntent = isBookingIntent(cleaned);
 
-if (bookingIntent && cleaned.length < 200) {
-  cleaned =
-    "You can book a strategy call directly using the **\"Book a Strategy Call\"** button at the bottom-left corner of this page. That’s the fastest way to get started.";
+if (strictIntent && cleaned.length < 120) {
+  return "You can book a strategy call directly using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
 }
 
   return cleaned.trim();
@@ -630,7 +627,9 @@ const isHighIntent = leadScoreValue >= 0.7;
 
 
 // 🔥 FIX 5 — STRICT BOOKING OVERRIDE (CRITICAL)
-const strictBookingIntent = isBookingIntent(message);
+const strictBookingIntent =
+  isBookingIntent(message) &&
+  !/how|what|why|explain|process|works/i.test(message.toLowerCase());
 const isBookingRejected = detectBookingRejection(message);
 
 // ✅ FIX — prevent spam + respect rejection
