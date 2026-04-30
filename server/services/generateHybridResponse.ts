@@ -475,7 +475,15 @@ function isGoodResponse(text: unknown): text is string {
   const lower = clean.toLowerCase();
 
   // ✅ VERY LIGHT FILTER (DO NOT BLOCK GOOD RESPONSES)
-  if (clean.length < 12) return false;
+if (clean.length < 30) return false;
+
+// 🔥 block generic fluff
+if (
+  /we help businesses|we focus on|we specialize in/i.test(lower) &&
+  clean.length < 120
+) {
+  return false;
+}
 
   const badPatterns = [
     "undefined",
@@ -740,6 +748,24 @@ const hasServiceContext =
   brainContext.detectedServices.length > 0;
 
 
+// 🔒 MEMORY STABILIZATION (CRITICAL FIX)
+if (
+  brainContext.detectedServices.length === 0 &&
+  brainContext?.strategicMemory?.lastService
+) {
+  brainContext.detectedServices = [
+    brainContext.strategicMemory.lastService
+  ];
+}
+
+// 🔒 SAVE detected service
+if (brainContext.detectedServices.length > 0) {
+  brainContext.strategicMemory = {
+    ...(brainContext.strategicMemory || {}),
+    lastService: brainContext.detectedServices[0],
+  };
+}
+
 // ================= VECTOR (SMART RETRIEVAL FIX) =================
 let fusedChunksText = "";
 
@@ -747,7 +773,7 @@ const shouldUseRetrieval =
   message.length > 15 &&
 
 // ❌ skip retrieval for simple intent queries
-  !/(pricing|price|cost|who are you|services|tell me|book|booking|schedule|call)/i.test(message) &&
+!/(pricing|price|cost|book|booking|schedule|call)$/i.test(message.trim())
 
   !/^(hi|hello|hey|yo)$/i.test(message);
 
@@ -825,7 +851,7 @@ let response: string | null = null;
 try {
 const result = await withTimeout(
   generateOpenRouter(prompt, sessionId),
-  14000 // 🔥 prevents cut responses
+  9000 // 🔥 prevents cut responses
 );
 
   if (isGoodResponse(result)) {
@@ -866,12 +892,18 @@ const result = await withTimeout(
 
 
 // ================= FINAL FALLBACK (SAFE SINGLE PASS) =================
-
 const isHardFail =
   typeof response !== "string" ||
   !response ||
-  response.trim().length < 25 ||
-  /Something’s missing.*context|undefined|null/i.test(response);
+  response.trim().length < 20 ||
+
+// 🔥 ONLY treat as fail if clearly broken
+  /undefined|null|error occurred/i.test(response) ||
+
+// 🔧 PREVENT killing valid strategic answers
+  (response.trim().length < 60 &&
+   !/[.?!]/.test(response));
+
 
 // 🔥 CRITICAL FIX: prevent overriding valid model responses
 if (isHardFail && !response?.includes("Digital Transition Marketing")) {
@@ -897,7 +929,8 @@ if (isHardFail && !response?.includes("Digital Transition Marketing")) {
   else {
     // 🔧 cleaner fallback (less robotic, no loop trigger phrase)
     response =
-      "Tell me what you're trying to achieve or fix — I’ll give you a precise direction.";
+response =
+  "What specific outcome are you aiming for right now?";
   }
 }
 
