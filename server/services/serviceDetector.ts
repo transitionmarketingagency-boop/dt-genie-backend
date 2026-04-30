@@ -52,6 +52,7 @@ function matchKeyword(text: string, keyword: string): number {
   return (hits / words.length) * 0.6;
 }
 
+
 /* ================= SERVICES CONFIG ================= */
 const services: Record<string, { keywords: string[]; weight: number }> = {
   ai_automation: {
@@ -62,6 +63,10 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
       "crm automation",
       "chatbot automation",
       "lead automation",
+      "ai assistants",
+      "automate workflows",
+      "replace saas tools",
+      "ai business automation",
     ],
     weight: 1.2,
   },
@@ -75,52 +80,197 @@ const services: Record<string, { keywords: string[]; weight: number }> = {
       "performance marketing",
       "roas",
       "cac",
+      "lower cac",
+      "increase roas",
+      "ppc management",
+      "real-time bidding",
+      "ad spend optimization",
     ],
     weight: 1.3,
   },
 
   content_marketing: {
-    keywords: ["content marketing", "copywriting", "blogs", "seo content"],
+    keywords: [
+      "content marketing",
+      "copywriting",
+      "blogs",
+      "seo content",
+      "lead magnets",
+      "whitepapers",
+      "viral hooks",
+      "b2b case studies",
+      "psychological triggers",
+    ],
     weight: 1,
   },
 
   social_media: {
-    keywords: ["instagram", "tiktok", "linkedin", "social media"],
+    keywords: [
+      "instagram",
+      "tiktok",
+      "linkedin",
+      "social media",
+      "reels reach",
+      "shadowban fix",
+      "hack the algorithm",
+      "linkedin top stories",
+      "social domination",
+    ],
     weight: 1,
   },
 
   website_design: {
-    keywords: ["website", "web design", "shopify", "landing page"],
+    keywords: [
+      "website",
+      "web design",
+      "shopify",
+      "landing page",
+      "fast website",
+      "mobile-first",
+      "seo-optimized site",
+      "website redesign",
+      "shopify setup",
+    ],
     weight: 1,
   },
 
   email_marketing: {
-    keywords: ["email marketing", "klaviyo", "newsletter", "cold email"],
+    keywords: [
+      "email marketing",
+      "klaviyo",
+      "newsletter",
+      "cold email",
+      "klaviyo flows",
+      "improve open rates",
+      "abandoned cart automation",
+      "cold email sequences",
+    ],
     weight: 1,
   },
 
   cgi_marketing: {
-    keywords: ["cgi", "3d ads", "product render", "3d marketing"],
+    keywords: [
+      "cgi",
+      "3d ads",
+      "product render",
+      "3d marketing",
+      "viral cgi ads",
+      "3d product animation",
+      "realistic cgi",
+      "cgi commercial",
+    ],
     weight: 1.1,
   },
 
   video_audio: {
-    keywords: ["video editing", "video production", "reels", "youtube"],
+    keywords: [
+      "video editing",
+      "video production",
+      "reels",
+      "youtube",
+      "dolby atmos",
+      "retention heatmaps",
+      "ai voiceover",
+      "7-day video production",
+      "video ads",
+    ],
     weight: 1,
   },
 
   seo_geo: {
-    keywords: ["seo", "geo", "ai seo", "chatgpt ranking", "search ranking"],
+    keywords: [
+      "seo",
+      "geo",
+      "ai seo",
+      "chatgpt ranking",
+      "search ranking",
+      "rank on chatgpt",
+      "optimize for gemini",
+      "ai indexing",
+      "ai search seo",
+      "generative engine optimization",
+    ],
     weight: 1,
   },
 
   virtual_tours: {
-    keywords: ["virtual tours", "360 tours", "real estate tours"],
+    keywords: [
+      "virtual tours",
+      "360 tours",
+      "real estate tours",
+      "neur renders",
+      "interactive floor plan",
+      "virtual staging",
+      "property tour",
+    ],
     weight: 1,
   },
 
   predictive_analytics: {
-    keywords: ["analytics", "data insights", "forecasting", "prediction"],
+    keywords: [
+      "analytics",
+      "data insights",
+      "forecasting",
+      "prediction",
+      "market shifts",
+      "dark pool flow",
+      "sentiment analysis",
+      "predict crypto crash",
+      "financial reporting",
+    ],
+    weight: 1,
+  },
+
+  voice_search_optimization: {
+    keywords: [
+      "voice search optimization",
+      "vso",
+      "alexa search",
+      "siri optimization",
+      "position zero",
+      "featured snippets",
+      "voice ranking",
+      "near me now",
+    ],
+    weight: 1.15,
+  },
+
+  ai_search_domination: {
+    keywords: [
+      "geo",
+      "ai seo",
+      "chatgpt ranking",
+      "ai search optimization",
+      "generative engine optimization",
+      "ai indexing",
+      "optimize for ai search",
+    ],
+    weight: 1.2,
+  },
+
+  ai_ad_warfare: {
+    keywords: [
+      "ad warfare",
+      "performance marketing ai",
+      "algorithmic bidding",
+      "creative fatigue detection",
+      "autonomous ads",
+      "ad optimization ai",
+      "stop ad bots",
+    ],
+    weight: 1.35,
+  },
+
+  music_production: {
+    keywords: [
+      "music production",
+      "ssl mixing",
+      "mastering",
+      "ghost producer",
+      "radio ready track",
+      "professional mixing",
+      "audio engineering",
+    ],
     weight: 1,
   },
 };
