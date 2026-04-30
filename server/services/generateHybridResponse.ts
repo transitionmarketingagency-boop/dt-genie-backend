@@ -834,23 +834,19 @@ const result = await withTimeout(
 } catch {}
 
 
-// ================= GEMINI FALLBACK (STRICT - HARD FAILURE ONLY) =================
 
-const isHardFailure =
+// ================= GEMINI FALLBACK (FIXED - TRUE FAILURE ONLY) =================
+let isHardFailure =
   !response ||
   typeof response !== "string" ||
-
-  // only fallback if truly broken
   response.trim().length < 25 &&
-
-  // prevent fallback on partial good answers
   !response.includes("Digital Transition Marketing");
 
-if (response && response.length > 80) {
-  // skip Gemini entirely if OpenRouter already gave decent output
-  return response;
-}
 
+if (response && response.trim().length > 120) {
+  // mark as valid but DO NOT exit early (prevents bypassing final cleanup)
+  isHardFailure = false;
+}
 
 if (isHardFailure && GEMINI_ENABLED && canUseGemini()) {
   try {
@@ -869,21 +865,21 @@ const result = await withTimeout(
 
 
 
-// ================= FINAL FALLBACK (HARD FAIL ONLY - NO LOOPS) =================
+// ================= FINAL FALLBACK (SAFE SINGLE PASS) =================
 
 const isHardFail =
-  !response ||
   typeof response !== "string" ||
-  response.trim().length < 35 ||
+  !response ||
+  response.trim().length < 25 ||
+  /Something’s missing.*context|undefined|null/i.test(response);
 
-// ❌ ONLY treat as failure if truly unusable content
-  /Something’s missing|Tell me what you're actually|undefined|null/i.test(response);
+// 🔥 CRITICAL FIX: prevent overriding valid model responses
+if (isHardFail && !response?.includes("Digital Transition Marketing")) {
 
-if (isHardFail) {
   const msg = (message || "").toLowerCase();
 
-const fallbackBookingIntent = isBookingIntent(message);
-const isBookingRejected = detectBookingRejection(message);
+  const fallbackBookingIntent = isBookingIntent(message);
+  const isBookingRejected = detectBookingRejection(message);
 
   const isVeryShortGreeting =
     /^(hi|hello|hey|yo)$/i.test(msg.trim());
@@ -893,19 +889,18 @@ const isBookingRejected = detectBookingRejection(message);
       "Hey — what are you trying to improve in your business right now?";
   }
 
-else if (fallbackBookingIntent && !isBookingRejected) {
-  response =
-    "You can book a strategy call using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
-}
-
+  else if (fallbackBookingIntent && !isBookingRejected) {
+    response =
+      "You can book a strategy call using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
+  }
 
   else {
-    // ✅ ONLY ONE fallback (no rotation, no loops)
-response =
-  "Something’s missing in the context. Tell me what you're actually trying to achieve or fix — I’ll give you a precise direction.";
-
+    // 🔧 cleaner fallback (less robotic, no loop trigger phrase)
+    response =
+      "Tell me what you're trying to achieve or fix — I’ll give you a precise direction.";
   }
 }
+
 
 // ================= PRICING GUARD (STABLE HUMANIZED FIX) =================
 
