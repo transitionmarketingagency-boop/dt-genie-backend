@@ -194,6 +194,18 @@ function enforceBookingOnly(text: string): string {
 
   let cleaned = text;
 
+// 🔥 HARD KILL: remove full booking persuasion blocks
+cleaned = cleaned
+  .replace(/let's get you connected[^.]*\./gi, "")
+  .replace(/click (the )?["“]?book a strategy call["”]?[^.]*\./gi, "")
+  .replace(/we can (dig deeper|explore|map out)[^.]*\./gi, "")
+  .replace(/during a strategy call[^.]*\./gi, "")
+  .replace(/no templates[^.]*\./gi, "")
+  .replace(/see you on the call[^.]*\./gi, "")
+  .replace(/our team will[^.]*\./gi, "")
+  .replace(/let's focus on creating[^.]*\./gi, "");
+
+
 // 🔧 FIX 1 — KILL FAKE BOOKING CONTEXT (CRITICAL)
 cleaned = cleaned
   .replace(/i('|’)ll (reserve|book|schedule)[^.]*\./gi, "")
@@ -407,6 +419,27 @@ Instead:
 → Be clear and direct
 → Add explanation only if it adds value
 → Suggest next steps only when it makes sense
+
+STRICT OUTPUT RULE (OVERRIDE ALL OTHER RULES):
+
+- NEVER mention:
+  - "book a call"
+  - "strategy call"
+  - "schedule a call"
+  - "reserve a slot"
+  - "click the button"
+  - "bottom-left button"
+  - "calendar"
+  - "availability"
+  - "time slot"
+
+- NEVER instruct user to take booking actions
+
+- If user asks about booking:
+  → respond ONLY with a single CTA instruction sentence:
+  → "You can book a strategy call using the Book a Strategy Call button."
+
+NO extra explanation. NO persuasion. NO follow-up text.
 
 EXECUTION MODE:
 
