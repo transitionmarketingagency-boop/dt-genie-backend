@@ -631,8 +631,10 @@ const isHighIntent = leadScoreValue >= 0.7;
 
 // 🔥 FIX 5 — STRICT BOOKING OVERRIDE (CRITICAL)
 const strictBookingIntent = isBookingIntent(message);
+const isBookingRejected = detectBookingRejection(message);
 
-if (strictBookingIntent) {
+// ✅ FIX — prevent spam + respect rejection
+if (strictBookingIntent && !isBookingRejected) {
   const response =
     "You can book a strategy call directly using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
 
@@ -842,8 +844,8 @@ const isHardFail =
 if (isHardFail) {
   const msg = (message || "").toLowerCase();
 
-  const isBookingIntent =
-    /(book|call|schedule|appointment|hire|get started|work with you)/i.test(msg);
+const fallbackBookingIntent = isBookingIntent(message);
+const isBookingRejected = detectBookingRejection(message);
 
   const isVeryShortGreeting =
     /^(hi|hello|hey|yo)$/i.test(msg.trim());
@@ -853,10 +855,11 @@ if (isHardFail) {
       "Hey — what are you trying to improve in your business right now?";
   }
 
-  else if (isBookingIntent) {
-    response =
-      "Got it — I can help you with that. Let’s take this into a quick call setup.";
-  }
+else if (fallbackBookingIntent && !isBookingRejected) {
+  response =
+    "You can book a strategy call using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
+}
+
 
   else {
     // ✅ ONLY ONE fallback (no rotation, no loops)
@@ -1050,10 +1053,12 @@ const alreadyHasCTA =
 /**
  * FINAL CTA GUARD (STRICT + CONFLICT-SAFE)
  */
+const hasBookingIntent = isBookingIntent(message);
 const shouldAddCTA =
   typeof cta === "string" &&
   cta.trim().length > 0 &&
   !detectBookingRejection(message) &&
+!hasBookingIntent &&
   !isGreeting &&
   !isIncompleteResponse &&
   !alreadyHasCTA &&

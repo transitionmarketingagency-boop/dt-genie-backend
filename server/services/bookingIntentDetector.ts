@@ -58,12 +58,29 @@ export function isBookingIntent(message: string): boolean {
     return false;
   }
 
+
+// ❌ REJECTION SIGNALS (CRITICAL)
+const rejectionSignals = [
+  "later",
+  "not now",
+  "maybe later",
+  "just checking",
+  "just exploring",
+  "not ready",
+  "no need",
+];
+
+if (rejectionSignals.some(p => msg.includes(p))) {
+  return false;
+}
+
   // =============================
   // 4. LENGTH CONTROL (CRITICAL)
   // =============================
   const wordCount = msg.split(/\s+/).length;
 
-  if (wordCount > 10) return false;
+// ✅ allow natural sentences but still controlled
+if (wordCount > 15) return false;
 
   // =============================
   // 5. INTENT SIGNAL CHECK
