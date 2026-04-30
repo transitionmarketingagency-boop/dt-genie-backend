@@ -494,6 +494,24 @@ function isGoodResponse(text: unknown): text is string {
   return true;
 }
 
+
+// ================= TRUE RESPONSE VALIDATOR (NEW SOURCE OF TRUTH) =================
+
+function isValidResponse(text: any): boolean {
+  if (typeof text !== "string") return false;
+
+  const t = text.trim();
+
+  // minimum useful length (real response threshold)
+  if (t.length < 25) return false;
+
+  // detect broken outputs
+  if (/undefined|null|error occurred/i.test(t)) return false;
+
+  return true;
+}
+
+
 function shouldResetContext(message: string): boolean {
   const triggers = [
     "i run",
@@ -836,23 +854,32 @@ const result = await withTimeout(
 
 // ================= GEMINI FALLBACK (STRICT - HARD FAILURE ONLY) =================
 
-const isHardFailure =
+// ================= TRUE FAILURE DETECTION (SINGLE SOURCE LOGIC) =================
+
+// OpenRouter validation
+const openRouterFailed = !isValidResponse(response);
+
+// Gemini fallback validation
+const geminiFailed =
   !response ||
   typeof response !== "string" ||
+  response.trim().length < 25;
 
-  // only fallback if truly broken
-  response.trim().length < 25 &&
+// FINAL DECISION: only fail if BOTH fail
+const isTrueFailure = openRouterFailed && geminiFailed;
 
-  // prevent fallback on partial good answers
-  !response.includes("Digital Transition Marketing");
+// ================= GEMINI FALLBACK CONTROL (CHAIN MUST CONTINUE) =================
 
-if (response && response.length > 80) {
-  // skip Gemini entirely if OpenRouter already gave decent output
-  return response;
-}
+// ❌ DO NOT early return here
+// OpenRouter result MUST pass through Gemini validation chain
 
 
-if (isHardFailure && GEMINI_ENABLED && canUseGemini()) {
+const _isHardFail =
+  !response ||
+  typeof response !== "string" ||
+  response.trim().length < 35;
+
+if (_isHardFail && GEMINI_ENABLED && canUseGemini()) {
   try {
 
 const result = await withTimeout(
@@ -871,16 +898,12 @@ const result = await withTimeout(
 
 // ================= FINAL FALLBACK (HARD FAIL ONLY - NO LOOPS) =================
 
-const isHardFail =
-  !response ||
-  typeof response !== "string" ||
-  response.trim().length < 35 ||
 
 // ❌ ONLY treat as failure if truly unusable content
-  /Something’s missing|Tell me what you're actually|undefined|null/i.test(response);
+/Something’s missing|Tell me what you're actually|undefined|null/i.test(response || "");
 
-if (isHardFail) {
-  const msg = (message || "").toLowerCase();
+if (_isHardFail) {
+const msg = String(message || "").toLowerCase();
 
 const fallbackBookingIntent = isBookingIntent(message);
 const isBookingRejected = detectBookingRejection(message);
