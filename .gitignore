@@ -131,3 +131,4 @@ project_blueprint_copy/
 # Generated data (if not production)
 chunks.json
 backup_root_duplicates/
+dt-genie-full-backup.tar.gz
