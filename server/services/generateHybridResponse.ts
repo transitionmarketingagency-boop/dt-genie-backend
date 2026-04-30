@@ -26,7 +26,10 @@ async function loadOptimizer(): Promise<ProcessResponseFn | null> {
 
   try {
     // ✅ FIXED: correct NodeNext relative path from server/services → root
-    const mod: any = await import("../../responseOptimizer.js");
+const mod: any =
+  processResponse
+    ? { processResponse }
+    : await import("../../responseOptimizer.js");
 
     const fn = mod?.processResponse;
 
@@ -702,7 +705,11 @@ const hasServiceContext =
 let fusedChunksText = "";
 
 const shouldUseRetrieval =
-  message.length > 8 &&
+  message.length > 15 &&
+
+// ❌ skip retrieval for simple intent queries
+  !/(pricing|price|cost|book|call|who are you|services|tell me)/i.test(message) &&
+
   !/^(hi|hello|hey|yo)\b/i.test(message);
 
 if (shouldUseRetrieval) {
@@ -792,7 +799,18 @@ const result = await withTimeout(
 const isHardFailure =
   !response ||
   typeof response !== "string" ||
-  response.trim().length < 10;
+
+  // only fallback if truly broken
+  response.trim().length < 25 &&
+
+  // prevent fallback on partial good answers
+  !response.includes("Digital Transition Marketing");
+
+if (response && response.length > 80) {
+  // skip Gemini entirely if OpenRouter already gave decent output
+  return response;
+}
+
 
 if (isHardFailure && GEMINI_ENABLED && canUseGemini()) {
   try {
@@ -816,7 +834,10 @@ const result = await withTimeout(
 const isHardFail =
   !response ||
   typeof response !== "string" ||
-  response.trim().length < 20;
+  response.trim().length < 35 ||
+
+// ❌ ONLY treat as failure if truly unusable content
+  /Something’s missing|Tell me what you're actually|undefined|null/i.test(response);
 
 if (isHardFail) {
   const msg = (message || "").toLowerCase();
