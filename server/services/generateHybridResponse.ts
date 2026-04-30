@@ -203,12 +203,15 @@ cleaned = cleaned
   .replace(/i('|’)ll make sure[^.]*\./gi, "");
 
   // ❌ Remove fake confirmations
-  cleaned = cleaned
-    .replace(/calendar invite[^.]*\./gi, "")
-    .replace(/check your inbox[^.]*\./gi, "")
-    .replace(/i('|’)ve (booked|scheduled|confirmed)[^.]*\./gi, "")
-    .replace(/your booking (is )?confirmed[^.]*\./gi, "")
-    .replace(/we('|’)ll confirm[^.]*\./gi, "")
+// 🔥 FIX 3 — HARD BLOCK IMPLICIT CONFIRMATIONS (CRITICAL PATCH)
+cleaned = cleaned
+  .replace(/\byour (slot|time|booking|appointment)[^.]*\b(is|has been)?\s*(reserved|booked|confirmed)[^.]*\./gi, "")
+  .replace(/\b(you('|’)re|you are)\s*(scheduled|booked|confirmed)[^.]*\./gi, "")
+  .replace(/\bconsider it (booked|done|scheduled)[^.]*\./gi, "")
+  .replace(/\bit('|’)s (booked|scheduled|confirmed)[^.]*\./gi, "")
+  .replace(/\bwe('|’)ve (reserved|booked|scheduled)[^.]*\./gi, "")
+  .replace(/\byou are all set[^.]*\./gi, "")
+  .replace(/\byour spot is (locked|confirmed|reserved)[^.]*\./gi, "");
 
   // ❌ Remove contact methods
   cleaned = cleaned.replace(
@@ -629,7 +632,9 @@ const isHighIntent = leadScoreValue >= 0.7;
 // 🔥 FIX 5 — STRICT BOOKING OVERRIDE (CRITICAL)
 const strictBookingIntent =
   isBookingIntent(message) &&
+  message.trim().split(/\s+/).length <= 6 &&
   !/how|what|why|explain|process|works/i.test(message.toLowerCase());
+
 const isBookingRejected = detectBookingRejection(message);
 
 // ✅ FIX — prevent spam + respect rejection
@@ -709,9 +714,10 @@ const shouldUseRetrieval =
   message.length > 15 &&
 
 // ❌ skip retrieval for simple intent queries
-  !/(pricing|price|cost|book|call|who are you|services|tell me)/i.test(message) &&
+  !/(pricing|price|cost|who are you|services|tell me|book|booking|schedule|call)/i.test(message) &&
 
-  !/^(hi|hello|hey|yo)\b/i.test(message);
+  !/^(hi|hello|hey|yo)$/i.test(message);
+
 
 if (shouldUseRetrieval) {
   try {
