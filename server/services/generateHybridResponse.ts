@@ -120,10 +120,10 @@ function removeForbiddenContent(text: string): string {
 
 
 // 🔧 FIX 2 — HARD BLOCK FAKE STATS
-.replace(/\b\d{1,3}%\s*(of\s*)?(clients?|users?)\b/gi, "")
-.replace(/\b\d{1,3}%\+?\s*(improvement|increase|results?)\b/gi, "")
-.replace(/\bmost clients see\b[^.]*\./gi, "")
-
+// 🔥 FIX 5 — SOFT REMOVE (DO NOT BREAK STRUCTURE)
+.replace(/\b\d{1,3}%\s*(of\s*)?(clients?|users?)\b/gi, "results")
+.replace(/\b\d{1,3}%\+?\s*(improvement|increase|results?)\b/gi, "improvement")
+.replace(/\bmost clients see\b/gi, "")
 
 
 // ❌ remove unsafe / blackhat suggestions
@@ -765,7 +765,8 @@ const shouldUseRetrieval =
   message.length > 15 &&
 
 // ❌ skip retrieval for simple intent queries
-  !/(pricing|price|cost|who are you|services|tell me|book|booking|schedule|call)/i.test(message) &&
+// 🔥 FIX 6 — ALLOW SERVICES + INFO QUERIES TO USE RETRIEVAL
+!/(pricing|price|cost|book|booking|schedule|call)/i.test(message)
 
   !/^(hi|hello|hey|yo)$/i.test(message);
 
@@ -849,6 +850,12 @@ const result = await withTimeout(
   if (isGoodResponse(result)) {
     response = result;
   }
+
+// 🔥 FIX 7 — REPAIR BROKEN MODEL OUTPUT EARLY
+if (response && typeof response === "string") {
+  response = repairResponse(response);
+}
+
 } catch {}
 
 
@@ -859,14 +866,6 @@ const result = await withTimeout(
 // OpenRouter validation
 const openRouterFailed = !isValidResponse(response);
 
-// Gemini fallback validation
-const geminiFailed =
-  !response ||
-  typeof response !== "string" ||
-  response.trim().length < 25;
-
-// FINAL DECISION: only fail if BOTH fail
-const isTrueFailure = openRouterFailed && geminiFailed;
 
 // ================= GEMINI FALLBACK CONTROL (CHAIN MUST CONTINUE) =================
 
@@ -874,12 +873,15 @@ const isTrueFailure = openRouterFailed && geminiFailed;
 // OpenRouter result MUST pass through Gemini validation chain
 
 
+// 🔥 FIX 1 — TRUE HARD FAILURE ONLY (DO NOT KILL SHORT VALID ANSWERS)
 const _isHardFail =
   !response ||
   typeof response !== "string" ||
-  response.trim().length < 35;
+  response.trim().length < 10 || // allow short but valid answers
+  /undefined|null|error occurred/i.test(response);
 
-if (_isHardFail && GEMINI_ENABLED && canUseGemini()) {
+// 🔥 FIX 8 — ONLY FALLBACK IF OPENROUTER FAILED
+if (openRouterFailed && GEMINI_ENABLED && canUseGemini()) {
   try {
 
 const result = await withTimeout(
@@ -895,18 +897,13 @@ const result = await withTimeout(
 }
 
 
-
 // ================= FINAL FALLBACK (HARD FAIL ONLY - NO LOOPS) =================
 
-
-// ❌ ONLY treat as failure if truly unusable content
-/Something’s missing|Tell me what you're actually|undefined|null/i.test(response || "");
-
 if (_isHardFail) {
-const msg = String(message || "").toLowerCase();
+  const msg = String(message || "").toLowerCase();
 
-const fallbackBookingIntent = isBookingIntent(message);
-const isBookingRejected = detectBookingRejection(message);
+  const fallbackBookingIntent = isBookingIntent(message);
+  const isBookingRejected = detectBookingRejection(message);
 
   const isVeryShortGreeting =
     /^(hi|hello|hey|yo)$/i.test(msg.trim());
@@ -916,19 +913,39 @@ const isBookingRejected = detectBookingRejection(message);
       "Hey — what are you trying to improve in your business right now?";
   }
 
-else if (fallbackBookingIntent && !isBookingRejected) {
-  response =
-    "You can book a strategy call using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
-}
-
+  else if (fallbackBookingIntent && !isBookingRejected) {
+    response =
+      "You can book a strategy call using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
+  }
 
   else {
-    // ✅ ONLY ONE fallback (no rotation, no loops)
-response =
-  "Something’s missing in the context. Tell me what you're actually trying to achieve or fix — I’ll give you a precise direction.";
-
+    // 🔥 FIX — PRESERVE PARTIAL RESPONSE INSTEAD OF OVERWRITING
+    if (response && typeof response === "string" && response.trim().length > 25) {
+      response = repairResponse(response);
+    } else {
+      response =
+        "Give me a bit more detail on what you're trying to improve — I’ll give you a precise direction.";
+    }
   }
+
+  // 🔥 FIX 10 — PREVENT REPEATED FALLBACK LOOP
+  try {
+    const lastMessages = await memoryService.getRecentMessages(sessionId, 1);
+    const lastBot = lastMessages?.[0]?.content || "";
+
+    if (
+      typeof lastBot === "string" &&
+      lastBot.includes("give me a bit more detail") &&
+      typeof response === "string" &&
+      response.includes("give me a bit more detail")
+    ) {
+      response =
+        "Tell me what part specifically you're trying to improve — traffic, leads, or conversions.";
+    }
+  } catch {}
 }
+
+
 
 // ================= PRICING GUARD (STABLE HUMANIZED FIX) =================
 
@@ -990,7 +1007,10 @@ response = cleanHybridResponse(response || "");
 response = removeForbiddenContent(response);
 
 // 2. REMOVE GENERIC GARBAGE
-response = removeGenericPhrases(response);
+// 🔥 FIX 4 — ONLY CLEAN GENERIC PHRASES IF RESPONSE IS LONG
+if (response.length > 120) {
+  response = removeGenericPhrases(response);
+}
 
 // 3. Remove pricing / monetary leaks
 response = removePricing(response);
