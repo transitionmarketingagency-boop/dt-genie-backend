@@ -27,23 +27,6 @@ export function isBookingIntent(message: string): boolean {
   }
 
 
-// 🔥 NEW — TIME-BASED BOOKING INTENT
-const timeBookingPatterns = [
-  "reserve a spot",
-  "book me for",
-  "schedule me for",
-  "tomorrow",
-  "today",
-  "4pm",
-  "5pm",
-];
-
-if (
-  timeBookingPatterns.some(p => msg.includes(p)) &&
-  msg.length < 80
-) {
-  return true;
-}
 
   // =============================
   // 2. WEAK WORD PRESENCE
@@ -98,8 +81,6 @@ if (rejectionSignals.some(p => msg.includes(p))) {
   // =============================
   const wordCount = msg.split(/\s+/).length;
 
-// ✅ allow natural sentences but still controlled
-if (wordCount > 15) return false;
 
   // =============================
   // 5. INTENT SIGNAL CHECK

@@ -189,59 +189,6 @@ function enforceDTMStyle(text: string): string {
 }
 
 
-function enforceBookingOnly(text: string): string {
-  if (!text) return "";
-
-  let cleaned = text;
-
-// 🔥 HARD KILL: remove full booking persuasion blocks
-cleaned = cleaned
-  .replace(/let's get you connected[^.]*\./gi, "")
-  .replace(/click (the )?["“]?book a strategy call["”]?[^.]*\./gi, "")
-  .replace(/we can (dig deeper|explore|map out)[^.]*\./gi, "")
-  .replace(/during a strategy call[^.]*\./gi, "")
-  .replace(/no templates[^.]*\./gi, "")
-  .replace(/see you on the call[^.]*\./gi, "")
-  .replace(/our team will[^.]*\./gi, "")
-  .replace(/let's focus on creating[^.]*\./gi, "");
-
-
-// 🔧 FIX 1 — KILL FAKE BOOKING CONTEXT (CRITICAL)
-cleaned = cleaned
-  .replace(/i('|’)ll (reserve|book|schedule)[^.]*\./gi, "")
-  .replace(/we('|’)ll (prepare|schedule|confirm)[^.]*\./gi, "")
-  .replace(/since you('|’)ve already scheduled[^.]*\./gi, "")
-  .replace(/see you (then|there)[^.]*\./gi, "")
-  .replace(/i('|’)ll make sure[^.]*\./gi, "");
-
-  // ❌ Remove fake confirmations
-// 🔥 FIX 3 — HARD BLOCK IMPLICIT CONFIRMATIONS (CRITICAL PATCH)
-cleaned = cleaned
-  .replace(/\byour (slot|time|booking|appointment)[^.]*\b(is|has been)?\s*(reserved|booked|confirmed)[^.]*\./gi, "")
-  .replace(/\b(you('|’)re|you are)\s*(scheduled|booked|confirmed)[^.]*\./gi, "")
-  .replace(/\bconsider it (booked|done|scheduled)[^.]*\./gi, "")
-  .replace(/\bit('|’)s (booked|scheduled|confirmed)[^.]*\./gi, "")
-  .replace(/\bwe('|’)ve (reserved|booked|scheduled)[^.]*\./gi, "")
-  .replace(/\byou are all set[^.]*\./gi, "")
-  .replace(/\byour spot is (locked|confirmed|reserved)[^.]*\./gi, "");
-
-  // ❌ Remove contact methods
-  cleaned = cleaned.replace(
-    /(email|phone|contact us|reach out)[^.]*\./gi,
-    ""
-  );
-
-  // ✅ FORCE CORRECT BOOKING INSTRUCTION
-// 🔧 FIX — ONLY enforce booking UI for TRUE STRONG INTENT
-const strictIntent = isBookingIntent(cleaned);
-
-if (strictIntent && cleaned.length < 120) {
-  return "You can book a strategy call directly using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
-}
-
-  return cleaned.trim();
-}
-
 
 function detectPricingIntent(message: string): boolean {
   if (!message) return false;
@@ -420,26 +367,7 @@ Instead:
 → Add explanation only if it adds value
 → Suggest next steps only when it makes sense
 
-STRICT OUTPUT RULE (OVERRIDE ALL OTHER RULES):
 
-- NEVER mention:
-  - "book a call"
-  - "strategy call"
-  - "schedule a call"
-  - "reserve a slot"
-  - "click the button"
-  - "bottom-left button"
-  - "calendar"
-  - "availability"
-  - "time slot"
-
-- NEVER instruct user to take booking actions
-
-- If user asks about booking:
-  → respond ONLY with a single CTA instruction sentence:
-  → "You can book a strategy call using the Book a Strategy Call button."
-
-NO extra explanation. NO persuasion. NO follow-up text.
 
 EXECUTION MODE:
 
@@ -680,18 +608,13 @@ const isGreeting = /^(hi|hello|hey|yo)$/i.test(msg.trim());
 const isHighIntent = leadScoreValue >= 0.7;
 
 
-// 🔥 FIX 5 — STRICT BOOKING OVERRIDE (CRITICAL)
-const strictBookingIntent =
-  isBookingIntent(message) &&
-  message.trim().split(/\s+/).length <= 6 &&
-  !/how|what|why|explain|process|works/i.test(message.toLowerCase());
-
+// ✅ SINGLE SOURCE BOOKING CONTROL (FINAL)
+const hasBookingIntent = isBookingIntent(message);
 const isBookingRejected = detectBookingRejection(message);
 
-// ✅ FIX — prevent spam + respect rejection
-if (strictBookingIntent && !isBookingRejected) {
+if (hasBookingIntent && !isBookingRejected) {
   const response =
-    "You can book a strategy call directly using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
+    "An automatic booking form may have opened on your screen. If not, go to the bottom-left corner of this page, click 'Book a Strategy Call', and submit the form to reserve your spot.";
 
   await memoryService.addMessage(sessionId, "assistant", response);
   return response;
@@ -913,10 +836,6 @@ if (_isHardFail) {
       "Hey — what are you trying to improve in your business right now?";
   }
 
-  else if (fallbackBookingIntent && !isBookingRejected) {
-    response =
-      "You can book a strategy call using the \"Book a Strategy Call\" button at the bottom-left corner of this page.";
-  }
 
   else {
     // 🔥 FIX — PRESERVE PARTIAL RESPONSE INSTEAD OF OVERWRITING
@@ -1055,8 +974,6 @@ response = sanitizeFinalOutput(response || "");
 // ================= BOOKING UI OVERRIDE (STRICT FIX) =================
 
 
-// ✅ NEW FIX: remove fake booking + contact behavior
-response = enforceBookingOnly(response);
 
 // ✅ REMOVE IDENTITY SPAM
 response = removeIdentitySpam(response);
@@ -1134,18 +1051,22 @@ const alreadyHasCTA =
 /**
  * FINAL CTA GUARD (STRICT + CONFLICT-SAFE)
  */
-const hasBookingIntent = isBookingIntent(message);
+
+// ✅ reuse existing hasBookingIntent from entry layer
+
 const shouldAddCTA =
   typeof cta === "string" &&
   cta.trim().length > 0 &&
   !detectBookingRejection(message) &&
-!hasBookingIntent &&
+  !hasBookingIntent &&
+  !safeResponse.toLowerCase().includes("book a strategy call") &&
   !isGreeting &&
   !isIncompleteResponse &&
   !alreadyHasCTA &&
   safeResponse.length > 60 &&
   leadScoreValue >= 0.75 &&
   String(brainContext?.executionMode) === "execution";
+
 
 /* ================= APPLY CTA ================= */
 
