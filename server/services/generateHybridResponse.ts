@@ -599,36 +599,37 @@ export async function executeHybridResponse({
 
 
 
-// ================= ENTRY INTELLIGENCE (FINAL STABLE FIX) =================
+ // ================= ENTRY INTELLIGENCE (FINAL FIXED) =================
 
 const isFirstMessage = !historyText || historyText.length < 10;
 const isGreeting = /^(hi|hello|hey|yo)$/i.test(msg.trim());
 
-// ✅ FIXED (removed broken trailing &&)
 const isHighIntent = leadScoreValue >= 0.7;
 
-
-// ✅ SINGLE SOURCE BOOKING CONTROL (FINAL)
+// ================= SINGLE SOURCE BOOKING CONTROL =================
 const hasBookingIntent = isBookingIntent(message);
 const isBookingRejected = detectBookingRejection(message);
 
-// ✅ HARD GUARD — ONLY TRIGGER FOR EXPLICIT ACTION INTENT
-const isExplicitBooking =
-  typeof message === "string" &&
-  /(book\s+(a\s+)?call|schedule\s+(a\s+)?call|talk\s+to\s+(someone|team)|get\s+on\s+a\s+call)/i.test(message);
+/**
+ * FINAL RULE:
+ * Only trigger booking if:
+ * 1. Intent detector says YES
+ * 2. NOT rejected
+ * 3. Lead score is reasonably high
+ */
+const shouldTriggerBookingUI =
+  hasBookingIntent &&
+  !isBookingRejected &&
+  leadScoreValue >= 0.75;
 
-// ❗ BLOCK informational / contextual usage
-const isInformationalBooking =
-  /(booking system|how bookings work|increase bookings|more bookings)/i.test(message);
-
-if (hasBookingIntent && isExplicitBooking && !isInformationalBooking && !isBookingRejected) {
+// ================= BOOKING RESPONSE (SAFE OUTPUT ONLY) =================
+if (shouldTriggerBookingUI) {
   const response =
-    "An automatic booking form may have opened on your screen. If not, go to the bottom-left corner of this page, click 'Book a Strategy Call', and submit the form to reserve your spot.";
+    "If you're ready, you can proceed using the booking option available in the interface. It will guide you through scheduling a strategy call.";
 
   await memoryService.addMessage(sessionId, "assistant", response);
   return response;
 }
-
 
 /**
  * FINAL ENTRY MODE (IMMUTABLE)
