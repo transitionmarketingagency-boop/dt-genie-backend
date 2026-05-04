@@ -612,7 +612,16 @@ const isHighIntent = leadScoreValue >= 0.7;
 const hasBookingIntent = isBookingIntent(message);
 const isBookingRejected = detectBookingRejection(message);
 
-if (hasBookingIntent && !isBookingRejected) {
+// ✅ HARD GUARD — ONLY TRIGGER FOR EXPLICIT ACTION INTENT
+const isExplicitBooking =
+  typeof message === "string" &&
+  /(book\s+(a\s+)?call|schedule\s+(a\s+)?call|talk\s+to\s+(someone|team)|get\s+on\s+a\s+call)/i.test(message);
+
+// ❗ BLOCK informational / contextual usage
+const isInformationalBooking =
+  /(booking system|how bookings work|increase bookings|more bookings)/i.test(message);
+
+if (hasBookingIntent && isExplicitBooking && !isInformationalBooking && !isBookingRejected) {
   const response =
     "An automatic booking form may have opened on your screen. If not, go to the bottom-left corner of this page, click 'Book a Strategy Call', and submit the form to reserve your spot.";
 
@@ -825,7 +834,6 @@ const result = await withTimeout(
 if (_isHardFail) {
   const msg = String(message || "").toLowerCase();
 
-  const fallbackBookingIntent = isBookingIntent(message);
   const isBookingRejected = detectBookingRejection(message);
 
   const isVeryShortGreeting =
@@ -937,7 +945,7 @@ response = removePricing(response);
 // 4. Repair structure
 response = repairResponse(response);
 
-// 5. ENFORCE BRAND STYLEimport { isBookingIntent } from "./bookingIntentDetector.js";
+// 5. ENFORCE BRAND STYLE
 response = enforceDTMStyle(response);
 
 // ================= PHASE 2 OPTIMIZER =================
@@ -1059,6 +1067,7 @@ const shouldAddCTA =
   cta.trim().length > 0 &&
   !detectBookingRejection(message) &&
   !hasBookingIntent &&
+  !/booking|book|call|schedule/i.test(message) &&
   !safeResponse.toLowerCase().includes("book a strategy call") &&
   !isGreeting &&
   !isIncompleteResponse &&

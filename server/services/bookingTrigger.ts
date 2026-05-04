@@ -1,5 +1,5 @@
 /* =====================================================
-   BOOKING TRIGGER (PHASE 6 — PRODUCTION STABLE)
+   BOOKING TRIGGER (PHASE 6 — PRODUCTION STABLE FIXED)
 ===================================================== */
 
 /* ================= TYPES ================= */
@@ -53,16 +53,19 @@ function isContextShift(msg: string): boolean {
   );
 }
 
+/* ================= STRICT BUYING INTENT ================= */
 function isStrongBuyingIntent(msg: string): boolean {
-  return /(i want to hire|i want to work with you|let's start|ready to begin|how do we start|get started|book a call|schedule a call)/i.test(
+  return /(i want to hire|i want to work with you|let's start|ready to begin|how do we start|get started|book a call|schedule a call|book a strategy call|schedule a strategy call)/i.test(
     msg
   );
 }
 
+/* ================= FIXED SOFT INTENT (ANTI-SPAM PATCH) ================= */
 function isSoftBookingMention(msg: string): boolean {
-  return /(book|schedule|call|consultation)/i.test(msg);
+  return /(book a call|schedule a call|consultation call|strategy call)/i.test(msg);
 }
 
+/* ================= REJECTION ================= */
 function isRejection(msg: string): boolean {
   return /(not now|later|just exploring|no thanks|dont want|don't want|stop|maybe later)/i.test(
     msg
@@ -117,7 +120,6 @@ export async function shouldTriggerBooking(
 
     /* ---------- CONTEXT SHIFT RESET ---------- */
     if (isContextShift(msg)) {
-      // reset booking pressure on new context
       return false;
     }
 
@@ -125,24 +127,24 @@ export async function shouldTriggerBooking(
     if (isInCooldown(sessionId)) return false;
 
     /* ---------- INFORMATIONAL GUARD ---------- */
-    if (isInformational(msg) && leadScore < 0.7) return false;
+    if (isInformational(msg) && leadScore < 0.75) return false;
 
-    /* ---------- STRONG INTENT (ONLY SAFE TRIGGER) ---------- */
+    /* ---------- STRONG INTENT (SAFE TRIGGER ONLY) ---------- */
     if (isStrongBuyingIntent(msg)) {
       markTriggered(sessionId);
       return true;
     }
 
-    /* ---------- SOFT INTENT BLOCK ---------- */
-    if (isSoftBookingMention(msg) && leadScore < 0.8) {
-      return false; // prevent premature triggers
+    /* ---------- SOFT INTENT BLOCK (STRICT FIX) ---------- */
+    if (isSoftBookingMention(msg) && leadScore < 0.85) {
+      return false;
     }
 
-    /* ---------- STAGE + SCORE ---------- */
+    /* ---------- STAGE + SCORE (TIGHTENED THRESHOLDS) ---------- */
     const shouldTrigger =
-      (stage === "conversion" && leadScore >= 0.6) ||
-      (stage === "service" && leadScore >= 0.7) ||
-      (stage === "strategy" && leadScore >= 0.8);
+      (stage === "conversion" && leadScore >= 0.75) ||
+      (stage === "service" && leadScore >= 0.8) ||
+      (stage === "strategy" && leadScore >= 0.9);
 
     if (shouldTrigger) {
       markTriggered(sessionId);
