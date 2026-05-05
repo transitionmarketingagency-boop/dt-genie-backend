@@ -147,6 +147,20 @@ function removeForbiddenContent(text: string): string {
       ""
     )
 
+// ❌ BLOCK FAKE BOOKING CONFIRMATIONS (STRONG FIX)
+.replace(
+  /\b(confirmed|scheduled|booked)\s+(for|at|on)\s+\d{1,2}(:\d{2})?\s?(am|pm)?\b/gi,
+  ""
+)
+.replace(
+  /\b(your\s+meeting\s+is\s+confirmed|your\s+call\s+is\s+scheduled)\b/gi,
+  ""
+)
+.replace(
+  /\b(see\s+you\s+then|looking\s+forward\s+to\s+our\s+call)\b/gi,
+  ""
+)
+
     .trim();
 }
 
@@ -294,6 +308,11 @@ CRITICAL RULES (STRICT)
    → Politely guide them to a discovery call or website
 8. DO NOT act like a “guru” or “strategist personality”
 9. DO NOT ask repetitive or unnecessary questions
+10. NEVER confirm bookings, calls, or meetings as completed
+11. NEVER say a time or date is confirmed
+12. If booking is triggered, ONLY refer to UI action or button navigation
+13. Always assume booking is external system handled
+
 
 If knowledge is missing:
 → Answer naturally using general business reasoning
@@ -654,13 +673,13 @@ const bookingResult: {
 
 // 🔥 IF BOOKING SHOULD TRIGGER → FORCE UI RESPONSE
 if (bookingResult.shouldOpenUI) {
+
   const response =
-    "An automatic booking form may have opened on your screen. If not, you can use the 'Book a Strategy Call' button at the bottom left to schedule your call.";
+    "A booking window may have opened on your screen. If you don’t see it, use the 'Book a Strategy Call' button at the bottom-left corner to schedule your call.";
 
   await memoryService.addMessage(sessionId, "assistant", response);
   return response;
 }
-
 
 /**
  * FINAL ENTRY MODE (IMMUTABLE)
@@ -1115,6 +1134,22 @@ if (shouldAddCTA) {
   safeResponse = safeResponse.trim() + "\n\n" + cta.trim();
 }
 
+// 🚨 UI AWARENESS ENFORCEMENT
+if (bookingResult.shouldOpenUI) {
+  safeResponse =
+    "A booking interface may have opened. If not visible, use the 'Book a Strategy Call' button at the bottom-left corner to continue.";
+}
+
+
+// ================= BOOKING UI CONFLICT GUARD (FIX 6) =================
+
+// prevent model from hallucinating booking confirmation text
+if (bookingResult.shouldOpenUI) {
+  safeResponse = safeResponse
+    .replace(/confirmed|scheduled|booked/gi, "")
+    .replace(/\b(for|at|on)\s+\d{1,2}(:\d{2})?\s?(am|pm)?/gi, "")
+    .trim();
+}
 
 
 // ================= SAVE =================

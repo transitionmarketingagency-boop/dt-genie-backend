@@ -104,10 +104,9 @@ const bookingFlow = {
     const explicitIntent =
       /(book|call|schedule|meeting|get on a call|strategy call)/i.test(message);
 
-    const shouldOpenUI =
-      strongIntent ||
-      aiDecision ||
-      (explicitIntent && leadScore >= 0.75);
+const shouldOpenUI =
+  aiDecision ||
+  (strongIntent && leadScore >= 0.75);
 
     // store session only if triggered
     if (shouldOpenUI) {
