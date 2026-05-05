@@ -28,18 +28,17 @@ export function neuralBrain(message: string) {
     };
   }
 
-  /* ================= BOOKING / HIGH INTENT ================= */
-  const bookingMatch = /(book|schedule|appointment|consultation|call|hire|work with you|start now|ready to proceed|let's start|get started)/i.test(
-    msg
-  );
 
-  if (bookingMatch) {
-    return {
-      type: "booking",
-      highIntent: true,
-      confidence: 0.98,
-    };
-  }
+/* ================= BOOKING / HIGH INTENT (FIXED) ================= */
+const bookingMatch = /(book\s+(a\s+)?call|schedule\s+(a\s+)?call|book\s+(a\s+)?meeting|schedule\s+(a\s+)?meeting|i want to (book|schedule)|let'?s schedule|can we schedule|get on a call|talk to (someone|team))/i.test(msg);
+
+if (bookingMatch) {
+  return {
+    type: "booking",
+    highIntent: true,
+    confidence: 0.98,
+  };
+}
 
   /* ================= PROBLEM DETECTION ================= */
   const problemMatch = /(low roas|no conversions|ads not working|no sales|traffic but no leads|bad performance|struggling|not working|issue|problem)/i.test(

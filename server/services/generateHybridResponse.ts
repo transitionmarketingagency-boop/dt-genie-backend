@@ -617,10 +617,15 @@ const isBookingRejected = detectBookingRejection(message);
  * 2. NOT rejected
  * 3. Lead score is reasonably high
  */
+
+const isExplicitBooking =
+  /(book\s+(a\s+)?call|schedule\s+(a\s+)?call|get\s+on\s+a\s+call|talk\s+to\s+(someone|team))/i.test(message);
+
 const shouldTriggerBookingUI =
   hasBookingIntent &&
+  isExplicitBooking &&
   !isBookingRejected &&
-  leadScoreValue >= 0.75;
+  leadScoreValue >= 0.85;
 
 // ================= BOOKING RESPONSE (SAFE OUTPUT ONLY) =================
 if (shouldTriggerBookingUI) {

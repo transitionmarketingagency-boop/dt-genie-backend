@@ -6,9 +6,6 @@ import { shouldTriggerBooking } from "./services/bookingTrigger.js";
 const ongoingBookings: Record<string, any> = {};
 const BOOKING_SESSION_TTL = 1000 * 60 * 30;
 
-const baseCalendlyLink =
-  "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future";
-
 /* ================= CLEANUP ================= */
 
 function cleanupExpiredBookings(): void {
@@ -48,13 +45,27 @@ function fallbackServiceDetection(message: string): string[] {
   return services;
 }
 
+/* ================= INTENT GUARDS ================= */
+
+function isExplicitBookingIntent(msg: string): boolean {
+  return /(book\s+(a\s+)?call|schedule\s+(a\s+)?call|book\s+(a\s+)?meeting|schedule\s+(a\s+)?meeting|get\s+on\s+a\s+call|talk\s+to\s+(someone|team)|i want to (book|schedule)|let'?s schedule|can we schedule)/i.test(
+    msg
+  );
+}
+
+function isInformational(msg: string): boolean {
+  return /(how|what|why|explain|tell me|guide|learn)/i.test(msg);
+}
+
+function isRejection(msg: string): boolean {
+  return /(not now|later|just exploring|no thanks|dont want|don't want|stop|maybe later)/i.test(
+    msg
+  );
+}
+
 /* ================= CORE ENGINE ================= */
 
 const bookingFlow = {
-  /**
-   * ONLY RESPONSIBILITY:
-   * Decide whether booking UI should open
-   */
   trigger: async (
     userId: string,
     userMessage: string,
@@ -71,6 +82,12 @@ const bookingFlow = {
       return { shouldOpenUI: false };
     }
 
+    /* ---------- HARD REJECTION ---------- */
+    if (isRejection(message)) {
+      return { shouldOpenUI: false };
+    }
+
+    /* ---------- SERVICE DETECTION ---------- */
     let detectedServices: string[] = [];
 
     try {
@@ -79,7 +96,7 @@ const bookingFlow = {
       detectedServices = fallbackServiceDetection(message);
     }
 
-    // AI + rule hybrid decision (SINGLE SOURCE OF TRUTH)
+    /* ---------- AI DECISION (SOURCE OF TRUTH) ---------- */
     let aiDecision = false;
 
     try {
@@ -93,14 +110,15 @@ const bookingFlow = {
       aiDecision = false;
     }
 
-    const strongIntent =
-      /(book|call|schedule|meeting|appointment|get started|hire)/i.test(
-        message
-      );
+    /* ---------- EXPLICIT INTENT (CONTROLLED OVERRIDE) ---------- */
+    const explicitIntent = isExplicitBookingIntent(message);
 
-    const shouldOpenUI = strongIntent || aiDecision;
+    /* ---------- FINAL DECISION ---------- */
+    const shouldOpenUI =
+      aiDecision ||
+      (explicitIntent && !isInformational(message) && leadScore >= 0.85);
 
-    // store ONLY if UI opens (no flow logic)
+    /* ---------- STORE SESSION ---------- */
     if (shouldOpenUI) {
       ongoingBookings[userId] = {
         createdAt: Date.now(),
@@ -114,23 +132,14 @@ const bookingFlow = {
     };
   },
 
-  /**
-   * Called from frontend after booking is completed
-   */
   confirmBooking: async (userId: string): Promise<void> => {
     delete ongoingBookings[userId];
   },
 
-  /**
-   * Reset session
-   */
   reset: (userId: string): void => {
     delete ongoingBookings[userId];
   },
 
-  /**
-   * UI helper only (no logic)
-   */
   isActive: (userId: string): boolean => {
     cleanupExpiredBookings();
     return Boolean(ongoingBookings[userId]);

@@ -62,7 +62,7 @@ function isStrongBuyingIntent(msg: string): boolean {
 
 /* ================= FIXED SOFT INTENT (ANTI-SPAM PATCH) ================= */
 function isSoftBookingMention(msg: string): boolean {
-  return /(book a call|schedule a call|consultation call|strategy call)/i.test(msg);
+  return /(book\s+(a\s+)?call|schedule\s+(a\s+)?call|strategy call)/i.test(msg);
 }
 
 /* ================= REJECTION ================= */
@@ -141,10 +141,9 @@ export async function shouldTriggerBooking(
     }
 
     /* ---------- STAGE + SCORE (TIGHTENED THRESHOLDS) ---------- */
-    const shouldTrigger =
-      (stage === "conversion" && leadScore >= 0.75) ||
-      (stage === "service" && leadScore >= 0.8) ||
-      (stage === "strategy" && leadScore >= 0.9);
+const shouldTrigger =
+  stage === "conversion" && leadScore >= 0.85;
+
 
     if (shouldTrigger) {
       markTriggered(sessionId);
