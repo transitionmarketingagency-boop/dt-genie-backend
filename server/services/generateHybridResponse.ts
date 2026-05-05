@@ -54,7 +54,6 @@ import { detectService } from "./serviceDetector.js";
 import { strategicBrain } from "./strategicBrain.js";
 import bookingFlow from "../bookingFlow.js";
 import { analyzeLeadSignals } from "./leadIntelligence.js";
-import { shouldTriggerBooking } from "./bookingTrigger.js";
 import { isBookingIntent } from "./bookingIntentDetector.js";
 
 // Modular helpers
@@ -137,6 +136,16 @@ function removeForbiddenContent(text: string): string {
 
     // ❌ remove "Platform: xyz"
     .replace(/platform:\s*[a-z0-9.\-]+/gi, "")
+
+    // ❌ BLOCK FAKE BOOKING CONFIRMATIONS
+    .replace(
+      /\b(call|meeting|appointment)\s+(is|has been)\s+(confirmed|scheduled)\b/gi,
+      ""
+    )
+    .replace(
+      /\b(calendar invite|confirmation email|invite sent)\b/gi,
+      ""
+    )
 
     .trim();
 }
@@ -621,20 +630,37 @@ const isBookingRejected = detectBookingRejection(message);
 const isExplicitBooking =
   /(book\s+(a\s+)?call|schedule\s+(a\s+)?call|get\s+on\s+a\s+call|talk\s+to\s+(someone|team))/i.test(message);
 
-const shouldTriggerBookingUI =
-  hasBookingIntent &&
-  isExplicitBooking &&
-  !isBookingRejected &&
-  leadScoreValue >= 0.85;
 
-// ================= BOOKING RESPONSE (SAFE OUTPUT ONLY) =================
-if (shouldTriggerBookingUI) {
+// ================= SINGLE SOURCE BOOKING (FINAL FIX) =================
+
+let bookingResult = {
+  shouldOpenUI: false,
+  detectedServices: [],
+};
+
+try {
+const bookingResult: {
+  shouldOpenUI: boolean;
+  detectedServices: string[];
+} = await bookingFlow.trigger(
+  sessionId,
+  message,
+  leadScoreValue
+);
+
+} catch {
+  bookingResult = { shouldOpenUI: false, detectedServices: [] };
+}
+
+// 🔥 IF BOOKING SHOULD TRIGGER → FORCE UI RESPONSE
+if (bookingResult.shouldOpenUI) {
   const response =
-    "If you're ready, you can proceed using the booking option available in the interface. It will guide you through scheduling a strategy call.";
+    "An automatic booking form may have opened on your screen. If not, you can use the 'Book a Strategy Call' button at the bottom left to schedule your call.";
 
   await memoryService.addMessage(sessionId, "assistant", response);
   return response;
 }
+
 
 /**
  * FINAL ENTRY MODE (IMMUTABLE)
