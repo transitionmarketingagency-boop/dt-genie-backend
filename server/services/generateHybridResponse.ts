@@ -101,67 +101,59 @@ function cleanHybridResponse(text: string): string {
     : text.trim();
 }
 
+
 function removeForbiddenContent(text: string): string {
   if (!text) return "";
 
-  return text
+  let cleaned = text;
+
+  const rules: Array<[RegExp, string]> = [
     // ❌ remove emails
-    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "")
+    [/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, ""],
 
     // ❌ remove links
-    .replace(/https?:\/\/\S+/gi, "")
+    [/https?:\/\/\S+/gi, ""],
 
-    // ❌ remove tool/platform mentions
-.replace(
-  /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify\s?apps?|jasper|perplexity|sprout\s?social|spark\s?toro|sparktoro|firecrawl|ad\s?creative(\.ai)?|synthesia|apollo|instantly|mailchimp|sendgrid|brevo|runway|pika|leonardo|elevenlabs|descript|riverside)\b/gi,
-  ""
-)
+    // ❌ remove tool/platform mentions (FULL ORIGINAL + SAFE EXTENDED)
+    [
+      /\b(semrush|ahrefs|zapier|openai|chatgpt|gemini|activepieces|salesforce|hubspot|klaviyo|shopify\s?apps?|jasper|perplexity|sprout\s?social|spark\s?toro|sparktoro|firecrawl|ad\s?creative(\.ai)?|synthesia|apollo|instantly|mailchimp|sendgrid|brevo|runway|pika|leonardo|elevenlabs|descript|riverside)\b/gi,
+      "",
+    ],
 
+    // 🔧 FIX 2 — fake stats (original behavior preserved)
+    [/\b\d{1,3}%\s*(of\s*)?(clients?|users?)\b/gi, "results"],
+    [/\b\d{1,3}%\+?\s*(improvement|increase|results?)\b/gi, "improvement"],
+    [/\bmost clients see\b/gi, ""],
 
-// 🔧 FIX 2 — HARD BLOCK FAKE STATS
-// 🔥 FIX 5 — SOFT REMOVE (DO NOT BREAK STRUCTURE)
-.replace(/\b\d{1,3}%\s*(of\s*)?(clients?|users?)\b/gi, "results")
-.replace(/\b\d{1,3}%\+?\s*(improvement|increase|results?)\b/gi, "improvement")
-.replace(/\bmost clients see\b/gi, "")
+    // ❌ unsafe / blackhat suggestions
+    [
+      /\b(device fingerprint spoofing|bypass algorithms?|hack|scrape accounts?|fake engagement)\b/gi,
+      "",
+    ],
 
+    // ❌ tool labels
+    [/tool:\s*[a-z0-9.\-]+/gi, ""],
+    [/platform:\s*[a-z0-9.\-]+/gi, ""],
 
-// ❌ remove unsafe / blackhat suggestions
-.replace(
-  /\b(device fingerprint spoofing|bypass algorithms?|hack|scrape accounts?|fake engagement)\b/gi,
-  ""
-)
+    // ❌ booking confirmations (soft)
+    [/\b(call|meeting|appointment)\s+(is|has been)\s+(confirmed|scheduled)\b/gi, ""],
+    [/\b(calendar invite|confirmation email|invite sent)\b/gi, ""],
 
-    // ❌ remove "Tool: xyz"
-    .replace(/tool:\s*[a-z0-9.\-]+/gi, "")
+    // ❌ booking confirmations (strong)
+    [/\b(confirmed|scheduled|booked)\s+(for|at|on)\s+\d{1,2}(:\d{2})?\s?(am|pm)?\b/gi, ""],
+    [/\b(your\s+meeting\s+is\s+confirmed|your\s+call\s+is\s+scheduled)\b/gi, ""],
+    [/\b(see\s+you\s+then|looking\s+forward\s+to\s+our\s+call)\b/gi, ""],
+    [
+      /\b(will send a confirmation|you will receive a confirmation|our team will contact you|we will confirm|appointment is confirmed|booking is confirmed)\b/gi,
+      "",
+    ],
+  ];
 
-    // ❌ remove "Platform: xyz"
-    .replace(/platform:\s*[a-z0-9.\-]+/gi, "")
+  for (const [regex, replacement] of rules) {
+    cleaned = cleaned.replace(regex, replacement);
+  }
 
-    // ❌ BLOCK FAKE BOOKING CONFIRMATIONS
-    .replace(
-      /\b(call|meeting|appointment)\s+(is|has been)\s+(confirmed|scheduled)\b/gi,
-      ""
-    )
-    .replace(
-      /\b(calendar invite|confirmation email|invite sent)\b/gi,
-      ""
-    )
-
-// ❌ BLOCK FAKE BOOKING CONFIRMATIONS (STRONG FIX)
-.replace(
-  /\b(confirmed|scheduled|booked)\s+(for|at|on)\s+\d{1,2}(:\d{2})?\s?(am|pm)?\b/gi,
-  ""
-)
-.replace(
-  /\b(your\s+meeting\s+is\s+confirmed|your\s+call\s+is\s+scheduled)\b/gi,
-  ""
-)
-.replace(
-  /\b(see\s+you\s+then|looking\s+forward\s+to\s+our\s+call)\b/gi,
-  ""
-)
-
-    .trim();
+  return cleaned.trim();
 }
 
 
@@ -242,18 +234,24 @@ function removeGenericPhrases(text: string): string {
     "how can i assist you",
     "feel free to share",
     "happy to explore",
+    "navigate to",
+    "visit our platform",
+    "fill out the form",
+    "our team will review",
+    "we will process your request",
+    "confirmation will be sent",
+    "coordinate a discussion",
   ];
 
   let cleaned = text;
 
-  garbage.forEach(p => {
-    const regex = new RegExp(p, "gi");
+  for (const phrase of garbage) {
+    const regex = new RegExp(phrase, "gi");
     cleaned = cleaned.replace(regex, "");
-  });
+  }
 
   return cleaned.trim();
 }
-
 
 
 // ===================== PROMPT BUILDER ===================== //
@@ -673,9 +671,8 @@ const bookingResult: {
 
 // 🔥 IF BOOKING SHOULD TRIGGER → FORCE UI RESPONSE
 if (bookingResult.shouldOpenUI) {
-
   const response =
-    "A booking window may have opened on your screen. If you don’t see it, use the 'Book a Strategy Call' button at the bottom-left corner to schedule your call.";
+    "A booking form may have opened on your screen. If not, use the 'Book a Strategy Call' button at the bottom-left of the page to continue.";
 
   await memoryService.addMessage(sessionId, "assistant", response);
   return response;
