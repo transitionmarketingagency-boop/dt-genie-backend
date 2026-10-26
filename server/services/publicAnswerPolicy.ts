@@ -26,6 +26,18 @@ export function getApprovedPublicAnswer(message: string): string {
     return "I can’t disclose DTM’s internal commercial or sales procedures. I can explain the public approach: DTM diagnoses the growth constraint, weighs evidence and business economics, then recommends a suitable next step.";
   }
 
+  if (/\b(?:customer|client|personal|sensitive|identifiable) (?:data|records|information)\b/.test(question) && /\b(?:ai|model|provider|tool|upload|share|send|use)\b/.test(question)) {
+    return "Before sharing customer data with an AI tool, confirm what information is needed, how it will be used, the provider’s retention and security terms, access controls, and applicable requirements. Use the minimum necessary data. If the information is sensitive or identifiable, pause for qualified review when the rules or safeguards are unclear.";
+  }
+
+  const performanceCostQuestion =
+    /\bcost per (?:lead|click|acquisition|conversion|booking|customer|sale|enquir\w*|impression)\b/.test(question) &&
+    !/\b(?:dtm|you|your|agency)\b.{0,35}\b(?:charge|price|pricing|quote|bill|fee)\b/.test(question);
+
+  if (performanceCostQuestion && /\b(?:why|enough|assess|judge|compare|measure|what does|how should|how do)\b/.test(question)) {
+    return "Cost per lead is an acquisition-efficiency measure, not proof of lead quality or sales value. Assess whether enquiries fit the intended customer, progress to conversations and sales, what those outcomes contribute, and whether the business can serve them. Compare consistent periods and account for changes in audience, offer, channel, and tracking.";
+  }
+
   if (/\b(pric(?:e|ing)|costs?|how much|fixed fee|packages?|quotes?|rates?|retainers?|margins?)\b/.test(question)) {
     return "I can’t confirm a fixed price from approved public information. Investment depends on scope and business context; what outcome are you looking to achieve?";
   }
