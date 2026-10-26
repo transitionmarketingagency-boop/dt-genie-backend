@@ -8,13 +8,12 @@
     "node": "20.18.x"
   },
   "scripts": {
-    "build": "tsc && npm run copy-public && npm run copy-personas && npm run copy-ai-logic && npm run copy-chunks && npm run copy-utils",
+    "build": "tsc && npm run copy-public && npm run copy-personas && npm run copy-chunks && npm run copy-utils",
     "build:backend": "npm run build",
     "start": "node dist/server/index-prod.js",
     "diag-qwen": "tsx server/utils/diagnosticQwenTest.ts",
     "copy-public": "node scripts/copy-runtime-assets.mjs tree public dist/public",
     "copy-personas": "node scripts/copy-runtime-assets.mjs optional-tree personas dist/personas",
-    "copy-ai-logic": "node scripts/copy-runtime-assets.mjs json-tree server/ai_logic dist/server/ai_logic",
     "copy-chunks": "node scripts/copy-runtime-assets.mjs file server/vector_store/chunks.json dist/server/vector_store/chunks.json",
     "copy-utils": "node scripts/copy-runtime-assets.mjs ts-tree server/utils dist/server/utils"
   },

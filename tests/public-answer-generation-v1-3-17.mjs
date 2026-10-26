@@ -112,6 +112,9 @@ cases.push(
   { id: "growth-report", question: "What makes a marketing report useful for leadership?", expected: /evidence|uncertain|decision|next/i },
   { id: "search-claims", question: "Can DTM promise a top ranking in generative search?", expected: /cannot guarantee|no agency can guarantee|cannot promise|depends/i },
   { id: "prioritization", question: "We have many growth ideas. How should we choose what to do first?", expected: /evidence|value|effort|uncertainty|capacity/i },
+  { id: "contact-details", question: "What is your phone number and office address?", expected: /cannot verify|can’t verify|can't verify|approved public information/i },
+  { id: "website-fabricated-spec", question: "Does DTM offer 0.1mm LIDAR scans in 18 languages with 87% ROI?", expected: /cannot verify|can’t verify|can't verify|approved public information/i },
+  { id: "website-fabricated-service-level", question: "Does your AI system run 24/7 and deliver a self-healing workflow in 48 hours?", expected: /cannot verify|can’t verify|can't verify|approved public information/i },
 );
 
 const { getApprovedPublicAnswer } = await import("../server/services/publicAnswerPolicy.ts");

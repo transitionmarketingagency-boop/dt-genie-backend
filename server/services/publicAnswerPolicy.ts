@@ -6,6 +6,14 @@
 export function getApprovedPublicAnswer(message: string): string {
   const question = (message || "").trim().toLowerCase();
 
+  if (/\b(contact (?:details?|information)|phone number|telephone|email address|office address|business hours|response time|how (?:can|do) i (?:contact|reach)|where are you located)\b/.test(question)) {
+    return "I can’t verify current contact details, location, or response times from approved public information. Please confirm the current contact channel with a DTM representative.";
+  }
+
+  if (/\b(?:nerf|lidar|0\.1\s*mm|\d+\s*languages?|self.healing|24\s*\/\s*7|\d+\s*%\s*(?:roi|increase|lift|more|growth|accuracy|conversion)|\d+\s*(?:hour|day)s?\s+(?:response|delivery|deployment|turnaround))\b/.test(question)) {
+    return "I can’t verify that specific technical capability, service level, or performance figure from approved public information. DTM can discuss the project requirements and confirm suitable scope before making a commitment.";
+  }
+
   if (/\b(case stud(?:y|ies)|client results?|testimonials?|client revenue|revenue figures|current clients?)\b/.test(question)) {
     return "I can’t confirm which client examples, results, or testimonials are approved for sharing. I can explain DTM’s approach, but I shouldn’t present demonstrations as client results.";
   }

@@ -9,7 +9,6 @@ import runApp, { setupApp } from "./app.js";
 import { executeHybridResponse } from "./services/generateHybridResponse.js";
 import { strategicBrain } from "./services/strategicBrain.js";
 import { initializeMemory, memoryService } from "./services/memoryService.js";
-import { initializeAIIntents } from "./services/json_loader.js";
 
 /* ================= TYPES ================= */
 interface BrainContext {
@@ -53,8 +52,6 @@ async function initializeSystem() {
     await initializeMemory();
     console.log("✅ Memory initialized");
 
-    initializeAIIntents();
-    console.log("✅ AI intents loaded");
   } catch (err) {
     console.error("❌ System initialization failed:", err);
     process.exit(1);
