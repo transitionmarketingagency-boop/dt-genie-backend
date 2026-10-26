@@ -34,8 +34,8 @@ let scrollTimeout;
       <div id="dt-genie-widget">
         <div id="dt-genie-button" role="button" aria-label="Open ${CHATBOT_NAME} Chat" tabindex="0">
           <div id="dt-genie-avatar-wrap">
-            <img src="https://dt-genie-backend.onrender.com/neon-brain.png"
-              alt="${CHATBOT_NAME} icon" width="48" height="48" />
+            <img src="https://dt-genie-backend.onrender.com/neonvision-mark.svg?v=icon-v1"
+              alt="${CHATBOT_NAME} AI icon" width="48" height="48" />
           </div>
           <svg id="dt-genie-curved-text" viewBox="0 0 140 140">
             <defs>
@@ -43,7 +43,7 @@ let scrollTimeout;
             </defs>
             <text>
               <textPath href="#circlePath" startOffset="0">
-                WE ARE HERE • NeonVision •
+                AGENCY GROWTH INTELLIGENCE • NEONVISION •
               </textPath>
             </text>
           </svg>
@@ -52,12 +52,12 @@ let scrollTimeout;
         <div id="dt-genie-panel" role="dialog" aria-hidden="true">
           <div id="dt-genie-header">
             <div id="dt-genie-header-avatar-wrap">
-              <img src="https://dt-genie-backend.onrender.com/neon-brain.png"
-                alt="${CHATBOT_NAME} icon" width="48" height="48" />
+              <img src="https://dt-genie-backend.onrender.com/neonvision-mark.svg?v=icon-v1"
+                alt="${CHATBOT_NAME} AI icon" width="48" height="48" />
             </div>
             <div id="dt-genie-header-info">
-              <h3 id="dt-genie-header-name">${CHATBOT_NAME}</h3>
-              <p id="dt-genie-header-status">Online</p>
+              <h3 id="dt-genie-header-name"><span class="neonvision-word-neon">Neon</span><span class="neonvision-word-vision">Vision</span></h3>
+              <p id="dt-genie-header-status">Online · DTM growth intelligence</p>
             </div>
             <button id="dt-genie-close" aria-label="Close Chat">×</button>
           </div>

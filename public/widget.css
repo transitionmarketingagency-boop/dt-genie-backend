@@ -68,12 +68,14 @@
 #dt-genie-header-avatar-wrap img {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
+  object-fit: contain;
+  overflow: visible;
   box-shadow:
     0 0 12px rgba(0, 225, 255, 0.6),
     0 0 24px rgba(0, 225, 255, 0.4),
     0 0 36px rgba(0, 225, 255, 0.2);
-  transition: box-shadow 0.3s ease-in-out;
+  filter: drop-shadow(0 0 5px rgba(0, 225, 255, 0.55));
+  transition: box-shadow 0.3s ease-in-out, filter 0.3s ease-in-out;
 }
 
 #dt-genie-button:hover #dt-genie-avatar-wrap img,
@@ -169,10 +171,16 @@
 #dt-genie-header-name {
   font-size: 16px;
   font-weight: 700;
-  color: #fff;
+  color: transparent;
+  background: linear-gradient(92deg, #40F2FF 0%, #B7FAFF 48%, #FFB333 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  letter-spacing: 0.025em;
   margin: 0 0 4px 0;
   text-shadow: 0 0 8px rgba(0, 225, 255, 0.35);
 }
+.neonvision-word-neon { color: #40F2FF; }
+.neonvision-word-vision { color: #FFB333; }
 #dt-genie-header-status {
   font-size: 12px;
   color: var(--neon-blue);

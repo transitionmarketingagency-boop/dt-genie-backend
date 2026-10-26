@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">NeonVision headset and lightning mark</title>
+  <defs>
+    <linearGradient id="cyan" x1="18" y1="48" x2="105" y2="94" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#42F5FF"/>
+      <stop offset=".52" stop-color="#00BFFF"/>
+      <stop offset="1" stop-color="#316BFF"/>
+    </linearGradient>
+    <linearGradient id="bolt" x1="55" y1="13" x2="82" y2="64" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF3A0"/>
+      <stop offset=".42" stop-color="#FFC43D"/>
+      <stop offset="1" stop-color="#FF8617"/>
+    </linearGradient>
+    <filter id="glowCyan" x="-45%" y="-35%" width="190%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="3.2" result="blur"/>
+      <feComposite in="blur" in2="SourceGraphic" operator="out" result="halo"/>
+      <feColorMatrix in="halo" values="0 0 0 0 0.00  0 0 0 0 0.78  0 0 0 0 1.00  0 0 0 .82 0" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowBolt" x="-45%" y="-35%" width="190%" height="180%" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feColorMatrix in="blur" values="1 0 0 0 .2  0 .55 0 0 .15  0 0 .1 0 0  0 0 0 .8 0" result="tint"/>
+      <feMerge><feMergeNode in="tint"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- headset arc and ear cups -->
+  <g fill="none" stroke="url(#cyan)" stroke-linecap="round" stroke-linejoin="round" filter="url(#glowCyan)">
+    <path d="M23 61V54a41 41 0 0 1 82 0v7" stroke-width="7"/>
+    <path d="M29 49a36 36 0 0 1 70-1" stroke="#9CFBFF" stroke-opacity=".78" stroke-width="2.4"/>
+    <path d="M18 61v17a9 9 0 0 0 9 9h5V55h-5a9 9 0 0 0-9 6Z" fill="#07172A" stroke-width="4"/>
+    <path d="M110 61v17a9 9 0 0 1-9 9h-5V55h5a9 9 0 0 1 9 6Z" fill="#07172A" stroke-width="4"/>
+    <!-- speech-face silhouette -->
+    <path d="M40 44h48a17 17 0 0 1 17 17v22a17 17 0 0 1-17 17H68l-13 12V100h-15a17 17 0 0 1-17-17V61a17 17 0 0 1 17-17Z" fill="#061225" stroke-width="4.2"/>
+    <!-- expressive eyes -->
+    <path d="M39 72q7-10 14 0M76 72q7-10 14 0" stroke="#35F3FF" stroke-width="5.2"/>
+  </g>
+
+  <!-- lightning / vision spark -->
+  <path d="m70 13-20 26h13l-4 19 26-31H69l8-14Z" fill="url(#bolt)" stroke="#FFE39A" stroke-linejoin="round" stroke-width="2.3" filter="url(#glowBolt)"/>
+  <path d="m68 22-11 14h9l-3 12 14-17H68l5-9Z" fill="#FFF7C8" fill-opacity=".28"/>
+</svg>
