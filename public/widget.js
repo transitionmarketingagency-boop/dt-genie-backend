@@ -43,7 +43,7 @@ let scrollTimeout;
             </defs>
             <text>
               <textPath href="#circlePath" startOffset="0">
-                NEONVISION
+                NEON VISION • CHAT WITH ME
               </textPath>
             </text>
           </svg>
