@@ -8,6 +8,7 @@
   };
 
   const CHATBOT_NAME = 'NeonVision';
+  const BOOKING_URL = 'https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future';
 
   let sessionId = localStorage.getItem('dtGenieSession');
   if (!sessionId) {
@@ -205,6 +206,26 @@ function showTyping() {
     typing.appendChild(dot);
   }
 
+  function addBookingLink() {
+    const container = document.getElementById('dt-genie-messages');
+    if (!container) return;
+
+    const row = document.createElement('div');
+    row.className = 'dt-message assistant';
+    const bubble = document.createElement('div');
+    bubble.className = 'dt-message-bubble';
+    const link = document.createElement('a');
+    link.href = BOOKING_URL;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = 'Choose a strategy call time';
+    link.style.cssText = 'display:inline-block;padding:10px 14px;border-radius:8px;background:#00d9ff;color:#071018;font-weight:600;text-decoration:none;';
+    bubble.appendChild(link);
+    row.appendChild(bubble);
+    container.appendChild(row);
+    container.scrollTop = container.scrollHeight;
+  }
+
   bubble.appendChild(typing);
   wrapper.appendChild(bubble);
   container.appendChild(wrapper);
@@ -242,38 +263,12 @@ function showTyping() {
       hideTyping();
 
       addMessage('assistant', data.reply || 'No response received.');
+      const bookingRequest = /\b(book|schedule|strategy call|meeting|consultation)\b/i.test(message);
+      if (bookingRequest) addBookingLink();
       messageHistory.push({ role: 'assistant', content: data.reply });
 
 sessionData.lastUserIntent = message;
 saveSession();
-
-      /* Calendly trigger preserved exactly */
-      const bookingKeywords = ["book", "schedule", "strategy call", "meeting", "call", "consultation"];
-      const now = Date.now();
-      const cooldown = 5 * 60 * 1000;
-
-      if (
-        bookingKeywords.some(k => message.toLowerCase().includes(k)) &&
-        (!sessionData.lastCalendlyOpen || now - sessionData.lastCalendlyOpen > cooldown)
-      ) {
-        sessionData.lastCalendlyOpen = now;
-        sessionData.bookingIntentCount = (sessionData.bookingIntentCount || 0) + 1;
-        saveSession();
-
-        const contextNote = encodeURIComponent(
-          messageHistory.slice(-5).map(m => `${m.role}: ${m.content}`).join(' | ')
-        );
-
-        setTimeout(() => {
-          if (window.Calendly) {
-            Calendly.initPopupWidget({
-              url:
-                "https://calendly.com/transition-marketing-agency/let-s-plan-your-digital-future" +
-                "?notes=" + contextNote
-            });
-          }
-        }, 800);
-      }
 
     } catch (err) {
       hideTyping();
@@ -304,9 +299,9 @@ const isFirstLoad = container.children.length === 0;
 
         addMessage(
           'assistant',
-`Welcome to Digital Transition Marketing. I’m NeonVision — your AI growth system.
+`Welcome to Digital Transition Marketing. I’m NeonVision.
 
-DTM builds 14 AI growth systems for leads, ads, automation, AI search, and business growth.
+I can help you explore growth challenges and possible next steps across marketing, customer experience, and technology.
 
 ⚡ Pick an action below or tell me what you want to improve.`
         );

@@ -629,6 +629,27 @@ export async function executeHybridResponse({
 
 const isFirstMessage = !historyText || historyText.length < 10;
 const isGreeting = /^(hi|hello|hey|yo)$/i.test(msg.trim());
+// Give the widget's three quick actions a useful, focused first question.
+// These short button messages intentionally bypass vector retrieval.
+const quickActionFollowUp = (() => {
+  const normalized = message.trim().toLowerCase().replace(/[.!?]+$/, "");
+  if (/^(fix|improve) (my )?(ads|advertising)$/.test(normalized)) {
+    return "Which ad platform are you using, and what needs attention most: cost per lead, lead quality, conversions, or the creative?";
+  }
+  if (/^(get|generate) (more )?leads$/.test(normalized)) {
+    return "What do you sell, who is the customer you want to reach, and where do your leads come from today?";
+  }
+  if (/^(automate|improve automation) (my )?business$/.test(normalized)) {
+    return "Which recurring task takes the most time right now, and what tools or steps are involved?";
+  }
+  return "";
+})();
+
+if (quickActionFollowUp) {
+  await memoryService.addMessage(sessionId, "assistant", quickActionFollowUp);
+  return quickActionFollowUp;
+}
+
 
 const isHighIntent = leadScoreValue >= 0.7;
 
@@ -672,7 +693,7 @@ const bookingResult: {
 // 🔥 IF BOOKING SHOULD TRIGGER → FORCE UI RESPONSE
 if (bookingResult.shouldOpenUI) {
   const response =
-    "A booking form may have opened on your screen. If not, use the 'Book a Strategy Call' button at the bottom-left of the page to continue.";
+    "Use the scheduling link below to choose a time. Your call is not booked until you select an available slot.";
 
   await memoryService.addMessage(sessionId, "assistant", response);
   return response;
