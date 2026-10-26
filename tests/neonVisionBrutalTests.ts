@@ -2,8 +2,8 @@
 import fs from "fs";
 import path from "path";
 import assert from "assert";
-import { memoryService } from "../server/services/memoryService";
-import { generateHybridResponse } from "../server/services/generateHybridResponse";
+import { initializeMemory, memoryService } from "../server/services/memoryService";
+import { executeHybridResponse } from "../server/services/generateHybridResponse";
 import { cleanResponse } from "../server/utils/cleanResponse";
 
 // ================== AUTO FOLDER CREATION ==================
@@ -21,6 +21,7 @@ function randomString(len: number) {
 // ================== MAIN TEST ==================
 async function runTests() {
   console.log("🚀 Starting Neon Vision Brutal Tests...");
+  await initializeMemory();
 
   const sessionId = "test-session-" + Date.now();
 
@@ -31,14 +32,14 @@ async function runTests() {
   assert(msg1.content === "Hello there!", "Message content mismatch");
   console.log("✅ User message stored correctly");
 
+  // Adjacent duplicate test
+  const msg3 = await memoryService.addMessage(sessionId, "user", "Hello there!");
+  assert.equal(msg3, null, "Adjacent duplicate message should be skipped");
+  console.log("✅ Duplicate message skipped correctly");
+
   const msg2 = await memoryService.addMessage(sessionId, "assistant", "Hi! How can I help?");
   assert(msg2.role === "assistant", "Assistant role mismatch");
   console.log("✅ Assistant message stored correctly");
-
-  // Duplicate message test
-  const msg3 = await memoryService.addMessage(sessionId, "user", "Hello there!");
-  assert(msg3.id === msg1.id, "Duplicate message not skipped");
-  console.log("✅ Duplicate message skipped correctly");
 
   // ----- 2. Test memoryService.getHistory -----
   console.log("🧪 Testing memoryService.getHistory...");
@@ -70,7 +71,7 @@ async function runTests() {
   const strat = await memoryService.getStrategicMemory(sessionId);
   assert(strat.industry === "Marketing", "Industry mismatch");
   assert(strat.goals?.length === 2, "Goals not stored correctly");
-  assert(strat.bantSignals?.budget === 5000, "BANT budget mismatch");
+  assert.equal(strat.budget, 5000, "Budget mismatch");
   console.log("✅ Strategic memory stored and retrieved correctly");
 
   // ----- 5. Test bookings -----
@@ -88,7 +89,17 @@ async function runTests() {
 
   // ----- 6. Test generateHybridResponse + cleaning -----
   console.log("🧪 Testing generateHybridResponse + cleanResponse...");
-  const rawResponse = await generateHybridResponse("Test message", sessionId);
+  const rawResponse = await executeHybridResponse({
+    sessionId,
+    message: "What is Digital Transition Marketing?",
+    brainContext: { executionMode: "exploration" },
+    leadScoreValue: 0,
+    detectedIntentNames: [],
+    vectorText: "",
+    historyText: "",
+    recentMessagesCache: [],
+    intentCategories: [],
+  });
   const cleaned = cleanResponse(rawResponse);
   assert(typeof cleaned === "string" && cleaned.length > 0, "Response cleaning failed");
   console.log("✅ Hybrid response generated and cleaned");
