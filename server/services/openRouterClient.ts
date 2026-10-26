@@ -4,7 +4,7 @@ import crypto from "crypto";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 /* ================= CONFIG ================= */
-const MODEL = "qwen/qwen3-235b-a22b";
+const MODEL = "qwen/qwen3.7-plus";
 const REQUEST_TIMEOUT = 12000;
 const MAX_PROMPT_LENGTH = 3500;
 const MAX_RETRIES = 2;
@@ -75,6 +75,7 @@ async function callOpenRouter(
         model: MODEL,
         temperature,
         max_tokens: 1400,
+        reasoning: { effort: "none", exclude: true },
         messages: [{ role: "user", content: prompt }],
       }),
       signal: controller.signal,
