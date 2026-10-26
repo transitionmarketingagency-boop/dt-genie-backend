@@ -1,0 +1,74 @@
+[
+  {
+    "chunk_id": "PUBLIC-SERVICE-001",
+    "intent": "service_discovery",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "Digital Transition Marketing uses strategy, data, creative, technology and AI as ways to address a diagnosed growth constraint. The right intervention depends on the business objective, customer journey, economics, evidence, operating capacity and measurement. A service label alone is not a recommendation, and no single channel or tool is right for every business."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-002",
+    "intent": "search_discovery",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "Search and discovery work can include search engine optimization, local or destination discovery, voice search and optimization for answers in generative search systems. The starting point is how customers look for, compare and evaluate the offer, and whether the business has useful, accurate information for those questions. Visibility, traffic or ranking improvements are not guaranteed; measurement should distinguish discovery from qualified enquiries and business outcomes."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-003",
+    "intent": "website_conversion",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "Website and digital experience work should connect a clear offer to the customer's next step. Diagnosis may examine audience fit, message clarity, page experience, accessibility, mobile use, enquiry or booking flow, response time and tracking. Website design or development is appropriate when evidence points to a digital journey constraint; a new website by itself does not guarantee more leads or sales."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-004",
+    "intent": "paid_media",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "If someone asks, \"Can you help with YouTube or paid ads?\" DTM can help with YouTube ads and paid ads, including PPC, search ads, social ads and video advertising when the audience, offer, conversion path, tracking and economics support a test. Before increasing spend, review lead quality, conversion rates, contribution, sales capacity and attribution limits. Creative, targeting, landing pages and follow-up may all affect performance. DTM does not promise a fixed return or guaranteed advertising result."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-005",
+    "intent": "customer_relationships",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "Email, lifecycle communication and customer relationship systems may help a business respond consistently, nurture enquiries, support repeat visits or bookings, and learn from customer interactions. Their use depends on customer consent, data quality, relevant content, a clear purpose and the team's ability to follow up. A CRM or email automation should support a sound customer process rather than conceal a broken one."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-006",
+    "intent": "automation_ai",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "AI and business automation are best evaluated against a recurring workflow with clear inputs, predictable steps, useful outputs and manageable exceptions. Start by mapping the process and its failure cases; test with human review before expanding automation. Sensitive decisions, customer commitments and unusual exceptions should have an accountable human owner. Tool availability and integrations must be confirmed for each business before they are promised."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-007",
+    "intent": "creative_visualization",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "Creative work can include content, video, audio, social assets, CGI or virtual experiences when the customer needs a clearer way to understand, compare or imagine an offer. The format should fit the audience, buying stage, product evidence and distribution plan. Production specifications, turnaround times, platform integrations and performance claims require confirmation for the specific project; visual content alone does not establish commercial impact."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-008",
+    "intent": "measurement_analytics",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "Analytics and reporting should help decision-makers understand what is happening, how reliable the evidence is, and what to test next. Useful measurement connects business objectives to customer journey events and commercial outcomes, while recording data gaps, attribution limits and uncertainty. Forecasts or dashboards are not proof of future performance; decisions should be updated as observed results accumulate."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-009",
+    "intent": "travel_growth",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "For an independent hotel or travel business, direct booking growth should be assessed alongside the discovery and demand that third-party channels provide. Compare channel contribution after commissions and acquisition costs, guest experience, repeat-booking potential, available capacity and the ability to generate direct demand. Reducing an OTA before a reliable alternative exists can reduce occupancy; the appropriate channel mix depends on evidence and business economics."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-010",
+    "intent": "real_estate_growth",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "For a premium or boutique property business, a growth review can examine project economics, qualified buyer demand, positioning, visual presentation, discovery, enquiry quality, sales response, inventory and the path from interest to sale. CGI, paid media, web experience or automation may be useful interventions when evidence identifies a relevant constraint. DTM does not claim that any one tactic guarantees faster sales or a specific return."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-011",
+    "intent": "strategy_process",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "A practical growth engagement starts with the business objective and available evidence, maps constraints and opportunities, prioritizes a test or intervention, then measures what changed and learns from the result. Recommendations should account for economics, operational capacity, dependencies and uncertainty. If the evidence is insufficient, the next step is to clarify the question or establish a baseline rather than invent a confident diagnosis."
+  },
+  {
+    "chunk_id": "PUBLIC-SERVICE-012",
+    "intent": "service_scope",
+    "source": "10_PUBLIC_SERVICE_PATHWAYS.md",
+    "text": "If someone asks, \"Which services does DTM provide?\" Digital Transition Marketing can support growth strategy and diagnosis; paid advertising across search, social and YouTube or video; SEO, voice search and generative engine optimization; website design and conversion; email marketing and CRM; content and social media; CGI, virtual experiences, video and audio production; analytics and reporting; and AI business automation or agents. These capability areas are considered after diagnosis, not a fixed package or promise that every named tool, integration, certification or delivery option is currently available. Confirm project scope and suitability with DTM."
+  }
+]
