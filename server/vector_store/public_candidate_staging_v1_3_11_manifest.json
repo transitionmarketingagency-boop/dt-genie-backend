@@ -1,5 +1,5 @@
 {
-  "status": "public_corpus_integrated_locally_validation_pending",
+  "status": "public_corpus_integrated_and_validation_passed",
   "generated_at": "2026-10-26T12:36:53.124Z",
   "model": "qwen/Qwen3-Embedding-4B",
   "dimensions": 2560,
