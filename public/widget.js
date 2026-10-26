@@ -206,26 +206,6 @@ function showTyping() {
     typing.appendChild(dot);
   }
 
-  function addBookingLink() {
-    const container = document.getElementById('dt-genie-messages');
-    if (!container) return;
-
-    const row = document.createElement('div');
-    row.className = 'dt-message assistant';
-    const bubble = document.createElement('div');
-    bubble.className = 'dt-message-bubble';
-    const link = document.createElement('a');
-    link.href = BOOKING_URL;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.textContent = 'Choose a strategy call time';
-    link.style.cssText = 'display:inline-block;padding:10px 14px;border-radius:8px;background:#00d9ff;color:#071018;font-weight:600;text-decoration:none;';
-    bubble.appendChild(link);
-    row.appendChild(bubble);
-    container.appendChild(row);
-    container.scrollTop = container.scrollHeight;
-  }
-
   bubble.appendChild(typing);
   wrapper.appendChild(bubble);
   container.appendChild(wrapper);
@@ -235,6 +215,31 @@ function showTyping() {
       container.scrollTop = container.scrollHeight;
     }
   });
+}
+
+
+function addBookingLink() {
+  const container = document.getElementById('dt-genie-messages');
+  if (!container) return;
+
+  // Avoid adding a second link if the booking control was already rendered.
+  if (container.querySelector('.dt-booking-link')) return;
+
+  const row = document.createElement('div');
+  row.className = 'dt-message assistant';
+  const bubble = document.createElement('div');
+  bubble.className = 'dt-message-bubble';
+  const link = document.createElement('a');
+  link.className = 'dt-booking-link';
+  link.href = BOOKING_URL;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = 'Choose a strategy call time';
+  link.style.cssText = 'display:inline-block;padding:10px 14px;border-radius:8px;background:#00d9ff;color:#071018;font-weight:600;text-decoration:none;';
+  bubble.appendChild(link);
+  row.appendChild(bubble);
+  container.appendChild(row);
+  container.scrollTop = container.scrollHeight;
 }
 
 
