@@ -305,6 +305,8 @@ function togglePanel(force) {
   const container = document.getElementById('dt-genie-messages');
 
   isOpen = force !== undefined ? force : !isOpen;
+  panel.setAttribute('aria-hidden', String(!isOpen));
+  document.getElementById('dt-genie-button')?.setAttribute('aria-expanded', String(isOpen));
 
   if (isOpen) {
     panel.classList.add('open');
