@@ -1,0 +1,20 @@
+{
+  "status": "isolated_public_staging_candidate_not_production_approved",
+  "generated_at": "2026-10-26T11:39:49.223Z",
+  "model": "qwen/Qwen3-Embedding-4B",
+  "dimensions": 2560,
+  "retained_existing_chunks": 18,
+  "added_grounded_chunks": 3,
+  "total_chunks": 21,
+  "source_file": "07_PUBLIC_FAQ_AND_SAFE_ANSWER_PATTERNS.md",
+  "source_sha256": "706e04801cc3e52f175df87fd356cd573300987a4efb42f68ba8e5d634317629",
+  "input_candidate_file": "public_candidate_staging_v1_3_3_reembedded18.json",
+  "input_candidate_sha256": "91de409db14c6066aefed9c1445a1fa475994aade0a6b5794aac4f0e94a61041",
+  "output_file": "public_candidate_staging_v1_3_8.json",
+  "output_sha256": "d16bb57cafe6413d0310b49cc87669ea157cf09df5547043df99a0011ef96c0a",
+  "live_corpus_sha256": "25cddc7cbb24f8dd71ecc4e7488f11dcf9b30080140c4f66882ce4916bb40175",
+  "live_corpus_modified": false,
+  "internal_only_sources_included": false,
+  "production_integrated": false,
+  "deployment_performed": false
+}

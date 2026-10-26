@@ -1,17 +1,34 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { getEmbedding as getQwenEmbedding } from "./services/openRouterEmbeddingsClient.js";
+import { getEmbedding as getQwenEmbedding, getEmbeddingsBatch } from "./services/openRouterEmbeddingsClient.js";
 
 /* ================= PATH RESOLUTION ================= */
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const usePublicCandidateStaging =
+  process.env.NEONVISION_USE_PUBLIC_STAGING === "true";
+
+const stagingPath = path.join(
+  __dirname,
+  "vector_store",
+  "public_candidate_staging_v1_3_8.json"
+);
+
 const distPath = path.join(__dirname, "vector_store", "chunks.json");
 const devPath = path.join(__dirname, "../vector_store/chunks.json");
 
-const chunksPath = fs.existsSync(distPath) ? distPath : devPath;
+const chunksPath = usePublicCandidateStaging
+  ? stagingPath
+  : fs.existsSync(distPath)
+    ? distPath
+    : devPath;
+
+if (usePublicCandidateStaging && !fs.existsSync(stagingPath)) {
+  throw new Error(`Public candidate staging corpus not found: ${stagingPath}`);
+}
 
 console.log("🧠 Loading vector chunks from:", chunksPath);
 
@@ -212,38 +229,66 @@ export async function getTopChunks(
   const normalized = normalize(queryText);
   const queries = await expandQueryNeural(normalized);
 
-  const embeddings: number[][] = [];
+  const embeddings: number[][] = new Array(queries.length);
+  const missingIndices: number[] = [];
+  const missingQueries: string[] = [];
+  const missingKeys: string[] = [];
 
-  for (const q of queries) {
-    const cacheKey = normalize(q);
+  for (let i = 0; i < queries.length; i++) {
+    const cacheKey = normalize(queries[i]);
+    const cached = queryEmbeddingCache.get(cacheKey);
 
-    let embedding = queryEmbeddingCache.get(cacheKey);
-
-    if (!embedding) {
-      try {
-        embedding = await getQwenEmbedding(q);
-        if (!embedding?.length) continue;
-
-        embedding = normalizeVector(embedding);
-        cacheEmbedding(cacheKey, embedding);
-
-      } catch (err) {
-        console.error("❌ Embedding generation failed:", err);
-        continue;
-      }
-    }
-
-    if (embedding.length === embeddingSize) {
-      embeddings.push(embedding);
+    if (cached && cached.length === embeddingSize) {
+      embeddings[i] = cached;
+    } else {
+      missingIndices.push(i);
+      missingQueries.push(queries[i]);
+      missingKeys.push(cacheKey);
     }
   }
 
-  if (!embeddings.length || !cachedChunks.length) return [];
+  if (missingQueries.length > 0) {
+    let generated: number[][] = [];
+
+    try {
+      generated = await getEmbeddingsBatch(missingQueries);
+    } catch (err) {
+      console.error("❌ Batch embedding generation failed; using sequential fallback:", err);
+    }
+
+    for (let i = 0; i < missingQueries.length; i++) {
+      let embedding = generated[i];
+
+      if (!Array.isArray(embedding) || embedding.length !== embeddingSize || embedding.some(value => !Number.isFinite(value))) {
+        try {
+          embedding = await getQwenEmbedding(missingQueries[i]);
+        } catch (err) {
+          console.error("❌ Embedding generation failed:", err);
+          continue;
+        }
+      }
+
+      if (Array.isArray(embedding) && embedding.length === embeddingSize && embedding.every(Number.isFinite)) {
+        embedding = normalizeVector(embedding);
+        cacheEmbedding(missingKeys[i], embedding);
+        embeddings[missingIndices[i]] = embedding;
+      }
+    }
+  }
+
+  const validEmbeddings = embeddings.filter(
+    (embedding): embedding is number[] =>
+      Array.isArray(embedding) &&
+      embedding.length === embeddingSize &&
+      embedding.every(Number.isFinite)
+  );
+
+  if (!validEmbeddings.length || !cachedChunks.length) return [];
 
   const scored = cachedChunks.map(chunk => {
     let best = 0;
 
-    for (const emb of embeddings) {
+    for (const emb of validEmbeddings) {
       best = Math.max(best, cosineSimilarity(emb, chunk.embedding));
     }
 
