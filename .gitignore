@@ -135,3 +135,5 @@ backup_root_duplicates/
 # Local internal-only corpus; do not publish to the public repository.
 server/vector_store/dtm_internal_candidate_*.json
 scripts/corpus-rebuild/build-local-internal-icp-*.mjs
+server/vector_store/admin_public_candidate_*.json
+.neon-admin-test-data/

@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>NeonVision Knowledge Desk</title>
+  <link rel="stylesheet" href="/admin.css">
+  <link rel="stylesheet" href="/preview.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="NeonVision Knowledge Desk home"><span class="brand-mark">N<span>V</span></span><span><strong>NeonVision</strong><small>Knowledge Desk</small></span></a>
+      <div class="local-badge"><i></i> PRIVATE · THIS PC ONLY</div>
+    </header>
+
+    <section id="authPanel" class="auth-card">
+      <div class="eyebrow">ADMIN ACCESS</div>
+      <h1 id="authTitle">Your knowledge, under your control.</h1>
+      <p id="authCopy">This dashboard runs only on this computer. Your documents stay in your Windows user folder.</p>
+      <form id="authForm">
+        <label id="passwordLabel" for="passwordInput">Admin password</label>
+        <input id="passwordInput" type="password" autocomplete="current-password" required minlength="14" maxlength="256" placeholder="At least 14 characters">
+        <button id="authSubmit" class="button button-primary" type="submit">Sign in</button>
+      </form>
+      <p id="authMessage" class="message" role="status"></p>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="welcome-row">
+        <div><div class="eyebrow">CONTROL ROOM</div><h1>Knowledge, organized.</h1><p>Review every upload before it can affect NeonVision.</p></div>
+        <div class="controls"><button id="changePasswordButton" class="button button-quiet" type="button">Change password</button><button id="logoutButton" class="button button-quiet" type="button">Sign out</button></div>
+      </div>
+
+      <div class="metrics" id="metrics"></div>
+
+      <div class="grid-main">
+        <section class="panel upload-panel">
+          <div class="panel-heading"><div><div class="eyebrow">ADD KNOWLEDGE</div><h2>Upload a document</h2></div><span class="step">01</span></div>
+          <p>PDF, DOCX, Markdown, or text · up to 8 MB. New uploads start as drafts.</p>
+          <form id="uploadForm" class="stack">
+            <label for="audienceSelect">Knowledge audience</label>
+            <select id="audienceSelect" name="audience"><option value="internal">Internal · staff knowledge</option><option value="public">Public · chatbot knowledge</option></select>
+            <label class="dropzone" for="documentFile"><span class="upload-icon">↑</span><strong id="fileLabel">Choose a document</strong><small>Files are processed on this PC; text is sent to OpenRouter for embeddings.</small></label>
+            <input id="documentFile" type="file" accept=".pdf,.docx,.md,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown" required>
+            <button class="button button-primary" type="submit">Process as draft</button>
+          </form>
+          <p id="uploadMessage" class="message" role="status"></p>
+          <div class="privacy-note"><span>✦</span><p>Emails, account identifiers, and access tokens are redacted before embedding. Public documents need your explicit approval.</p></div>
+        </section>
+
+        <section class="panel import-panel">
+          <div class="panel-heading"><div><div class="eyebrow">PRIVATE CORPUS</div><h2>Import internal library</h2></div><span class="step">02</span></div>
+          <p>Import the validated internal corpus JSON. It remains in your local Windows profile and is never added to the public corpus.</p>
+          <form id="corpusForm" class="stack">
+            <label class="dropzone dropzone-amber" for="corpusFile"><span class="upload-icon">↥</span><strong id="corpusLabel">Choose internal corpus JSON</strong><small>Up to 32 MB · internal-only embeddings required</small></label>
+            <input id="corpusFile" type="file" accept=".json,application/json" required>
+            <button class="button button-secondary" type="submit">Import internal corpus</button>
+          </form>
+          <p id="corpusMessage" class="message" role="status"></p>
+          <div class="privacy-note"><span>!</span><p>Import is rejected if it contains email addresses, bank identifiers, or API credentials.</p></div>
+        </section>
+      </div>
+
+      <section class="panel query-panel">
+        <div class="panel-heading"><div><div class="eyebrow">INTERNAL RETRIEVAL CHECK</div><h2>Ask the agency library</h2></div><span class="step">03</span></div>
+        <p>Test what the staff-only collection finds. This search never uses the public knowledge set.</p>
+        <form id="searchForm" class="search-row"><input id="questionInput" maxlength="1200" required placeholder="Ask about discovery, delivery, commercial controls…"><button class="button button-secondary" type="submit">Search internal</button></form>
+        <div id="searchResults" class="results"></div>
+      </section>
+
+      <section class="panel documents-panel">
+        <div class="panel-heading"><div><div class="eyebrow">LIBRARY</div><h2>Your documents</h2></div><button id="refreshButton" class="button button-quiet" type="button">Refresh</button></div>
+        <div class="table-wrap"><table><thead><tr><th>Document</th><th>Audience</th><th>Chunks</th><th>Status</th><th>Added</th><th>Controls</th></tr></thead><tbody id="documentsBody"></tbody></table></div>
+        <p id="documentsEmpty" class="empty" hidden>No uploaded documents yet.</p>
+      </section>
+
+      <section class="panel publish-panel">
+        <div class="panel-heading"><div><div class="eyebrow">PUBLIC RELEASE</div><h2>Prepare a public-only candidate</h2></div><span class="step">04</span></div>
+        <p>Combines the current public baseline with active, approved public uploads. Internal chunks are rejected. This prepares a review file; it does not deploy or change the live chatbot.</p>
+        <button id="prepareButton" class="button button-primary" type="button">Prepare candidate</button>
+        <p id="prepareMessage" class="message" role="status"></p>
+      </section>
+
+      <section class="panel audit-panel">
+        <div class="panel-heading"><div><div class="eyebrow">LOCAL ACTIVITY</div><h2>Recent changes</h2></div></div>
+        <ul id="auditList" class="audit-list"></ul>
+      </section>
+
+      <dialog id="previewDialog" class="preview-dialog">
+        <div class="panel-heading"><div><div class="eyebrow">FULL DOCUMENT REVIEW</div><h2 id="previewTitle">Document</h2></div><button id="closePreview" class="button button-quiet" type="button">Close</button></div>
+        <p id="previewMeta" class="preview-meta"></p>
+        <pre id="previewText" class="preview-text"></pre>
+        <label class="review-check"><input id="reviewConfirm" type="checkbox"> I reviewed the full text and approve this document for its selected audience.</label>
+        <button id="markReviewed" class="button button-primary" type="button" disabled>Mark reviewed</button>
+      </dialog>
+
+      <footer class="footer"><span>Knowledge data folder</span><code id="dataDirectory">Loading…</code><span>· Stored outside the repository</span></footer>
+    </section>
+  </main>
+  <script src="/admin.js" defer></script>
+</body>
+</html>
