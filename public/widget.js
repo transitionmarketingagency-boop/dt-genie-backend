@@ -267,11 +267,21 @@ function showTyping() {
 
       addMessage('assistant', data.reply || 'No response received.');
       const bookingRequest = /\b(?:book|schedule)\s+(?:a\s+)?(?:strategy\s+)?(?:call|meeting)\b|\b(?:i want to|can i|let's)\s+(?:book|schedule)\b/i.test(message);
-      if (bookingRequest) addBookingLink();
-      messageHistory.push({ role: 'assistant', content: data.reply });
+      if (bookingRequest) {
+        try {
+          addBookingLink();
+        } catch (uiError) {
+          console.warn('[NeonVision] Could not render the booking link.', uiError);
+        }
+      }
 
-sessionData.lastUserIntent = message;
-saveSession();
+      try {
+        messageHistory.push({ role: 'assistant', content: data.reply });
+        sessionData.lastUserIntent = message;
+        saveSession();
+      } catch (storageError) {
+        console.warn('[NeonVision] Reply was shown, but chat history could not be saved.', storageError);
+      }
 
     } catch (err) {
       hideTyping();
