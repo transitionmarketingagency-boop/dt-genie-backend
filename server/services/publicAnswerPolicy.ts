@@ -38,6 +38,10 @@ export function getApprovedPublicAnswer(message: string): string {
     return "Cost per lead is an acquisition-efficiency measure, not proof of lead quality or sales value. Assess whether enquiries fit the intended customer, progress to conversations and sales, what those outcomes contribute, and whether the business can serve them. Compare consistent periods and account for changes in audience, offer, channel, and tracking.";
   }
 
+  if (/\b(?:seasonality|seasonal(?: demand)?)\b/.test(question) && /\b(?:campaign|advertis\w*|marketing)\b/.test(question)) {
+    return "Compare equivalent periods where possible and account for availability, booking window, cancellations, and changes to the offer or inventory. Review enquiries and bookings against a reliable baseline. A before-and-after comparison alone cannot isolate a campaign’s effect; where feasible, use a suitable comparison or holdout and note its limits. If the available data cannot separate seasonal demand from campaign impact, state that uncertainty rather than assigning credit.";
+  }
+
   if (/\b(pric(?:e|ing)|costs?|how much|fixed fee|packages?|quotes?|rates?|retainers?|margins?)\b/.test(question)) {
     return "I can’t confirm a fixed price from approved public information. Investment depends on scope and business context; what outcome are you looking to achieve?";
   }
