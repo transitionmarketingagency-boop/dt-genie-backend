@@ -43,7 +43,7 @@ let scrollTimeout;
             </defs>
             <text>
               <textPath href="#circlePath" startOffset="0">
-                AGENCY GROWTH INTELLIGENCE • NEONVISION •
+                YOUR AI GROWTH ASSISTANT • NEONVISION •
               </textPath>
             </text>
           </svg>
