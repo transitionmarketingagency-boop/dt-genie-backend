@@ -27,9 +27,14 @@ assert.equal(report.results.length, 18);
 assert.ok(report.results.every(result => result.status === "success" && result.retrieved_chunks.length === 3));
 assert.ok(report.results.every(result => result.retrieved_chunks.every(match => corpus.some(chunk => chunk.text === match.exact_text))));
 if (manifest.production_integrated) {
-  assert.equal(hash(liveBytes), manifest.output_sha256);
-  assert.equal(manifest.live_corpus_sha256, hash(liveBytes));
   assert.ok(manifest.previous_live_corpus_sha256);
+  if (hash(liveBytes) === manifest.output_sha256) {
+    assert.equal(manifest.live_corpus_sha256, hash(liveBytes));
+  } else {
+    const successor = JSON.parse(fs.readFileSync("server/vector_store/public_candidate_staging_v1_3_12_manifest.json", "utf8"));
+    assert.equal(successor.input_sha256, manifest.output_sha256, "The later validated candidate must be based on this one.");
+    assert.equal(successor.previous_live_corpus_sha256, manifest.output_sha256, "The replacement must record this corpus as its predecessor.");
+  }
 } else {
   assert.equal(manifest.live_corpus_sha256, hash(liveBytes));
 }

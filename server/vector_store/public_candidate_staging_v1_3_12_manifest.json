@@ -1,0 +1,27 @@
+{
+  "status": "public_candidate_validated_and_integrated_in_repository_deployment_pending",
+  "generated_at": "2026-10-26T14:28:24.470Z",
+  "version": "v1.3.12",
+  "model": "qwen/Qwen3-Embedding-4B",
+  "dimensions": 2560,
+  "total_chunks": 27,
+  "added_chunks": 6,
+  "added_sources": [
+    "09_PRACTICAL_GROWTH_GUIDANCE.md"
+  ],
+  "input_file": "public_candidate_staging_v1_3_11.json",
+  "input_sha256": "ee99a137a11bbd1b40e531b26a0e351e51d89fb8af11a52be0be77d5780ddf98",
+  "output_file": "public_candidate_staging_v1_3_12.json",
+  "output_sha256": "6f48d3077f2a781877fa789420267fd45a12d04680199e9551fb737677fc5644",
+  "live_corpus_sha256": "6f48d3077f2a781877fa789420267fd45a12d04680199e9551fb737677fc5644",
+  "previous_live_corpus_sha256": "ee99a137a11bbd1b40e531b26a0e351e51d89fb8af11a52be0be77d5780ddf98",
+  "internal_only_sources_included": false,
+  "public_runtime_integrated": false,
+  "deployment_performed": false,
+  "production_integrated": true,
+  "repository_integrated": true,
+  "deployment_commit": null,
+  "retrieval_validation_cases": 11,
+  "answer_generation_cases": 17,
+  "integrated_at": "2026-10-26T14:53:44.380Z"
+}

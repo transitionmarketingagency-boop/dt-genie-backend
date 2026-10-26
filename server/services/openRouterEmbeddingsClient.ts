@@ -104,7 +104,10 @@ export async function getEmbedding(text: string): Promise<number[]> {
 
 
 /* ================= BATCH GET EMBEDDINGS ================= */
-export async function getEmbeddingsBatch(texts: string[]): Promise<number[][]> {
+export async function getEmbeddingsBatch(
+  texts: string[],
+  options: { timeoutMs?: number; fallbackToSingle?: boolean } = {}
+): Promise<number[][]> {
   if (!Array.isArray(texts) || texts.length === 0) return [];
 
   const results: (number[] | undefined)[] = new Array(texts.length);
@@ -133,7 +136,7 @@ export async function getEmbeddingsBatch(texts: string[]): Promise<number[][]> {
   const missingTexts = [...missingByKey.keys()];
   if (missingTexts.length === 0) return results.map(embedding => embedding ?? []);
 
-  const REQUEST_TIMEOUT_MS = Number(process.env.EMBEDDING_TIMEOUT_MS) || 12000;
+  const REQUEST_TIMEOUT_MS = options.timeoutMs ?? (Number(process.env.EMBEDDING_TIMEOUT_MS) || 12000);
 
   try {
     if (!OPENROUTER_API_KEY) {
@@ -216,6 +219,11 @@ export async function getEmbeddingsBatch(texts: string[]): Promise<number[][]> {
     const message = err?.name === "AbortError"
       ? `request timed out after ${REQUEST_TIMEOUT_MS}ms`
       : err?.message || String(err);
+
+    if (options.fallbackToSingle === false) {
+      console.warn(`[Batch Embeddings] ${message}; returning empty vectors for retrieval fallback.`);
+      return results.map(embedding => embedding ?? []);
+    }
 
     console.warn(`[Batch Embeddings] ${message}; falling back to individual requests.`);
 

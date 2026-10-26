@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { getEmbedding as getQwenEmbedding, getEmbeddingsBatch } from "./services/openRouterEmbeddingsClient.js";
+import { getEmbeddingsBatch } from "./services/openRouterEmbeddingsClient.js";
 
 /* ================= PATH RESOLUTION ================= */
 
@@ -11,10 +11,17 @@ const __dirname = path.dirname(__filename);
 const usePublicCandidateStaging =
   process.env.NEONVISION_USE_PUBLIC_STAGING === "true";
 
+const stagingFilename = process.env.NEONVISION_PUBLIC_STAGING_FILE ||
+  "public_candidate_staging_v1_3_8.json";
+
+if (path.basename(stagingFilename) !== stagingFilename || !stagingFilename.endsWith(".json")) {
+  throw new Error("NEONVISION_PUBLIC_STAGING_FILE must be a JSON filename inside server/vector_store.");
+}
+
 const stagingPath = path.join(
   __dirname,
   "vector_store",
-  "public_candidate_staging_v1_3_8.json"
+  stagingFilename
 );
 
 const distPath = path.join(__dirname, "vector_store", "chunks.json");
@@ -207,13 +214,10 @@ function keywordOverlap(a: string, b: string) {
 
 async function expandQueryNeural(query: string): Promise<string[]> {
   const normalized = normalize(query);
-
-  return Array.from(new Set([
-    normalized,
-    `${normalized} marketing`,
-    `${normalized} service`,
-    `${normalized} digital marketing`
-  ]));
+  // One embedding request per user turn keeps retrieval responsive. Keyword
+  // overlap remains part of ranking, so generic artificial expansions add
+  // latency without adding useful evidence.
+  return normalized ? [normalized] : [];
 }
 
 /* ================= MAIN RETRIEVAL ================= */
@@ -251,21 +255,19 @@ export async function getTopChunks(
     let generated: number[][] = [];
 
     try {
-      generated = await getEmbeddingsBatch(missingQueries);
+      generated = await getEmbeddingsBatch(missingQueries, {
+        timeoutMs: 6500,
+        fallbackToSingle: false,
+      });
     } catch (err) {
-      console.error("❌ Batch embedding generation failed; using sequential fallback:", err);
+      console.error("❌ Batch embedding generation failed; using keyword fallback:", err);
     }
 
     for (let i = 0; i < missingQueries.length; i++) {
       let embedding = generated[i];
 
       if (!Array.isArray(embedding) || embedding.length !== embeddingSize || embedding.some(value => !Number.isFinite(value))) {
-        try {
-          embedding = await getQwenEmbedding(missingQueries[i]);
-        } catch (err) {
-          console.error("❌ Embedding generation failed:", err);
-          continue;
-        }
+        continue;
       }
 
       if (Array.isArray(embedding) && embedding.length === embeddingSize && embedding.every(Number.isFinite)) {
@@ -283,7 +285,26 @@ export async function getTopChunks(
       embedding.every(Number.isFinite)
   );
 
-  if (!validEmbeddings.length || !cachedChunks.length) return [];
+  if (!cachedChunks.length) return [];
+
+  if (!validEmbeddings.length) {
+    const lexicalFallback = cachedChunks
+      .map(chunk => ({ chunk, score: keywordOverlap(normalized, chunk.text) }))
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ chunk, score }) => ({
+        text: chunk.text.slice(0, 1400),
+        source: chunk.source,
+        score: Number(score.toFixed(4)),
+        intent: chunk.intent,
+      }));
+
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[Vector Search] Embeddings unavailable; returned ${lexicalFallback.length} keyword matches.`);
+    }
+    return lexicalFallback;
+  }
 
   const scored = cachedChunks.map(chunk => {
     let best = 0;

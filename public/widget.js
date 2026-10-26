@@ -260,10 +260,13 @@ function showTyping() {
       });
 
       const data = await response.json();
+      if (!response.ok || typeof data.reply !== 'string' || !data.reply.trim()) {
+        throw new Error(`Chat service returned HTTP ${response.status}`);
+      }
       hideTyping();
 
       addMessage('assistant', data.reply || 'No response received.');
-      const bookingRequest = /\b(book|schedule|strategy call|meeting|consultation)\b/i.test(message);
+      const bookingRequest = /\b(?:book|schedule)\s+(?:a\s+)?(?:strategy\s+)?(?:call|meeting)\b|\b(?:i want to|can i|let's)\s+(?:book|schedule)\b/i.test(message);
       if (bookingRequest) addBookingLink();
       messageHistory.push({ role: 'assistant', content: data.reply });
 
@@ -272,7 +275,10 @@ saveSession();
 
     } catch (err) {
       hideTyping();
-      addMessage('assistant', "Sorry, I'm having trouble connecting.");
+      addMessage('assistant', "I couldn't reach the chat service just now. Please try again in a moment.");
+      if (/\b(?:book|schedule)\s+(?:a\s+)?(?:strategy\s+)?(?:call|meeting)\b/i.test(message)) {
+        addBookingLink();
+      }
     } finally {
       isProcessing = false;
     }

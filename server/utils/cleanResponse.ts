@@ -1,3 +1,5 @@
+import { isShortCompleteAnswer } from "../services/responseCompleteness.js";
+
 /**
  * Response Cleaner (PRODUCTION v3 - Unified)
  * Fixes spacing, removes artifacts, preserves meaning, prevents junk outputs
@@ -61,9 +63,8 @@ export function cleanResponse(raw: string): string {
   if (badPatterns.some((p) => lower.includes(p))) {
     return "";
   }
-
   /* ================= LENGTH GUARDS ================= */
-  if (text.length < 18) return "";
+  if (text.length < 18 && !isShortCompleteAnswer(text)) return "";
 
   if (text.length > 2000) {
     text = text.slice(0, 2000).trim();
