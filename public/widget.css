@@ -25,7 +25,7 @@
   height: 80px;
   border-radius: 50%;
   background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
-  border: none;
+  border: 2px solid var(--neon-blue);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -40,6 +40,7 @@
 
 #dt-genie-button:hover {
   transform: scale(1.06);
+  border-color: var(--neon-orange);
   box-shadow:
     0 0 60px rgba(0, 225, 255, 0.6),
     0 12px 60px rgba(0, 225, 255, 0.25);
@@ -69,20 +70,24 @@
   height: 56px;
   object-fit: contain;
   overflow: visible;
-  box-shadow:
-    0 0 12px rgba(0, 225, 255, 0.6),
-    0 0 24px rgba(0, 225, 255, 0.4),
-    0 0 36px rgba(0, 225, 255, 0.2);
   filter: drop-shadow(0 0 5px rgba(0, 225, 255, 0.55));
-  transition: box-shadow 0.3s ease-in-out, filter 0.3s ease-in-out;
+  animation: neonvision-pulse 3s ease-in-out infinite;
+  transition: filter 0.3s ease-in-out;
 }
 
 #dt-genie-button:hover #dt-genie-avatar-wrap img,
 #dt-genie-header-avatar-wrap:hover img {
-  box-shadow:
-    0 0 20px rgba(0, 225, 255, 0.8),
-    0 0 40px rgba(0, 225, 255, 0.6),
-    0 0 60px rgba(0, 225, 255, 0.4);
+  filter: brightness(1.08) drop-shadow(0 0 10px rgba(0, 225, 255, 0.8)) drop-shadow(0 0 14px rgba(255, 122, 24, 0.45));
+}
+
+@keyframes neonvision-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(0, 225, 255, 0.5)); }
+  50% { filter: drop-shadow(0 0 9px rgba(0, 225, 255, 0.85)) drop-shadow(0 0 5px rgba(255, 122, 24, 0.35)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #dt-genie-curved-text,
+  #dt-genie-avatar-wrap img { animation: none; }
 }
 
 /* Curved Text Around Button */
