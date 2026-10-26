@@ -95,7 +95,7 @@
   left: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  animation: rotate 20s linear infinite;
+  animation: rotate 40s linear infinite;
   z-index: 1;
 }
 
@@ -109,7 +109,7 @@
   font-family: 'Poppins', sans-serif;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 5px;
+  letter-spacing: 2px;
   text-transform: uppercase;
 }
 
