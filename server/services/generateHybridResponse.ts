@@ -651,6 +651,30 @@ if (quickActionFollowUp) {
 }
 
 
+// Keep high-risk public claims anchored to the reviewed corpus instead of model improvisation.
+const normalizedQuestion = message.trim().toLowerCase();
+let approvedPublicAnswer = "";
+
+if (/\b(case stud(?:y|ies)|client results?|testimonials?|client revenue|revenue figures)\b/.test(normalizedQuestion)) {
+  approvedPublicAnswer = "I can’t confirm which client examples, results, or testimonials are approved for sharing. I can explain DTM’s approach, but I shouldn’t present demonstrations as client results.";
+} else if (/\b(payment methods?|payment providers?|bank routes?|bank details|fees|billing systems?)\b/.test(normalizedQuestion)) {
+  approvedPublicAnswer = "I can’t confirm current payment methods, providers, fees, or bank routes from approved public information.";
+} else if (/\b(security|certifications?|certified|soc ?2|iso\s*\d|hipaa|gdpr)\b/.test(normalizedQuestion)) {
+  approvedPublicAnswer = "The approved public information does not confirm a specific security certification or claim, so I can’t verify one.";
+} else if (/\b(ai models?|integrations?|current tools?|supported tools?)\b/.test(normalizedQuestion)) {
+  approvedPublicAnswer = "The approved public information does not confirm which AI models, integrations, or current tools are supported. Which workflow or platform are you asking about?";
+} else if (/\b(pricing|price|cost|how much|fixed fee|packages?)\b/.test(normalizedQuestion)) {
+  approvedPublicAnswer = "I can’t confirm a fixed price from approved public information. Investment depends on scope and business context; what outcome are you looking to achieve?";
+} else if (/\b(what is digital transition marketing|what does dtm do|who is dtm|what is dtm)\b/.test(normalizedQuestion)) {
+  approvedPublicAnswer = "Digital Transition Marketing is an intelligence-driven Growth Partner. DTM helps growth-focused businesses diagnose growth constraints, identify opportunities, and choose suitable strategic, creative, technology, or AI interventions.";
+}
+
+if (approvedPublicAnswer) {
+  await memoryService.addMessage(sessionId, "assistant", approvedPublicAnswer);
+  return approvedPublicAnswer;
+}
+
+
 const isHighIntent = leadScoreValue >= 0.7;
 
 // ================= SINGLE SOURCE BOOKING CONTROL =================
