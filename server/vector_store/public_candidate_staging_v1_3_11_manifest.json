@@ -1,5 +1,5 @@
 {
-  "status": "isolated_public_staging_candidate_not_production_approved",
+  "status": "public_corpus_integrated_locally_validation_pending",
   "generated_at": "2026-10-26T12:36:53.124Z",
   "model": "qwen/Qwen3-Embedding-4B",
   "dimensions": 2560,
@@ -13,8 +13,9 @@
   "input_sha256": "afa2a812ea63a080f4e397472b8756c67ec37b2449188d84c13f8eb8c39b97b5",
   "output_file": "public_candidate_staging_v1_3_11.json",
   "output_sha256": "ee99a137a11bbd1b40e531b26a0e351e51d89fb8af11a52be0be77d5780ddf98",
-  "live_corpus_sha256": "25cddc7cbb24f8dd71ecc4e7488f11dcf9b30080140c4f66882ce4916bb40175",
+  "live_corpus_sha256": "ee99a137a11bbd1b40e531b26a0e351e51d89fb8af11a52be0be77d5780ddf98",
   "internal_only_sources_included": false,
-  "production_integrated": false,
-  "deployment_performed": false
+  "production_integrated": true,
+  "deployment_performed": false,
+  "previous_live_corpus_sha256": "25cddc7cbb24f8dd71ecc4e7488f11dcf9b30080140c4f66882ce4916bb40175"
 }

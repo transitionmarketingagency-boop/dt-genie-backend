@@ -26,8 +26,15 @@ assert.equal(report.corpus_sha256, hash(corpusBytes));
 assert.equal(report.results.length, 18);
 assert.ok(report.results.every(result => result.status === "success" && result.retrieved_chunks.length === 3));
 assert.ok(report.results.every(result => result.retrieved_chunks.every(match => corpus.some(chunk => chunk.text === match.exact_text))));
-assert.equal(manifest.live_corpus_sha256, hash(liveBytes));
+if (manifest.production_integrated) {
+  assert.equal(hash(liveBytes), manifest.output_sha256);
+  assert.equal(manifest.live_corpus_sha256, hash(liveBytes));
+  assert.ok(manifest.previous_live_corpus_sha256);
+} else {
+  assert.equal(manifest.live_corpus_sha256, hash(liveBytes));
+}
 assert.equal(manifest.internal_only_sources_included, false);
+assert.equal(report.production_integrated, manifest.production_integrated);
 
 const cases = [
   ["PUB-01", /intelligence-driven Growth Partner/i],
@@ -53,6 +60,6 @@ console.log(JSON.stringify({
   retrieval_answer_generations: report.results.length,
   targeted_retrieval_safety_cases: cases.length,
   generation_errors: report.results.filter(result => result.status !== "success").length,
-  live_corpus_unchanged: hash(liveBytes) === manifest.live_corpus_sha256,
+  live_corpus_matches_validated_candidate: hash(liveBytes) === manifest.output_sha256,
   public_sources_only: true
 }));
