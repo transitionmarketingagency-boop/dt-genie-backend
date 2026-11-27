@@ -82,9 +82,8 @@ export function getApprovedPublicAnswer(message: string): string {
     return "First verify tracking, then find where the funnel is breaking: audience and offer fit, creative, landing-page conversion, lead quality and follow-up, sales conversion, or contribution after acquisition costs. A low cost per lead does not prove the leads are valuable. Change a small number of variables at a time, and don’t increase spend until the economics and capacity support it. Which metric is weakest right now?";
   }
 
-  if (/\b(?:lead generation|more leads?|qualified leads?|lead quality|generate leads?)\b/.test(question)) {
-    return "Define what makes an enquiry qualified, then inspect the offer, how suitable customers discover it, the path to enquiry, follow-up, and conversion to sale. Measure qualified enquiries through to sales and their economics, not just form fills, and confirm you can serve more demand. What do you sell, who is the target customer, and where do enquiries come from today?";
-  }
+  // Lead-generation advice is intentionally handled by the context-aware model.
+  // A deterministic generic answer here would bypass the user's business profile and history.
 
   if (/\b(?:which|what|how|should i)\b.{0,45}\b(?:automate|automation)\b|\b(?:automate|automation)\b.{0,45}\b(?:business|workflow|task|process)\b/.test(question)) {
     return "Start with a repeated, stable workflow whose steps and exceptions are clear. Map the current process and measure its time, errors, and maintenance cost before automating it; add a fallback and human review for consequential actions or sensitive data. What recurring task takes the most time, and what steps or tools does it involve?";
