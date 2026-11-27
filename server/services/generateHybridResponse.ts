@@ -89,6 +89,7 @@ export interface BrainContext {
   strategicMemory?: {
     industry?: string;
     businessType?: string;
+    servicesDiscussed?: string[];
   };
   executionMode?: string;
   isFresh?: boolean;
@@ -336,6 +337,7 @@ Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
 
 Industry: ${brainContext?.strategicMemory?.industry || "not yet identified"}
 Business Type: ${brainContext?.strategicMemory?.businessType || "not yet identified"}
+Services already identified for this business: ${brainContext?.strategicMemory?.servicesDiscussed?.join(", ") || "not yet identified"}
 
 Industry handling:
 - DTM's current priority sectors are Premium Travel & Experiences, Boutique/Premium Real Estate, and E-commerce.
