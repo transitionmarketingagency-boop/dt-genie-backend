@@ -50,7 +50,7 @@ export function getApprovedPublicAnswer(message: string): string {
     return "Compare equivalent periods where possible and account for availability, booking window, cancellations, and changes to the offer or inventory. Review enquiries and bookings against a reliable baseline. A before-and-after comparison alone cannot isolate a campaign’s effect; where feasible, use a suitable comparison or holdout and note its limits. If the available data cannot separate seasonal demand from campaign impact, state that uncertainty rather than assigning credit.";
   }
 
-  if (/\b(pric(?:e|ing)|costs?|how much|fixed fee|packages?|quotes?|rates?|retainers?|margins?)\b/.test(question)) {
+  if (/\b(pric(?:e|es|ing)|costs?|how much|fixed fee|packages?|quotes?|rates?|retainers?|margins?)\b/.test(question)) {
     return "I can’t confirm a fixed price from approved public information. Investment depends on scope and business context; what outcome are you looking to achieve?";
   }
 
