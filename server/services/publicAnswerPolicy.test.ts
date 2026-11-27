@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { getApprovedPublicAnswer } from "./publicAnswerPolicy.js";
+import { detectBusinessProfile } from "./strategicBrain.js";
 
 test("business-specific lead-generation questions reach context-aware response generation", () => {
   const cases = [
@@ -70,5 +71,36 @@ test("specific existing ad-campaign troubleshooting retains deterministic guidan
   assert.equal(
     getApprovedPublicAnswer("Which advertising channel should we test first?"),
     "",
+  );
+});
+
+
+test("business profile detection preserves multiple named services separately", () => {
+  const profile = detectBusinessProfile(
+    "We own a plumbing and home cleaning company. We serve residential customers in our local area.",
+  );
+  assert.ok(profile);
+  assert.equal(profile.industry, "home_services");
+  assert.deepEqual(profile.servicesDiscussed, ["plumbing", "home cleaning"]);
+});
+
+test("business profile detection recognizes stated business types and services", () => {
+  const travel = detectBusinessProfile(
+    "I am a travel agent in Dubai selling premium private tours.",
+  );
+  assert.equal(travel?.industry, "premium_travel_experiences");
+  assert.deepEqual(travel?.servicesDiscussed, ["private tours"]);
+
+  const ecommerce = detectBusinessProfile(
+    "I run an ecommerce brand selling premium skincare.",
+  );
+  assert.equal(ecommerce?.industry, "ecommerce");
+  assert.deepEqual(ecommerce?.servicesDiscussed, ["skincare"]);
+});
+
+test("hypothetical industry mentions do not overwrite a user's business profile", () => {
+  assert.equal(
+    detectBusinessProfile("I am researching plumbing and home cleaning businesses."),
+    null,
   );
 });
