@@ -12,16 +12,19 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /* ================= DB PATH ================= */
-const memoryDir = path.join(__dirname, "../memory");
-if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
+/* ================= SQLITE (LAZY) ================= */
+// Do not open or create a local SQLite database when the D1 backend is selected.
+let dbPromise: ReturnType<typeof sqlite.open> | undefined;
 
-const dbPath = path.join(memoryDir, "chat_memory.db");
-
-/* ================= SQLITE ================= */
-const dbPromise = sqlite.open({
-  filename: dbPath,
-  driver: sqlite3.Database,
-});
+function getSqliteDb() {
+  if (!dbPromise) {
+    const memoryDir = path.join(__dirname, "../memory");
+    if (!fs.existsSync(memoryDir)) fs.mkdirSync(memoryDir, { recursive: true });
+    const dbPath = path.join(memoryDir, "chat_memory.db");
+    dbPromise = sqlite.open({ filename: dbPath, driver: sqlite3.Database });
+  }
+  return dbPromise;
+}
 
 /* ================= LIMITS ================= */
 const MAX_HISTORY_MESSAGES = 50;
@@ -143,7 +146,7 @@ export async function initializeMemory(): Promise<void> {
     console.log("✅ Cloudflare D1 memory initialized");
     return;
   }
-  const db = await dbPromise;
+  const db = await getSqliteDb();
 
   await db.exec(`PRAGMA journal_mode = WAL;`);
   await db.exec(`PRAGMA synchronous = NORMAL;`);
@@ -202,7 +205,7 @@ export async function initializeMemory(): Promise<void> {
 /* ================= SERVICE ================= */
 
 export class MemoryService {
-  private db = dbPromise;
+  private get db() { return getSqliteDb(); }
 
   /* ---------- ADD MESSAGE ---------- */
   async addMessage(
