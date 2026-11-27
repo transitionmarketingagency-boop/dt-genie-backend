@@ -37,3 +37,38 @@ test("pricing questions remain protected by deterministic approved answers", () 
     /can’t confirm a fixed price/i,
   );
 });
+
+test("budget constraints and channel-selection questions reach context-aware response generation", () => {
+  const cases = [
+    "We own a plumbing and home cleaning company. We serve residential customers in our local area. We want more qualified enquiries but have a limited marketing budget. What should we focus on first?",
+    "Which acquisition channel should we test first for these two services, and why? Give us a practical first test.",
+    "Which channel should a dental clinic test first with a small budget?",
+    "We have a limited advertising budget. Should we focus on referrals or paid search?",
+  ];
+
+  for (const message of cases) {
+    assert.equal(
+      getApprovedPublicAnswer(message),
+      "",
+      `Expected context-aware model handling for: ${message}`,
+    );
+  }
+});
+
+test("explicit requests to increase existing marketing spend retain deterministic guidance", () => {
+  assert.match(
+    getApprovedPublicAnswer("Should we increase our marketing budget?"),
+    /Before increasing spend/i,
+  );
+});
+
+test("specific existing ad-campaign troubleshooting retains deterministic guidance", () => {
+  assert.match(
+    getApprovedPublicAnswer("Our Google Ads are not converting. How do we fix them?"),
+    /First verify tracking/i,
+  );
+  assert.equal(
+    getApprovedPublicAnswer("Which advertising channel should we test first?"),
+    "",
+  );
+});
