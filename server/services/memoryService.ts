@@ -5,6 +5,7 @@ import crypto from "crypto";
 import path from "node:path";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { d1MemoryClient } from "./d1MemoryClient.js";
 
 /* ================= PATH ================= */
 const __filename = fileURLToPath(import.meta.url);
@@ -137,6 +138,11 @@ export interface StrategicMemory {
 /* ================= INIT ================= */
 
 export async function initializeMemory(): Promise<void> {
+  if (process.env.MEMORY_BACKEND === "d1") {
+    await d1MemoryClient.initialize();
+    console.log("✅ Cloudflare D1 memory initialized");
+    return;
+  }
   const db = await dbPromise;
 
   await db.exec(`PRAGMA journal_mode = WAL;`);
@@ -204,6 +210,7 @@ export class MemoryService {
     role: "user" | "assistant",
     content: string
   ) {
+    if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.addMessage(sessionId, role, content);
     const db = await this.db;
     const normalized = normalizeContent(content);
 
@@ -254,6 +261,7 @@ export class MemoryService {
 
   /* ---------- HISTORY ---------- */
   async getHistory(sessionId: string): Promise<ChatMessage[]> {
+    if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.getHistory(sessionId);
     const db = await this.db;
 
     const rows = await db.all(
@@ -273,6 +281,7 @@ export class MemoryService {
 
   /* ---------- CONTEXT ---------- */
   async getRecentContext(sessionId: string): Promise<ChatMessage[]> {
+    if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.getRecentContext(sessionId);
     const db = await this.db;
 
     const rows = await db.all(
@@ -298,6 +307,7 @@ async getRecentMessages(
   sessionId: string,
   limit: number = 4
 ): Promise<ChatMessage[]> {
+  if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.getRecentMessages(sessionId, limit);
   const db = await this.db;
 
   const rows = await db.all(
@@ -336,6 +346,7 @@ async getRecentMessages(
 
   /* ---------- STRATEGIC MEMORY ---------- */
   async getStrategicMemory(sessionId: string): Promise<StrategicMemory> {
+    if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.getStrategicMemory(sessionId);
     const db = await this.db;
 
     const row = await db.get(
@@ -377,6 +388,7 @@ async getRecentMessages(
     sessionId: string,
     data: Partial<StrategicMemory>
   ) {
+    if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.updateStrategicMemory(sessionId, data);
     const db = await this.db;
     const existing = await this.getStrategicMemory(sessionId);
 
@@ -471,6 +483,7 @@ await db.run(
     calendlyLink?: string;
     status?: string;
   }) {
+    if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.storeBooking(data);
     const db = await this.db;
 
     await db.run(
@@ -487,6 +500,7 @@ await db.run(
   }
 
   async updateBookingStatus(bookingId: string, status: string) {
+    if (process.env.MEMORY_BACKEND === "d1") return d1MemoryClient.updateBookingStatus(bookingId, status);
     const db = await this.db;
     await db.run(`UPDATE bookings SET status=? WHERE id=?`, status, bookingId);
   }
