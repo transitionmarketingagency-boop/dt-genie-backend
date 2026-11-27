@@ -66,7 +66,9 @@ export function getApprovedPublicAnswer(message: string): string {
     return "High visits with few enquiries do not identify the cause by themselves. Verify measurement and review visitor fit by source, the offer and positioning, landing-page conversion, enquiry friction, follow-up, and progression to sale. Find the observed drop-off and compare a representative period before choosing a new channel. Which source sends most visits, and where do prospects currently drop out?";
   }
 
-  if (/\b(?:increas\w*|rais\w*|scal\w*)\b.{0,35}\b(?:marketing|ad|advertising|budget|spend)\b|\b(?:marketing|advertising|ad) budget\b/.test(question)) {
+  // Keep explicit requests to increase existing spend deterministic. General budget
+  // constraints and channel-selection questions must reach the context-aware model.
+  if (/\b(?:should (?:i|we)|how (?:much|far) (?:should|can) (?:i|we))\b.{0,45}\b(?:increase|raise|scale|expand)\b.{0,30}\b(?:marketing|ad|advertising) (?:budget|spend)\b|\b(?:increase|raise|scale|expand)\b.{0,30}\b(?:our|the)\b.{0,15}\b(?:marketing|ad|advertising) (?:budget|spend)\b/.test(question)) {
     return "Before increasing spend, review a reliable baseline, tracking, qualified-lead and sale conversion, channel contribution, seasonality, attribution limits, and capacity to serve added demand. Use evidence to estimate whether more spend is likely to add profitable demand, then test a measured change before scaling. What result and baseline are you using to judge the increase?";
   }
 
@@ -74,11 +76,11 @@ export function getApprovedPublicAnswer(message: string): string {
     return "Start by clarifying the business outcome and reviewing the evidence across demand, conversion, customer economics, delivery capacity, and measurement. Identify where the largest supported constraint sits, check what it would take to change it, then prioritize a testable intervention against the expected impact, cost, and risk. What outcome matters most, and which measures do you already trust?";
   }
 
-  if (/\b(?:best marketing channel|best channel|which marketing channel|which channel should)\b/.test(question)) {
-    return "There isn’t one best channel for every business. Compare options against your target customer, offer, customer economics, buying journey, ability to serve demand, and what you can measure. Judge qualified opportunities and contribution, not reach or clicks alone; test before scaling when evidence is limited. What do you sell, and who are you trying to reach?";
-  }
+  // Channel selection is inherently business- and context-dependent; do not
+  // intercept it with a generic answer before the model can use session memory.
 
-  if (/\b(?:ads?|advertising)\b/.test(question) && /\b(?:fix|improv\w*|perform\w*|working|results?|wast\w*|cost|lead quality|convert\w*|scale)\b/.test(question)) {
+  if (/\b(?:my|our|the)\s+(?:google|meta|facebook|instagram|search|paid)\s+(?:ads?|advertising|campaigns?)\b/.test(question) &&
+      /\b(?:not working|underperform\w*|wast\w* money|poor results?|not converting|low lead quality|fix|troubleshoot)\b/.test(question)) {
     return "First verify tracking, then find where the funnel is breaking: audience and offer fit, creative, landing-page conversion, lead quality and follow-up, sales conversion, or contribution after acquisition costs. A low cost per lead does not prove the leads are valuable. Change a small number of variables at a time, and don’t increase spend until the economics and capacity support it. Which metric is weakest right now?";
   }
 
