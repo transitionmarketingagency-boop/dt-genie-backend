@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { getApprovedPublicAnswer } from "./publicAnswerPolicy.js";
 import { detectBusinessProfile } from "./strategicBrain.js";
+import { cleanPrompt } from "./openRouterClient.js";
 
 test("business-specific lead-generation questions reach context-aware response generation", () => {
   const cases = [
@@ -117,4 +118,22 @@ test("hypothetical industry mentions do not overwrite a user's business profile"
     detectBusinessProfile("I am researching plumbing and home cleaning businesses."),
     null,
   );
+});
+
+
+test("long model prompts preserve the latest question and final response rules", () => {
+  const prompt = [
+    "SYSTEM OPENING INSTRUCTIONS",
+    "x".repeat(14000),
+    "LATEST USER QUESTION: calculate the service booking rates",
+    "FINAL RESPONSE RULES: answer the latest question directly",
+  ].join("\\n");
+
+  const cleaned = cleanPrompt(prompt);
+
+  assert.ok(cleaned.length <= 12000);
+  assert.ok(cleaned.startsWith("SYSTEM OPENING INSTRUCTIONS"));
+  assert.ok(cleaned.includes("LATEST USER QUESTION: calculate the service booking rates"));
+  assert.ok(cleaned.endsWith("FINAL RESPONSE RULES: answer the latest question directly"));
+  assert.ok(cleaned.includes("Middle conversation context omitted"));
 });
