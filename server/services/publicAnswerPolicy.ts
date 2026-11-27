@@ -92,7 +92,7 @@ export function getApprovedPublicAnswer(message: string): string {
   }
 
   if (/\b(what types? of businesses|which industries|what industries|who do you help|who does dtm help|markets do you focus on|industry focus)\b/.test(question)) {
-    return "DTM’s primary market focus is Premium Travel & Experiences, with Boutique/Premium Real Estate as a secondary market. These are starting markets rather than permanent limits; suitability depends on the business economics, growth opportunity, operating capacity, and willingness to measure and improve.";
+    return "DTM’s primary beachhead is Premium Travel & Experiences, with Boutique/Premium Real Estate as a secondary beachhead. E-commerce is also a current priority sector. These are focus areas, not eligibility restrictions; DTM can assess suitable businesses in other industries based on their growth opportunity, economics, operating capacity, and willingness to measure and improve.";
   }
 
   if (/\b(what is digital transition marketing|what does dtm do|who is dtm|what is dtm)\b/.test(question)) {
