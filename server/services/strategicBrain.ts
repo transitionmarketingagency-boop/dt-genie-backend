@@ -80,28 +80,28 @@ function detectContextShift(
 function detectBusinessIndustry(message: string): { industry: string; businessType: string } | null {
   const msg = normalize(message);
   const ownershipSignal =
-    /\\b(i own|i run|i operate|i manage|i founded|i have|i work at|i work for|our company|our business|our store|our clinic|our practice|we operate|we run|we own|we manage|my company|my business|my store|my clinic|my practice|my dental|my travel|my property|my ecommerce|i am|i'm|we are|we're)\\b/.test(msg);
+    /\b(i own|i run|i operate|i manage|i founded|i have|i work at|i work for|our company|our business|our store|our clinic|our practice|we operate|we run|we own|we manage|my company|my business|my store|my clinic|my practice|my dental|my travel|my property|my ecommerce|i am|i'm|we are|we're)\b/.test(msg);
 
   if (!ownershipSignal) return null;
 
   const industries: Array<{ industry: string; businessType: string; pattern: RegExp }> = [
-    { industry: "premium_travel_experiences", businessType: "Travel and experiences", pattern: /\\b(travel agency|travel company|tour operator|tour company|tourism|guided tours|private tours|travel experiences|destination management)\\b/ },
-    { industry: "real_estate", businessType: "Real estate", pattern: /\\b(real estate|realtor|property developer|property agency|estate agency|realty|property brokerage|real estate brokerage)\\b/ },
-    { industry: "ecommerce", businessType: "E-commerce", pattern: /\\b(e ?commerce|online store|online shop|direct to consumer|dtc brand|shopify store)\\b/ },
-    { industry: "dental_healthcare", businessType: "Dental and oral healthcare", pattern: /\\b(dentist|dental clinic|dental practice|orthodontist|orthodontic clinic|oral surgery)\\b/ },
-    { industry: "home_services", businessType: "Home services", pattern: /\\b(home services|plumbing|plumber|hvac|roofing|roofer|electrician|pest control|house cleaning|cleaning company|landscaping|landscaper|home renovation|general contractor)\\b/ },
-    { industry: "hospitality", businessType: "Hospitality", pattern: /\\b(hotel|resort|restaurant|cafe|catering|hospitality|guesthouse|short term rental)\\b/ },
-    { industry: "healthcare", businessType: "Healthcare", pattern: /\\b(healthcare|medical clinic|medical practice|doctor|physician|physiotherapy|physiotherapist|health centre|health center)\\b/ },
-    { industry: "saas_software", businessType: "Software and SaaS", pattern: /\\b(saas|software company|software business|software as a service|app company|tech startup)\\b/ },
-    { industry: "professional_services", businessType: "Professional services", pattern: /\\b(law firm|lawyer|accounting firm|accountant|consultancy|consulting firm|professional services|recruitment agency|staffing agency)\\b/ },
-    { industry: "education", businessType: "Education", pattern: /\\b(school|college|university|training institute|education business|online course|coaching institute|tutoring)\\b/ },
-    { industry: "fitness_wellness", businessType: "Fitness and wellness", pattern: /\\b(gym|fitness studio|personal training|wellness studio|yoga studio|pilates)\\b/ },
-    { industry: "automotive", businessType: "Automotive", pattern: /\\b(car dealership|auto dealer|automotive|auto repair|car service centre|car service center)\\b/ },
-    { industry: "construction", businessType: "Construction and building", pattern: /\\b(construction company|builder|building contractor|civil engineering)\\b/ },
-    { industry: "manufacturing", businessType: "Manufacturing", pattern: /\\b(manufacturer|manufacturing|factory|industrial production)\\b/ },
-    { industry: "retail", businessType: "Retail", pattern: /\\b(retail store|retail business|physical shop|brick and mortar)\\b/ },
-    { industry: "financial_services", businessType: "Financial services", pattern: /\\b(financial services|insurance agency|insurance broker|financial advisory|wealth management)\\b/ },
-    { industry: "other", businessType: "Other / not yet classified", pattern: /\\b(company|business|agency|brand|firm|startup|practice|store|shop)\\b/ },
+    { industry: "premium_travel_experiences", businessType: "Travel and experiences", pattern: /\b(travel agency|travel company|tour operator|tour company|tourism|guided tours|private tours|travel experiences|destination management)\b/ },
+    { industry: "real_estate", businessType: "Real estate", pattern: /\b(real estate|realtor|property developer|property agency|estate agency|realty|property brokerage|real estate brokerage)\b/ },
+    { industry: "ecommerce", businessType: "E-commerce", pattern: /\b(e ?commerce|online store|online shop|direct to consumer|dtc brand|shopify store)\b/ },
+    { industry: "dental_healthcare", businessType: "Dental and oral healthcare", pattern: /\b(dentist|dental clinic|dental practice|orthodontist|orthodontic clinic|oral surgery)\b/ },
+    { industry: "home_services", businessType: "Home services", pattern: /\b(home services|plumbing|plumber|hvac|roofing|roofer|electrician|pest control|house cleaning|cleaning company|landscaping|landscaper|home renovation|general contractor)\b/ },
+    { industry: "hospitality", businessType: "Hospitality", pattern: /\b(hotel|resort|restaurant|cafe|catering|hospitality|guesthouse|short term rental)\b/ },
+    { industry: "healthcare", businessType: "Healthcare", pattern: /\b(healthcare|medical clinic|medical practice|doctor|physician|physiotherapy|physiotherapist|health centre|health center)\b/ },
+    { industry: "saas_software", businessType: "Software and SaaS", pattern: /\b(saas|software company|software business|software as a service|app company|tech startup)\b/ },
+    { industry: "professional_services", businessType: "Professional services", pattern: /\b(law firm|lawyer|accounting firm|accountant|consultancy|consulting firm|professional services|recruitment agency|staffing agency)\b/ },
+    { industry: "education", businessType: "Education", pattern: /\b(school|college|university|training institute|education business|online course|coaching institute|tutoring)\b/ },
+    { industry: "fitness_wellness", businessType: "Fitness and wellness", pattern: /\b(gym|fitness studio|personal training|wellness studio|yoga studio|pilates)\b/ },
+    { industry: "automotive", businessType: "Automotive", pattern: /\b(car dealership|auto dealer|automotive|auto repair|car service centre|car service center)\b/ },
+    { industry: "construction", businessType: "Construction and building", pattern: /\b(construction company|builder|building contractor|civil engineering)\b/ },
+    { industry: "manufacturing", businessType: "Manufacturing", pattern: /\b(manufacturer|manufacturing|factory|industrial production)\b/ },
+    { industry: "retail", businessType: "Retail", pattern: /\b(retail store|retail business|physical shop|brick and mortar)\b/ },
+    { industry: "financial_services", businessType: "Financial services", pattern: /\b(financial services|insurance agency|insurance broker|financial advisory|wealth management)\b/ },
+    { industry: "other", businessType: "Other / not yet classified", pattern: /\b(company|business|agency|brand|firm|startup|practice|store|shop)\b/ },
   ];
 
   for (const item of industries) {
