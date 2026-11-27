@@ -61,7 +61,16 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/health") {
-      return json({ ok: true, service: "neonvision-memory" });
+      try {
+        await Promise.all([
+          env.DB.prepare("SELECT id, sessionId, role, content, timestamp FROM chat_messages LIMIT 0").all(),
+          env.DB.prepare("SELECT * FROM strategic_memory LIMIT 0").all(),
+          env.DB.prepare("SELECT id, userId, serviceType, preferredTime, email, calendlyLink, status, createdAt FROM bookings LIMIT 0").all(),
+        ]);
+        return json({ ok: true, service: "neonvision-memory" });
+      } catch {
+        return json({ ok: false, service: "neonvision-memory", error: "Memory schema is not ready" }, 503);
+      }
     }
     if (request.method !== "POST" || !url.pathname.startsWith("/v1/")) {
       return json({ error: "Not found" }, 404);
@@ -221,3 +230,4 @@ export default {
     }
   }
 };
+
