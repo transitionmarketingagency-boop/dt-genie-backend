@@ -330,8 +330,16 @@ Stage: ${brainContext?.stage ?? "unknown"}
 Intent: ${detectedIntentNames?.join(", ") || "general"}
 Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
 
-Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
-Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
+Industry: ${brainContext?.strategicMemory?.industry || "not yet identified"}
+Business Type: ${brainContext?.strategicMemory?.businessType || "not yet identified"}
+
+Industry handling:
+- DTM's current priority sectors are Premium Travel & Experiences, Boutique/Premium Real Estate, and E-commerce.
+- These are focus areas, NOT eligibility restrictions. DTM is open to assessing suitable businesses in other industries, including healthcare and dental, home services, hospitality, SaaS, professional services, education, retail, and other sectors.
+- Never tell a prospect DTM only serves the priority sectors.
+- Never assume the user's industry from DTM's focus areas. Use the user's stated business context.
+- If the user's industry is known from this session, carry it forward in follow-ups. Do not ask for it again unless genuinely ambiguous or the user explicitly changes businesses.
+- Adapt examples and questions to the user's actual business model, buyer journey, geography, sales cycle, and constraints. Do not force travel, real estate, or e-commerce assumptions onto other sectors.
 
 --------------------------------------------------
 
@@ -461,18 +469,20 @@ function isValidResponse(text: any): boolean {
 
 
 function shouldResetContext(message: string): boolean {
-  const triggers = [
-    "i run",
-    "i have",
-    "my business",
-    "we are",
-    "new business",
-    "starting a new",
-    "different business",
+  const lower = message.toLowerCase().replace(/\\s+/g, " ").trim();
+  const explicitSwitchSignals = [
+    "switch to a different business",
+    "let's discuss a different business",
+    "lets discuss a different business",
+    "this is a new business",
+    "for a new business",
+    "start a new business context",
+    "forget the previous business",
+    "reset business context",
+    "change the business we are discussing",
+    "different company now",
   ];
-
-  const lower = message.toLowerCase();
-  return triggers.some((t) => lower.includes(t));
+  return explicitSwitchSignals.some((signal) => lower.includes(signal));
 }
 
 function repairResponse(text: string): string {
@@ -716,14 +726,12 @@ if (shouldUseRetrieval) {
 
 // ================= CONTEXT CONTROL (ANTI-BLEED FIX) =================
 
-const isNewTopic =
-  shouldResetContext(message) ||
-  (message.length > 40 && !message.toLowerCase().includes("that"));
+const isNewTopic = shouldResetContext(message);
 
 const safeHistoryText =
   isNewTopic || isGreeting
     ? ""
-    : (historyText || "").slice(-800);
+    : (historyText || "").slice(-1800);
 
 
 // ================= PROMPT =================
