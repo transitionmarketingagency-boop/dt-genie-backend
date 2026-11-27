@@ -98,6 +98,20 @@ test("business profile detection recognizes stated business types and services",
   assert.deepEqual(ecommerce?.servicesDiscussed, ["skincare"]);
 });
 
+
+test("first-person role statements identify an actual business without accepting research statements", () => {
+  const travel = detectBusinessProfile("I am a travel agent selling private tours.");
+  assert.equal(travel?.industry, "premium_travel_experiences");
+  assert.equal(
+    detectBusinessProfile("I am researching travel agencies and private tours."),
+    null,
+  );
+  assert.equal(
+    detectBusinessProfile("We are researching real estate developers."),
+    null,
+  );
+});
+
 test("hypothetical industry mentions do not overwrite a user's business profile", () => {
   assert.equal(
     detectBusinessProfile("I am researching plumbing and home cleaning businesses."),
