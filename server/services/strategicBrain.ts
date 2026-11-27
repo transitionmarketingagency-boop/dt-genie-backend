@@ -80,7 +80,7 @@ function detectContextShift(
 function detectBusinessIndustry(message: string): { industry: string; businessType: string } | null {
   const msg = normalize(message);
   const ownershipSignal =
-    /\\b(i own|i run|i operate|i manage|i founded|i work at|i work for|our company|our business|our store|our clinic|our practice|we operate|we run|we own|we manage|my company|my business|my store|my clinic|my practice|i am a|i'm a|we are a|we're a)\\b/.test(msg);
+    /\\b(i own|i run|i operate|i manage|i founded|i have|i work at|i work for|our company|our business|our store|our clinic|our practice|we operate|we run|we own|we manage|my company|my business|my store|my clinic|my practice|my dental|my travel|my property|my ecommerce|i am|i'm|we are|we're)\\b/.test(msg);
 
   if (!ownershipSignal) return null;
 
