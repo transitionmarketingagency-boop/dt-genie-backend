@@ -50,7 +50,7 @@ export function getApprovedPublicAnswer(message: string): string {
     return "Compare equivalent periods where possible and account for availability, booking window, cancellations, and changes to the offer or inventory. Review enquiries and bookings against a reliable baseline. A before-and-after comparison alone cannot isolate a campaign’s effect; where feasible, use a suitable comparison or holdout and note its limits. If the available data cannot separate seasonal demand from campaign impact, state that uncertainty rather than assigning credit.";
   }
 
-  if (/\b(pric(?:e|ing)|costs?|how much|fixed fee|packages?|quotes?|rates?|retainers?|margins?)\b/.test(question)) {
+  if (/\b(pric(?:e|es|ing)|costs?|how much|fixed fee|packages?|quotes?|rates?|retainers?|margins?)\b/.test(question)) {
     return "I can’t confirm a fixed price from approved public information. Investment depends on scope and business context; what outcome are you looking to achieve?";
   }
 
@@ -66,7 +66,9 @@ export function getApprovedPublicAnswer(message: string): string {
     return "High visits with few enquiries do not identify the cause by themselves. Verify measurement and review visitor fit by source, the offer and positioning, landing-page conversion, enquiry friction, follow-up, and progression to sale. Find the observed drop-off and compare a representative period before choosing a new channel. Which source sends most visits, and where do prospects currently drop out?";
   }
 
-  if (/\b(?:increas\w*|rais\w*|scal\w*)\b.{0,35}\b(?:marketing|ad|advertising|budget|spend)\b|\b(?:marketing|advertising|ad) budget\b/.test(question)) {
+  // Keep explicit requests to increase existing spend deterministic. General budget
+  // constraints and channel-selection questions must reach the context-aware model.
+  if (/\b(?:should (?:i|we)|how (?:much|far) (?:should|can) (?:i|we))\b.{0,45}\b(?:increase|raise|scale|expand)\b.{0,30}\b(?:marketing|ad|advertising) (?:budget|spend)\b|\b(?:increase|raise|scale|expand)\b.{0,30}\b(?:our|the)\b.{0,15}\b(?:marketing|ad|advertising) (?:budget|spend)\b/.test(question)) {
     return "Before increasing spend, review a reliable baseline, tracking, qualified-lead and sale conversion, channel contribution, seasonality, attribution limits, and capacity to serve added demand. Use evidence to estimate whether more spend is likely to add profitable demand, then test a measured change before scaling. What result and baseline are you using to judge the increase?";
   }
 
@@ -74,24 +76,23 @@ export function getApprovedPublicAnswer(message: string): string {
     return "Start by clarifying the business outcome and reviewing the evidence across demand, conversion, customer economics, delivery capacity, and measurement. Identify where the largest supported constraint sits, check what it would take to change it, then prioritize a testable intervention against the expected impact, cost, and risk. What outcome matters most, and which measures do you already trust?";
   }
 
-  if (/\b(?:best marketing channel|best channel|which marketing channel|which channel should)\b/.test(question)) {
-    return "There isn’t one best channel for every business. Compare options against your target customer, offer, customer economics, buying journey, ability to serve demand, and what you can measure. Judge qualified opportunities and contribution, not reach or clicks alone; test before scaling when evidence is limited. What do you sell, and who are you trying to reach?";
-  }
+  // Channel selection is inherently business- and context-dependent; do not
+  // intercept it with a generic answer before the model can use session memory.
 
-  if (/\b(?:ads?|advertising)\b/.test(question) && /\b(?:fix|improv\w*|perform\w*|working|results?|wast\w*|cost|lead quality|convert\w*|scale)\b/.test(question)) {
+  if (/\b(?:my|our|the)\s+(?:google|meta|facebook|instagram|search|paid)\s+(?:ads?|advertising|campaigns?)\b/.test(question) &&
+      /\b(?:not working|underperform\w*|wast\w* money|poor results?|not converting|low lead quality|fix|troubleshoot)\b/.test(question)) {
     return "First verify tracking, then find where the funnel is breaking: audience and offer fit, creative, landing-page conversion, lead quality and follow-up, sales conversion, or contribution after acquisition costs. A low cost per lead does not prove the leads are valuable. Change a small number of variables at a time, and don’t increase spend until the economics and capacity support it. Which metric is weakest right now?";
   }
 
-  if (/\b(?:lead generation|more leads?|qualified leads?|lead quality|generate leads?)\b/.test(question)) {
-    return "Define what makes an enquiry qualified, then inspect the offer, how suitable customers discover it, the path to enquiry, follow-up, and conversion to sale. Measure qualified enquiries through to sales and their economics, not just form fills, and confirm you can serve more demand. What do you sell, who is the target customer, and where do enquiries come from today?";
-  }
+  // Lead-generation advice is intentionally handled by the context-aware model.
+  // A deterministic generic answer here would bypass the user's business profile and history.
 
   if (/\b(?:which|what|how|should i)\b.{0,45}\b(?:automate|automation)\b|\b(?:automate|automation)\b.{0,45}\b(?:business|workflow|task|process)\b/.test(question)) {
     return "Start with a repeated, stable workflow whose steps and exceptions are clear. Map the current process and measure its time, errors, and maintenance cost before automating it; add a fallback and human review for consequential actions or sensitive data. What recurring task takes the most time, and what steps or tools does it involve?";
   }
 
   if (/\b(what types? of businesses|which industries|what industries|who do you help|who does dtm help|markets do you focus on|industry focus)\b/.test(question)) {
-    return "DTM’s primary market focus is Premium Travel & Experiences, with Boutique/Premium Real Estate as a secondary market. These are starting markets rather than permanent limits; suitability depends on the business economics, growth opportunity, operating capacity, and willingness to measure and improve.";
+    return "DTM’s primary beachhead is Premium Travel & Experiences, with Boutique/Premium Real Estate as a secondary beachhead. E-commerce is also a current priority sector. These are focus areas, not eligibility restrictions; DTM can assess suitable businesses in other industries based on their growth opportunity, economics, operating capacity, and willingness to measure and improve.";
   }
 
   if (/\b(what is digital transition marketing|what does dtm do|who is dtm|what is dtm)\b/.test(question)) {

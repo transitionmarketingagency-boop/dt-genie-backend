@@ -89,6 +89,7 @@ export interface BrainContext {
   strategicMemory?: {
     industry?: string;
     businessType?: string;
+    servicesDiscussed?: string[];
   };
   executionMode?: string;
   isFresh?: boolean;
@@ -310,6 +311,10 @@ CRITICAL RULES (STRICT)
 11. Be concise, answer the actual question first, and ask at most one focused follow-up when needed.
 
 When giving business advice, separate established facts from assumptions. State the important variables, avoid one-size-fits-all prescriptions, and recommend a small measurable test when the evidence is incomplete. Do not pretend to have audited the user's business.
+When a user says their marketing budget is limited, do not assume they currently run ads, have a proven best-performing channel, or should increase spend. Recommend a first step that fits the stated budget and evidence. Do not invent relative margins, lifetime value, conversion rates, or profitability for their services. For businesses with multiple services, distinguish their buying urgency and repeat-purchase patterns only as hypotheses to validate, not as facts about this business. Never ask which service is most profitable unless the user has supplied reliable profitability evidence. Use observable signals such as enquiries by service, booked jobs, response time, close rate, repeat bookings, service capacity, and customer feedback; label unmeasured differences as unknown.
+When asked which acquisition channel to test first, answer with one clear conditional recommendation and a practical, low-risk test. Explain why it fits the stated customer and service. If a key fact such as market, service area, existing lead source, or ability to answer enquiries is missing, state the assumption and ask at most one focused follow-up; do not substitute generic advice or a request for financial metrics that are not necessary to choose an initial test.
+Do not recommend increasing existing ad spend unless the user explicitly asks about scaling current spend or provides evidence that existing campaigns are working profitably.
+When recommending location-dependent advertising products (including Google Local Services Ads), do not imply availability or eligibility unless the user's market is known and the product's availability there is established. If uncertain, state the condition and offer a suitable general alternative such as standard paid search, subject to local platform availability.
 
 --------------------------------------------------
 
@@ -320,7 +325,7 @@ Company: Digital Transition Marketing
 Focus Areas:
 - Diagnosis-led growth improvement
 - Strategy, acquisition, creative, customer experience, measurement, and appropriate technology or AI interventions
-- Initial market focus: Premium Travel & Experiences; secondary focus: Boutique/Premium Real Estate
+- Current priority sectors: Premium Travel & Experiences, Boutique/Premium Real Estate, and E-commerce. These are focus areas, not eligibility restrictions.
 
 --------------------------------------------------
 
@@ -330,8 +335,22 @@ Stage: ${brainContext?.stage ?? "unknown"}
 Intent: ${detectedIntentNames?.join(", ") || "general"}
 Lead Score: ${leadScoreValue?.toFixed(2) ?? "0.00"}
 
-Industry: ${brainContext?.strategicMemory?.industry ?? "unknown"}
-Business Type: ${brainContext?.strategicMemory?.businessType ?? "unknown"}
+Industry: ${brainContext?.strategicMemory?.industry || "not yet identified"}
+Business Type: ${brainContext?.strategicMemory?.businessType || "not yet identified"}
+Services already identified for this business: ${brainContext?.strategicMemory?.servicesDiscussed?.join(", ") || "not yet identified"}
+
+Industry handling:
+- DTM's current priority sectors are Premium Travel & Experiences, Boutique/Premium Real Estate, and E-commerce.
+- These are focus areas, NOT eligibility restrictions. DTM is open to assessing suitable businesses in other industries, including healthcare and dental, home services, hospitality, SaaS, professional services, education, retail, and other sectors.
+- Never tell a prospect DTM only serves the priority sectors.
+- Never assume the user's industry from DTM's focus areas. Use the user's stated business context.
+- If the user's industry or business type is known from this session, carry it forward in follow-ups. Do not ask what they sell, what industry they are in, or where they operate again unless genuinely ambiguous or the user explicitly changes businesses.
+- In the first response, explicitly acknowledge the business, every named core service where practical, and the customer type the user named. For example, for a plumbing and home cleaning company serving residential customers, refer to both plumbing and residential cleaning.
+- Make the recommendation visibly specific to the stated services, customers, buying process, geography, and operating constraints; do not merely give generic lead-generation advice.
+- Never ask what the user sells, which industry they are in, or where they operate when that information is already present in the current message or recent conversation. Ask only for a genuinely missing decision variable.
+- For businesses with multiple services, preserve and name each service separately in the profile and follow-up answers. Do not collapse distinct services into a generic industry label. If service-level performance data is missing, propose a small comparison test rather than declaring one service more profitable or valuable.
+- When the user asks how to compare a test after a stated period (for example, two weeks), answer that measurement question directly; do not repeat the original channel recommendation. Give a simple service-by-service comparison framework. Track enquiries, qualified enquiries, booked jobs, response time, quote-to-booking rate, cancellations/no-shows, and spend/cost per qualified enquiry where paid spend exists. Compare plumbing and cleaning separately, using the same dates and attribution rules. Treat revenue, gross margin, and profitability as unknown unless the user supplies reliable figures. Explain that a two-week sample may be directional rather than conclusive, especially with low enquiry volume.
+- Adapt examples and questions to the user's actual business model, buyer journey, geography, sales cycle, and constraints. Do not force travel, real estate, or e-commerce assumptions onto other sectors. If the user says local area but gives no city or service area, give a useful provisional recommendation and ask for the city only if it materially changes channel availability or targeting.
 
 --------------------------------------------------
 
@@ -368,7 +387,7 @@ RESPONSE RULES
 - No unnecessary complexity
 - Keep it natural and human
 - Keep ordinary answers under about 130 words
-- Preserve DTM's market hierarchy: Premium Travel & Experiences is the primary focus; Boutique/Premium Real Estate is secondary
+- Preserve DTM's current priority sectors accurately: Premium Travel & Experiences, Boutique/Premium Real Estate, and E-commerce. Travel is the primary beachhead and Real Estate is secondary; E-commerce is also a current priority sector. These priorities do not restrict DTM from assessing suitable businesses in other industries.
 - For business advice, use conditional guidance and say what evidence would change the recommendation; do not invent what businesses typically do
 
 RESPONSE STYLE (VERY IMPORTANT)
@@ -461,18 +480,20 @@ function isValidResponse(text: any): boolean {
 
 
 function shouldResetContext(message: string): boolean {
-  const triggers = [
-    "i run",
-    "i have",
-    "my business",
-    "we are",
-    "new business",
-    "starting a new",
-    "different business",
+  const lower = message.toLowerCase().replace(/\\s+/g, " ").trim();
+  const explicitSwitchSignals = [
+    "switch to a different business",
+    "let's discuss a different business",
+    "lets discuss a different business",
+    "this is a new business",
+    "for a new business",
+    "start a new business context",
+    "forget the previous business",
+    "reset business context",
+    "change the business we are discussing",
+    "different company now",
   ];
-
-  const lower = message.toLowerCase();
-  return triggers.some((t) => lower.includes(t));
+  return explicitSwitchSignals.some((signal) => lower.includes(signal));
 }
 
 function repairResponse(text: string): string {
@@ -642,10 +663,7 @@ if (isFirstMessage && isGreeting) {
 // ================= CONTEXT RESET =================
 
 const strongResetSignal =
-  message.length > 80 &&
-  /(new business|different business|start over|completely different)/i.test(
-    message
-  );
+  /(this is a new business|for a new business|switch to a different business|different company now|forget the previous business|reset business context|start a new business context)/i.test(message);
 
 if (strongResetSignal) {
   brainContext = {
@@ -716,14 +734,12 @@ if (shouldUseRetrieval) {
 
 // ================= CONTEXT CONTROL (ANTI-BLEED FIX) =================
 
-const isNewTopic =
-  shouldResetContext(message) ||
-  (message.length > 40 && !message.toLowerCase().includes("that"));
+const isNewTopic = shouldResetContext(message);
 
 const safeHistoryText =
   isNewTopic || isGreeting
     ? ""
-    : (historyText || "").slice(-800);
+    : (historyText || "").slice(-1800);
 
 
 // ================= PROMPT =================

@@ -30,6 +30,7 @@ export type BrainContext = {
   shouldAskQuestion?: boolean;
   shouldGiveCTA?: boolean;
   confidenceLevel?: number;
+  strategicMemory?: StrategicMemory;
 };
 
 /* ================= HELPERS ================= */
@@ -54,24 +55,80 @@ function detectContextShift(
 ): boolean {
   const msg = normalize(message);
 
-  const strongSignals = ["new business", "different business", "reset"];
-  const weakSignals = ["i run", "we are", "my business", "my store"];
+  // Reset only when the user clearly asks to switch/reset the business context.
+  // Ordinary statements such as "I run...", "we are..." and "my business..." are context.
+  const explicitSwitchSignals = [
+    "switch to a different business",
+    "let's discuss a different business",
+    "lets discuss a different business",
+    "this is a new business",
+    "for a new business",
+    "start a new business context",
+    "forget the previous business",
+    "reset business context",
+    "change the business we are discussing",
+    "different company now",
+  ];
 
-  const hasStrong = strongSignals.some((s) => msg.includes(s));
-  const hasWeak = weakSignals.some((s) => msg.includes(s));
+  return explicitSwitchSignals.some((signal) => msg.includes(signal));
+}
 
-  const hasMemory =
-    !!memory?.industry ||
-    !!memory?.businessType ||
-    (memory?.servicesDiscussed?.length ?? 0) > 0;
+/* ================= INDUSTRY CONTEXT DETECTION ================= */
 
-  // ❌ FIX: only reset on STRONG intent OR strong+clear context mismatch
-  if (hasStrong) return true;
+// Detect a user's own business only when the message contains an ownership/operator
+// signal. Mentioning an industry hypothetically must not overwrite their profile.
+export function detectBusinessProfile(message: string): { industry: string; businessType: string; servicesDiscussed: string[] } | null {
+  const msg = normalize(message);
+  const ownershipSignal =
+    /\b(i own|i run|i operate|i manage|i founded|i have|i work at|i work for|our company|our business|our store|our clinic|our practice|we operate|we run|we own|we manage|my company|my business|my store|my clinic|my practice|my dental|my travel|my property|my ecommerce)\b/.test(msg) ||
+    /\b(i am|i'm) (?:a|an)\b/.test(msg) ||
+    /\b(we are|we're) (?:a|an)\b/.test(msg);
 
-  // ❌ FIX: prevent false resets on normal statements like "my business does X"
-  if (hasWeak && hasMemory && msg.length > 40) return true;
+  if (!ownershipSignal) return null;
 
-  return false;
+  const industries: Array<{ industry: string; businessType: string; pattern: RegExp }> = [
+    { industry: "premium_travel_experiences", businessType: "Travel and experiences", pattern: /\b(travel agent|travel agency|travel company|travel business|tour operator|tour company|tourism|guided tours|private tours|travel experiences|destination management|destination management company|dmc)\b/ },
+    { industry: "real_estate", businessType: "Real estate", pattern: /\b(real estate|realtor|property developer|property agency|estate agency|realty|property brokerage|real estate brokerage)\b/ },
+    { industry: "ecommerce", businessType: "E-commerce", pattern: /\b(e ?commerce|online store|online shop|direct to consumer|dtc brand|shopify store)\b/ },
+    { industry: "dental_healthcare", businessType: "Dental and oral healthcare", pattern: /\b(dentist|dental clinic|dental practice|orthodontist|orthodontic clinic|oral surgery)\b/ },
+    { industry: "home_services", businessType: "Home services", pattern: /\b(home services|plumbing|plumber|hvac|roofing|roofer|electrician|pest control|house cleaning|cleaning company|cleaning business|landscaping|landscaper|home renovation|renovation company|general contractor)\b/ },
+    { industry: "hospitality", businessType: "Hospitality", pattern: /\b(hotel|resort|restaurant|cafe|catering|hospitality|guesthouse|short term rental)\b/ },
+    { industry: "healthcare", businessType: "Healthcare", pattern: /\b(healthcare|medical clinic|medical practice|doctor|physician|physiotherapy|physiotherapist|health centre|health center)\b/ },
+    { industry: "saas_software", businessType: "Software and SaaS", pattern: /\b(saas|software company|software business|software as a service|app company|tech startup)\b/ },
+    { industry: "professional_services", businessType: "Professional services", pattern: /\b(law firm|lawyer|accounting firm|accountant|consultancy|consulting firm|professional services|recruitment agency|staffing agency)\b/ },
+    { industry: "education", businessType: "Education", pattern: /\b(school|college|university|training institute|education business|online course|coaching institute|tutoring)\b/ },
+    { industry: "fitness_wellness", businessType: "Fitness and wellness", pattern: /\b(gym|fitness studio|personal training|wellness studio|yoga studio|pilates)\b/ },
+    { industry: "automotive", businessType: "Automotive", pattern: /\b(car dealership|auto dealer|automotive|auto repair|car service centre|car service center)\b/ },
+    { industry: "construction", businessType: "Construction and building", pattern: /\b(construction company|construction business|construction firm|builder|building contractor|civil engineering)\b/ },
+    { industry: "manufacturing", businessType: "Manufacturing", pattern: /\b(manufacturer|manufacturing|factory|industrial production)\b/ },
+    { industry: "retail", businessType: "Retail", pattern: /\b(retail store|retail business|physical shop|brick and mortar)\b/ },
+    { industry: "financial_services", businessType: "Financial services", pattern: /\b(financial services|insurance agency|insurance broker|financial advisory|wealth management)\b/ },
+    { industry: "other", businessType: "Other / not yet classified", pattern: /\b(company|business|agency|brand|firm|startup|practice|store|shop)\b/ },
+  ];
+
+  for (const item of industries) {
+    if (item.pattern.test(msg)) {
+      const servicePatterns: Array<{ label: string; pattern: RegExp }> = [
+        { label: "plumbing", pattern: /\b(plumbing|plumber|plumbers)\b/ },
+        { label: "home cleaning", pattern: /\b(home cleaning|house cleaning|residential cleaning|cleaning company|cleaning business)\b/ },
+        { label: "HVAC", pattern: /\b(hvac|heating and cooling|air conditioning)\b/ },
+        { label: "roofing", pattern: /\b(roofing|roofer|roof repair)\b/ },
+        { label: "electrical services", pattern: /\b(electrician|electrical services|electrical contractor)\b/ },
+        { label: "pest control", pattern: /\b(pest control|exterminator)\b/ },
+        { label: "landscaping", pattern: /\b(landscaping|landscaper|lawn care)\b/ },
+        { label: "renovation", pattern: /\b(home renovation|renovation company|remodeling|remodelling)\b/ },
+        { label: "private tours", pattern: /\b(private tours|guided tours|travel experiences)\b/ },
+        { label: "property sales", pattern: /\b(property sales|residential sales|real estate sales)\b/ },
+        { label: "skincare", pattern: /\b(skincare|skin care)\b/ },
+      ];
+      const servicesDiscussed = servicePatterns
+        .filter((service) => service.pattern.test(msg))
+        .map((service) => service.label);
+      return { industry: item.industry, businessType: item.businessType, servicesDiscussed };
+    }
+  }
+
+  return null;
 }
 
 /* ================= STAGE DETECTOR ================= */
@@ -164,8 +221,9 @@ export async function strategicBrain(
     }
   }
 
-  /* ---------- CONTEXT SHIFT ---------- */
-  if (detectContextShift(message, strategicMemory)) {
+  /* ---------- CONTEXT SHIFT + INDUSTRY PROFILE ---------- */
+  const contextWasExplicitlyReset = detectContextShift(message, strategicMemory);
+  if (contextWasExplicitlyReset) {
     strategicMemory = {
       servicesDiscussed: [],
       industry: undefined,
@@ -173,6 +231,22 @@ export async function strategicBrain(
       leadScore: 0,
       stage: "discovery",
     };
+    if (sessionId) {
+      await memoryService.updateStrategicMemory(sessionId, {
+        industry: "",
+        businessType: "",
+        servicesDiscussed: [],
+        goals: [],
+        lastDetectedServices: [],
+        lastUserProblem: "",
+      }).catch(() => {});
+    }
+  }
+
+  const detectedBusiness = detectBusinessProfile(userMessage);
+  if (detectedBusiness && sessionId) {
+    strategicMemory = { ...strategicMemory, ...detectedBusiness };
+    await memoryService.updateStrategicMemory(sessionId, detectedBusiness).catch(() => {});
   }
 
   /* ---------- INTENT (STABILIZED) ---------- */
@@ -244,6 +318,7 @@ export async function strategicBrain(
       shouldAskQuestion: signals.shouldAskQuestion,
       shouldGiveCTA: signals.shouldGiveCTA,
       confidenceLevel: signals.confidenceLevel,
+      strategicMemory,
     },
     chunks: [],
   };

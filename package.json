@@ -8,6 +8,7 @@
     "node": "20.18.x"
   },
   "scripts": {
+    "test:public-answer-policy": "tsx --test server/services/publicAnswerPolicy.test.ts",
     "build": "tsc && npm run copy-public && npm run copy-personas && npm run copy-chunks && npm run copy-utils",
     "build:backend": "npm run build",
     "start": "node dist/server/index-prod.js",
