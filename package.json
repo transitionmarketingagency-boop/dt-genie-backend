@@ -17,7 +17,8 @@
     "copy-public": "node scripts/copy-runtime-assets.mjs tree public dist/public",
     "copy-personas": "node scripts/copy-runtime-assets.mjs optional-tree personas dist/personas",
     "copy-chunks": "node scripts/copy-runtime-assets.mjs file server/vector_store/chunks.json dist/server/vector_store/chunks.json",
-    "copy-utils": "node scripts/copy-runtime-assets.mjs ts-tree server/utils dist/server/utils"
+    "copy-utils": "node scripts/copy-runtime-assets.mjs ts-tree server/utils dist/server/utils",
+    "test:d1-memory": "tsx --test server/services/d1MemoryClient.test.ts"
   },
   "dependencies": {
     "axios": "^1.15.0",
