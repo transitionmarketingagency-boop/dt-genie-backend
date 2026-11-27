@@ -33,12 +33,20 @@ function hash(text: string) {
 }
 
 /* ================= PROMPT CLEAN ================= */
-function cleanPrompt(prompt: string): string {
+export function cleanPrompt(prompt: string): string {
+  const normalized = (prompt || "").replace(/\\s+/g, " ").trim();
+  if (!normalized || normalized.length <= MAX_PROMPT_LENGTH) return normalized;
+
+  // Preserve the opening instructions and the end of the prompt, where the
+  // latest user question and final response requirements are placed.
+  const available = MAX_PROMPT_LENGTH - PROMPT_TRUNCATION_MARKER.length;
+  const prefixLength = Math.floor(available * 0.7);
+  const suffixLength = available - prefixLength;
+
   return (
-    prompt
-      ?.replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_PROMPT_LENGTH) || ""
+    normalized.slice(0, prefixLength) +
+    PROMPT_TRUNCATION_MARKER +
+    normalized.slice(-suffixLength)
   );
 }
 
