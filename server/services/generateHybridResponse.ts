@@ -320,7 +320,7 @@ Company: Digital Transition Marketing
 Focus Areas:
 - Diagnosis-led growth improvement
 - Strategy, acquisition, creative, customer experience, measurement, and appropriate technology or AI interventions
-- Initial market focus: Premium Travel & Experiences; secondary focus: Boutique/Premium Real Estate
+- Current priority sectors: Premium Travel & Experiences, Boutique/Premium Real Estate, and E-commerce. These are focus areas, not eligibility restrictions.
 
 --------------------------------------------------
 
