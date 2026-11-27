@@ -7,7 +7,8 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 /* ================= CONFIG ================= */
 const MODEL = "qwen/qwen3.7-plus";
 const REQUEST_TIMEOUT = 12000;
-const MAX_PROMPT_LENGTH = 6000;
+const MAX_PROMPT_LENGTH = 12000;
+const PROMPT_TRUNCATION_MARKER = "\n[Middle conversation context omitted to preserve the latest question and response rules]\n";
 const MAX_RETRIES = 2;
 
 const SYSTEM_INSTRUCTIONS = `You are NeonVision, the public website assistant for Digital Transition Marketing (DTM).
