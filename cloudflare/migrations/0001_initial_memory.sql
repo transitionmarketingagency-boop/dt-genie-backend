@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS schema_migrations (
-  version TEXT PRIMARY KEY NOT NULL,
-  appliedAt TEXT NOT NULL
+  version INTEGER PRIMARY KEY NOT NULL,
+  applied_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS chat_messages (
@@ -51,5 +51,6 @@ CREATE TABLE IF NOT EXISTS bookings (
 CREATE INDEX IF NOT EXISTS idx_bookings_user_created
   ON bookings (userId, createdAt);
 
-INSERT OR IGNORE INTO schema_migrations (version, appliedAt)
-VALUES ('0001_initial_memory', CURRENT_TIMESTAMP);
+INSERT OR IGNORE INTO schema_migrations (version, applied_at)
+VALUES (1, CURRENT_TIMESTAMP);
+
