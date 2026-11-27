@@ -36,7 +36,7 @@ test("high-risk public claims remain protected by deterministic approved answers
 
 test("industry-focus answers preserve DTM market hierarchy and E-commerce priority", () => {
   const answer = getApprovedPublicAnswer("Which industries do you serve?");
-  assert.match(answer, /Premium Travel & Experiences as the primary beachhead/i);
+  assert.match(answer, /primary beachhead is Premium Travel & Experiences/i);
   assert.match(answer, /Boutique\/Premium Real Estate as a secondary beachhead/i);
   assert.match(answer, /E-commerce is also a current priority sector/i);
   assert.match(answer, /not eligibility restrictions/i);
