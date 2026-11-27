@@ -1,0 +1,9 @@
+name = "neonvision-memory"
+main = "cloudflare/neonvision-memory-worker.ts"
+compatibility_date = "2026-11-27"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "neonvision-memory"
+database_id = "ba90ad91-802a-439b-a485-6a586d48a316"
+migrations_dir = "cloudflare/migrations"
