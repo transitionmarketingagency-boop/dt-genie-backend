@@ -35,6 +35,15 @@ function isLowValue(text: string): boolean {
   return !text || text.length < 10 || /^(ok|yes|no|hi|hello|hey)$/i.test(text);
 }
 
+function detectIndustry(message: string): string | null {
+  const msg = message.toLowerCase();
+  if (msg.includes("saas")) return "saas";
+  if (msg.includes("ecom")) return "ecommerce";
+  if (msg.includes("real estate")) return "real_estate";
+  if (msg.includes("hotel")) return "hospitality";
+  return null;
+}
+
 function safeParse<T>(value: unknown, fallback: T): T {
   if (typeof value !== "string" || !value) return fallback;
   try { return JSON.parse(value) ?? fallback; } catch { return fallback; }
@@ -94,16 +103,16 @@ export default {
         if (!sessionId) return json({ error: "sessionId required" }, 400);
         const limit = action.endsWith("/history") ? 50 :
           action.endsWith("/context") ? 15 : Math.min(40, Math.max(1, Number(body.limit) || 4) * 2);
+        const order = action.endsWith("/history") ? "ASC" : "DESC";
         const result = await env.DB.prepare(
-          "SELECT id, sessionId, role, content, timestamp FROM chat_messages WHERE sessionId = ? ORDER BY timestamp DESC LIMIT ?"
+          `SELECT id, sessionId, role, content, timestamp FROM chat_messages WHERE sessionId = ? ORDER BY timestamp ${order} LIMIT ?`
         ).bind(sessionId, limit).all();
         let rows = (result.results || []).filter((row: any) =>
           !isLowValue(String(row.content || "")) && !isGarbage(String(row.content || ""))
         );
         if (action.endsWith("/context")) rows = rows.slice(0, 6);
         if (action.endsWith("/recent")) rows = rows.slice(0, Math.max(1, Number(body.limit) || 4));
-        if (action.endsWith("/history")) rows = (result.results || []).slice().reverse();
-        else rows = rows.reverse();
+        if (!action.endsWith("/history")) rows = rows.reverse();
         return json({ messages: rows });
       }
 
@@ -133,7 +142,13 @@ export default {
         }
         const existingRow = await env.DB.prepare("SELECT * FROM strategic_memory WHERE sessionId = ?")
           .bind(sessionId).first<any>();
-        const existing = existingRow ? {
+        const incoming = body.data as JsonRecord;
+        const detectedIndustry = typeof incoming.lastUserProblem === "string"
+          ? detectIndustry(incoming.lastUserProblem)
+          : null;
+        const contextShift = Boolean(detectedIndustry && existingRow?.industry &&
+          detectedIndustry !== existingRow.industry);
+        const existing = existingRow && !contextShift ? {
           industry: existingRow.industry, businessType: existingRow.businessType,
           goals: safeParse(existingRow.goals, []), servicesDiscussed: safeParse(existingRow.servicesDiscussed, []),
           leadScore: existingRow.leadScore, stage: existingRow.stage, budget: existingRow.budget,
@@ -144,7 +159,7 @@ export default {
           conversionProbability: existingRow.conversionProbability, ctaReadiness: existingRow.ctaReadiness,
           intentMomentum: existingRow.intentMomentum
         } : {};
-        const merged = { ...existing, ...(body.data as JsonRecord) };
+        const merged = { ...existing, ...incoming };
         const now = new Date().toISOString();
         const values = [
           sessionId, merged.industry ?? null, merged.businessType ?? null,
