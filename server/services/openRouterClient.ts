@@ -34,7 +34,7 @@ function hash(text: string) {
 
 /* ================= PROMPT CLEAN ================= */
 export function cleanPrompt(prompt: string): string {
-  const normalized = (prompt || "").replace(/\\s+/g, " ").trim();
+  const normalized = (prompt || "").replace(/\s+/g, " ").trim();
   if (!normalized || normalized.length <= MAX_PROMPT_LENGTH) return normalized;
 
   // Preserve the opening instructions and the end of the prompt, where the
