@@ -77,7 +77,7 @@ function detectContextShift(
 
 // Detect a user's own business only when the message contains an ownership/operator
 // signal. Mentioning an industry hypothetically must not overwrite their profile.
-function detectBusinessIndustry(message: string): { industry: string; businessType: string } | null {
+export function detectBusinessProfile(message: string): { industry: string; businessType: string; servicesDiscussed: string[] } | null {
   const msg = normalize(message);
   const ownershipSignal =
     /\b(i own|i run|i operate|i manage|i founded|i have|i work at|i work for|our company|our business|our store|our clinic|our practice|we operate|we run|we own|we manage|my company|my business|my store|my clinic|my practice|my dental|my travel|my property|my ecommerce|i am|i'm|we are|we're)\b/.test(msg);
@@ -106,7 +106,23 @@ function detectBusinessIndustry(message: string): { industry: string; businessTy
 
   for (const item of industries) {
     if (item.pattern.test(msg)) {
-      return { industry: item.industry, businessType: item.businessType };
+      const servicePatterns: Array<{ label: string; pattern: RegExp }> = [
+        { label: "plumbing", pattern: /\b(plumbing|plumber|plumbers)\b/ },
+        { label: "home cleaning", pattern: /\b(home cleaning|house cleaning|residential cleaning|cleaning company|cleaning business)\b/ },
+        { label: "HVAC", pattern: /\b(hvac|heating and cooling|air conditioning)\b/ },
+        { label: "roofing", pattern: /\b(roofing|roofer|roof repair)\b/ },
+        { label: "electrical services", pattern: /\b(electrician|electrical services|electrical contractor)\b/ },
+        { label: "pest control", pattern: /\b(pest control|exterminator)\b/ },
+        { label: "landscaping", pattern: /\b(landscaping|landscaper|lawn care)\b/ },
+        { label: "renovation", pattern: /\b(home renovation|renovation company|remodeling|remodelling)\b/ },
+        { label: "private tours", pattern: /\b(private tours|guided tours|travel experiences)\b/ },
+        { label: "property sales", pattern: /\b(property sales|residential sales|real estate sales)\b/ },
+        { label: "skincare", pattern: /\b(skincare|skin care)\b/ },
+      ];
+      const servicesDiscussed = servicePatterns
+        .filter((service) => service.pattern.test(msg))
+        .map((service) => service.label);
+      return { industry: item.industry, businessType: item.businessType, servicesDiscussed };
     }
   }
 
@@ -225,7 +241,7 @@ export async function strategicBrain(
     }
   }
 
-  const detectedBusiness = detectBusinessIndustry(userMessage);
+  const detectedBusiness = detectBusinessProfile(userMessage);
   if (detectedBusiness && sessionId) {
     strategicMemory = { ...strategicMemory, ...detectedBusiness };
     await memoryService.updateStrategicMemory(sessionId, detectedBusiness).catch(() => {});
